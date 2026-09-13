@@ -57,14 +57,23 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   String _loi = '';
   double _doTo = 0;
 
-  /// Vị trí bắt đầu của câu đang được đọc dở, và độ dài phần chữ tạm đã chèn.
-  /// Mỗi khi có kết quả mới, ta thay đúng đoạn [_neo, _neo + _daiTam) — nhờ
-  /// vậy chữ được sửa dần tại chỗ thay vì lặp lại.
+  /// Vị trí bắt đầu của câu đang đọc dở, và ĐÚNG đoạn chữ tạm đã chèn ở đó.
+  ///
+  /// Giữ nguyên văn đoạn chữ chứ không chỉ giữ độ dài: trước mỗi lần ghi, ta
+  /// đọc lại trong bài xem đoạn đó còn nguyên ở chỗ cũ không. Còn thì đè lên,
+  /// không còn thì coi như câu mới. Nhờ vậy mốc có lệch cũng không lặp chữ.
   int _neo = 0;
-  int _daiTam = 0;
+  String _chuTam = '';
 
   /// Bật lên khi chính ta đang sửa nội dung, để phân biệt với người gõ phím.
+  /// Chỉ là lớp chắn thứ nhất: bộ gõ báo ngược trạng thái về một cách bất
+  /// đồng bộ, lúc đó cờ này đã tắt rồi — nên còn hai lớp chắn nữa bên dưới.
   bool _tuSua = false;
+
+  /// Nội dung và thời điểm của lần ghi gần nhất do chính ta thực hiện.
+  String _chuGanNhat = '';
+  int _viTriGanNhat = -1;
+  DateTime _lucGhi = DateTime.fromMillisecondsSinceEpoch(0);
 
   Timer? _hen;
   String? _maNgonNgu;
@@ -102,13 +111,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final kho = await SharedPreferences.getInstance();
     final cu = kho.getString(_khoaLuu) ?? '';
     if (cu.isEmpty || !mounted) return;
-    _tuSua = true;
-    _boDieuKhien.value = TextEditingValue(
-      text: cu,
-      selection: TextSelection.collapsed(offset: cu.length),
-    );
-    _tuSua = false;
+    _ghiVaoO(cu, cu.length);
     _neo = cu.length;
+    _chuTam = '';
   }
 
   Future<void> _luuVanBan() async {
@@ -235,61 +240,116 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void _datNeoTaiConTro() {
     final chon = _boDieuKhien.selection;
     _neo = chon.isValid ? chon.end : _boDieuKhien.text.length;
-    _daiTam = 0;
+    _chuTam = '';
   }
 
   /// Coi phần chữ tạm hiện tại là đã xong, và dời neo ra sau nó.
   void _chotCauDangDoc() {
-    _neo += _daiTam;
-    _daiTam = 0;
+    _neo += _chuTam.length;
+    _chuTam = '';
+  }
+
+  /// Đoạn chữ tạm có còn nguyên vẹn ở đúng chỗ cũ không?
+  ///
+  /// Đây là lớp chắn quan trọng nhất chống lặp chữ: nếu đoạn cũ không còn ở
+  /// đó (người dùng vừa xoá, vừa gõ chèn, hoặc mốc bị lệch vì bộ gõ báo ngược
+  /// trạng thái về), ta KHÔNG đè bừa mà đặt lại mốc tại con trỏ.
+  bool _vungTamConNguyen(String cu) {
+    if (_chuTam.isEmpty) return false;
+    if (_neo < 0) return false;
+    final het = _neo + _chuTam.length;
+    if (het > cu.length) return false;
+    return cu.substring(_neo, het) == _chuTam;
   }
 
   void _khiCoChu(dynamic ketQua) {
-    final noi = ketQua.recognizedWords as String? ?? '';
+    final noi = (ketQua.recognizedWords as String? ?? '').trim();
     final xong = ketQua.finalResult as bool? ?? false;
-    if (noi.isEmpty && !xong) return;
+    if (noi.isEmpty) return;
 
     final cu = _boDieuKhien.text;
-    // Neo có thể lệch nếu người dùng vừa xoá bớt chữ — kéo về trong khoảng hợp lệ.
-    if (_neo > cu.length) _neo = cu.length;
-    var het = _neo + _daiTam;
-    if (het > cu.length) het = cu.length;
+
+    // Không tin vào mốc suông. Đoạn tạm không còn nguyên thì bắt đầu lại từ
+    // chỗ con trỏ, coi như đây là câu mới.
+    if (!_vungTamConNguyen(cu)) {
+      final chon = _boDieuKhien.selection;
+      _neo = chon.isValid ? chon.end : cu.length;
+      if (_neo > cu.length) _neo = cu.length;
+      if (_neo < 0) _neo = 0;
+      _chuTam = '';
+    }
 
     var chen = noi;
     // Nếu ngay trước neo đã có chữ mà chưa có dấu cách, thêm một dấu cách cho
     // câu mới không dính vào câu cũ.
-    if (_neo > 0 && chen.isNotEmpty) {
+    if (_neo > 0) {
       final truoc = cu[_neo - 1];
       if (truoc != ' ' && truoc != '\n' && truoc != '\t') {
         chen = ' $chen';
       }
     }
 
-    final moi = cu.replaceRange(_neo, het, chen);
+    if (chen == _chuTam) return; // Không có gì đổi, khỏi động vào ô văn bản.
+
+    final moi = cu.replaceRange(_neo, _neo + _chuTam.length, chen);
     final viTri = _neo + chen.length;
 
-    _tuSua = true;
-    _boDieuKhien.value = TextEditingValue(
-      text: moi,
-      selection: TextSelection.collapsed(offset: viTri),
-    );
-    _tuSua = false;
+    _ghiVaoO(moi, viTri);
+    _chuTam = chen;
 
-    _daiTam = chen.length;
     if (xong) {
       _chotCauDangDoc();
       _luuVanBan();
     }
   }
 
+  /// Mọi lần ghi do máy thực hiện đều đi qua đây, để ghi nhớ nội dung và thời
+  /// điểm — hai thứ dùng để nhận ra đâu là trạng thái bộ gõ báo ngược về.
+  void _ghiVaoO(String chu, int viTri) {
+    _tuSua = true;
+    _boDieuKhien.value = TextEditingValue(
+      text: chu,
+      selection: TextSelection.collapsed(offset: viTri),
+    );
+    _tuSua = false;
+    _chuGanNhat = chu;
+    _viTriGanNhat = viTri;
+    _lucGhi = DateTime.now();
+  }
+
   /// Người dùng gõ phím hoặc bấm để dời con trỏ. Phần chữ tạm đang hiện được
   /// coi như đã xong, và câu nói tiếp theo sẽ rơi vào chỗ con trỏ mới.
   void _khiNguoiDungSua() {
     if (_tuSua) return;
+
+    final chu = _boDieuKhien.text;
+
+    if (chu != _chuGanNhat) {
+      // Chữ thật sự đổi mà không phải do ta → người dùng vừa gõ.
+      _chuGanNhat = chu;
+      _chuTam = '';
+      final chon = _boDieuKhien.selection;
+      _neo = chon.isValid ? chon.end : chu.length;
+      _henLuu();
+      return;
+    }
+
+    // Chữ y nguyên, chỉ con trỏ đổi. Có hai khả năng, và phải phân biệt cho
+    // đúng — nhầm chỗ này là chữ lặp lại y như bản v1.
     final chon = _boDieuKhien.selection;
-    _neo = chon.isValid ? chon.end : _boDieuKhien.text.length;
-    _daiTam = 0;
-    _henLuu();
+    if (!chon.isValid) return;
+
+    // (a) Bộ gõ báo ngược lại đúng trạng thái ta vừa đặt. Con trỏ trùng khít
+    //     chỗ ta vừa đặt nó, hoặc chuyện xảy ra ngay sau khi ta ghi.
+    final trungKhit = chon.end == _viTriGanNhat && chon.isCollapsed;
+    final vuaGhiXong =
+        DateTime.now().difference(_lucGhi) < const Duration(milliseconds: 600);
+    if (trungKhit || vuaGhiXong) return;
+
+    // (b) Người dùng thật sự chạm màn hình để dời con trỏ: chốt câu đang đọc
+    //     dở lại, câu sau sẽ rơi vào chỗ mới.
+    _chuTam = '';
+    _neo = chon.end;
   }
 
   Timer? _henLuuTru;
@@ -443,11 +503,12 @@ class _NutMicro extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final muc = (doTo.clamp(0, 10)) / 10.0;
-    final vong = bat ? 64.0 + muc * 26.0 : 0.0;
+    // Vòng phải lớn hơn nút (96px) mới thò ra ngoài mà nhìn thấy được.
+    final vong = bat ? 104.0 + muc * 44.0 : 0.0;
 
     return SizedBox(
-      width: 96,
-      height: 96,
+      width: 152,
+      height: 152,
       child: Stack(
         alignment: Alignment.center,
         children: [
