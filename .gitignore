@@ -1,0 +1,13 @@
+# Thu muc do Flutter sinh ra, khong theo doi trong git
+.dart_tool/
+.packages
+build/
+android/
+ios/
+linux/
+macos/
+windows/
+web/
+pubspec.lock
+*.iml
+.idea/

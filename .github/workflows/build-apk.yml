@@ -1,0 +1,90 @@
+name: Dựng file APK
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  dung-apk:
+    name: Dựng APK cho Android
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Lấy mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Cài Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cài Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Xem phiên bản
+        run: flutter --version
+
+      # Thư mục android/ không nằm trong git. Sinh lại nó bằng đúng phiên bản
+      # Flutter vừa cài, rồi vá thêm phần riêng của Ghi Nói.
+      - name: Sinh phần Android
+        run: |
+          set -e
+          flutter create --platforms=android \
+            --project-name=ghi_noi \
+            --org=vn.ghinoi \
+            /tmp/khung
+          cp -r /tmp/khung/android ./android
+          python3 tool/va_android.py .
+          echo '--- AndroidManifest.xml ---'
+          cat android/app/src/main/AndroidManifest.xml
+
+      - name: Tải thư viện
+        run: flutter pub get
+
+      - name: Soát mã
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+        continue-on-error: true
+
+      - name: Dựng bản phát hành
+        run: flutter build apk --release
+
+      - name: Đặt tên file
+        id: dat-ten
+        run: |
+          set -e
+          mkdir -p ban-giao
+          TEN="GhiNoi-v${{ github.run_number }}.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "ban-giao/$TEN"
+          echo "ten=$TEN" >> "$GITHUB_OUTPUT"
+          ls -lh ban-giao
+
+      - name: Gắn file vào kết quả chạy
+        uses: actions/upload-artifact@v4
+        with:
+          name: GhiNoi-apk-${{ github.run_number }}
+          path: ban-giao/*.apk
+          retention-days: 30
+
+      - name: Đưa lên mục Releases để tải bằng điện thoại
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Ghi Nói v${{ github.run_number }}
+          body: |
+            Bản dựng tự động từ nhánh `${{ github.ref_name }}`.
+
+            Tải tệp `${{ steps.dat-ten.outputs.ten }}` bên dưới rồi cài vào máy Android.
+            Máy sẽ hỏi cho phép cài từ nguồn không xác định — đồng ý là được.
+
+            Lần đầu mở app, bấm nút micro thì máy hỏi quyền ghi âm: chọn "Cho phép".
+          files: ban-giao/*.apk
+          draft: false
+          prerelease: false
