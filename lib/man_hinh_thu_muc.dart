@@ -3,6 +3,7 @@
 // thảo qua Navigator.pop; đi dạo rồi quay lại tay không thì trả về null.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'kho_du_lieu.dart';
 import 'mo_hinh.dart';
@@ -68,11 +69,11 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   }) async {
     final ten = await _hoiTen(tieuDe: 'Đổi tên', tenBanDau: tenCu);
     if (ten == null || ten.trim().isEmpty) return;
-    final ok = laThuMuc
+    final loi = laThuMuc
         ? _kho.doiTenThuMuc(id, ten.trim())
         : _kho.doiTenGhiChu(id, ten.trim());
-    if (!ok) {
-      _bao('Tên "$ten" đã có trong thư mục này.');
+    if (loi != null) {
+      _bao(loi);
       return;
     }
     setState(() {});
@@ -91,6 +92,8 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
         content: TextField(
           controller: bo,
           autofocus: true,
+          maxLength: doDaiTenToiDa,
+          inputFormatters: [FilteringTextInputFormatter.deny(kyTuCamTrongTen)],
           onSubmitted: (v) => Navigator.of(ctx).pop(v),
         ),
         actions: [

@@ -8,6 +8,28 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'mo_hinh.dart';
 
+/// Độ dài tối đa của tên thư mục/ghi chú.
+const doDaiTenToiDa = 50;
+
+/// Ký tự bị cấm trong tên thư mục/ghi chú — đúng bộ ký tự Windows cấm dùng
+/// trong tên file, chặt nhất trong các hệ điều hành phổ biến nên áp dụng
+/// chung cho chắc chắn, kể cả ký tự điều khiển không nhìn thấy được.
+final RegExp kyTuCamTrongTen = RegExp(r'[\\/:*?"<>|\x00-\x1F]');
+
+/// null nghĩa là tên hợp lệ; khác null là lời giải thích vì sao không được,
+/// hiển thị thẳng cho người dùng.
+String? loiTenKhongHopLe(String tenTho) {
+  final ten = tenTho.trim();
+  if (ten.isEmpty) return 'Tên không được để trống.';
+  if (ten.length > doDaiTenToiDa) {
+    return 'Tên không được quá $doDaiTenToiDa ký tự.';
+  }
+  if (kyTuCamTrongTen.hasMatch(ten)) {
+    return 'Tên không được chứa các ký tự \\ / : * ? " < > |';
+  }
+  return null;
+}
+
 class KhoDuLieu {
   static const _khoaDuLieu = 'ghi_noi_cay_du_lieu';
   static const _khoaGhiChuDangMo = 'ghi_noi_ghi_chu_dang_mo';
@@ -133,16 +155,28 @@ class KhoDuLieu {
     String? boQuaIdThuMuc,
     String? boQuaIdGhiChu,
   }) {
-    if (!_daCoTen(tenMongMuon, chaId,
+    // Cắt bớt tên gốc nếu cần, để dù có thêm hậu tố " (n)" vào cũng không
+    // bao giờ vượt quá giới hạn độ dài chung của cả app.
+    final goc = tenMongMuon.trim().length > doDaiTenToiDa
+        ? tenMongMuon.trim().substring(0, doDaiTenToiDa)
+        : tenMongMuon.trim();
+
+    if (!_daCoTen(goc, chaId,
         boQuaIdThuMuc: boQuaIdThuMuc, boQuaIdGhiChu: boQuaIdGhiChu)) {
-      return tenMongMuon;
+      return goc;
     }
     var n = 2;
-    while (_daCoTen('$tenMongMuon ($n)', chaId,
-        boQuaIdThuMuc: boQuaIdThuMuc, boQuaIdGhiChu: boQuaIdGhiChu)) {
+    while (true) {
+      final hauTo = ' ($n)';
+      final gioiHanGoc = doDaiTenToiDa - hauTo.length;
+      final coSo = goc.length > gioiHanGoc ? goc.substring(0, gioiHanGoc) : goc;
+      final ung = '$coSo$hauTo';
+      if (!_daCoTen(ung, chaId,
+          boQuaIdThuMuc: boQuaIdThuMuc, boQuaIdGhiChu: boQuaIdGhiChu)) {
+        return ung;
+      }
       n++;
     }
-    return '$tenMongMuon ($n)';
   }
 
   String _tenGhiChuTuDong(String chaId) {
@@ -183,21 +217,32 @@ class KhoDuLieu {
 
   // ------------------------------------------------------------------ sửa
 
-  /// true nếu đổi được, false nếu tên trùng trong cùng thư mục.
-  bool doiTenGhiChu(String id, String tenMoi) {
+  /// null nếu đổi được; khác null là lời giải thích vì sao không được (tên
+  /// không hợp lệ, hoặc tên trùng trong cùng thư mục).
+  String? doiTenGhiChu(String id, String tenMoi) {
     final g = timGhiChu(id);
-    if (g == null) return false;
-    if (_daCoTen(tenMoi, g.chaId, boQuaIdGhiChu: id)) return false;
-    g.ten = tenMoi.trim();
-    return true;
+    if (g == null) return 'Không tìm thấy ghi chú.';
+    final loi = loiTenKhongHopLe(tenMoi);
+    if (loi != null) return loi;
+    final tenSach = tenMoi.trim();
+    if (_daCoTen(tenSach, g.chaId, boQuaIdGhiChu: id)) {
+      return 'Tên "$tenSach" đã có trong thư mục này.';
+    }
+    g.ten = tenSach;
+    return null;
   }
 
-  bool doiTenThuMuc(String id, String tenMoi) {
+  String? doiTenThuMuc(String id, String tenMoi) {
     final t = timThuMuc(id);
-    if (t == null) return false;
-    if (_daCoTen(tenMoi, t.chaId, boQuaIdThuMuc: id)) return false;
-    t.ten = tenMoi.trim();
-    return true;
+    if (t == null) return 'Không tìm thấy thư mục.';
+    final loi = loiTenKhongHopLe(tenMoi);
+    if (loi != null) return loi;
+    final tenSach = tenMoi.trim();
+    if (_daCoTen(tenSach, t.chaId, boQuaIdThuMuc: id)) {
+      return 'Tên "$tenSach" đã có trong thư mục này.';
+    }
+    t.ten = tenSach;
+    return null;
   }
 
   void suaNoiDungGhiChu(String id, String noiDung) {

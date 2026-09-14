@@ -15,6 +15,7 @@ import 'man_hinh_cai_dat.dart';
 import 'man_hinh_thu_muc.dart';
 import 'mo_hinh.dart';
 import 'thanh_cong_cu.dart';
+import 'thong_bao_giua.dart';
 
 class TrangSoanThao extends StatefulWidget {
   const TrangSoanThao({
@@ -168,7 +169,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       ..clear()
       ..addAll(List<bool>.filled(_boDieuKhien.text.length, true));
     await _luuVanBan();
-    _bao('Đã lưu "${_ghiChuHienTai.ten}".');
+    if (mounted) {
+      hienThongBaoGiua(context, 'Đã lưu "${_ghiChuHienTai.ten}" vào bộ nhớ máy.');
+    }
   }
 
   // -------------------------------------------------------------- tên file
@@ -185,10 +188,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
     if (tenMoi == _ghiChuHienTai.ten) return;
-    final thanhCong = widget.kho.doiTenGhiChu(_ghiChuHienTai.id, tenMoi);
-    if (!thanhCong) {
+    final loi = widget.kho.doiTenGhiChu(_ghiChuHienTai.id, tenMoi);
+    if (loi != null) {
       _tenController.text = _ghiChuHienTai.ten;
-      _bao('Tên "$tenMoi" đã có trong thư mục này.');
+      _bao(loi);
       return;
     }
     widget.kho.luu();
@@ -711,7 +714,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
     await Clipboard.setData(ClipboardData(text: chu));
-    _bao('Đã chép toàn bộ văn bản.');
+    if (mounted) {
+      hienThongBaoGiua(
+        context,
+        'Đã sao chép tất cả văn bản vào bộ nhớ tạm của thiết bị',
+      );
+    }
   }
 
   Future<void> _xoaTatCa() async {
@@ -823,10 +831,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         title: TextField(
           controller: _tenController,
           focusNode: _oTen,
+          maxLength: doDaiTenToiDa,
+          inputFormatters: [FilteringTextInputFormatter.deny(kyTuCamTrongTen)],
           style: const TextStyle(fontSize: 18, color: Colors.black87),
           decoration: const InputDecoration(
             border: InputBorder.none,
             isDense: true,
+            counterText: '',
           ),
           onSubmitted: (_) => _oTen.unfocus(),
         ),

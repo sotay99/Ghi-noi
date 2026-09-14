@@ -103,13 +103,72 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     widget.khiTatTuDongChenKhoangCach();
   }
 
-  void _hienGiaiThich(String tieuDe, String noiDung) {
+  /// Chữ giữa cặp **hai dấu sao** được in đậm — cách đánh dấu nhẹ nhàng để
+  /// viết văn bản giải thích dài mà vẫn tô đậm được từ khoá quan trọng.
+  List<InlineSpan> _phanTichDam(String vanBan) {
+    final ketQua = <InlineSpan>[];
+    final mauDam = RegExp(r'\*\*(.+?)\*\*');
+    var viTri = 0;
+    for (final m in mauDam.allMatches(vanBan)) {
+      if (m.start > viTri) {
+        ketQua.add(TextSpan(text: vanBan.substring(viTri, m.start)));
+      }
+      ketQua.add(TextSpan(
+        text: m.group(1),
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ));
+      viTri = m.end;
+    }
+    if (viTri < vanBan.length) {
+      ketQua.add(TextSpan(text: vanBan.substring(viTri)));
+    }
+    return ketQua;
+  }
+
+  Widget _doanVanCoDam(String vanBan, {double fontSize = 14}) {
+    return Text.rich(
+      TextSpan(
+        style: TextStyle(height: 1.5, fontSize: fontSize, color: Colors.black87),
+        children: _phanTichDam(vanBan),
+      ),
+    );
+  }
+
+  void _hienGiaiThich(String tieuDe, String ngan, String chiTiet) {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(tieuDe),
         content: SingleChildScrollView(
-          child: Text(noiDung, style: const TextStyle(height: 1.5, fontSize: 14)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'GIẢI THÍCH NGẮN GỌN',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  letterSpacing: 0.5,
+                  color: Color(0xFF1A73E8),
+                ),
+              ),
+              const SizedBox(height: 8),
+              _doanVanCoDam(ngan),
+              const SizedBox(height: 20),
+              const Text(
+                'GIẢI THÍCH CHI TIẾT HƠN',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  letterSpacing: 0.5,
+                  color: Color(0xFF1A73E8),
+                ),
+              ),
+              const SizedBox(height: 8),
+              _doanVanCoDam(chiTiet),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -171,6 +230,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
         ),
         _nutTimHieuThem(() => _hienGiaiThich(
               'Thời gian bật lại micro',
+              _giaiThichThoiGianNgan,
               _giaiThichThoiGian,
             )),
       ],
@@ -208,6 +268,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
         ),
         _nutTimHieuThem(() => _hienGiaiThich(
               'Tự động chèn dấu cách',
+              _giaiThichChenCachNgan,
               _giaiThichChenCach,
             )),
       ],
@@ -327,28 +388,36 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
   }
 }
 
-const _giaiThichThoiGian = '''
-Khi bạn đang nói mà tay chạm vào bàn phím để gõ thêm chữ, ứng dụng sẽ TẮT HẲN micro ngay lập tức trong một lúc — làm vậy để tiếng gõ phím, tiếng bạn lẩm bẩm khi suy nghĩ chữ cần gõ, hay bất cứ âm thanh nào trong lúc bạn đang bận tay gõ không bị micro nghe nhầm thành một câu nói mới.
+const _giaiThichThoiGianNgan = '''
+Khi bạn gõ phím, ứng dụng **tắt hẳn micro** một lúc để khỏi nghe nhầm tiếng gõ phím thành lời nói. Cài đặt này là **thời gian chờ** sau khi bạn ngừng gõ, trước khi micro tự bật lại. Để **ngắn** thì nói tiếp nhanh hơn nhưng dễ bắt nhầm âm thanh lúc bạn còn đang lơ đãng; để **dài** thì an toàn hơn nhưng phải chờ lâu hơn. Mặc định **1 giây** là hợp lý cho hầu hết mọi người.
+''';
 
-Cài đặt này quyết định ỨNG DỤNG SẼ CHỜ BAO LÂU, kể từ lúc bạn NGỪNG GÕ (không chạm bàn phím nữa), rồi mới tự động bật micro nghe lại.
+const _giaiThichThoiGian = '''
+Khi bạn đang nói mà tay chạm vào bàn phím để gõ thêm chữ, ứng dụng sẽ **tắt hẳn micro** ngay lập tức trong một lúc — làm vậy để tiếng gõ phím, tiếng bạn lẩm bẩm khi suy nghĩ chữ cần gõ, hay bất cứ âm thanh nào trong lúc bạn đang bận tay gõ không bị micro nghe nhầm thành một câu nói mới.
+
+Cài đặt này quyết định **ứng dụng sẽ chờ bao lâu**, kể từ lúc bạn **ngừng gõ** (không chạm bàn phím nữa), rồi mới tự động bật micro nghe lại.
 
 Ví dụ dễ hình dung: bạn đang nói dở câu "Cuộc họp sáng mai lúc", rồi bạn ngừng nói, tự tay gõ thêm mấy chữ "9 giờ". Ngay khi ngón tay bạn chạm phím đầu tiên, micro tắt phụt. Gõ xong chữ cuối cùng, ứng dụng bắt đầu đếm — hết đúng khoảng thời gian bạn chọn ở đây thì micro mới bật trở lại, để bạn nói tiếp phần còn lại của câu.
 
-Chọn thời gian NGẮN (ví dụ 0,5 giây): tiện vì nói tiếp được gần như ngay lập tức. Nhưng nếu thói quen gõ của bạn hay bị ngắt quãng — gõ một chữ, dừng tay một chút để suy nghĩ, rồi gõ tiếp — thì trong lúc bạn đang dừng tay suy nghĩ đó (chưa gõ xong hẳn), micro có thể đã bật lên và vô tình nghe được tiếng bạn lẩm bẩm, tiếng thở dài, hay tiếng ồn xung quanh, biến chúng thành chữ chen ngang vào bài mà bạn không muốn.
+Chọn thời gian **ngắn** (ví dụ 0,5 giây): tiện vì nói tiếp được gần như ngay lập tức. Nhưng nếu thói quen gõ của bạn hay bị ngắt quãng — gõ một chữ, dừng tay một chút để suy nghĩ, rồi gõ tiếp — thì trong lúc bạn đang dừng tay suy nghĩ đó (chưa gõ xong hẳn), micro có thể đã bật lên và vô tình nghe được tiếng bạn lẩm bẩm, tiếng thở dài, hay tiếng ồn xung quanh, biến chúng thành chữ chen ngang vào bài mà bạn không muốn.
 
-Chọn thời gian DÀI (ví dụ 5 giây): an toàn hơn, gần như chắc chắn bạn đã gõ xong hẳn ứng dụng mới bật lại micro. Nhưng đổi lại, gõ xong mà muốn nói tiếp ngay, bạn sẽ phải chờ lâu hơn, cảm giác ứng dụng "đơ" một nhịp trước khi chịu nghe.
+Chọn thời gian **dài** (ví dụ 5 giây): an toàn hơn, gần như chắc chắn bạn đã gõ xong hẳn ứng dụng mới bật lại micro. Nhưng đổi lại, gõ xong mà muốn nói tiếp ngay, bạn sẽ phải chờ lâu hơn, cảm giác ứng dụng "đơ" một nhịp trước khi chịu nghe.
 
-Mức mặc định 1 giây là khoảng vừa phải, hợp với cách gõ của phần lớn mọi người: đủ để gõ xong một từ hay một con số ngắn mà không bị ngắt giữa chừng, mà cũng không phải chờ quá lâu để nói tiếp.
+Mức mặc định **1 giây** là khoảng vừa phải, hợp với cách gõ của phần lớn mọi người: đủ để gõ xong một từ hay một con số ngắn mà không bị ngắt giữa chừng, mà cũng không phải chờ quá lâu để nói tiếp.
+''';
+
+const _giaiThichChenCachNgan = '''
+Tính năng này tự thêm một **dấu cách** khi bạn gõ tay ngay sau chữ do **giọng nói** tạo ra, để hai chữ không bị dính liền sai chính tả. Tắt đi thì ứng dụng gõ dính như một trang soạn thảo bình thường, và bộ nhớ đang ghi nhớ điều này sẽ bị xoá, **không thể khôi phục lại**.
 ''';
 
 const _giaiThichChenCach = '''
-Ứng dụng này cho phép bạn vừa NÓI vừa GÕ TAY xen kẽ trong cùng một bài. Vấn đề là: khi giọng nói vừa dứt một câu, bộ nhận dạng của máy không phải lúc nào cũng tự thêm dấu cách vào cuối câu — có lúc câu vừa nói dừng lại đúng ngay sau chữ cuối, không có khoảng trắng nào theo sau cả.
+Ứng dụng này cho phép bạn vừa **nói** vừa **gõ tay** xen kẽ trong cùng một bài. Vấn đề là: khi giọng nói vừa dứt một câu, bộ nhận dạng của máy không phải lúc nào cũng tự thêm dấu cách vào cuối câu — có lúc câu vừa nói dừng lại đúng ngay sau chữ cuối, không có khoảng trắng nào theo sau cả.
 
-Nếu ngay lúc đó bạn gõ tay tiếp vào, chữ gõ tay sẽ bị DÍNH LIỀN vào chữ vừa nói, tạo ra một cụm chữ sai chính tả. Ví dụ: bạn nói ra được câu "Thành đẹp trai ./.", câu này kết thúc ngay sau dấu chấm cuối, không có dấu cách theo sau. Bạn gõ tay tiếp chữ "abc" ngay sau đó — nếu không có tính năng này, kết quả sẽ là "./.abc" dính chùm lại với nhau.
+Nếu ngay lúc đó bạn gõ tay tiếp vào, chữ gõ tay sẽ bị **dính liền** vào chữ vừa nói, tạo ra một cụm chữ sai chính tả. Ví dụ: bạn nói ra được câu "Thành đẹp trai ./.", câu này kết thúc ngay sau dấu chấm cuối, không có dấu cách theo sau. Bạn gõ tay tiếp chữ "abc" ngay sau đó — nếu không có tính năng này, kết quả sẽ là "./.abc" dính chùm lại với nhau.
 
-Bật tính năng này (mặc định là BẬT), ứng dụng sẽ tự nhớ NGUỒN GỐC của từng chữ trong bài: chữ nào do bạn NÓI ra, chữ nào do bạn TỰ GÕ. Khi bạn gõ tay dính ngay sau một chữ DO GIỌNG NÓI tạo ra (mà chữ đó chưa phải khoảng trắng sẵn), ứng dụng sẽ tự động chèn một dấu cách vào giữa trước, cho ra kết quả đúng: "./. abc". Nhưng nếu bạn gõ tay dính ngay sau một chữ CŨNG DO CHÍNH TAY BẠN GÕ TRƯỚC ĐÓ, ứng dụng để dính liền như bình thường, không tự ý chèn gì — vì lúc đó rất có thể bạn CỐ Ý muốn gõ liền, ví dụ đang gõ một từ dài, một mã số, hay một địa chỉ email.
+Bật tính năng này (mặc định là **bật**), ứng dụng sẽ tự nhớ **nguồn gốc** của từng chữ trong bài: chữ nào do bạn **nói** ra, chữ nào do bạn **tự gõ**. Khi bạn gõ tay dính ngay sau một chữ do **giọng nói** tạo ra (mà chữ đó chưa phải khoảng trắng sẵn), ứng dụng sẽ tự động chèn một dấu cách vào giữa trước, cho ra kết quả đúng: "./. abc". Nhưng nếu bạn gõ tay dính ngay sau một chữ cũng do chính tay bạn gõ trước đó, ứng dụng để dính liền như bình thường, không tự ý chèn gì — vì lúc đó rất có thể bạn **cố ý** muốn gõ liền, ví dụ đang gõ một từ dài, một mã số, hay một địa chỉ email.
 
 Tắt tính năng này (chọn Không), ứng dụng sẽ ứng xử như một trang soạn thảo bình thường: gõ tới đâu dính tới đó, không tự chèn thêm gì hết, kể cả khi gõ ngay sau chữ do giọng nói tạo ra.
 
-CẢNH BÁO QUAN TRỌNG: để làm được việc "nhớ nguồn gốc từng chữ" này, ứng dụng phải liên tục ghi một danh sách riêng trong bộ nhớ máy — không phải là một phần của bài viết, bạn không nhìn thấy nó, và nó không được lưu lại lâu dài như nội dung bài. Nếu bạn TẮT tính năng này đi, danh sách ghi nhớ đó bị XOÁ SẠCH NGAY và KHÔNG THỂ LẤY LẠI ĐƯỢC, kể cả sau này bạn có BẬT tính năng lên lại. Bật lại chỉ giúp tính năng hoạt động cho những chữ bạn nói hoặc gõ SAU THỜI ĐIỂM bật lại mà thôi — chữ đã có sẵn trong bài từ trước sẽ được coi là "chữ gõ tay" hết, dù trước đây có thể chúng vốn là do bạn nói ra.
+**Cảnh báo quan trọng:** để làm được việc "nhớ nguồn gốc từng chữ" này, ứng dụng phải liên tục ghi một danh sách riêng trong bộ nhớ máy — không phải là một phần của bài viết, bạn không nhìn thấy nó, và nó không được lưu lại lâu dài như nội dung bài. Nếu bạn tắt tính năng này đi, danh sách ghi nhớ đó bị **xoá sạch ngay** và **không thể lấy lại được**, kể cả sau này bạn có bật tính năng lên lại. Bật lại chỉ giúp tính năng hoạt động cho những chữ bạn nói hoặc gõ sau thời điểm bật lại mà thôi — chữ đã có sẵn trong bài từ trước sẽ được coi là "chữ gõ tay" hết, dù trước đây có thể chúng vốn là do bạn nói ra.
 ''';
