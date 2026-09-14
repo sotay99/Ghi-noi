@@ -47,6 +47,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   final _boDieuKhien = TextEditingController();
   final _oChu = FocusNode();
+  final _cuonVanBan = ScrollController();
   final _micro = SpeechToText();
 
   /// Người dùng ĐANG MUỐN micro bật hay không. Khác với việc bộ nhận dạng có
@@ -108,6 +109,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _micro.cancel();
     _boDieuKhien.dispose();
     _oChu.dispose();
+    _cuonVanBan.dispose();
     super.dispose();
   }
 
@@ -353,6 +355,25 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _chuGanNhat = chu;
     _viTriGanNhat = viTri;
     _lucGhi = DateTime.now();
+
+    // Chữ vừa thêm vào cuối bài thì kéo màn hình xuống theo, để dòng mới nhất
+    // luôn nằm trong tầm mắt.
+    if (viTri >= chu.length) _cuonXuongDuoi();
+  }
+
+  /// Kéo ô văn bản xuống hết cỡ, sau khi khung hình đã dựng lại xong — lúc đó
+  /// chiều cao mới của bài mới được tính ra.
+  ///
+  /// Chỉ gọi khi chữ vừa thêm vào CUỐI bài. Người dùng chèn chữ vào giữa mà
+  /// nhảy xuống đáy thì họ mất chỗ đang làm. Ngoài những lúc đó, họ cuộn lên
+  /// xuống xem lại bài hoàn toàn tự do.
+  void _cuonXuongDuoi() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_cuonVanBan.hasClients) return;
+      final day = _cuonVanBan.position.maxScrollExtent;
+      if ((_cuonVanBan.offset - day).abs() < 1) return;
+      _cuonVanBan.jumpTo(day);
+    });
   }
 
   /// Người dùng vừa chạm vào văn bản. Đoạn chữ đang nhảy được đóng băng ngay,
@@ -388,6 +409,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _neo = chon.isValid ? chon.end : chu.length;
       _dongBangDoanDangNhay();
       _henLuu();
+      if (_neo >= chu.length) _cuonXuongDuoi();
       return;
     }
 
@@ -526,6 +548,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 child: TextField(
                   controller: _boDieuKhien,
                   focusNode: _oChu,
+                  scrollController: _cuonVanBan,
                   maxLines: null,
                   expands: true,
                   autofocus: true,
@@ -588,8 +611,10 @@ class _ThanhCongCu extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: Container(
-          height: 72,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          // Thấp hết mức còn bấm trúng: 48px vẫn đủ vùng chạm theo chuẩn
+          // Material, mà nhường gần hết màn hình cho chữ.
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
           decoration: const BoxDecoration(
             border: Border(top: BorderSide(color: Color(0xFFE3E3E3))),
           ),
@@ -600,17 +625,15 @@ class _ThanhCongCu extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    IconButton(
-                      onPressed: khiBamCaiDat,
-                      icon: const Icon(Icons.settings_outlined),
-                      tooltip: 'Cài đặt',
-                      color: const Color(0xFF5F6368),
+                    _NutNho(
+                      bieuTuong: Icons.settings_outlined,
+                      nhan: 'Cài đặt',
+                      khiBam: khiBamCaiDat,
                     ),
-                    IconButton(
-                      onPressed: khiBamHuongDan,
-                      icon: const Icon(Icons.help_outline_rounded),
-                      tooltip: 'Hướng dẫn',
-                      color: const Color(0xFF5F6368),
+                    _NutNho(
+                      bieuTuong: Icons.help_outline_rounded,
+                      nhan: 'Hướng dẫn',
+                      khiBam: khiBamHuongDan,
                     ),
                   ],
                 ),
@@ -671,13 +694,47 @@ class _NutMicroTron extends StatelessWidget {
           customBorder: const CircleBorder(),
           onTap: khiBam,
           child: SizedBox(
-            width: 56,
-            height: 56,
+            width: 40,
+            height: 40,
             child: Icon(
               bat ? Icons.mic : Icons.mic_none,
               color: Colors.white,
-              size: 28,
+              size: 22,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Nút biểu tượng cỡ nhỏ. IconButton sẵn có chiếm tối thiểu 48x48, quá cao so
+/// với thanh công cụ này, nên tự dựng lấy một cái vừa vặn hơn.
+class _NutNho extends StatelessWidget {
+  const _NutNho({
+    required this.bieuTuong,
+    required this.nhan,
+    required this.khiBam,
+  });
+
+  final IconData bieuTuong;
+  final String nhan;
+  final VoidCallback khiBam;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: nhan,
+      child: Tooltip(
+        message: nhan,
+        child: InkResponse(
+          onTap: khiBam,
+          radius: 22,
+          child: SizedBox(
+            width: 42,
+            height: 42,
+            child: Icon(bieuTuong, size: 22, color: const Color(0xFF5F6368)),
           ),
         ),
       ),
@@ -696,8 +753,8 @@ class _SongAm extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 84,
-      height: 32,
+      width: 76,
+      height: 22,
       child: CustomPaint(
         painter: _VeSongAm(
           muc: muc,
