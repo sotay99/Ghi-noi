@@ -5,6 +5,7 @@
 
 import 'package:flutter/material.dart';
 
+import 'cai_dat.dart';
 import 'kho_du_lieu.dart';
 import 'trang_soan_thao.dart';
 
@@ -22,6 +23,7 @@ class UngDungGhiNoi extends StatefulWidget {
 
 class _UngDungGhiNoiState extends State<UngDungGhiNoi> {
   final _kho = KhoDuLieu();
+  final _caiDat = CaiDat();
   String? _idGhiChuMoDau;
 
   @override
@@ -32,6 +34,7 @@ class _UngDungGhiNoiState extends State<UngDungGhiNoi> {
 
   Future<void> _napTruoc() async {
     final id = await _kho.tai();
+    await _caiDat.tai();
     if (!mounted) return;
     setState(() => _idGhiChuMoDau = id);
   }
@@ -51,7 +54,11 @@ class _UngDungGhiNoiState extends State<UngDungGhiNoi> {
               backgroundColor: Colors.white,
               body: Center(child: CircularProgressIndicator()),
             )
-          : TrangSoanThao(kho: _kho, ghiChuId: _idGhiChuMoDau!),
+          : TrangSoanThao(
+              kho: _kho,
+              caiDat: _caiDat,
+              ghiChuId: _idGhiChuMoDau!,
+            ),
     );
   }
 }

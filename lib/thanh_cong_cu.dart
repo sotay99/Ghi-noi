@@ -50,15 +50,16 @@ class ThanhCongCu extends StatelessWidget {
           ),
           child: Row(
             children: [
-              // Bên trái: thư mục, cài đặt, rồi hướng dẫn.
+              // Bên trái: hướng dẫn sát mép màn hình, rồi cài đặt, rồi thư
+              // mục — hướng dẫn và thư mục đổi chỗ cho nhau theo yêu cầu.
               Expanded(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
                     NutNho(
-                      bieuTuong: Icons.folder_outlined,
-                      nhan: 'Thư mục',
-                      khiBam: khiBamThuMuc,
+                      bieuTuong: Icons.help_outline_rounded,
+                      nhan: 'Hướng dẫn',
+                      khiBam: khiBamHuongDan,
                     ),
                     NutNho(
                       bieuTuong: Icons.settings_outlined,
@@ -66,9 +67,9 @@ class ThanhCongCu extends StatelessWidget {
                       khiBam: khiBamCaiDat,
                     ),
                     NutNho(
-                      bieuTuong: Icons.help_outline_rounded,
-                      nhan: 'Hướng dẫn',
-                      khiBam: khiBamHuongDan,
+                      bieuTuong: Icons.folder_outlined,
+                      nhan: 'Thư mục',
+                      khiBam: khiBamThuMuc,
                     ),
                   ],
                 ),

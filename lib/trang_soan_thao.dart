@@ -9,15 +9,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+import 'cai_dat.dart';
 import 'kho_du_lieu.dart';
+import 'man_hinh_cai_dat.dart';
 import 'man_hinh_thu_muc.dart';
 import 'mo_hinh.dart';
 import 'thanh_cong_cu.dart';
 
 class TrangSoanThao extends StatefulWidget {
-  const TrangSoanThao({super.key, required this.kho, required this.ghiChuId});
+  const TrangSoanThao({
+    super.key,
+    required this.kho,
+    required this.caiDat,
+    required this.ghiChuId,
+  });
 
   final KhoDuLieu kho;
+  final CaiDat caiDat;
   final String ghiChuId;
 
   @override
@@ -186,6 +194,29 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     widget.kho.luu();
   }
 
+  // ---------------------------------------------------------------- cài đặt
+
+  Future<void> _moCaiDat() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ManHinhCaiDat(
+          caiDat: widget.caiDat,
+          // Người dùng vừa tắt tính năng trong màn Cài đặt — xoá bộ nhớ
+          // đánh dấu ký tự ngay tại đây, vì nó là dữ liệu riêng của trang
+          // soạn thảo, màn Cài đặt không cầm được.
+          khiTatTuDongChenKhoangCach: () {
+            setState(() {
+              _nguonKyTu
+                ..clear()
+                ..addAll(List<bool>.filled(_boDieuKhien.text.length, true));
+            });
+          },
+          khiKiemTraLaiMicro: _khoiTaoMicro,
+        ),
+      ),
+    );
+  }
+
   // --------------------------------------------------------------- thư mục
 
   Future<void> _moManHinhThuMuc() async {
@@ -333,8 +364,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Future<void> _tatMicro() async {
     _muonNghe = false;
     _hen?.cancel();
-    await _micro.stop();
-    _chotCauDangDoc();
+    // Chặn NGAY mọi kết quả còn đang trên đường về, trước khi ra lệnh tắt —
+    // nếu không, một câu đang nói dở sẽ trả về kết quả chốt SAU KHI đã bấm
+    // tắt, đổ thêm một lần chữ nữa đè lên trên chữ vừa hiện.
+    _boQuaCauNay = true;
+    _chotCauDangDoc(); // Chữ đã hiện ra đứng im tại đó, không sửa thêm.
+    // cancel() vứt bỏ hẳn phiên nghe, không như stop() còn cố trả về một kết
+    // quả chốt cuối cùng — chính kết quả chốt đó là nguồn gốc của lỗi nhân
+    // đôi câu nói khi bấm tắt micro.
+    await _micro.cancel();
     if (mounted) {
       setState(() {
         _dangNghe = false;
@@ -523,7 +561,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // thật sự ngừng tay.
     if (_microNgungDeGo) {
       _henGoXong?.cancel();
-      _henGoXong = Timer(const Duration(seconds: 1), _batLaiSauKhiGoXong);
+      _henGoXong = Timer(
+        Duration(
+          milliseconds: (widget.caiDat.thoiGianBatLaiGiay * 1000).round(),
+        ),
+        _batLaiSauKhiGoXong,
+      );
     }
   }
 
@@ -605,7 +648,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     // Có chèn chữ mới (không phải chỉ xoá), ngay tại ranh giới một ký tự do
     // GIỌNG NÓI tạo ra và chưa phải khoảng trắng → chen một dấu cách trước.
-    if (doDaiChenVao > 0 &&
+    // Tắt trong Cài đặt thì bỏ hẳn bước này, dính liền như soạn thảo thường.
+    if (widget.caiDat.tuDongChenKhoangCach &&
+        doDaiChenVao > 0 &&
         dau > 0 &&
         dau <= _nguonKyTu.length &&
         !_nguonKyTu[dau - 1] &&
@@ -845,8 +890,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               neThanhDieuHuong: caoBanPhim == 0,
               khiBamMicro: _bamNutMicro,
               khiBamThuMuc: _moManHinhThuMuc,
-              khiBamCaiDat: () =>
-                  _moModalTam('Cài đặt', Icons.settings_outlined),
+              khiBamCaiDat: _moCaiDat,
               khiBamHuongDan: () =>
                   _moModalTam('Hướng dẫn', Icons.help_outline_rounded),
             ),
