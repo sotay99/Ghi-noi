@@ -1,10 +1,16 @@
-// Màn hình cài đặt: bốn dòng — thời gian bật lại micro, tự động chèn dấu
-// cách, kiểm tra chính tả bằng AI, và trạng thái quyền micro của thiết bị.
+// Màn hình cài đặt: năm dòng — thời gian bật lại micro, tự động chèn dấu
+// cách, kiểm tra chính tả bằng AI, phím tắt tắt/mở micro, và trạng thái
+// quyền micro của thiết bị.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'cai_dat.dart';
+
+/// Hai bộ biến đổi cho phép chọn làm phím tắt — bàn phím Android/desktop
+/// thường chỉ có hai phím này ở vị trí dễ bấm cùng lúc với một phím khác.
+const _cacBoBienDoi = ['Ctrl', 'Alt'];
 
 const _cacMucThoiGian = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, _khongTuBatLai];
 
@@ -43,6 +49,8 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
   late double _thoiGian;
   late bool _tuDongChen;
   late bool _kiemTraChinhTa;
+  late String _phimTatBoBienDoi;
+  late String _phimTatPhim;
   PermissionStatus? _trangThaiMicro;
   bool _dangXuLyMicro = false;
 
@@ -52,6 +60,8 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     _thoiGian = widget.caiDat.thoiGianBatLaiGiay;
     _tuDongChen = widget.caiDat.tuDongChenKhoangCach;
     _kiemTraChinhTa = widget.caiDat.kiemTraChinhTaBangAI;
+    _phimTatBoBienDoi = widget.caiDat.phimTatBoBienDoi;
+    _phimTatPhim = widget.caiDat.phimTatPhim;
     _kiemTraQuyenMicro();
   }
 
@@ -204,7 +214,9 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
           const Divider(height: 40),
           _dong3AI(),
           const Divider(height: 40),
-          _dong4Micro(),
+          _dong4PhimTat(),
+          const Divider(height: 40),
+          _dong5Micro(),
         ],
       ),
     );
@@ -323,7 +335,176 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     );
   }
 
-  Widget _dong4Micro() {
+  Widget _oPhim(String nhan, VoidCallback khiBam) {
+    return InkWell(
+      onTap: khiBam,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          border: Border.all(color: const Color(0xFFDADCE0)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(nhan, style: const TextStyle(fontWeight: FontWeight.w600)),
+      ),
+    );
+  }
+
+  /// Modal chọn phím thứ hai: nghe phím vật lý kế tiếp, bỏ qua các phím biến
+  /// đổi (Ctrl/Alt/Shift/Meta) — chính cách này đã tự bảo đảm phím thứ hai
+  /// không bao giờ trùng với bộ biến đổi đang chọn (một phím biến đổi không
+  /// bao giờ lọt qua được để trở thành "phím thứ hai" cả).
+  Future<String?> _moDialogBatPhim(BuildContext ctxCha) async {
+    final tieuDiem = FocusNode();
+    final ketQua = await showDialog<String>(
+      context: ctxCha,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Nhấn một phím'),
+        content: KeyboardListener(
+          focusNode: tieuDiem,
+          autofocus: true,
+          onKeyEvent: (event) {
+            if (event is! KeyDownEvent) return;
+            final phim = event.logicalKey;
+            final laBoBienDoi = phim == LogicalKeyboardKey.controlLeft ||
+                phim == LogicalKeyboardKey.controlRight ||
+                phim == LogicalKeyboardKey.altLeft ||
+                phim == LogicalKeyboardKey.altRight ||
+                phim == LogicalKeyboardKey.shiftLeft ||
+                phim == LogicalKeyboardKey.shiftRight ||
+                phim == LogicalKeyboardKey.metaLeft ||
+                phim == LogicalKeyboardKey.metaRight;
+            if (laBoBienDoi) return; // Phím biến đổi không được làm phím thứ hai.
+            final nhan = phim.keyLabel;
+            if (nhan.isEmpty) return;
+            Navigator.of(ctx).pop(nhan.toUpperCase());
+          },
+          child: const SizedBox(
+            height: 60,
+            child: Center(child: Text('Hãy nhấn một phím bất kỳ trên bàn phím...')),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Huỷ'),
+          ),
+        ],
+      ),
+    );
+    tieuDiem.dispose();
+    return ketQua;
+  }
+
+  Future<void> _moDialogSuaPhimTat() async {
+    var boBienDoiTam = _phimTatBoBienDoi;
+    var phimTam = _phimTatPhim;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, capNhatModal) {
+          Future<void> chonBoBienDoi() async {
+            final chon = await showDialog<String>(
+              context: ctx,
+              builder: (ctx2) => SimpleDialog(
+                title: const Text('Chọn bộ biến đổi'),
+                children: [
+                  for (final bbd in _cacBoBienDoi)
+                    SimpleDialogOption(
+                      onPressed: () => Navigator.of(ctx2).pop(bbd),
+                      child: Text(bbd),
+                    ),
+                ],
+              ),
+            );
+            if (chon != null) capNhatModal(() => boBienDoiTam = chon);
+          }
+
+          Future<void> chonPhim() async {
+            final chon = await _moDialogBatPhim(ctx);
+            if (chon != null) capNhatModal(() => phimTam = chon);
+          }
+
+          return AlertDialog(
+            title: const Text('Phím tắt tắt/mở Micro'),
+            content: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _oPhim(boBienDoiTam, chonBoBienDoi),
+                const SizedBox(width: 8),
+                const Text('+', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(width: 8),
+                _oPhim(phimTam, chonPhim),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Huỷ'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  await widget.caiDat.datPhimTat(boBienDoiTam, phimTam);
+                  if (mounted) {
+                    setState(() {
+                      _phimTatBoBienDoi = boBienDoiTam;
+                      _phimTatPhim = phimTam;
+                    });
+                  }
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                },
+                child: const Text('Lưu'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _dong4PhimTat() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _tieuDeDong('Phím tắt để tắt/mở Nút Micro'),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: _moDialogSuaPhimTat,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              border: Border.all(color: const Color(0xFFDADCE0)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$_phimTatBoBienDoi + $_phimTatPhim',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1A73E8),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(Icons.edit_outlined, size: 16, color: Color(0xFF5F6368)),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Chỉ có tác dụng khi thiết bị gắn bàn phím vật lý (kể cả bàn phím '
+          'rời cắm vào máy tính bảng).',
+          style: TextStyle(fontSize: 12, color: Color(0xFF9AA0A6)),
+        ),
+      ],
+    );
+  }
+
+  Widget _dong5Micro() {
     final tt = _trangThaiMicro;
     IconData icon;
     Color mau;

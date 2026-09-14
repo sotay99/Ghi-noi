@@ -13,6 +13,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.songAm,
     required this.sanSang,
     required this.neThanhDieuHuong,
+    required this.nhanPhimTat,
     required this.khiBamMicro,
     required this.khiBamThuMuc,
     required this.khiBamCaiDat,
@@ -26,6 +27,11 @@ class ThanhCongCu extends StatelessWidget {
   final List<double> songAm;
   final bool sanSang;
   final bool neThanhDieuHuong;
+
+  /// Nhãn phím tắt hiện đang cài, ví dụ "Ctrl + F" — hiện lên khi rê chuột
+  /// vào nút micro (chỉ có ý nghĩa với thiết bị có chuột/con trỏ thật).
+  final String nhanPhimTat;
+
   final VoidCallback khiBamMicro;
   final VoidCallback khiBamThuMuc;
   final VoidCallback khiBamCaiDat;
@@ -99,6 +105,7 @@ class ThanhCongCu extends StatelessWidget {
                 bat: bat,
                 sanSang: sanSang,
                 mau: mau,
+                nhanPhimTat: nhanPhimTat,
                 khiBam: sanSang ? khiBamMicro : null,
               ),
             ],
@@ -114,12 +121,14 @@ class _NutMicroTron extends StatelessWidget {
     required this.bat,
     required this.sanSang,
     required this.mau,
+    required this.nhanPhimTat,
     required this.khiBam,
   });
 
   final bool bat;
   final bool sanSang;
   final ColorScheme mau;
+  final String nhanPhimTat;
   final VoidCallback? khiBam;
 
   @override
@@ -131,19 +140,22 @@ class _NutMicroTron extends StatelessWidget {
     return Semantics(
       button: true,
       label: bat ? 'Tắt micro' : 'Bật micro',
-      child: Material(
-        color: nen,
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: khiBam,
-          child: SizedBox(
-            width: 40,
-            height: 40,
-            child: Icon(
-              bat ? Icons.mic : Icons.mic_none,
-              color: Colors.white,
-              size: 22,
+      child: Tooltip(
+        message: '${bat ? 'Tắt' : 'Bật'} micro ($nhanPhimTat)',
+        child: Material(
+          color: nen,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: khiBam,
+            child: SizedBox(
+              width: 40,
+              height: 40,
+              child: Icon(
+                bat ? Icons.mic : Icons.mic_none,
+                color: Colors.white,
+                size: 22,
+              ),
             ),
           ),
         ),

@@ -197,10 +197,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _viTriDaKiemTraChinhTa = banDau.length;
 
     _khoiTaoMicro();
+    // Lắng nghe TOÀN CỤC (không phụ thuộc widget nào đang giữ tiêu điểm) —
+    // phím tắt phải hoạt động kể cả đang gõ dở trong ô văn bản.
+    HardwareKeyboard.instance.addHandler(_khiPhimTatMicro);
   }
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_khiPhimTatMicro);
     WidgetsBinding.instance.removeObserver(this);
     _hen?.cancel();
     _henLuuTru?.cancel();
@@ -300,6 +304,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         ),
       ),
     );
+    // Phím tắt có thể vừa đổi trong màn Cài đặt — vẽ lại nhãn hiện trên nút
+    // micro cho khớp giá trị mới nhất.
+    if (mounted) setState(() {});
   }
 
   // --------------------------------------------------------------- thư mục
@@ -490,6 +497,32 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _datNeoTaiConTro();
       _batMicro();
     }
+  }
+
+  /// Bàn phím vật lý bấm đúng tổ hợp phím tắt đang cài (mặc định Ctrl + F):
+  /// tắt/mở micro, y hệt bấm nút. Trả về true để chặn phím này lan xuống ô
+  /// văn bản (không thì gõ Ctrl+F trong lúc soạn thảo cũng gõ luôn chữ "f").
+  bool _khiPhimTatMicro(KeyEvent event) {
+    if (!mounted || event is! KeyDownEvent) return false;
+
+    // Đang có màn hình khác đè lên (Cài đặt, Thư mục, Hướng dẫn...) thì
+    // không xử lý ở đây — kẻo đang gõ thử phím tắt trong màn Cài đặt lại vô
+    // tình tắt/mở luôn micro của trang soạn thảo bên dưới.
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return false;
+
+    final dungBoBienDoi = widget.caiDat.phimTatBoBienDoi == 'Ctrl'
+        ? HardwareKeyboard.instance.isControlPressed
+        : HardwareKeyboard.instance.isAltPressed;
+    if (!dungBoBienDoi) return false;
+
+    if (event.logicalKey.keyLabel.toUpperCase() !=
+        widget.caiDat.phimTatPhim.toUpperCase()) {
+      return false;
+    }
+
+    _bamNutMicro();
+    return true;
   }
 
   void _khiDoiMucAm(double muc) {
@@ -1313,6 +1346,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               dangNghe: _dangNghe,
               songAm: _songAm,
               sanSang: _sanSang,
+              nhanPhimTat: '${widget.caiDat.phimTatBoBienDoi} + ${widget.caiDat.phimTatPhim}',
               // Bàn phím đóng thì còn phải né thanh điều hướng của máy; bàn
               // phím mở thì nó che mất thanh đó rồi, né nữa là hở một dải
               // trắng giữa thanh công cụ và bàn phím.
