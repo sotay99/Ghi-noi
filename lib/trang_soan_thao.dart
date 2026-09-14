@@ -368,9 +368,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       onStatus: _khiDoiTrangThai,
       onError: (loi) {
         // 'error_no_match' và 'error_speech_timeout' chỉ nghĩa là người dùng
-        // im lặng — không phải hỏng, đừng làm phiền họ.
+        // im lặng — không phải hỏng, đừng làm phiền họ. 'error_client' xảy ra
+        // rất thường xuyên vì app tự bật lại micro liên tục (kể cả lúc không
+        // nghe thấy gì) — Android thỉnh thoảng từ chối một lượt bật lại quá
+        // nhanh, tự hết ngay ở lượt kế tiếp, không phải sự cố đáng báo.
         final nhe = loi.errorMsg == 'error_no_match' ||
-            loi.errorMsg == 'error_speech_timeout';
+            loi.errorMsg == 'error_speech_timeout' ||
+            loi.errorMsg == 'error_client';
         if (!nhe && mounted) {
           setState(() => _loi = _dichLoi(loi.errorMsg));
         }
@@ -1158,65 +1162,101 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   // ----------------------------------------------------------------- dựng
 
+  /// Ngưỡng bề ngang phân biệt màn hình rộng (máy tính bảng — giữ giao diện
+  /// một dòng như từ trước tới giờ) và màn hình hẹp (điện thoại — tên tệp và
+  /// công cụ phải tách hai dòng, không thì đè lên nhau). 600dp là mốc
+  /// Material Design vẫn dùng để phân biệt "compact" và "medium".
+  static const _nguongManHinhHep = 600.0;
+
+  Widget _oTenField() {
+    return TextField(
+      controller: _tenController,
+      focusNode: _oTen,
+      maxLength: doDaiTenToiDa,
+      inputFormatters: [FilteringTextInputFormatter.deny(kyTuCamTrongTen)],
+      style: const TextStyle(fontSize: 18, color: Colors.black87),
+      decoration: const InputDecoration(
+        border: InputBorder.none,
+        isDense: true,
+        counterText: '',
+      ),
+      onSubmitted: (_) => _oTen.unfocus(),
+    );
+  }
+
+  List<Widget> _dsNutCongCu() => [
+        IconButton(
+          onPressed: _lichSuLui.isEmpty ? null : _lui,
+          icon: const Icon(Icons.undo),
+          tooltip: 'Lùi lại',
+        ),
+        IconButton(
+          onPressed: _lichSuToi.isEmpty ? null : _toi,
+          icon: const Icon(Icons.redo),
+          tooltip: 'Tiến tới',
+        ),
+        IconButton(
+          onPressed: _bamNutLuu,
+          icon: const Icon(Icons.save_outlined),
+          tooltip: 'Lưu',
+        ),
+        IconButton(
+          onPressed: _chepTatCa,
+          icon: const Icon(Icons.copy_all_outlined),
+          tooltip: 'Chép toàn bộ văn bản',
+        ),
+        IconButton(
+          onPressed: _xoaTatCa,
+          icon: const Icon(Icons.delete_outline),
+          tooltip: 'Xoá tất cả',
+        ),
+        IconButton(
+          onPressed: _chonTatCa,
+          icon: const Icon(Icons.select_all),
+          tooltip: 'Chọn tất cả',
+        ),
+      ];
+
   @override
   Widget build(BuildContext context) {
     // Tự đo chiều cao bàn phím thay vì giao cho Scaffold: đặt thanh công cụ
     // làm dòng cuối của thân trang rồi chừa đúng khoảng đó bên dưới, thì
     // thanh luôn nằm khít mép trên bàn phím.
     final caoBanPhim = MediaQuery.viewInsetsOf(context).bottom;
+    final manHinhHep = MediaQuery.sizeOf(context).width < _nguongManHinhHep;
+
+    // Màn hình rộng (máy tính bảng): tên tệp và công cụ chung một dòng, như
+    // thiết kế gốc. Màn hình hẹp (điện thoại): tên tệp một dòng riêng, công
+    // cụ xuống dòng thứ hai — không thì tên tệp dài bị công cụ đè lên, hoặc
+    // ngược lại công cụ bị ép chật tới mức khó bấm trúng.
+    final appBar = manHinhHep
+        ? AppBar(
+            title: _oTenField(),
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.white,
+            elevation: 1,
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(40),
+              child: SizedBox(
+                height: 40,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(children: _dsNutCongCu()),
+                ),
+              ),
+            ),
+          )
+        : AppBar(
+            title: _oTenField(),
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.white,
+            elevation: 1,
+            actions: _dsNutCongCu(),
+          );
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      appBar: AppBar(
-        title: TextField(
-          controller: _tenController,
-          focusNode: _oTen,
-          maxLength: doDaiTenToiDa,
-          inputFormatters: [FilteringTextInputFormatter.deny(kyTuCamTrongTen)],
-          style: const TextStyle(fontSize: 18, color: Colors.black87),
-          decoration: const InputDecoration(
-            border: InputBorder.none,
-            isDense: true,
-            counterText: '',
-          ),
-          onSubmitted: (_) => _oTen.unfocus(),
-        ),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        elevation: 1,
-        actions: [
-          IconButton(
-            onPressed: _lichSuLui.isEmpty ? null : _lui,
-            icon: const Icon(Icons.undo),
-            tooltip: 'Lùi lại',
-          ),
-          IconButton(
-            onPressed: _lichSuToi.isEmpty ? null : _toi,
-            icon: const Icon(Icons.redo),
-            tooltip: 'Tiến tới',
-          ),
-          IconButton(
-            onPressed: _bamNutLuu,
-            icon: const Icon(Icons.save_outlined),
-            tooltip: 'Lưu',
-          ),
-          IconButton(
-            onPressed: _chepTatCa,
-            icon: const Icon(Icons.copy_all_outlined),
-            tooltip: 'Chép toàn bộ văn bản',
-          ),
-          IconButton(
-            onPressed: _xoaTatCa,
-            icon: const Icon(Icons.delete_outline),
-            tooltip: 'Xoá tất cả',
-          ),
-          IconButton(
-            onPressed: _chonTatCa,
-            icon: const Icon(Icons.select_all),
-            tooltip: 'Chọn tất cả',
-          ),
-        ],
-      ),
+      appBar: appBar,
       body: SafeArea(
         bottom: false,
         child: Column(

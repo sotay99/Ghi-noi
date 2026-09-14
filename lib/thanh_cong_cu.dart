@@ -1,9 +1,7 @@
 // Thanh ngang dưới màn hình soạn thảo: bên trái là hướng dẫn, cài đặt, làm
-// việc với AI, bàn phím, thư mục; bên phải là micro sát cạnh sóng âm. Tự nằm
-// khít mép trên bàn phím ảo — việc đó do trang gọi widget này lo, ở đây chỉ
-// vẽ giao diện.
-
-import 'dart:math' as toan;
+// việc với AI, bàn phím, thư mục; bên phải là sóng âm rồi micro sát mép phải
+// màn hình. Tự nằm khít mép trên bàn phím ảo — việc đó do trang gọi widget
+// này lo, ở đây chỉ vẽ giao diện.
 
 import 'package:flutter/material.dart';
 
@@ -94,17 +92,14 @@ class ThanhCongCu extends StatelessWidget {
                 ),
               ),
 
-              // Bên phải: micro nằm sát ngay cạnh sóng âm, không còn ở giữa.
+              // Bên phải: sóng âm trước, micro sát mép phải màn hình.
+              SongAm(muc: songAm, dangNghe: bat && dangNghe),
+              const SizedBox(width: 6),
               _NutMicroTron(
                 bat: bat,
                 sanSang: sanSang,
                 mau: mau,
                 khiBam: sanSang ? khiBamMicro : null,
-              ),
-              const SizedBox(width: 6),
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: SongAm(muc: songAm, dangNghe: bat && dangNghe),
               ),
             ],
           ),
@@ -192,8 +187,9 @@ class NutNho extends StatelessWidget {
   }
 }
 
-/// Mấy vạch nhảy theo giọng nói. Micro tắt thì nằm im thành một đường phẳng —
-/// nhìn vào là biết ngay máy có đang nghe thấy mình hay không.
+/// Một chấm tròn nhỏ khi im lặng; micro bật lên thì có thêm các vòng tròn
+/// đồng tâm bao quanh chấm, âm càng lớn thì vòng càng nhiều và càng đậm.
+/// Gọn hơn hẳn dãy vạch cũ — chỉ chiếm đúng bằng cỡ nút micro bên cạnh.
 class SongAm extends StatelessWidget {
   const SongAm({super.key, required this.muc, required this.dangNghe});
 
@@ -203,8 +199,8 @@ class SongAm extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 76,
-      height: 22,
+      width: 34,
+      height: 34,
       child: CustomPaint(
         painter: _VeSongAm(
           muc: muc,
@@ -223,24 +219,37 @@ class _VeSongAm extends CustomPainter {
   final Color mau;
   final bool dangNghe;
 
+  static const _banKinhCham = 3.0;
+  static const _soVongToiDa = 3;
+
   @override
   void paint(Canvas canvas, Size size) {
-    final but = Paint()
-      ..color = mau
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = 3;
+    final tam = Offset(size.width / 2, size.height / 2);
 
-    final soVach = muc.length;
-    final buoc = size.width / soVach;
-    final giua = size.height / 2;
+    canvas.drawCircle(tam, _banKinhCham, Paint()..color = mau);
+    if (!dangNghe) return;
 
-    for (var i = 0; i < soVach; i++) {
-      final x = buoc * i + buoc / 2;
-      final cao = dangNghe ? toan.max(3.0, muc[i] * size.height) : 3.0;
-      canvas.drawLine(
-        Offset(x, giua - cao / 2),
-        Offset(x, giua + cao / 2),
-        but,
+    // Mức âm hiện tại: trung bình vài mẫu gần nhất (mẫu mới nhất nằm cuối
+    // danh sách) — mượt hơn hẳn so với chỉ nhìn đúng một mẫu tức thời.
+    final soMauDung = muc.length < 4 ? muc.length : 4;
+    final ganDay = soMauDung == 0 ? const <double>[] : muc.sublist(muc.length - soMauDung);
+    final mucHienTai = ganDay.isEmpty
+        ? 0.0
+        : (ganDay.reduce((a, b) => a + b) / ganDay.length).clamp(0.0, 1.0);
+
+    final soVong = 1 + (mucHienTai * _soVongToiDa).round().clamp(0, _soVongToiDa);
+    final banKinhToiDa = size.shortestSide / 2 - 1;
+
+    for (var i = 1; i <= soVong; i++) {
+      final banKinh = _banKinhCham + (banKinhToiDa - _banKinhCham) * i / soVong;
+      final doDam = (0.15 + mucHienTai * 0.6) * (1 - (i - 1) / soVong * 0.5);
+      canvas.drawCircle(
+        tam,
+        banKinh,
+        Paint()
+          ..color = mau.withValues(alpha: doDam.clamp(0.1, 0.9))
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5,
       );
     }
   }
