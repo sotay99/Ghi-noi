@@ -77,17 +77,17 @@ sealed class _MucToanVan {
 }
 
 class _MucChinhTaToanVan extends _MucToanVan {
-  const _MucChinhTaToanVan(this.goc) : super(goc.viTri);
+  _MucChinhTaToanVan(this.goc) : super(goc.viTri);
   final ChinhTaMuc goc;
 }
 
 class _MucKhongPhuHopToanVan extends _MucToanVan {
-  const _MucKhongPhuHopToanVan(this.goc) : super(goc.viTri);
+  _MucKhongPhuHopToanVan(this.goc) : super(goc.viTri);
   final KhongPhuHopMuc goc;
 }
 
 class _MucCanXoaToanVan extends _MucToanVan {
-  const _MucCanXoaToanVan(this.goc) : super(goc.viTri);
+  _MucCanXoaToanVan(this.goc) : super(goc.viTri);
   final CanXoaMuc goc;
 }
 
@@ -115,6 +115,11 @@ class _BoDieuKhienChinhTa extends TextEditingController {
   void Function(LoiChinhTa loi, Offset viTriManHinh)? khiBamTuSai;
   void Function(_VungKhongPhuHop vung, Offset viTriManHinh)? khiBamDoanKhongPhuHop;
   void Function(_VungCanXoa vung, Offset viTriManHinh)? khiBamDoanCanXoa;
+
+  /// `notifyListeners()` được đánh dấu @protected trong ChangeNotifier — bọc
+  /// lại một hàm công khai để trang soạn thảo gọi vẽ lại sau khi tự tay sửa
+  /// trực tiếp `loi`/`khongPhuHop`/`canXoa` mà không đi qua đường đổi `text`.
+  void veLai() => notifyListeners();
 
   @override
   void dispose() {
@@ -467,7 +472,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           // nhớ đánh dấu ký tự của nó.
           khiTatKiemTraChinhTa: () {
             _boDieuKhien.loi.clear();
-            _boDieuKhien.notifyListeners();
+            _boDieuKhien.veLai();
           },
           khiKiemTraLaiMicro: _khoiTaoMicro,
         ),
@@ -1042,7 +1047,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // vòng lặp đệ quy vô hạn — đúng nguyên nhân app đơ cứng khi gõ tay. Dời
     // việc thông báo ra một microtask thì nó chạy SAU KHI toàn bộ lệnh gọi
     // hiện tại (kể cả _ghiVaoO cập nhật _chuGanNhat) đã xong.
-    scheduleMicrotask(_boDieuKhien.notifyListeners);
+    scheduleMicrotask(_boDieuKhien.veLai);
   }
 
   /// Y hệt [_dieuChinhLoiChinhTaSauKhiSua] nhưng cho hai danh sách của lượt
@@ -1089,7 +1094,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       }
     }
 
-    scheduleMicrotask(_boDieuKhien.notifyListeners);
+    scheduleMicrotask(_boDieuKhien.veLai);
   }
 
   /// Hẹn giờ gọi AI kiểm tra chính tả, dồn nhiều thay đổi liên tiếp (gõ từng
@@ -1132,7 +1137,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     _boDieuKhien.loi.addAll(loiMoi.map((l) => l.dich(tuViTri)));
     _viTriDaKiemTraChinhTa = tuViTri + doan.length;
-    _boDieuKhien.notifyListeners();
+    _boDieuKhien.veLai();
   }
 
   /// Người dùng vừa bấm đúng vào một từ đang bị gạch đỏ — mở menu đề xuất.
@@ -1168,7 +1173,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         _apDungThayTheChinhTa(loi, '');
       default: // 'huy'
         _boDieuKhien.loi.remove(loi);
-        _boDieuKhien.notifyListeners();
+        _boDieuKhien.veLai();
     }
   }
 
@@ -1184,7 +1189,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // Bài đã đổi từ lúc gạch đỏ này xuất hiện — bỏ đề xuất, không đụng gì
       // vào bài nữa vì không còn chắc đúng chỗ.
       _boDieuKhien.loi.remove(loi);
-      _boDieuKhien.notifyListeners();
+      _boDieuKhien.veLai();
       return;
     }
 
@@ -1356,7 +1361,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       }
     }
 
-    _boDieuKhien.notifyListeners();
+    _boDieuKhien.veLai();
   }
 
   /// Bắt đầu nhấp nháy 4 giây (đổi giữa [mau] và màu chữ thường, mỗi 250ms)
@@ -1373,9 +1378,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         t.cancel();
         _boDieuKhien.khongPhuHop.remove(v);
       }
-      if (mounted) _boDieuKhien.notifyListeners();
+      if (mounted) _boDieuKhien.veLai();
     });
-    _boDieuKhien.notifyListeners();
+    _boDieuKhien.veLai();
   }
 
   void _batNhapNhayCanXoa(_VungCanXoa x) {
@@ -1390,9 +1395,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         t.cancel();
         _boDieuKhien.canXoa.remove(x);
       }
-      if (mounted) _boDieuKhien.notifyListeners();
+      if (mounted) _boDieuKhien.veLai();
     });
-    _boDieuKhien.notifyListeners();
+    _boDieuKhien.veLai();
   }
 
   /// Người dùng bấm vào đoạn ĐỀ XUẤT (xanh) cạnh một đoạn "không phù hợp".
@@ -1416,7 +1421,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final vb = _boDieuKhien.text;
     if (v.ketThucDeXuat > vb.length) {
       _boDieuKhien.khongPhuHop.remove(v);
-      _boDieuKhien.notifyListeners();
+      _boDieuKhien.veLai();
       return;
     }
 
@@ -1469,7 +1474,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       final vb = _boDieuKhien.text;
       if (x.ketThuc > vb.length) {
         _boDieuKhien.canXoa.remove(x);
-        _boDieuKhien.notifyListeners();
+        _boDieuKhien.veLai();
         return;
       }
       final doDai = x.ketThuc - x.batDau;
