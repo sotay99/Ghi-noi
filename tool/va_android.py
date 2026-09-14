@@ -11,6 +11,15 @@ from pathlib import Path
 
 GOC = Path(sys.argv[1] if len(sys.argv) > 1 else '.')
 MANIFEST = GOC / 'android' / 'app' / 'src' / 'main' / 'AndroidManifest.xml'
+GRADLE_KTS = GOC / 'android' / 'app' / 'build.gradle.kts'
+GRADLE_GROOVY = GOC / 'android' / 'app' / 'build.gradle'
+
+# permission_handler_android đòi compileSdk 37; Flutter tạo project mới với
+# compileSdk mặc định của chính nó (36 ở thời điểm viết script này), thấp hơn
+# yêu cầu đó. Nâng lên đúng bằng số plugin đòi — không nâng thừa để đỡ phải
+# sửa lại khi Android SDK còn tăng số nữa về sau; đọc lại lỗi bản dựng đỏ nếu
+# một plugin khác trong tương lai đòi số cao hơn.
+COMPILE_SDK_TOI_THIEU = 37
 
 QUYEN = (
     '    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n'
@@ -32,10 +41,39 @@ HOI = (
 )
 
 
+def _va_compile_sdk() -> int:
+    tep = GRADLE_KTS if GRADLE_KTS.exists() else GRADLE_GROOVY
+    if not tep.exists():
+        print(f'Khong thay {GRADLE_KTS} lan {GRADLE_GROOVY}', file=sys.stderr)
+        return 1
+
+    chu = tep.read_text(encoding='utf-8')
+    # Khớp cả hai kiểu cú pháp: Kotlin DSL "compileSdk = 36" và Groovy
+    # "compileSdk 36", cùng biến thể trỏ tới flutter.compileSdkVersion.
+    moi, n = re.subn(
+        r'compileSdk(Version)?\s*=?\s*(flutter\.compileSdkVersion|\d+)',
+        f'compileSdk\\1 = {COMPILE_SDK_TOI_THIEU}' if tep == GRADLE_KTS
+        else f'compileSdk\\1 {COMPILE_SDK_TOI_THIEU}',
+        chu,
+        count=1,
+    )
+    if n == 0:
+        print(f'LOI: khong tim thay dong compileSdk trong {tep}', file=sys.stderr)
+        return 1
+
+    tep.write_text(moi, encoding='utf-8')
+    print(f'Da nang compileSdk len {COMPILE_SDK_TOI_THIEU} trong {tep.name}.')
+    return 0
+
+
 def main() -> int:
     if not MANIFEST.exists():
         print(f'Khong thay {MANIFEST}', file=sys.stderr)
         return 1
+
+    ket_qua_gradle = _va_compile_sdk()
+    if ket_qua_gradle != 0:
+        return ket_qua_gradle
 
     chu = MANIFEST.read_text(encoding='utf-8')
 

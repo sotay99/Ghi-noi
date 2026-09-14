@@ -45,6 +45,8 @@ jobs:
           python3 tool/va_android.py .
           echo '--- AndroidManifest.xml ---'
           cat android/app/src/main/AndroidManifest.xml
+          echo '--- build.gradle.kts (compileSdk) ---'
+          grep -n compileSdk android/app/build.gradle.kts || true
 
       - name: Tải thư viện
         run: flutter pub get

@@ -35,10 +35,12 @@ tool/va_android.py       vá AndroidManifest sau khi sinh phần Android
 ### Vì sao không có thư mục `android/` trong kho
 
 Phần Android do `flutter create` sinh ra lúc dựng, bằng đúng phiên bản Flutter
-đang dùng, rồi `tool/va_android.py` thêm vào ba thứ riêng của app: quyền
+đang dùng, rồi `tool/va_android.py` thêm vào những thứ riêng của app: quyền
 `RECORD_AUDIO`/`INTERNET`, khối `<queries>` khai `RecognitionService` (thiếu
-nó thì trên Android 11 trở lên micro im lặng mà không báo lỗi gì), và tên
-hiển thị "Ghi Nói".
+nó thì trên Android 11 trở lên micro im lặng mà không báo lỗi gì), tên hiển
+thị "Ghi Nói", và nâng `compileSdk` trong `build.gradle.kts` lên mức các gói
+phụ thuộc đòi hỏi (ví dụ `permission_handler_android` đòi 37, cao hơn mức mặc
+định Flutter tạo sẵn) — thiếu bước này thì Gradle từ chối dựng ngay từ đầu.
 
 ## Cơ chế chèn chữ tại con trỏ
 
