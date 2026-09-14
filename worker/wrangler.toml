@@ -14,4 +14,4 @@ compatibility_date = "2024-09-01"
 # GEMINI_MODEL có thể đặt ở đây vì không phải bí mật — chỉ là tên model,
 # đổi được bất cứ lúc nào bằng cách sửa dòng dưới rồi `wrangler deploy` lại.
 [vars]
-GEMINI_MODEL = "gemini-2.0-flash"
+GEMINI_MODEL = "gemini-1.5-flash"
