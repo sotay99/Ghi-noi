@@ -88,6 +88,7 @@ class ThanhCongCu extends StatelessWidget {
                         nhan: 'Thư mục',
                         khiBam: khiBamThuMuc,
                       ),
+                      const _NutThemMenu(),
                     ],
                   ),
                 ),
@@ -246,4 +247,47 @@ class _VeSongAm extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _VeSongAm cu) => true;
+}
+
+/// Nút dấu cộng ở thanh công cụ: mở một menu sổ lên (nằm trên đỉnh nút, vì
+/// nút ở sát đáy màn hình — PopupMenuButton tự né mép màn hình nên không cần
+/// tự tính toán vị trí). Các mục hiện tại chưa gắn logic gì, chỉ là chỗ đặt
+/// trước cho tính năng sau này.
+class _NutThemMenu extends StatelessWidget {
+  const _NutThemMenu();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Thêm',
+      child: Tooltip(
+        message: 'Thêm',
+        child: PopupMenuButton<int>(
+          padding: EdgeInsets.zero,
+          splashRadius: 20,
+          icon: const Icon(Icons.add_circle_outline, size: 20, color: Color(0xFF5F6368)),
+          onSelected: (_) {}, // Chưa gắn logic — làm sau.
+          itemBuilder: (ctx) => const [
+            PopupMenuItem(
+              value: 1,
+              child: Text('Luyện gõ bàn phím bằng 10 ngón tay'),
+            ),
+            PopupMenuItem(
+              value: 2,
+              child: Text('Chia sẻ ứng dụng này đến với mọi người'),
+            ),
+            PopupMenuItem(
+              value: 3,
+              child: Text('Góp ý thêm, báo lỗi về ứng dụng'),
+            ),
+            PopupMenuItem(
+              value: 4,
+              child: Text('Donate ủng hộ Tác giả'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

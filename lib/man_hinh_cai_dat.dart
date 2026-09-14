@@ -7,7 +7,11 @@ import 'package:permission_handler/permission_handler.dart';
 
 import 'cai_dat.dart';
 
-const _cacMucThoiGian = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0];
+const _cacMucThoiGian = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, _khongTuBatLai];
+
+/// Giá trị đặc biệt: micro tắt hẳn khi gõ phím, người dùng phải tự bấm nút
+/// micro mới nghe lại — không có bộ đếm thời gian nào tự động bật hộ.
+const _khongTuBatLai = -1.0;
 
 class ManHinhCaiDat extends StatefulWidget {
   const ManHinhCaiDat({
@@ -65,6 +69,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
   }
 
   String _nhanThoiGian(double giay) {
+    if (giay == _khongTuBatLai) return 'Không tự động bật lại Micro';
     final tron = giay == giay.roundToDouble();
     final so =
         tron ? giay.toInt().toString() : giay.toStringAsFixed(1).replaceAll('.', ',');
@@ -389,7 +394,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
 }
 
 const _giaiThichThoiGianNgan = '''
-Khi bạn gõ phím, ứng dụng **tắt hẳn micro** một lúc để khỏi nghe nhầm tiếng gõ phím thành lời nói. Cài đặt này là **thời gian chờ** sau khi bạn ngừng gõ, trước khi micro tự bật lại. Để **ngắn** thì nói tiếp nhanh hơn nhưng dễ bắt nhầm âm thanh lúc bạn còn đang lơ đãng; để **dài** thì an toàn hơn nhưng phải chờ lâu hơn. Mặc định **1 giây** là hợp lý cho hầu hết mọi người.
+Khi bạn gõ phím, ứng dụng **tắt hẳn micro** một lúc để khỏi nghe nhầm tiếng gõ phím thành lời nói. Cài đặt này là **thời gian chờ** sau khi bạn ngừng gõ, trước khi micro tự bật lại. Để **ngắn** thì nói tiếp nhanh hơn nhưng dễ bắt nhầm âm thanh lúc bạn còn đang lơ đãng; để **dài** thì an toàn hơn nhưng phải chờ lâu hơn. Mặc định **1 giây** là hợp lý cho hầu hết mọi người. Chọn **"Không tự động bật lại Micro"** nếu bạn muốn hoàn toàn tự bấm nút micro mỗi lần muốn nói tiếp, không để ứng dụng tự quyết định thời điểm.
 ''';
 
 const _giaiThichThoiGian = '''
