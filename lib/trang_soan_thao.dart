@@ -826,7 +826,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // Đoạn đã kiểm tra bị sửa giữa chừng — coi như chưa kiểm tra từ đó.
       _viTriDaKiemTraChinhTa = vitri;
     }
-    _boDieuKhien.notifyListeners();
+    // scheduleMicrotask, KHÔNG gọi notifyListeners() ngay tại đây: hàm này
+    // chạy ngay bên trong _khiNguoiDungSua — chính nó là một listener của
+    // _boDieuKhien. Gọi notifyListeners() đồng bộ ở đây sẽ gọi lại ngay lập
+    // tức _khiNguoiDungSua một lần nữa trong khi lần gọi trước còn dang dở
+    // (chuMoi lúc đó vẫn khác _chuGanNhat vì _ghiVaoO() chưa kịp chạy), tạo
+    // vòng lặp đệ quy vô hạn — đúng nguyên nhân app đơ cứng khi gõ tay. Dời
+    // việc thông báo ra một microtask thì nó chạy SAU KHI toàn bộ lệnh gọi
+    // hiện tại (kể cả _ghiVaoO cập nhật _chuGanNhat) đã xong.
+    scheduleMicrotask(_boDieuKhien.notifyListeners);
   }
 
   /// Hẹn giờ gọi AI kiểm tra chính tả, dồn nhiều thay đổi liên tiếp (gõ từng
