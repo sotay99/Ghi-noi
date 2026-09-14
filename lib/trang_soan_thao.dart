@@ -495,8 +495,30 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     if (xong) {
       _chotCauDangDoc();
+      if (widget.caiDat.tuDongChenKhoangCach) _chenKhoangCachNgaySauKhiChot();
       _luuVanBan();
     }
+  }
+
+  /// Ngay khi một câu nói vừa chốt xong (không đợi tới lúc gõ phím), nếu nó
+  /// chưa kết thúc bằng khoảng trắng thì chèn một dấu cách vào đó luôn.
+  ///
+  /// Đây là cách DUY NHẤT thực sự chặn được lỗi bộ gõ tiếng Việt gộp ngược:
+  /// ứng dụng chỉ biết được người dùng vừa gõ phím gì SAU KHI bàn phím đã xử
+  /// lý xong — với các phím tạo dấu (Telex: s, f, r, x, j...), lúc ứng dụng
+  /// nhận được sự kiện thì "Thành" đã bị gộp thành "Thánh" rồi, nguyên âm gốc
+  /// mất hẳn, không có cách nào lấy lại. Chèn dấu cách NGAY LÚC NÀY (trước khi
+  /// người dùng kịp gõ) thì khi họ gõ "s" tiếp theo, bộ gõ nhìn thấy ngay
+  /// trước con trỏ là dấu cách chứ không phải nguyên âm, nên không gộp nữa.
+  void _chenKhoangCachNgaySauKhiChot() {
+    final cu = _boDieuKhien.text;
+    if (_neo <= 0 || _neo > cu.length) return;
+    if (_laKhoangTrang(cu[_neo - 1])) return;
+
+    final moi = cu.substring(0, _neo) + ' ' + cu.substring(_neo);
+    _nguonKyTu.insert(_neo, true);
+    _neo += 1;
+    _ghiVaoO(moi, _neo);
   }
 
   /// Mọi lần ghi do máy thực hiện đều đi qua đây, để ghi nhớ nội dung, vị trí
@@ -893,6 +915,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               khiBamCaiDat: _moCaiDat,
               khiBamHuongDan: () =>
                   _moModalTam('Hướng dẫn', Icons.help_outline_rounded),
+              khiBamAI: () =>
+                  _moModalTam('Làm việc với AI', Icons.smart_toy_outlined),
+              khiBamBanPhim: () =>
+                  _moModalTam('Bàn phím', Icons.keyboard_outlined),
             ),
             SizedBox(height: caoBanPhim),
           ],

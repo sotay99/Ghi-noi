@@ -219,6 +219,78 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     await _kho.luu();
   }
 
+  /// Toàn bộ đường đi từ gốc tới thư mục đang xem, gốc luôn ở vị trí 0.
+  List<String> get _chuoiDuongDan => [..._duongDan, _thuMucHienTaiId];
+
+  void _nhayToiViTri(int viTri) {
+    final chuoi = _chuoiDuongDan;
+    setState(() {
+      _thuMucHienTaiId = chuoi[viTri];
+      _duongDan
+        ..clear()
+        ..addAll(chuoi.sublist(0, viTri));
+    });
+  }
+
+  /// Tên dài quá thì rút gọn ở thanh địa chỉ, không thì tràn ngang màn hình.
+  String _rutGon(String ten) {
+    const gioiHan = 20;
+    if (ten.length <= gioiHan) return ten;
+    return '${ten.substring(0, gioiHan)}…';
+  }
+
+  Widget _thanhDiaChi() {
+    final chuoi = _chuoiDuongDan;
+    final manh = <Widget>[
+      InkWell(
+        onTap: () => _nhayToiViTri(0),
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          child: Icon(Icons.home_outlined, size: 18, color: Color(0xFF5F6368)),
+        ),
+      ),
+    ];
+
+    for (var i = 1; i < chuoi.length; i++) {
+      final ten = _kho.timThuMuc(chuoi[i])?.ten ?? '?';
+      final laCuoiCung = i == chuoi.length - 1;
+      manh.add(const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 2),
+        child: Icon(Icons.chevron_right, size: 16, color: Color(0xFFBDBDBD)),
+      ));
+      manh.add(
+        laCuoiCung
+            ? Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                child: Text(
+                  _rutGon(ten),
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+              )
+            : InkWell(
+                onTap: () => _nhayToiViTri(i),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                  child: Text(
+                    _rutGon(ten),
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF1A73E8)),
+                  ),
+                ),
+              ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFFF8F9FA),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(children: manh),
+      ),
+    );
+  }
+
   void _bao(String s) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
@@ -262,6 +334,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
         ),
         body: Column(
           children: [
+            if (_duongDan.isNotEmpty) _thanhDiaChi(),
             Expanded(
               child: trong
                   ? const Center(
@@ -274,7 +347,9 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                       children: [
                         for (final t in noiDung.thuMucCon)
                           ListTile(
-                            leading: const Icon(Icons.folder_outlined),
+                            // Vàng rực để phân biệt ngay với icon ghi chú
+                            // (xám) — liếc mắt là biết đâu là thư mục.
+                            leading: Icon(Icons.folder, color: Colors.amber.shade700),
                             title: Text(t.ten),
                             onTap: () => _moThuMuc(t.id),
                             trailing: PopupMenuButton<String>(

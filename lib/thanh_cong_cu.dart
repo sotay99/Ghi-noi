@@ -1,6 +1,7 @@
-// Thanh ngang dưới màn hình soạn thảo: bên trái là thư mục, cài đặt, hướng
-// dẫn; giữa là micro; phải là sóng âm. Tự nằm khít mép trên bàn phím ảo —
-// việc đó do trang gọi widget này lo, ở đây chỉ vẽ giao diện.
+// Thanh ngang dưới màn hình soạn thảo: bên trái là hướng dẫn, cài đặt, làm
+// việc với AI, bàn phím, thư mục; bên phải là micro sát cạnh sóng âm. Tự nằm
+// khít mép trên bàn phím ảo — việc đó do trang gọi widget này lo, ở đây chỉ
+// vẽ giao diện.
 
 import 'dart:math' as toan;
 
@@ -18,6 +19,8 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamThuMuc,
     required this.khiBamCaiDat,
     required this.khiBamHuongDan,
+    required this.khiBamAI,
+    required this.khiBamBanPhim,
   });
 
   final bool bat;
@@ -29,6 +32,8 @@ class ThanhCongCu extends StatelessWidget {
   final VoidCallback khiBamThuMuc;
   final VoidCallback khiBamCaiDat;
   final VoidCallback khiBamHuongDan;
+  final VoidCallback khiBamAI;
+  final VoidCallback khiBamBanPhim;
 
   @override
   Widget build(BuildContext context) {
@@ -50,48 +55,55 @@ class ThanhCongCu extends StatelessWidget {
           ),
           child: Row(
             children: [
-              // Bên trái: hướng dẫn sát mép màn hình, rồi cài đặt, rồi thư
-              // mục — hướng dẫn và thư mục đổi chỗ cho nhau theo yêu cầu.
+              // Bên trái: hướng dẫn sát mép màn hình, rồi cài đặt, rồi hai
+              // nút mới (AI, bàn phím), rồi thư mục.
               Expanded(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    NutNho(
-                      bieuTuong: Icons.help_outline_rounded,
-                      nhan: 'Hướng dẫn',
-                      khiBam: khiBamHuongDan,
-                    ),
-                    NutNho(
-                      bieuTuong: Icons.settings_outlined,
-                      nhan: 'Cài đặt',
-                      khiBam: khiBamCaiDat,
-                    ),
-                    NutNho(
-                      bieuTuong: Icons.folder_outlined,
-                      nhan: 'Thư mục',
-                      khiBam: khiBamThuMuc,
-                    ),
-                  ],
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      NutNho(
+                        bieuTuong: Icons.help_outline_rounded,
+                        nhan: 'Hướng dẫn',
+                        khiBam: khiBamHuongDan,
+                      ),
+                      NutNho(
+                        bieuTuong: Icons.settings_outlined,
+                        nhan: 'Cài đặt',
+                        khiBam: khiBamCaiDat,
+                      ),
+                      NutNho(
+                        bieuTuong: Icons.smart_toy_outlined,
+                        nhan: 'Làm việc với AI',
+                        khiBam: khiBamAI,
+                      ),
+                      NutNho(
+                        bieuTuong: Icons.keyboard_outlined,
+                        nhan: 'Bàn phím',
+                        khiBam: khiBamBanPhim,
+                      ),
+                      NutNho(
+                        bieuTuong: Icons.folder_outlined,
+                        nhan: 'Thư mục',
+                        khiBam: khiBamThuMuc,
+                      ),
+                    ],
+                  ),
                 ),
               ),
 
-              // Giữa: nút micro.
+              // Bên phải: micro nằm sát ngay cạnh sóng âm, không còn ở giữa.
               _NutMicroTron(
                 bat: bat,
                 sanSang: sanSang,
                 mau: mau,
                 khiBam: sanSang ? khiBamMicro : null,
               ),
-
-              // Bên phải: sóng âm cho biết micro có nghe được gì không.
-              Expanded(
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: SongAm(muc: songAm, dangNghe: bat && dangNghe),
-                  ),
-                ),
+              const SizedBox(width: 6),
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: SongAm(muc: songAm, dangNghe: bat && dangNghe),
               ),
             ],
           ),
