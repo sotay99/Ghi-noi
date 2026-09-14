@@ -1,0 +1,413 @@
+// Màn hình cây thư mục: xem, thêm, đổi tên, xoá, sao chép, cắt-di chuyển thư
+// mục và ghi chú. Bấm vào một ghi chú thì trả id của nó về cho trang soạn
+// thảo qua Navigator.pop; đi dạo rồi quay lại tay không thì trả về null.
+
+import 'package:flutter/material.dart';
+
+import 'kho_du_lieu.dart';
+import 'mo_hinh.dart';
+
+enum _LoaiChoDan { catThuMuc, catGhiChu, chepThuMuc, chepGhiChu }
+
+class ManHinhThuMuc extends StatefulWidget {
+  const ManHinhThuMuc({
+    super.key,
+    required this.kho,
+    required this.idGhiChuDangMo,
+  });
+
+  final KhoDuLieu kho;
+  final String idGhiChuDangMo;
+
+  @override
+  State<ManHinhThuMuc> createState() => _ManHinhThuMucState();
+}
+
+class _ManHinhThuMucState extends State<ManHinhThuMuc> {
+  String _thuMucHienTaiId = thuMucGoc;
+  final List<String> _duongDan = []; // Ngăn xếp id thư mục cha, để quay lại.
+
+  String? _choDanId;
+  _LoaiChoDan? _choDanLoai;
+  String _choDanTen = '';
+
+  KhoDuLieu get _kho => widget.kho;
+
+  String get _tenThuMucHienTai {
+    if (_thuMucHienTaiId == thuMucGoc) return 'Ghi chú của tôi';
+    return _kho.timThuMuc(_thuMucHienTaiId)?.ten ?? 'Ghi chú của tôi';
+  }
+
+  void _moThuMuc(String id) {
+    setState(() {
+      _duongDan.add(_thuMucHienTaiId);
+      _thuMucHienTaiId = id;
+    });
+  }
+
+  bool _veThuMucCha() {
+    if (_duongDan.isEmpty) return false;
+    setState(() => _thuMucHienTaiId = _duongDan.removeLast());
+    return true;
+  }
+
+  Future<void> _themThuMuc() async {
+    setState(() => _kho.taoThuMucMoi(_thuMucHienTaiId));
+    await _kho.luu();
+  }
+
+  Future<void> _themGhiChu() async {
+    setState(() => _kho.taoGhiChuMoi(_thuMucHienTaiId));
+    await _kho.luu();
+  }
+
+  Future<void> _doiTen({
+    required bool laThuMuc,
+    required String id,
+    required String tenCu,
+  }) async {
+    final ten = await _hoiTen(tieuDe: 'Đổi tên', tenBanDau: tenCu);
+    if (ten == null || ten.trim().isEmpty) return;
+    final ok = laThuMuc
+        ? _kho.doiTenThuMuc(id, ten.trim())
+        : _kho.doiTenGhiChu(id, ten.trim());
+    if (!ok) {
+      _bao('Tên "$ten" đã có trong thư mục này.');
+      return;
+    }
+    setState(() {});
+    await _kho.luu();
+  }
+
+  Future<String?> _hoiTen({
+    required String tieuDe,
+    required String tenBanDau,
+  }) {
+    final bo = TextEditingController(text: tenBanDau);
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tieuDe),
+        content: TextField(
+          controller: bo,
+          autofocus: true,
+          onSubmitted: (v) => Navigator.of(ctx).pop(v),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: const Text('Huỷ'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(bo.text),
+            child: const Text('Xong'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<GhiChuFile> _timGhiChuTrongCay(String thuMucId) {
+    final ketQua = <GhiChuFile>[];
+    void duyet(String id) {
+      ketQua.addAll(_kho.ghiChu.where((g) => g.chaId == id));
+      for (final con in _kho.thuMuc.where((t) => t.chaId == id)) {
+        duyet(con.id);
+      }
+    }
+
+    duyet(thuMucId);
+    return ketQua;
+  }
+
+  Future<void> _xoaThuMuc(ThuMuc t) async {
+    final coNoiDung = _kho.thuMuc.any((x) => x.chaId == t.id) ||
+        _kho.ghiChu.any((x) => x.chaId == t.id);
+    final dongY = await _hoiXoa(
+      ten: t.ten,
+      canhBao: coNoiDung ? ' và toàn bộ nội dung bên trong nó' : '',
+    );
+    if (dongY != true) return;
+    final xoaCaGhiChuDangMo =
+        _timGhiChuTrongCay(t.id).any((g) => g.id == widget.idGhiChuDangMo);
+    setState(() => _kho.xoaThuMuc(t.id));
+    await _kho.luu();
+    if (xoaCaGhiChuDangMo && mounted) {
+      _bao('Ghi chú đang mở nằm trong thư mục vừa xoá.');
+    }
+  }
+
+  Future<void> _xoaGhiChu(GhiChuFile g) async {
+    final dongY = await _hoiXoa(ten: g.ten, canhBao: '');
+    if (dongY != true) return;
+    final laDangMo = g.id == widget.idGhiChuDangMo;
+    setState(() => _kho.xoaGhiChu(g.id));
+    await _kho.luu();
+    if (laDangMo && mounted) {
+      _bao('Ghi chú đang mở vừa bị xoá.');
+    }
+  }
+
+  Future<bool?> _hoiXoa({required String ten, required String canhBao}) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.delete_outline, size: 28),
+        title: const Text('Xoá?'),
+        content: Text('Xoá "$ten"$canhBao. Không lấy lại được.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Không'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style:
+                FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
+            child: const Text('Xoá'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _dat(_LoaiChoDan loai, String id, String ten) {
+    setState(() {
+      _choDanLoai = loai;
+      _choDanId = id;
+      _choDanTen = ten;
+    });
+  }
+
+  void _huyChoDan() {
+    setState(() {
+      _choDanId = null;
+      _choDanLoai = null;
+    });
+  }
+
+  Future<void> _dan() async {
+    if (_choDanId == null || _choDanLoai == null) return;
+    final id = _choDanId!;
+
+    switch (_choDanLoai!) {
+      case _LoaiChoDan.catThuMuc:
+        if (id == _thuMucHienTaiId) {
+          _bao('Không thể chuyển vào chính nó.');
+          return;
+        }
+        if (!_kho.diChuyenThuMuc(id, _thuMucHienTaiId)) {
+          _bao('Không thể chuyển thư mục vào chính con cháu của nó.');
+          return;
+        }
+        break;
+      case _LoaiChoDan.catGhiChu:
+        _kho.diChuyenGhiChu(id, _thuMucHienTaiId);
+        break;
+      case _LoaiChoDan.chepThuMuc:
+        _kho.saoChepThuMuc(id, _thuMucHienTaiId);
+        break;
+      case _LoaiChoDan.chepGhiChu:
+        _kho.saoChepGhiChu(id, _thuMucHienTaiId);
+        break;
+    }
+
+    setState(() {
+      _choDanId = null;
+      _choDanLoai = null;
+    });
+    await _kho.luu();
+  }
+
+  void _bao(String s) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(s), behavior: SnackBarBehavior.floating),
+      );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final noiDung = _kho.noiDungThuMuc(_thuMucHienTaiId);
+    final trong = noiDung.thuMucCon.isEmpty && noiDung.ghiChuCon.isEmpty;
+
+    return PopScope(
+      canPop: _duongDan.isEmpty,
+      onPopInvokedWithResult: (daThoat, ketQua) {
+        if (!daThoat) _veThuMucCha();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(_tenThuMucHienTai),
+          leading: _duongDan.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: _veThuMucCha,
+                ),
+          actions: [
+            IconButton(
+              onPressed: _themThuMuc,
+              icon: const Icon(Icons.create_new_folder_outlined),
+              tooltip: 'Thêm thư mục',
+            ),
+            IconButton(
+              onPressed: _themGhiChu,
+              icon: const Icon(Icons.note_add_outlined),
+              tooltip: 'Thêm ghi chú',
+            ),
+          ],
+        ),
+        body: Column(
+          children: [
+            Expanded(
+              child: trong
+                  ? const Center(
+                      child: Text(
+                        'Thư mục trống',
+                        style: TextStyle(color: Color(0xFF9AA0A6)),
+                      ),
+                    )
+                  : ListView(
+                      children: [
+                        for (final t in noiDung.thuMucCon)
+                          ListTile(
+                            leading: const Icon(Icons.folder_outlined),
+                            title: Text(t.ten),
+                            onTap: () => _moThuMuc(t.id),
+                            trailing: PopupMenuButton<String>(
+                              onSelected: (v) {
+                                switch (v) {
+                                  case 'doi_ten':
+                                    _doiTen(
+                                      laThuMuc: true,
+                                      id: t.id,
+                                      tenCu: t.ten,
+                                    );
+                                    break;
+                                  case 'cat':
+                                    _dat(_LoaiChoDan.catThuMuc, t.id, t.ten);
+                                    break;
+                                  case 'chep':
+                                    _dat(_LoaiChoDan.chepThuMuc, t.id, t.ten);
+                                    break;
+                                  case 'xoa':
+                                    _xoaThuMuc(t);
+                                    break;
+                                }
+                              },
+                              itemBuilder: (ctx) => const [
+                                PopupMenuItem(
+                                  value: 'doi_ten',
+                                  child: Text('Đổi tên'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'cat',
+                                  child: Text('Cắt'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'chep',
+                                  child: Text('Sao chép'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'xoa',
+                                  child: Text('Xoá'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        for (final g in noiDung.ghiChuCon)
+                          ListTile(
+                            leading: const Icon(Icons.description_outlined),
+                            title: Text(g.ten),
+                            selected: g.id == widget.idGhiChuDangMo,
+                            selectedTileColor: const Color(0xFFE8F0FE),
+                            onTap: () => Navigator.of(context).pop(g.id),
+                            trailing: PopupMenuButton<String>(
+                              onSelected: (v) {
+                                switch (v) {
+                                  case 'doi_ten':
+                                    _doiTen(
+                                      laThuMuc: false,
+                                      id: g.id,
+                                      tenCu: g.ten,
+                                    );
+                                    break;
+                                  case 'cat':
+                                    _dat(_LoaiChoDan.catGhiChu, g.id, g.ten);
+                                    break;
+                                  case 'chep':
+                                    _dat(_LoaiChoDan.chepGhiChu, g.id, g.ten);
+                                    break;
+                                  case 'xoa':
+                                    _xoaGhiChu(g);
+                                    break;
+                                }
+                              },
+                              itemBuilder: (ctx) => const [
+                                PopupMenuItem(
+                                  value: 'doi_ten',
+                                  child: Text('Đổi tên'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'cat',
+                                  child: Text('Cắt'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'chep',
+                                  child: Text('Sao chép'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'xoa',
+                                  child: Text('Xoá'),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+            ),
+            if (_choDanId != null)
+              Material(
+                color: const Color(0xFFE8F0FE),
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.content_paste,
+                          size: 18,
+                          color: Color(0xFF1A73E8),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Đang giữ "$_choDanTen" — dán vào đây?',
+                            style: const TextStyle(fontSize: 13),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _huyChoDan,
+                          child: const Text('Huỷ'),
+                        ),
+                        FilledButton(
+                          onPressed: _dan,
+                          child: const Text('Dán'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
