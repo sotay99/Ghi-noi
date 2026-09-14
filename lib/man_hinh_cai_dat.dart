@@ -1,6 +1,5 @@
 // Màn hình cài đặt: bốn dòng — thời gian bật lại micro, tự động chèn dấu
-// cách, kiểm tra chính tả bằng AI (chưa làm, luôn tắt), và trạng thái quyền
-// micro của thiết bị.
+// cách, kiểm tra chính tả bằng AI, và trạng thái quyền micro của thiết bị.
 
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -18,6 +17,7 @@ class ManHinhCaiDat extends StatefulWidget {
     super.key,
     required this.caiDat,
     required this.khiTatTuDongChenKhoangCach,
+    required this.khiTatKiemTraChinhTa,
     required this.khiKiemTraLaiMicro,
   });
 
@@ -26,6 +26,10 @@ class ManHinhCaiDat extends StatefulWidget {
   /// Gọi ngay khi người dùng gạt dòng "tự động chèn dấu cách" từ Có sang
   /// Không — trang soạn thảo dùng đây để xoá bộ nhớ đánh dấu ký tự của nó.
   final VoidCallback khiTatTuDongChenKhoangCach;
+
+  /// Gọi ngay khi người dùng tắt "kiểm tra chính tả bằng AI" — trang soạn
+  /// thảo dùng đây để xoá hết gạch đỏ chân đang hiển thị.
+  final VoidCallback khiTatKiemTraChinhTa;
 
   /// Gọi lại speech_to_text.initialize() để trang soạn thảo cập nhật xem
   /// micro có dùng được không, sau khi người dùng vừa xin quyền.
@@ -38,6 +42,7 @@ class ManHinhCaiDat extends StatefulWidget {
 class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
   late double _thoiGian;
   late bool _tuDongChen;
+  late bool _kiemTraChinhTa;
   PermissionStatus? _trangThaiMicro;
   bool _dangXuLyMicro = false;
 
@@ -46,6 +51,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     super.initState();
     _thoiGian = widget.caiDat.thoiGianBatLaiGiay;
     _tuDongChen = widget.caiDat.tuDongChenKhoangCach;
+    _kiemTraChinhTa = widget.caiDat.kiemTraChinhTaBangAI;
     _kiemTraQuyenMicro();
   }
 
@@ -288,15 +294,31 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
         const SizedBox(height: 6),
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
-                'Chưa có — tính năng đang phát triển',
-                style: TextStyle(color: Color(0xFF9AA0A6)),
+                _kiemTraChinhTa ? 'Đang bật (Có)' : 'Đang tắt (Không)',
+                style: TextStyle(
+                  color: _kiemTraChinhTa
+                      ? const Color(0xFF1A73E8)
+                      : const Color(0xFF9AA0A6),
+                ),
               ),
             ),
-            Switch(value: false, onChanged: null),
+            Switch(
+              value: _kiemTraChinhTa,
+              onChanged: (bat) async {
+                setState(() => _kiemTraChinhTa = bat);
+                await widget.caiDat.datKiemTraChinhTaBangAI(bat);
+                if (!bat) widget.khiTatKiemTraChinhTa();
+              },
+            ),
           ],
         ),
+        _nutTimHieuThem(() => _hienGiaiThich(
+              'Kiểm tra chính tả bằng AI',
+              _giaiThichChinhTaNgan,
+              _giaiThichChinhTa,
+            )),
       ],
     );
   }
@@ -425,4 +447,20 @@ Bật tính năng này (mặc định là **bật**), ứng dụng sẽ tự nh�
 Tắt tính năng này (chọn Không), ứng dụng sẽ ứng xử như một trang soạn thảo bình thường: gõ tới đâu dính tới đó, không tự chèn thêm gì hết, kể cả khi gõ ngay sau chữ do giọng nói tạo ra.
 
 **Cảnh báo quan trọng:** để làm được việc "nhớ nguồn gốc từng chữ" này, ứng dụng phải liên tục ghi một danh sách riêng trong bộ nhớ máy — không phải là một phần của bài viết, bạn không nhìn thấy nó, và nó không được lưu lại lâu dài như nội dung bài. Nếu bạn tắt tính năng này đi, danh sách ghi nhớ đó bị **xoá sạch ngay** và **không thể lấy lại được**, kể cả sau này bạn có bật tính năng lên lại. Bật lại chỉ giúp tính năng hoạt động cho những chữ bạn nói hoặc gõ sau thời điểm bật lại mà thôi — chữ đã có sẵn trong bài từ trước sẽ được coi là "chữ gõ tay" hết, dù trước đây có thể chúng vốn là do bạn nói ra.
+''';
+
+const _giaiThichChinhTaNgan = '''
+Bật lên, mỗi khi bạn viết xong một đoạn mới (nói hoặc gõ), ứng dụng gửi ĐÚNG đoạn mới đó cho AI kiểm tra chính tả. Từ nào sai sẽ được **gạch đỏ chân** — bấm vào từ đó để xem AI đề xuất từ thay thế.
+''';
+
+const _giaiThichChinhTa = '''
+Khi tính năng này bật, mỗi lần bạn viết xong một đoạn văn mới (dù bằng giọng nói hay gõ tay), ứng dụng sẽ gửi đoạn văn đó lên máy chủ AI để kiểm tra chính tả. Chỉ đoạn văn **CHƯA từng được kiểm tra** mới được gửi đi — đoạn nào AI đã đọc qua rồi sẽ không gửi lại, để đỡ tốn dữ liệu và hạn mức AI.
+
+Từ nào AI cho là sai chính tả sẽ được **gạch chân màu đỏ** ngay trong bài. Bấm vào đúng từ đó, một menu nhỏ hiện ra:
+
+- Các dòng đầu là những từ **AI đề xuất thay thế** — bấm vào từ nào thì từ đó lập tức đè lên từ sai.
+- Dòng **"Xoá"** (màu đỏ) — xoá hẳn từ sai đó khỏi bài, không thay bằng gì cả. Đây không phải do AI đề xuất, mà là một lựa chọn có sẵn của ứng dụng cho mọi từ bị gạch đỏ.
+- Dòng **"Huỷ đề xuất"** (màu xanh lá) — bấm vào thì không có gì đổi trong bài, chỉ là ứng dụng thôi coi từ đó là sai nữa (hết gạch đỏ chân).
+
+Tắt tính năng này đi thì mọi gạch đỏ đang hiện biến mất ngay, và ứng dụng ngừng gọi AI kiểm tra chính tả cho tới khi bạn bật lại.
 ''';

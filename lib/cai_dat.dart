@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class CaiDat {
   static const _khoaThoiGianBatLai = 'ghi_noi_thoi_gian_bat_lai_micro_giay';
   static const _khoaTuDongChenCach = 'ghi_noi_tu_dong_chen_khoang_cach';
+  static const _khoaKiemTraChinhTaAI = 'ghi_noi_kiem_tra_chinh_ta_ai';
 
   /// Số giây chờ, kể từ lúc người dùng ngừng gõ phím, tới khi micro tự bật
   /// lại. Mặc định 1 giây.
@@ -16,10 +17,15 @@ class CaiDat {
   /// tạo ra hay không. Mặc định bật.
   bool tuDongChenKhoangCach = true;
 
+  /// Có tự gọi AI kiểm tra chính tả mỗi khi có đoạn văn mới hay không.
+  /// Mặc định TẮT — tính năng này gọi mạng và tốn hạn mức AI.
+  bool kiemTraChinhTaBangAI = false;
+
   Future<void> tai() async {
     final kho = await SharedPreferences.getInstance();
     thoiGianBatLaiGiay = kho.getDouble(_khoaThoiGianBatLai) ?? 1.0;
     tuDongChenKhoangCach = kho.getBool(_khoaTuDongChenCach) ?? true;
+    kiemTraChinhTaBangAI = kho.getBool(_khoaKiemTraChinhTaAI) ?? false;
   }
 
   Future<void> datThoiGianBatLai(double giay) async {
@@ -32,5 +38,11 @@ class CaiDat {
     tuDongChenKhoangCach = bat;
     final kho = await SharedPreferences.getInstance();
     await kho.setBool(_khoaTuDongChenCach, bat);
+  }
+
+  Future<void> datKiemTraChinhTaBangAI(bool bat) async {
+    kiemTraChinhTaBangAI = bat;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setBool(_khoaKiemTraChinhTaAI, bat);
   }
 }
