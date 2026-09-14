@@ -32,6 +32,8 @@ class ManHinhHuongDan extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      _HopMoDau(),
+                      SizedBox(height: 28),
                       _MucLon(so: 'I', tieuDe: 'Vì sao Ghi Nói ra đời?'),
                       SizedBox(height: 14),
                       _Doan(_doan1),
@@ -180,6 +182,33 @@ class _Hero extends StatelessWidget {
 }
 
 // --------------------------------------------------------------- mục lớn
+
+// ------------------------------------------------------------- khung mở đầu
+
+/// Nói thẳng vấn đề ngay dưới tiêu đề — ai lười đọc cả bài vẫn nắm được ý
+/// chính trong vài giây.
+class _HopMoDau extends StatelessWidget {
+  const _HopMoDau();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8F0FE),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFAECBFA)),
+      ),
+      child: const _Doan(
+        'Nói và gõ tay, xưa nay luôn phải **chọn một**: bật giọng nói thì '
+        'tắt bàn phím, ngồi gõ thì im giọng nói. Ghi Nói phá bỏ luật đó — '
+        'để bạn ==nói và gõ cùng lúc, không lẫn không đè lên nhau==, ra chữ '
+        'nhanh hơn hẳn cách làm cũ.',
+      ),
+    );
+  }
+}
 
 class _MucLon extends StatelessWidget {
   const _MucLon({required this.so, required this.tieuDe});
@@ -467,24 +496,35 @@ class _TheThongKe extends StatelessWidget {
             ? [BoxShadow(color: mau.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 4))]
             : null,
       ),
-      child: Row(
+      // Xếp dọc, không xếp ngang: nhãn và số liệu cùng nằm trên một hàng thì
+      // hàng chữ dài (như "Nói + gõ tay xen kẽ trong Ghi Nói") ép ô còn lại
+      // hẹp tới mức vỡ chữ ra từng ký tự một trên màn hình điện thoại. Xếp
+      // dọc thì nhãn và số liệu đều được dùng toàn bộ bề ngang, không bao
+      // giờ bị bóp bất kể màn hình rộng hay hẹp.
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: noiBat ? Colors.white : mau, size: 24),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              nhan,
-              style: TextStyle(
-                fontSize: 13.5,
-                color: noiBat ? Colors.white : const Color(0xFF5F6368),
-                fontWeight: FontWeight.w600,
+          Row(
+            children: [
+              Icon(icon, color: noiBat ? Colors.white : mau, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  nhan,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: noiBat ? Colors.white : const Color(0xFF5F6368),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
+          const SizedBox(height: 8),
           Text(
             soLieu,
             style: TextStyle(
-              fontSize: 14.5,
+              fontSize: 17,
               fontWeight: FontWeight.bold,
               color: noiBat ? Colors.white : mau,
             ),

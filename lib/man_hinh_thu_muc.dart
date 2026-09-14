@@ -315,10 +315,14 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     return Container(
       width: double.infinity,
       color: const Color(0xFFF8F9FA),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Row(children: manh),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      // Wrap chứ không phải cuộn ngang: chui càng sâu, thanh địa chỉ càng
+      // dài, tự động xuống dòng theo đúng bề ngang màn hình đang có, không
+      // cần biết trước máy rộng hay hẹp.
+      child: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        runSpacing: 2,
+        children: manh,
       ),
     );
   }
