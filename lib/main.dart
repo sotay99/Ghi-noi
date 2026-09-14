@@ -77,6 +77,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   bool _boQuaCauNay = false;
   bool _dangCatCau = false;
 
+  /// Micro đang tắt vì người dùng gõ phím, chứ không phải vì họ bấm nút tắt.
+  /// Phân biệt hai chuyện này mới biết có được tự bật lại hay không.
+  bool _microNgungDeGo = false;
+
   /// Bật lên khi chính ta đang sửa nội dung, để phân biệt với người gõ phím.
   /// Chỉ là lớp chắn thứ nhất: bộ gõ báo ngược trạng thái về một cách bất
   /// đồng bộ, lúc đó cờ này đã tắt rồi — nên còn hai lớp chắn nữa bên dưới.
@@ -90,6 +94,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   Timer? _hen;
   Timer? _henLuuTru;
+  Timer? _henGoXong;
   String? _maNgonNgu;
 
   @override
@@ -106,6 +111,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     WidgetsBinding.instance.removeObserver(this);
     _hen?.cancel();
     _henLuuTru?.cancel();
+    _henGoXong?.cancel();
     _micro.cancel();
     _boDieuKhien.dispose();
     _oChu.dispose();
@@ -244,6 +250,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 
   void _bamNutMicro() {
+    // Người dùng tự bấm thì ý họ là quyết định cuối cùng — bỏ mọi kế hoạch
+    // tự bật lại đang chờ.
+    _microNgungDeGo = false;
+    _henGoXong?.cancel();
+
     if (_muonNghe) {
       _tatMicro();
     } else {
@@ -376,20 +387,57 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     });
   }
 
-  /// Người dùng vừa chạm vào văn bản. Đoạn chữ đang nhảy được đóng băng ngay,
-  /// và câu nói đang dở bị cắt để nó không đổ ra lần nữa ở chỗ con trỏ mới.
+  /// Người dùng vừa GÕ PHÍM. Cắt sạch mọi thứ đang chạy của micro.
+  ///
+  /// Chữ nào đã lỡ ra màn hình thì chết tại đó. Phần câu nói còn dở trong máy
+  /// bị vứt bỏ hẳn — dùng cancel() chứ không phải stop(), vì stop() còn trả về
+  /// một kết quả chốt, mà kết quả đó sẽ đổ nguyên câu ra lần nữa ở chỗ con trỏ
+  /// mới. Nút micro tắt luôn, không được nghe gì nữa.
+  ///
+  /// Sau khi người dùng ngừng gõ đủ một giây thì micro tự bật lại như cũ.
+  void _nguoiDungVuaGo() {
+    _chuTam = ''; // Nhả đoạn đang nhảy ra: không gì đè lên nó được nữa.
+
+    if (_muonNghe || _micro.isListening) {
+      _boQuaCauNay = true;
+      _microNgungDeGo = true;
+      _muonNghe = false; // Ngăn _henBatLai() lén bật lại.
+      _hen?.cancel();
+      _micro.cancel();
+      if (mounted) {
+        setState(() {
+          _dangNghe = false;
+          _songAm.fillRange(0, _songAm.length, 0);
+        });
+      }
+    }
+
+    // Đồng hồ đếm lại từ đầu sau MỖI phím, nên nó chỉ điểm khi người dùng đã
+    // thật sự ngừng tay.
+    if (_microNgungDeGo) {
+      _henGoXong?.cancel();
+      _henGoXong = Timer(const Duration(seconds: 1), _batLaiSauKhiGoXong);
+    }
+  }
+
+  void _batLaiSauKhiGoXong() {
+    if (!_microNgungDeGo || !mounted) return;
+    _microNgungDeGo = false;
+    _boQuaCauNay = false;
+    setState(() => _muonNghe = true);
+    _datNeoTaiConTro();
+    _batMicro();
+  }
+
+  /// Người dùng chạm để dời con trỏ, chứ không gõ chữ. Nhẹ tay hơn: chỉ đóng
+  /// băng đoạn đang nhảy và cắt câu đang dở, micro vẫn nghe tiếp.
   void _dongBangDoanDangNhay() {
-    // Có đoạn nào đang được viết dở không? Không có thì chẳng có gì để đóng
-    // băng, và cũng đừng cắt câu — gõ phím lúc micro đang im mà cắt thì mỗi
-    // phím một lần khởi động lại, micro giật liên tục.
     final dangVietDo = _chuTam.isNotEmpty;
     _chuTam = '';
     if (!dangVietDo) return;
     if (!_muonNghe || _dangCatCau || !_micro.isListening) return;
     _boQuaCauNay = true;
     _dangCatCau = true;
-    // Cắt câu đang dở rồi mở ngay một lượt nghe mới, để người dùng nói tiếp
-    // được liền mà không mất cả câu.
     _micro.stop().whenComplete(() {
       _dangCatCau = false;
       _henBatLai();
@@ -407,7 +455,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _chuGanNhat = chu;
       final chon = _boDieuKhien.selection;
       _neo = chon.isValid ? chon.end : chu.length;
-      _dongBangDoanDangNhay();
+      _nguoiDungVuaGo();
       _henLuu();
       if (_neo >= chu.length) _cuonXuongDuoi();
       return;
@@ -451,6 +499,46 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ));
+  }
+
+  Future<void> _xoaTatCa() async {
+    if (_boDieuKhien.text.isEmpty) {
+      _bao('Trang đang trống, không có gì để xoá.');
+      return;
+    }
+
+    final dongY = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.delete_outline, size: 28),
+        title: const Text('Xoá tất cả?'),
+        content: const Text(
+          'Toàn bộ văn bản đang soạn sẽ bị xoá và không lấy lại được.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Không'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
+            child: const Text('Có, xoá tất cả'),
+          ),
+        ],
+      ),
+    );
+
+    if (dongY != true || !mounted) return;
+
+    // Trả mọi mốc về vạch xuất phát, nếu không thì câu nói kế tiếp lại nhắm
+    // vào một vị trí không còn tồn tại.
+    _ghiVaoO('', 0);
+    _neo = 0;
+    _chuTam = '';
+    _boQuaCauNay = _micro.isListening;
+    await _luuVanBan();
+    if (mounted) _bao('Đã xoá toàn bộ văn bản.');
   }
 
   void _moModalTam(String tieuDe, IconData bieuTuong) {
@@ -498,8 +586,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   @override
   Widget build(BuildContext context) {
+    // Tự đo chiều cao bàn phím thay vì giao cho Scaffold: đặt thanh công cụ
+    // làm dòng cuối của thân trang rồi chừa đúng khoảng đó bên dưới, thì
+    // thanh luôn nằm khít mép trên bàn phím.
+    final caoBanPhim = MediaQuery.viewInsetsOf(context).bottom;
+
     return Scaffold(
-      resizeToAvoidBottomInset: true,
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: const Text('Ghi Nói'),
         backgroundColor: Colors.white,
@@ -510,6 +603,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             onPressed: _chepTatCa,
             icon: const Icon(Icons.copy_all_outlined),
             tooltip: 'Chép toàn bộ văn bản',
+          ),
+          IconButton(
+            onPressed: _xoaTatCa,
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'Xoá tất cả',
           ),
         ],
       ),
@@ -563,18 +661,23 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 ),
               ),
             ),
+            _ThanhCongCu(
+              bat: _muonNghe,
+              dangNghe: _dangNghe,
+              songAm: _songAm,
+              sanSang: _sanSang,
+              // Bàn phím đóng thì còn phải né thanh điều hướng của máy; bàn
+              // phím mở thì nó che mất thanh đó rồi, né nữa là hở một dải
+              // trắng giữa thanh công cụ và bàn phím.
+              neThanhDieuHuong: caoBanPhim == 0,
+              khiBamMicro: _bamNutMicro,
+              khiBamCaiDat: () => _moModalTam('Cài đặt', Icons.settings_outlined),
+              khiBamHuongDan: () =>
+                  _moModalTam('Hướng dẫn', Icons.help_outline_rounded),
+            ),
+            SizedBox(height: caoBanPhim),
           ],
         ),
-      ),
-      bottomNavigationBar: _ThanhCongCu(
-        bat: _muonNghe,
-        dangNghe: _dangNghe,
-        songAm: _songAm,
-        sanSang: _sanSang,
-        khiBamMicro: _bamNutMicro,
-        khiBamCaiDat: () => _moModalTam('Cài đặt', Icons.settings_outlined),
-        khiBamHuongDan: () =>
-            _moModalTam('Hướng dẫn', Icons.help_outline_rounded),
       ),
     );
   }
@@ -588,6 +691,7 @@ class _ThanhCongCu extends StatelessWidget {
     required this.dangNghe,
     required this.songAm,
     required this.sanSang,
+    required this.neThanhDieuHuong,
     required this.khiBamMicro,
     required this.khiBamCaiDat,
     required this.khiBamHuongDan,
@@ -597,6 +701,7 @@ class _ThanhCongCu extends StatelessWidget {
   final bool dangNghe;
   final List<double> songAm;
   final bool sanSang;
+  final bool neThanhDieuHuong;
   final VoidCallback khiBamMicro;
   final VoidCallback khiBamCaiDat;
   final VoidCallback khiBamHuongDan;
@@ -610,6 +715,7 @@ class _ThanhCongCu extends StatelessWidget {
       elevation: 8,
       child: SafeArea(
         top: false,
+        bottom: neThanhDieuHuong,
         child: Container(
           // Thấp hết mức còn bấm trúng: 48px vẫn đủ vùng chạm theo chuẩn
           // Material, mà nhường gần hết màn hình cho chữ.
