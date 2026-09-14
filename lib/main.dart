@@ -69,6 +69,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   int _neo = 0;
   String _chuTam = '';
 
+  /// Vị trí NGAY SAU đoạn chữ giọng nói vừa chốt xong, nếu đoạn đó chưa kết
+  /// thúc bằng khoảng trắng. Chỉ có giá trị đến lần gõ phím kế tiếp: người
+  /// dùng gõ ký tự dính ngay tại đây thì ta chen một dấu cách trước, giữ đúng
+  /// một lần rồi thôi. -1 nghĩa là không có ranh giới nào đang chờ.
+  int _ranhGioiGiongNoi = -1;
+
   /// Bỏ qua mọi kết quả còn lại của câu nói đang dở.
   ///
   /// Bật lên khi người dùng chạm vào bàn phím giữa chừng: đoạn chữ đã hiện ra
@@ -136,6 +142,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _ghiVaoO(cu, cu.length);
     _neo = cu.length;
     _chuTam = '';
+    _ranhGioiGiongNoi = -1;
   }
 
   Future<void> _luuVanBan() async {
@@ -350,9 +357,19 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     if (xong) {
       _chotCauDangDoc();
+      // Ranh giới chỉ đáng giữ nếu chữ ngay trước nó không phải khoảng
+      // trắng — có khoảng trắng rồi thì gõ tiếp không cần thêm gì cả.
+      if (_neo > 0 && !_laKhoangTrang(moi[_neo - 1])) {
+        _ranhGioiGiongNoi = _neo;
+      } else {
+        _ranhGioiGiongNoi = -1;
+      }
       _luuVanBan();
     }
   }
+
+  static bool _laKhoangTrang(String kyTu) =>
+      kyTu == ' ' || kyTu == '\n' || kyTu == '\t';
 
   /// Mọi lần ghi do máy thực hiện đều đi qua đây, để ghi nhớ nội dung, vị trí
   /// con trỏ và thời điểm — ba thứ dùng để nhận ra trạng thái bộ gõ báo về.
@@ -451,7 +468,46 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final chu = _boDieuKhien.text;
 
     if (chu != _chuGanNhat) {
-      // Chữ thật sự đổi mà không phải do ta → người dùng vừa gõ.
+      // Chữ thật sự đổi mà không phải do ta → người dùng vừa gõ. Tìm đúng
+      // chỗ vừa gõ bằng cách so khác biệt với chữ cũ, để biết ký tự đầu tiên
+      // họ gõ rơi vào vị trí nào.
+      final cu = _chuGanNhat;
+      var dau = 0;
+      while (dau < cu.length &&
+          dau < chu.length &&
+          cu[dau] == chu[dau]) {
+        dau++;
+      }
+      final viTriGo = dau;
+      final coChenChu = chu.length > cu.length; // false nếu là xoá chữ
+
+      // Người dùng gõ đúng ngay tại ranh giới chữ do giọng nói tạo ra, mà
+      // chưa có khoảng trắng ở đó — chen một dấu cách trước khi ghi nhận chữ
+      // họ vừa gõ. Chỉ áp dụng cho giọng nói: gõ tay nối gõ tay thì dính liền
+      // như người dùng gõ, không tự ý chen gì cả.
+      if (coChenChu &&
+          viTriGo == _ranhGioiGiongNoi &&
+          !_laKhoangTrang(chu[viTriGo])) {
+        // Chèn một dấu cách vào đúng chỗ này trong CHỮ MỚI: phần trước
+        // viTriGo không đổi so với chữ cũ (đó là định nghĩa của viTriGo), nên
+        // chỉ cần chen thêm một dấu cách vào chữ mới là đủ.
+        final chuCuoiCung =
+            chu.substring(0, viTriGo) + ' ' + chu.substring(viTriGo);
+        final chon = _boDieuKhien.selection;
+        final viTriConTro =
+            (chon.isValid ? chon.end : chu.length) + 1;
+
+        _ranhGioiGiongNoi = -1; // Dùng một lần rồi mất.
+        _ghiVaoO(chuCuoiCung, viTriConTro);
+        _chuGanNhat = chuCuoiCung;
+        _neo = viTriConTro;
+        _nguoiDungVuaGo();
+        _henLuu();
+        if (_neo >= chuCuoiCung.length) _cuonXuongDuoi();
+        return;
+      }
+
+      _ranhGioiGiongNoi = -1; // Người dùng gõ, ranh giới cũ hết hiệu lực.
       _chuGanNhat = chu;
       final chon = _boDieuKhien.selection;
       _neo = chon.isValid ? chon.end : chu.length;
@@ -536,6 +592,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _ghiVaoO('', 0);
     _neo = 0;
     _chuTam = '';
+    _ranhGioiGiongNoi = -1;
     _boQuaCauNay = _micro.isListening;
     await _luuVanBan();
     if (mounted) _bao('Đã xoá toàn bộ văn bản.');
