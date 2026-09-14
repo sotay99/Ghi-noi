@@ -33,13 +33,13 @@ jobs:
         run: flutter --version
 
       # Thư mục android/ không nằm trong git. Sinh lại nó bằng đúng phiên bản
-      # Flutter vừa cài, rồi vá thêm phần riêng của Ghi Nói.
+      # Flutter vừa cài, rồi vá thêm phần riêng của Flowrite.
       - name: Sinh phần Android
         run: |
           set -e
           flutter create --platforms=android \
-            --project-name=ghi_noi \
-            --org=vn.ghinoi \
+            --project-name=flowrite \
+            --org=com.flowrite \
             /tmp/khung
           cp -r /tmp/khung/android ./android
           python3 tool/va_android.py .
@@ -63,7 +63,7 @@ jobs:
         run: |
           set -e
           mkdir -p ban-giao
-          TEN="GhiNoi-v${{ github.run_number }}.apk"
+          TEN="Flowrite-v${{ github.run_number }}.apk"
           cp build/app/outputs/flutter-apk/app-release.apk "ban-giao/$TEN"
           echo "ten=$TEN" >> "$GITHUB_OUTPUT"
           ls -lh ban-giao
@@ -71,7 +71,7 @@ jobs:
       - name: Gắn file vào kết quả chạy
         uses: actions/upload-artifact@v4
         with:
-          name: GhiNoi-apk-${{ github.run_number }}
+          name: Flowrite-apk-${{ github.run_number }}
           path: ban-giao/*.apk
           retention-days: 30
 
@@ -79,7 +79,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
-          name: Ghi Nói v${{ github.run_number }}
+          name: Flowrite v${{ github.run_number }}
           body: |
             Bản dựng tự động từ nhánh `${{ github.ref_name }}`.
 

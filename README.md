@@ -1,4 +1,4 @@
-# Ghi Nói
+# Flowrite
 
 Một trang văn bản trắng. Gõ chữ bằng bàn phím, hoặc bấm nút micro rồi nói —
 chữ hiện ra theo thời gian thực, ngay tại vị trí con trỏ. Hai cách nhập chạy
@@ -13,7 +13,7 @@ Viết bằng **Flutter (Dart)** để sau này dựng thêm bản iOS từ cùn
 ## Lấy file APK
 
 Mỗi lần đẩy mã lên, GitHub Actions tự dựng APK và đưa vào mục
-**Releases** của kho này. Mở bằng điện thoại, tải tệp `GhiNoi-vN.apk`,
+**Releases** của kho này. Mở bằng điện thoại, tải tệp `Flowrite-vN.apk`,
 Android hỏi "cài từ nguồn không xác định" thì đồng ý.
 
 APK ký bằng khoá thử (debug key): cài vào máy riêng thì được, đưa lên
@@ -38,7 +38,7 @@ Phần Android do `flutter create` sinh ra lúc dựng, bằng đúng phiên b�
 đang dùng, rồi `tool/va_android.py` thêm vào những thứ riêng của app: quyền
 `RECORD_AUDIO`/`INTERNET`, khối `<queries>` khai `RecognitionService` (thiếu
 nó thì trên Android 11 trở lên micro im lặng mà không báo lỗi gì), tên hiển
-thị "Ghi Nói", và nâng `compileSdk` trong `build.gradle.kts` lên mức các gói
+thị "Flowrite", và nâng `compileSdk` trong `build.gradle.kts` lên mức các gói
 phụ thuộc đòi hỏi (ví dụ `permission_handler_android` đòi 37, cao hơn mức mặc
 định Flutter tạo sẵn) — thiếu bước này thì Gradle từ chối dựng ngay từ đầu.
 

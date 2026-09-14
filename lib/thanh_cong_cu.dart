@@ -275,14 +275,18 @@ class _NutThemMenu extends StatelessWidget {
             ),
             PopupMenuItem(
               value: 2,
-              child: Text('Chia sẻ ứng dụng này đến với mọi người'),
+              child: Text('Bật bộ điều hướng con trỏ văn bản'),
             ),
             PopupMenuItem(
               value: 3,
-              child: Text('Góp ý thêm, báo lỗi về ứng dụng'),
+              child: Text('Chia sẻ ứng dụng này đến với mọi người'),
             ),
             PopupMenuItem(
               value: 4,
+              child: Text('Góp ý thêm, báo lỗi về ứng dụng'),
+            ),
+            PopupMenuItem(
+              value: 5,
               child: Text('Donate ủng hộ Tác giả'),
             ),
           ],

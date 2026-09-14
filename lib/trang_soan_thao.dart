@@ -1034,7 +1034,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   style: const TextStyle(fontSize: 17, height: 1.5),
                   decoration: const InputDecoration(
                     border: InputBorder.none,
-                    hintText: 'Gõ chữ, hoặc bấm nút micro và nói…',
+                    hintText: 'Gõ chữ và Bấm Micro để nói...\n'
+                        'Thực hiện song song 2 việc trên cùng lúc',
                   ),
                 ),
               ),
@@ -1066,12 +1067,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               khiBamBanPhim: () => _moModalTam(
                 'Bàn phím',
                 Icons.keyboard_outlined,
-                'Bàn phím riêng của Ghi Nói sẽ cho bạn tự chọn ngôn ngữ và '
+                'Bàn phím riêng của Flowrite sẽ cho bạn tự chọn ngôn ngữ và '
                     'kiểu gõ, tích hợp sẵn nhiều ngôn ngữ và kiểu gõ khác '
                     'nhau trong cùng một nơi.\n\n'
                     'Hữu ích nhất cho máy chưa cài sẵn bàn phím ngôn ngữ '
                     'mình cần, hoặc khi bạn muốn dùng hẳn bàn phím và bộ gõ '
-                    'riêng của Ghi Nói thay vì bàn phím mặc định của máy.',
+                    'riêng của Flowrite thay vì bàn phím mặc định của máy.',
               ),
             ),
             SizedBox(height: caoBanPhim),

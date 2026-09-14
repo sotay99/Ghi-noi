@@ -34,7 +34,7 @@ class ManHinhHuongDan extends StatelessWidget {
                     children: [
                       _HopMoDau(),
                       SizedBox(height: 28),
-                      _MucLon(so: 'I', tieuDe: 'Vì sao Ghi Nói ra đời?'),
+                      _MucLon(so: 'I', tieuDe: 'Vì sao Flowrite ra đời?'),
                       SizedBox(height: 14),
                       _Doan(_doan1),
                       SizedBox(height: 12),
@@ -78,7 +78,7 @@ class ManHinhHuongDan extends StatelessWidget {
                       SizedBox(height: 14),
                       _Doan(_doan6),
                       SizedBox(height: 28),
-                      _MucLon(so: 'IV', tieuDe: 'Ghi Nói dành cho ai?'),
+                      _MucLon(so: 'IV', tieuDe: 'Flowrite dành cho ai?'),
                       SizedBox(height: 14),
                       _Doan(_doan7),
                       SizedBox(height: 14),
@@ -164,7 +164,7 @@ class _Hero extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           const Text(
-            'GHI NÓI',
+            'FLOWRITE',
             style: TextStyle(
               color: Colors.white,
               fontSize: 34,
@@ -230,7 +230,7 @@ class _HopMoDau extends StatelessWidget {
       ),
       child: const _Doan(
         'Nói và gõ tay, xưa nay luôn phải **chọn một**: bật giọng nói thì '
-        'tắt bàn phím, ngồi gõ thì im giọng nói. Ghi Nói phá bỏ luật đó — '
+        'tắt bàn phím, ngồi gõ thì im giọng nói. Flowrite phá bỏ luật đó — '
         'để bạn ==nói và gõ cùng lúc, không lẫn không đè lên nhau==, ra chữ '
         'nhanh hơn hẳn cách làm cũ.',
       ),
@@ -487,7 +487,7 @@ class _HangTheThongKe extends StatelessWidget {
         _TheThongKe(
           icon: Icons.bolt,
           mau: Color(0xFF188038),
-          nhan: 'Nói + gõ tay xen kẽ trong Ghi Nói',
+          nhan: 'Nói + gõ tay xen kẽ trong Flowrite',
           soLieu: 'Gấp 3–4 lần cách gõ tay thuần tuý',
           noiBat: true,
         ),
@@ -525,7 +525,7 @@ class _TheThongKe extends StatelessWidget {
             : null,
       ),
       // Xếp dọc, không xếp ngang: nhãn và số liệu cùng nằm trên một hàng thì
-      // hàng chữ dài (như "Nói + gõ tay xen kẽ trong Ghi Nói") ép ô còn lại
+      // hàng chữ dài (như "Nói + gõ tay xen kẽ trong Flowrite") ép ô còn lại
       // hẹp tới mức vỡ chữ ra từng ký tự một trên màn hình điện thoại. Xếp
       // dọc thì nhãn và số liệu đều được dùng toàn bộ bề ngang, không bao
       // giờ bị bóp bất kể màn hình rộng hay hẹp.
@@ -650,7 +650,7 @@ class _TrichDan extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            'Ghi Nói không thay bạn viết — nó chỉ dọn đường để ý tưởng của '
+            'Flowrite không thay bạn viết — nó chỉ dọn đường để ý tưởng của '
             'bạn ra tới trang giấy nhanh nhất có thể.',
             style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13.5, height: 1.5),
           ),
@@ -673,7 +673,7 @@ const _doan1 =
     'tự nhiên, an toàn, không giẫm chân lên nhau.';
 
 const _doan2 =
-    'Ghi Nói sinh ra chính là để giải quyết đúng nỗi bức xúc đó. Bạn có thể '
+    'Flowrite sinh ra chính là để giải quyết đúng nỗi bức xúc đó. Bạn có thể '
     'nói một câu dài, rồi ngay lập tức đưa tay gõ chèn một từ, một con số, '
     'một dấu câu — mà không cần tắt micro thủ công, không lo chữ bị lặp, '
     'không lo giọng nói và ký tự gõ tay "đá nhau" làm hỏng cả câu. Đây là bài '
@@ -684,19 +684,19 @@ const _doan2 =
 
 const _oGoiY1 =
     'Tất cả các ứng dụng gõ chính tả phổ biến hiện nay coi giọng nói và bàn '
-    'phím là **hai chế độ tách biệt**: bật cái này thì tắt cái kia. Ghi Nói '
+    'phím là **hai chế độ tách biệt**: bật cái này thì tắt cái kia. Flowrite '
     'là nỗ lực để hai chế độ đó ==chạy song song thật sự==, không phải giả '
     'lập bằng cách bật tắt luân phiên.';
 
 const _doan3 =
     'Tốc độ nói của một người bình thường nhanh hơn tốc độ gõ tay của người '
-    'gõ giỏi rất nhiều lần. Đây không phải là con số Ghi Nói tự nhận, mà là '
+    'gõ giỏi rất nhiều lần. Đây không phải là con số Flowrite tự nhận, mà là '
     'những mức tham khảo phổ biến vẫn được nhắc tới khi so sánh tốc độ nói '
     'và tốc độ gõ của con người:';
 
 const _doan4 =
     'Con số ~~gấp 3-4 lần~~ ở trên là ước tính MINH HOẠ cho trải nghiệm '
-    'thực tế khi bạn dùng Ghi Nói: phần lớn nội dung tuôn ra bằng giọng nói '
+    'thực tế khi bạn dùng Flowrite: phần lớn nội dung tuôn ra bằng giọng nói '
     'với tốc độ gần bằng lúc bạn nói chuyện, chỉ xen vào những đoạn gõ tay '
     'ngắn để sửa lỗi hoặc thêm chi tiết — chứ không phải một phép đo khoa '
     'học chính xác tuyệt đối cho mọi người, mọi giọng nói, mọi ngôn ngữ.';
@@ -719,13 +719,13 @@ const _hanCheGo = [
 ];
 
 const _doan6 =
-    'Ghi Nói để giọng nói lo phần **tốc độ** — tuôn ý tưởng ra thật nhanh — '
+    'Flowrite để giọng nói lo phần **tốc độ** — tuôn ý tưởng ra thật nhanh — '
     'và để đôi tay lo phần **độ chính xác** — sửa lỗi chính tả, thêm dấu câu, '
     'chỉnh câu chữ cho logic — ngay tại chỗ, ngay lúc đang nói, không cần '
     'dừng lại quy trình nào cả. Hai điểm yếu tự triệt tiêu lẫn nhau.';
 
 const _doan7 =
-    'Bất kỳ ai cần tạo ra văn bản NHIỀU và NHANH đều được lợi từ Ghi Nói, '
+    'Bất kỳ ai cần tạo ra văn bản NHIỀU và NHANH đều được lợi từ Flowrite, '
     'nhưng có vài nhóm người sẽ thấy sự khác biệt rõ rệt nhất:';
 
 const _doan8 =

@@ -1,6 +1,6 @@
-// Ghi Nói — một trang văn bản trắng, gõ phím và nói bằng micro cùng lúc, với
-// một cây thư mục để tổ chức nhiều ghi chú. Xem lib/trang_soan_thao.dart cho
-// phần soạn thảo, lib/man_hinh_thu_muc.dart cho phần quản lý thư mục, và
+// Flowrite — một trang văn bản trắng, gõ phím và nói bằng micro cùng lúc,
+// với một cây thư mục để tổ chức nhiều ghi chú. Xem lib/trang_soan_thao.dart
+// cho phần soạn thảo, lib/man_hinh_thu_muc.dart cho phần quản lý thư mục, và
 // lib/kho_du_lieu.dart cho phần lưu trữ.
 
 import 'package:flutter/material.dart';
@@ -11,17 +11,17 @@ import 'trang_soan_thao.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const UngDungGhiNoi());
+  runApp(const UngDungFlowrite());
 }
 
-class UngDungGhiNoi extends StatefulWidget {
-  const UngDungGhiNoi({super.key});
+class UngDungFlowrite extends StatefulWidget {
+  const UngDungFlowrite({super.key});
 
   @override
-  State<UngDungGhiNoi> createState() => _UngDungGhiNoiState();
+  State<UngDungFlowrite> createState() => _UngDungFlowriteState();
 }
 
-class _UngDungGhiNoiState extends State<UngDungGhiNoi> {
+class _UngDungFlowriteState extends State<UngDungFlowrite> {
   final _kho = KhoDuLieu();
   final _caiDat = CaiDat();
   String? _idGhiChuMoDau;
@@ -42,7 +42,7 @@ class _UngDungGhiNoiState extends State<UngDungGhiNoi> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Ghi Nói',
+      title: 'Flowrite',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,

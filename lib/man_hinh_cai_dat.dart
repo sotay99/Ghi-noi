@@ -326,7 +326,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
       moTa = 'Có thể do trước đây bạn từng từ chối và chọn "Không hỏi lại", '
           'hoặc có ai đó (kể cả chính bạn) vào Cài đặt máy rồi tắt quyền này '
           'đi. Ứng dụng không thể tự hỏi lại nữa — bấm nút bên dưới để mở '
-          'màn hình cài đặt riêng của Ghi Nói, rồi tự bật mục "Micro" lên.';
+          'màn hình cài đặt riêng của Flowrite, rồi tự bật mục "Micro" lên.';
       nut = FilledButton.icon(
         onPressed: _dangXuLyMicro ? null : _moCaiDatUngDung,
         icon: const Icon(Icons.settings_outlined),

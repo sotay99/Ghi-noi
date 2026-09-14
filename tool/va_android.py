@@ -3,7 +3,7 @@
 
 Thư mục android/ không nằm trong git (xem .gitignore): mỗi lần dựng, máy chủ
 tự sinh lại nó bằng đúng phiên bản Flutter đang dùng, rồi chạy script này để
-thêm những thứ riêng của Ghi Nói. Nhờ vậy không bao giờ lệch phiên bản Gradle.
+thêm những thứ riêng của Flowrite. Nhờ vậy không bao giờ lệch phiên bản Gradle.
 """
 import re
 import sys
@@ -83,7 +83,7 @@ def main() -> int:
         chu = chu.replace('<application', HOI + '\n    <application', 1)
 
     # Ten hien duoi bieu tuong tren man hinh chinh.
-    chu, n = re.subn(r'android:label="[^"]*"', 'android:label="Ghi Nói"', chu, count=1)
+    chu, n = re.subn(r'android:label="[^"]*"', 'android:label="Flowrite"', chu, count=1)
     if n == 0:
         print('Canh bao: khong thay android:label de doi ten', file=sys.stderr)
 
