@@ -265,9 +265,13 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
         laCuoiCung
             ? Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                child: Text(
-                  _rutGon(ten),
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                // Khoá theo id thư mục: mỗi lần bước vào (bằng cách nào cũng
+                // vậy — bấm thẻ, bấm lùi, bấm thanh địa chỉ) là một widget
+                // MỚI, nên hiệu ứng nhấp nháy tự chạy lại từ đầu mỗi lần.
+                child: _ChuMucNhayNhay(
+                  key: ValueKey('deang-${chuoi[i]}'),
+                  chu: _rutGon(ten),
+                  kieuChu: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                 ),
               )
             : InkWell(
@@ -486,6 +490,56 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Tên thư mục hiện tại ở thanh địa chỉ: phóng to gấp 1,4 lần rồi thu nhỏ lại
+/// mượt mà, lặp 4 lần rồi đứng im hẳn. Chạy đúng một lần khi widget này được
+/// TẠO MỚI — nơi gọi nó chịu trách nhiệm đổi `key` mỗi lần bước vào một thư
+/// mục để widget được dựng lại từ đầu, hiệu ứng nhờ vậy tự chạy lại.
+class _ChuMucNhayNhay extends StatefulWidget {
+  const _ChuMucNhayNhay({required super.key, required this.chu, required this.kieuChu});
+
+  final String chu;
+  final TextStyle kieuChu;
+
+  @override
+  State<_ChuMucNhayNhay> createState() => _ChuMucNhayNhayState();
+}
+
+class _ChuMucNhayNhayState extends State<_ChuMucNhayNhay>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _dieuKhien;
+  late final Animation<double> _tiLe;
+
+  @override
+  void initState() {
+    super.initState();
+    _dieuKhien = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 260),
+    );
+    _tiLe = Tween<double>(begin: 1.0, end: 1.4).animate(
+      CurvedAnimation(parent: _dieuKhien, curve: Curves.easeInOut),
+    );
+    // reverse:true để mỗi chu kỳ tự phóng to rồi thu nhỏ mượt mà; count:4 để
+    // lặp đúng 4 lần rồi tự dừng hẳn, không lặp mãi.
+    _dieuKhien.repeat(reverse: true, count: 4);
+  }
+
+  @override
+  void dispose() {
+    _dieuKhien.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _tiLe,
+      alignment: Alignment.centerLeft,
+      child: Text(widget.chu, style: widget.kieuChu),
     );
   }
 }
