@@ -20,6 +20,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamHuongDan,
     required this.khiBamAI,
     required this.khiBamBanPhim,
+    required this.khiBamKiemTraToanVan,
   });
 
   final bool bat;
@@ -38,6 +39,7 @@ class ThanhCongCu extends StatelessWidget {
   final VoidCallback khiBamHuongDan;
   final VoidCallback khiBamAI;
   final VoidCallback khiBamBanPhim;
+  final VoidCallback khiBamKiemTraToanVan;
 
   @override
   Widget build(BuildContext context) {
@@ -91,6 +93,12 @@ class ThanhCongCu extends StatelessWidget {
                         bieuTuong: Icons.folder_outlined,
                         nhan: 'Thư mục',
                         khiBam: khiBamThuMuc,
+                      ),
+                      NutNho(
+                        bieuTuong: Icons.task_alt,
+                        nhan: 'Kiểm tra toàn văn bằng AI',
+                        mau: Colors.green.shade600,
+                        khiBam: khiBamKiemTraToanVan,
                       ),
                       const _NutThemMenu(),
                     ],
@@ -172,11 +180,13 @@ class NutNho extends StatelessWidget {
     required this.bieuTuong,
     required this.nhan,
     required this.khiBam,
+    this.mau = const Color(0xFF5F6368),
   });
 
   final IconData bieuTuong;
   final String nhan;
   final VoidCallback khiBam;
+  final Color mau;
 
   @override
   Widget build(BuildContext context) {
@@ -191,7 +201,7 @@ class NutNho extends StatelessWidget {
           child: SizedBox(
             width: 38,
             height: 38,
-            child: Icon(bieuTuong, size: 20, color: const Color(0xFF5F6368)),
+            child: Icon(bieuTuong, size: 20, color: mau),
           ),
         ),
       ),
@@ -294,18 +304,22 @@ class _NutThemMenu extends StatelessWidget {
               value: 1,
               child: Text('Luyện gõ bàn phím bằng 10 ngón tay'),
             ),
+            PopupMenuDivider(),
             PopupMenuItem(
               value: 2,
               child: Text('Bật bộ điều hướng con trỏ văn bản'),
             ),
+            PopupMenuDivider(),
             PopupMenuItem(
               value: 3,
               child: Text('Chia sẻ ứng dụng này đến với mọi người'),
             ),
+            PopupMenuDivider(),
             PopupMenuItem(
               value: 4,
               child: Text('Góp ý thêm, báo lỗi về ứng dụng'),
             ),
+            PopupMenuDivider(),
             PopupMenuItem(
               value: 5,
               child: Text('Donate ủng hộ Tác giả'),

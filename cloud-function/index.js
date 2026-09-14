@@ -26,6 +26,13 @@ function huongDanTheoHanhDong(action, cauHoi) {
       return `Người dùng đang hỏi về đoạn văn bản bên dưới. Câu hỏi của họ: "${(cauHoi || '').slice(0, 2000)}". Trả lời bằng tiếng Việt, ngắn gọn, đi thẳng vào vấn đề, dựa trên nội dung văn bản được cung cấp:`;
     case 'chinh_ta':
       return 'Bạn là bộ kiểm tra CHÍNH TẢ tiếng Việt (không kiểm tra ngữ pháp, không kiểm tra dấu câu, không kiểm tra văn phong). Tìm mọi TỪ SAI CHÍNH TẢ trong đoạn văn bản sau. Với mỗi từ sai, xác định: "tu" (đúng từ sai, nguyên vẹn như trong bài), "viTri" (vị trí ký tự đầu tiên của từ đó, đếm từ 0, tính trên ĐÚNG đoạn văn bản được cung cấp bên dưới — không đếm trên gì khác), và "deXuat" (tối đa 3 từ đúng chính tả để thay thế, từ gần nghĩa/gần âm nhất trước). CHỈ trả về một mảng JSON hợp lệ, không kèm lời giải thích, không bọc trong dấu ```, đúng khuôn: [{"tu":"...","viTri":0,"deXuat":["...","..."]}]. Không có lỗi nào thì trả về mảng rỗng []. Đoạn văn bản cần kiểm tra:';
+    case 'toan_van':
+      return 'Bạn là biên tập viên tiếng Việt, soát lại TOÀN BỘ văn bản sau đây một cách kỹ lưỡng. Trả về DUY NHẤT một object JSON hợp lệ (không giải thích, không bọc trong dấu ```), đúng khuôn:\n' +
+        '{"chinhTa":[{"tu":"...","viTri":0,"deXuat":["...","..."]}],"khongPhuHop":[{"doan":"...","viTri":0,"deXuat":"..."}],"canXoa":[{"doan":"...","viTri":0}]}\n' +
+        '- "chinhTa": các từ hoặc CỤM TỪ sai chính tả. "tu" là nguyên văn cụm sai, "viTri" là vị trí ký tự bắt đầu (đếm từ 0) TRÊN TOÀN BỘ văn bản được cung cấp, "deXuat" tối đa 3 cụm đúng để thay thế.\n' +
+        '- "khongPhuHop": các ĐOẠN VĂN (một câu hoặc vài câu liền nhau) không phù hợp — câu từ lủng củng, lạc đề so với toàn bài, thừa ý, lặp đi lặp lại, có quá nhiều lỗi chính tả trong cùng đoạn, hoặc nên dùng đoạn khác hay hơn để thay. "doan" là NGUYÊN VĂN đúng từng ký tự của đoạn đó như trong bài (kể cả dấu câu, khoảng trắng), "viTri" là vị trí ký tự bắt đầu của "doan" trên toàn bộ văn bản, "deXuat" là đoạn văn bạn đề xuất để thay thế toàn bộ đoạn đó.\n' +
+        '- "canXoa": các ĐOẠN VĂN nên xoá hẳn, không cần thay bằng gì (thừa hoàn toàn, không đóng góp gì cho bài). "doan" là nguyên văn đoạn đó, "viTri" là vị trí ký tự bắt đầu.\n' +
+        'Mọi "viTri" đều đếm trên văn bản GỐC (chưa sửa gì). Loại nào không có gì thì để mảng rỗng []. Văn bản cần kiểm tra:';
     default:
       return null;
   }

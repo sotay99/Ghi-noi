@@ -13,6 +13,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 import 'cai_dat.dart';
 import 'kho_du_lieu.dart';
 import 'kiem_tra_chinh_ta.dart';
+import 'kiem_tra_toan_van.dart';
 import 'man_hinh_cai_dat.dart';
 import 'man_hinh_thu_muc.dart';
 import 'mo_hinh.dart';
@@ -20,19 +21,111 @@ import 'thanh_cong_cu.dart';
 import 'thong_bao_giua.dart';
 import 'trang_huong_dan.dart';
 
-/// Bộ điều khiển ô văn bản riêng, biết gạch đỏ chân những từ sai chính tả AI
-/// tìm được (`loi`) và báo lại khi người dùng bấm đúng vào một từ như vậy.
-/// Việc gạch chân được vẽ ngay trong `buildTextSpan` — cách duy nhất chèn
-/// định dạng riêng cho từng đoạn vào một `TextField` đang cho gõ được.
+/// Một vùng chữ AI cho là "không phù hợp" (câu từ lủng củng, lạc đề, thừa ý,
+/// lặp lại, quá nhiều lỗi chính tả, hoặc nên thay bằng đoạn khác hay hơn).
+/// Đoạn GỐC [batDauGoc, ketThucGoc) và đoạn ĐỀ XUẤT [batDauDeXuat,
+/// ketThucDeXuat) đều là chữ THẬT nằm trong văn bản — đoạn đề xuất được chèn
+/// ngay sau đoạn gốc lúc áp dụng kết quả AI, "nằm cạnh nhau" đúng như yêu cầu.
+class _VungKhongPhuHop {
+  _VungKhongPhuHop({
+    required this.batDauGoc,
+    required this.ketThucGoc,
+    required this.batDauDeXuat,
+    required this.ketThucDeXuat,
+  });
+
+  int batDauGoc;
+  int ketThucGoc;
+  int batDauDeXuat;
+  int ketThucDeXuat;
+
+  /// null = còn chờ người dùng quyết định (gốc đỏ gạch giữa, đề xuất xanh
+  /// gạch chân, đề xuất bấm được). 'xanh'/'do' = đã quyết định, đang nhấp
+  /// nháy giữa màu đó và màu chữ thường trong 4 giây trước khi hoá chữ đen.
+  String? nhapNhayMau;
+  bool sangMau = true;
+  Timer? henNhapNhay;
+}
+
+/// Một vùng chữ AI đề xuất xoá hẳn.
+class _VungCanXoa {
+  _VungCanXoa({required this.batDau, required this.ketThuc});
+
+  int batDau;
+  int ketThuc;
+  bool dangNhapNhay = false;
+  bool sangMau = true;
+  Timer? henNhapNhay;
+}
+
+/// Một khoảng chữ cần vẽ với kiểu riêng — bước trung gian để gộp cả ba nguồn
+/// (lỗi chính tả, đoạn không phù hợp, đoạn cần xoá) thành một danh sách duy
+/// nhất trước khi dựng TextSpan.
+class _VungVe {
+  _VungVe({required this.batDau, required this.ketThuc, this.style, this.recognizer});
+  final int batDau;
+  final int ketThuc;
+  final TextStyle? style;
+  final GestureRecognizer? recognizer;
+}
+
+/// Một mục kết quả "Kiểm tra toàn văn", gắn kèm vị trí gốc để sắp xếp và áp
+/// dụng lần lượt theo đúng thứ tự xuất hiện trong bài.
+sealed class _MucToanVan {
+  const _MucToanVan(this.viTri);
+  final int viTri;
+}
+
+class _MucChinhTaToanVan extends _MucToanVan {
+  const _MucChinhTaToanVan(this.goc) : super(goc.viTri);
+  final ChinhTaMuc goc;
+}
+
+class _MucKhongPhuHopToanVan extends _MucToanVan {
+  const _MucKhongPhuHopToanVan(this.goc) : super(goc.viTri);
+  final KhongPhuHopMuc goc;
+}
+
+class _MucCanXoaToanVan extends _MucToanVan {
+  const _MucCanXoaToanVan(this.goc) : super(goc.viTri);
+  final CanXoaMuc goc;
+}
+
+const _kieuGachDoDuoiSong = TextStyle(
+  decoration: TextDecoration.underline,
+  decorationColor: Colors.red,
+  decorationThickness: 2,
+  decorationStyle: TextDecorationStyle.wavy,
+);
+
+/// Bộ điều khiển ô văn bản riêng — vẽ mọi đánh dấu AI ngay trong văn bản:
+/// gạch đỏ dưới từ/cụm sai chính tả, đoạn không phù hợp (đỏ, gạch giữa thân)
+/// cạnh đoạn đề xuất thay thế (xanh, gạch chân), và đoạn đề xuất xoá (đỏ,
+/// gạch giữa thân). Việc vẽ diễn ra ngay trong `buildTextSpan` — cách duy
+/// nhất chèn định dạng riêng cho từng đoạn vào một `TextField` đang gõ được.
 class _BoDieuKhienChinhTa extends TextEditingController {
   _BoDieuKhienChinhTa({super.text});
 
-  /// Danh sách lỗi hiện có. Đây là NGUỒN DUY NHẤT của sự thật — trang soạn
-  /// thảo sửa trực tiếp danh sách này rồi gọi `notifyListeners()` để vẽ lại,
-  /// không giữ một bản sao nào khác.
+  /// Ba danh sách dưới đây là NGUỒN DUY NHẤT của sự thật — trang soạn thảo
+  /// sửa trực tiếp rồi gọi `notifyListeners()` để vẽ lại, không giữ bản sao.
   final List<LoiChinhTa> loi = [];
+  final List<_VungKhongPhuHop> khongPhuHop = [];
+  final List<_VungCanXoa> canXoa = [];
 
   void Function(LoiChinhTa loi, Offset viTriManHinh)? khiBamTuSai;
+  void Function(_VungKhongPhuHop vung, Offset viTriManHinh)? khiBamDoanKhongPhuHop;
+  void Function(_VungCanXoa vung, Offset viTriManHinh)? khiBamDoanCanXoa;
+
+  @override
+  void dispose() {
+    for (final k in khongPhuHop) {
+      k.henNhapNhay?.cancel();
+    }
+    for (final x in canXoa) {
+      x.henNhapNhay?.cancel();
+    }
+    super.dispose();
+  }
 
   @override
   TextSpan buildTextSpan({
@@ -41,29 +134,98 @@ class _BoDieuKhienChinhTa extends TextEditingController {
     required bool withComposing,
   }) {
     final vb = text;
-    if (loi.isEmpty || vb.isEmpty) return TextSpan(style: style, text: vb);
+    if (vb.isEmpty) return TextSpan(style: style, text: vb);
 
-    final sapXep = List<LoiChinhTa>.from(loi)
-      ..sort((a, b) => a.batDau.compareTo(b.batDau));
+    final vung = <_VungVe>[];
+
+    for (final l in loi) {
+      if (l.batDau < 0 || l.ketThuc > vb.length || l.batDau >= l.ketThuc) continue;
+      vung.add(_VungVe(
+        batDau: l.batDau,
+        ketThuc: l.ketThuc,
+        style: _kieuGachDoDuoiSong,
+        recognizer: TapGestureRecognizer()
+          ..onTapDown = (ct) => khiBamTuSai?.call(l, ct.globalPosition),
+      ));
+    }
+
+    for (final k in khongPhuHop) {
+      if (k.batDauGoc < 0 || k.ketThucDeXuat > vb.length) continue;
+      if (k.nhapNhayMau == null) {
+        if (k.batDauGoc < k.ketThucGoc) {
+          vung.add(_VungVe(
+            batDau: k.batDauGoc,
+            ketThuc: k.ketThucGoc,
+            style: TextStyle(
+              color: Colors.red.shade700,
+              decoration: TextDecoration.lineThrough,
+              decorationColor: Colors.red.shade700,
+              decorationThickness: 2,
+            ),
+          ));
+        }
+        if (k.batDauDeXuat < k.ketThucDeXuat) {
+          vung.add(_VungVe(
+            batDau: k.batDauDeXuat,
+            ketThuc: k.ketThucDeXuat,
+            style: TextStyle(
+              color: Colors.blue.shade700,
+              decoration: TextDecoration.underline,
+              decorationColor: Colors.blue.shade700,
+              decorationThickness: 2,
+            ),
+            recognizer: TapGestureRecognizer()
+              ..onTapDown = (ct) => khiBamDoanKhongPhuHop?.call(k, ct.globalPosition),
+          ));
+        }
+      } else if (k.sangMau) {
+        final laXanh = k.nhapNhayMau == 'xanh';
+        final batDau = laXanh ? k.batDauDeXuat : k.batDauGoc;
+        final ketThuc = laXanh ? k.ketThucDeXuat : k.ketThucGoc;
+        if (batDau < ketThuc && ketThuc <= vb.length) {
+          vung.add(_VungVe(
+            batDau: batDau,
+            ketThuc: ketThuc,
+            style: TextStyle(color: laXanh ? Colors.blue.shade700 : Colors.red.shade700),
+          ));
+        }
+      }
+      // sangMau == false trong lúc nhấp nháy: không thêm gì, chữ hiện màu mặc định.
+    }
+
+    for (final x in canXoa) {
+      if (x.batDau < 0 || x.ketThuc > vb.length || x.batDau >= x.ketThuc) continue;
+      if (!x.dangNhapNhay) {
+        vung.add(_VungVe(
+          batDau: x.batDau,
+          ketThuc: x.ketThuc,
+          style: TextStyle(
+            color: Colors.red.shade700,
+            decoration: TextDecoration.lineThrough,
+            decorationColor: Colors.red.shade700,
+            decorationThickness: 2,
+          ),
+          recognizer: TapGestureRecognizer()
+            ..onTapDown = (ct) => khiBamDoanCanXoa?.call(x, ct.globalPosition),
+        ));
+      } else if (x.sangMau) {
+        vung.add(_VungVe(
+          batDau: x.batDau,
+          ketThuc: x.ketThuc,
+          style: TextStyle(color: Colors.red.shade700),
+        ));
+      }
+    }
+
+    vung.sort((a, b) => a.batDau.compareTo(b.batDau));
+
     final children = <InlineSpan>[];
     var vt = 0;
-    for (final l in sapXep) {
-      if (l.batDau < vt || l.ketThuc > vb.length || l.batDau >= l.ketThuc) {
-        continue; // Vị trí không còn hợp lệ (văn bản đã đổi) — bỏ qua, vẽ như bình thường.
-      }
-      if (l.batDau > vt) children.add(TextSpan(text: vb.substring(vt, l.batDau)));
-      children.add(TextSpan(
-        text: vb.substring(l.batDau, l.ketThuc),
-        style: const TextStyle(
-          decoration: TextDecoration.underline,
-          decorationColor: Colors.red,
-          decorationThickness: 2,
-          decorationStyle: TextDecorationStyle.wavy,
-        ),
-        recognizer: TapGestureRecognizer()
-          ..onTapDown = (chiTiet) => khiBamTuSai?.call(l, chiTiet.globalPosition),
-      ));
-      vt = l.ketThuc;
+    for (final v in vung) {
+      if (v.batDau < vt) continue; // Chồng lấn với vùng đã vẽ trước — bỏ qua.
+      if (v.batDau > vt) children.add(TextSpan(text: vb.substring(vt, v.batDau)));
+      children.add(TextSpan(text: vb.substring(v.batDau, v.ketThuc), style: v.style, recognizer: v.recognizer));
+      vt = v.ketThuc;
     }
     if (vt < vb.length) children.add(TextSpan(text: vb.substring(vt)));
 
@@ -177,6 +339,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Timer? _henChinhTa;
   final _dichVuChinhTa = DichVuKiemTraChinhTa();
 
+  /// Đang có một lượt "Kiểm tra toàn văn bằng AI" chạy dở hay không — chặn
+  /// bấm nút này thêm lần nữa trong lúc đang chờ.
+  bool _dangKiemTraToanVan = false;
+  final _dichVuToanVan = DichVuKiemTraToanVan();
+
   @override
   void initState() {
     super.initState();
@@ -187,6 +354,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     WidgetsBinding.instance.addObserver(this);
     _boDieuKhien.addListener(_khiNguoiDungSua);
     _boDieuKhien.khiBamTuSai = _khiBamTuSai;
+    _boDieuKhien.khiBamDoanKhongPhuHop = _khiBamDoanKhongPhuHop;
+    _boDieuKhien.khiBamDoanCanXoa = _khiBamDoanCanXoa;
 
     final banDau = _ghiChuHienTai.noiDung;
     if (banDau.isNotEmpty) {
@@ -573,6 +742,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final moi = cu.replaceRange(_neo, het, chenVao);
 
     _dieuChinhLoiChinhTaSauKhiSua(_neo, het - _neo, chenVao.length);
+    _dieuChinhVungToanVanSauKhiSua(_neo, het - _neo, chenVao.length);
 
     _nguonKyTu.removeRange(_neo, het);
     _nguonKyTu.insertAll(_neo, List<bool>.filled(chenVao.length, false));
@@ -823,6 +993,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // cách vừa tự chèn ở trên.
     final soLuongXoa = _nguonKyTu.length - dau - duoi;
     _dieuChinhLoiChinhTaSauKhiSua(dau, soLuongXoa, doDaiChenVao + lechConTro);
+    _dieuChinhVungToanVanSauKhiSua(dau, soLuongXoa, doDaiChenVao + lechConTro);
     _nguonKyTu.removeRange(dau, dau + soLuongXoa);
     _nguonKyTu.insertAll(
       dau,
@@ -871,6 +1042,53 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // vòng lặp đệ quy vô hạn — đúng nguyên nhân app đơ cứng khi gõ tay. Dời
     // việc thông báo ra một microtask thì nó chạy SAU KHI toàn bộ lệnh gọi
     // hiện tại (kể cả _ghiVaoO cập nhật _chuGanNhat) đã xong.
+    scheduleMicrotask(_boDieuKhien.notifyListeners);
+  }
+
+  /// Y hệt [_dieuChinhLoiChinhTaSauKhiSua] nhưng cho hai danh sách của lượt
+  /// "Kiểm tra toàn văn": dời vùng nằm sau, bỏ vùng chồng lấn vào chỗ vừa
+  /// sửa. [boQua] dùng khi CHÍNH thao tác đang xử lý một vùng gây ra sự thay
+  /// đổi này (ví dụ chèn/xoá chữ của chính nó) — đừng tự bỏ nó khỏi danh
+  /// sách của chính nó.
+  void _dieuChinhVungToanVanSauKhiSua(int vitri, int soXoa, int soChen, {Object? boQua}) {
+    if (soXoa == 0 && soChen == 0) return;
+    final ketThucXoa = vitri + soXoa;
+    final lech = soChen - soXoa;
+
+    for (final k in List<_VungKhongPhuHop>.of(_boDieuKhien.khongPhuHop)) {
+      if (identical(k, boQua)) continue;
+      var bo = false;
+      if (k.batDauGoc >= ketThucXoa) {
+        k.batDauGoc += lech;
+        k.ketThucGoc += lech;
+      } else if (k.ketThucGoc > vitri) {
+        bo = true;
+      }
+      if (!bo) {
+        if (k.batDauDeXuat >= ketThucXoa) {
+          k.batDauDeXuat += lech;
+          k.ketThucDeXuat += lech;
+        } else if (k.ketThucDeXuat > vitri) {
+          bo = true;
+        }
+      }
+      if (bo) {
+        k.henNhapNhay?.cancel();
+        _boDieuKhien.khongPhuHop.remove(k);
+      }
+    }
+
+    for (final x in List<_VungCanXoa>.of(_boDieuKhien.canXoa)) {
+      if (identical(x, boQua)) continue;
+      if (x.batDau >= ketThucXoa) {
+        x.batDau += lech;
+        x.ketThuc += lech;
+      } else if (x.ketThuc > vitri) {
+        x.henNhapNhay?.cancel();
+        _boDieuKhien.canXoa.remove(x);
+      }
+    }
+
     scheduleMicrotask(_boDieuKhien.notifyListeners);
   }
 
@@ -975,11 +1193,297 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _nguonKyTu.insertAll(loi.batDau, List<bool>.filled(thayBang.length, true));
     _boDieuKhien.loi.remove(loi);
     _dieuChinhLoiChinhTaSauKhiSua(loi.batDau, loi.ketThuc - loi.batDau, thayBang.length);
+    _dieuChinhVungToanVanSauKhiSua(loi.batDau, loi.ketThuc - loi.batDau, thayBang.length);
 
     final viTri = loi.batDau + thayBang.length;
     _neo = viTri;
     _ghiVaoO(moi, viTri);
     _henLuu();
+  }
+
+  // ------------------------------------------------- kiểm tra toàn văn bằng AI
+
+  /// Bấm nút "Kiểm tra toàn văn bằng AI": gửi TOÀN BỘ văn bản hiện có lên
+  /// máy chủ AI soát lại một lượt, trong lúc chờ hiện popup có thể bấm "Dừng
+  /// ngay lập tức" để huỷ (kết quả về trễ vẫn bị vứt, không áp dụng gì cả).
+  Future<void> _khiBamKiemTraToanVan() async {
+    if (_dangKiemTraToanVan) return;
+    final vanBan = _boDieuKhien.text;
+    if (vanBan.trim().isEmpty) {
+      _bao('Chưa có văn bản nào để kiểm tra.');
+      return;
+    }
+
+    final daHuy = ValueNotifier<bool>(false);
+    setState(() => _dangKiemTraToanVan = true);
+
+    unawaited(showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 32,
+              height: 32,
+              child: CircularProgressIndicator(strokeWidth: 3),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'AI đang kiểm tra lại toàn văn để soát lỗi chính tả - ngữ '
+              'pháp, và đề xuất cách sửa đổi. Đây là bước quan trọng trước '
+              'khi hoàn thiện văn bản.',
+              textAlign: TextAlign.center,
+              style: TextStyle(height: 1.4),
+            ),
+          ],
+        ),
+        actions: [
+          Center(
+            child: FilledButton(
+              onPressed: () {
+                daHuy.value = true;
+                Navigator.of(ctx).pop();
+              },
+              style: FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
+              child: const Text('Dừng ngay lập tức'),
+            ),
+          ),
+        ],
+      ),
+    ));
+
+    KetQuaKiemTraToanVan? ketQua;
+    Object? loiXayRa;
+    try {
+      ketQua = await _dichVuToanVan.kiemTra(vanBan);
+    } catch (e) {
+      loiXayRa = e;
+    }
+
+    if (daHuy.value || !mounted) {
+      if (mounted) setState(() => _dangKiemTraToanVan = false);
+      return;
+    }
+
+    // Popup "đang kiểm tra" vẫn còn hiện (người dùng không bấm Dừng) — đóng
+    // nó lại trước khi báo kết quả.
+    Navigator.of(context, rootNavigator: true).pop();
+    setState(() => _dangKiemTraToanVan = false);
+
+    if (loiXayRa != null || ketQua == null) {
+      _bao('Không kiểm tra được: $loiXayRa');
+      return;
+    }
+
+    _apDungKetQuaToanVan(ketQua);
+    _henLuu();
+    _hienPopupXongTamThoi();
+  }
+
+  void _hienPopupXongTamThoi() {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          if (ctx.mounted) Navigator.of(ctx).pop();
+        });
+        return const AlertDialog(
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.check_circle, color: Colors.green),
+              SizedBox(width: 12),
+              Text('AI đã trả về kết quả'),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Đưa kết quả AI vào văn bản thật: từ/cụm sai chính tả gạch đỏ như bình
+  /// thường; đoạn "không phù hợp" thì CHÈN đoạn đề xuất ngay sau đoạn gốc
+  /// (một chữ thật nằm trong bài, không phải chữ ảo vẽ đè lên); đoạn "cần
+  /// xoá" chỉ đánh dấu, chưa xoá gì. Xử lý theo đúng thứ tự vị trí gốc (từ
+  /// đầu bài tới cuối), cộng dồn độ lệch mỗi lần chèn thêm chữ — không thì
+  /// các mục đứng sau sẽ trỏ nhầm chỗ.
+  void _apDungKetQuaToanVan(KetQuaKiemTraToanVan kq) {
+    final tatCa = <_MucToanVan>[
+      for (final c in kq.chinhTa) _MucChinhTaToanVan(c),
+      for (final k in kq.khongPhuHop) _MucKhongPhuHopToanVan(k),
+      for (final x in kq.canXoa) _MucCanXoaToanVan(x),
+    ]..sort((a, b) => a.viTri.compareTo(b.viTri));
+
+    var lech = 0;
+    for (final muc in tatCa) {
+      final vb = _boDieuKhien.text;
+      final viTriThuc = muc.viTri + lech;
+      if (viTriThuc < 0 || viTriThuc > vb.length) continue;
+
+      switch (muc) {
+        case _MucChinhTaToanVan(:final goc):
+          final ketThuc = viTriThuc + goc.tu.length;
+          if (ketThuc > vb.length || vb.substring(viTriThuc, ketThuc) != goc.tu) continue;
+          _boDieuKhien.loi.add(LoiChinhTa(
+            batDau: viTriThuc,
+            ketThuc: ketThuc,
+            tu: goc.tu,
+            deXuat: goc.deXuat,
+          ));
+
+        case _MucKhongPhuHopToanVan(:final goc):
+          final ketThucGoc = viTriThuc + goc.doan.length;
+          if (ketThucGoc > vb.length || vb.substring(viTriThuc, ketThucGoc) != goc.doan) continue;
+          final moi = vb.replaceRange(ketThucGoc, ketThucGoc, goc.deXuat);
+          _nguonKyTu.insertAll(ketThucGoc, List<bool>.filled(goc.deXuat.length, true));
+          final viTriConTro = ketThucGoc + goc.deXuat.length;
+          _ghiVaoO(moi, viTriConTro);
+          _boDieuKhien.khongPhuHop.add(_VungKhongPhuHop(
+            batDauGoc: viTriThuc,
+            ketThucGoc: ketThucGoc,
+            batDauDeXuat: ketThucGoc,
+            ketThucDeXuat: viTriConTro,
+          ));
+          lech += goc.deXuat.length;
+
+        case _MucCanXoaToanVan(:final goc):
+          final ketThuc = viTriThuc + goc.doan.length;
+          if (ketThuc > vb.length || vb.substring(viTriThuc, ketThuc) != goc.doan) continue;
+          _boDieuKhien.canXoa.add(_VungCanXoa(batDau: viTriThuc, ketThuc: ketThuc));
+      }
+    }
+
+    _boDieuKhien.notifyListeners();
+  }
+
+  /// Bắt đầu nhấp nháy 4 giây (đổi giữa [mau] và màu chữ thường, mỗi 250ms)
+  /// rồi tự hoá chữ đen như bình thường, xoá luôn khỏi danh sách.
+  void _batNhapNhayKhongPhuHop(_VungKhongPhuHop v, String mau) {
+    v.nhapNhayMau = mau;
+    v.sangMau = true;
+    v.henNhapNhay?.cancel();
+    var dem = 0;
+    v.henNhapNhay = Timer.periodic(const Duration(milliseconds: 250), (t) {
+      dem++;
+      v.sangMau = !v.sangMau;
+      if (dem >= 16) {
+        t.cancel();
+        _boDieuKhien.khongPhuHop.remove(v);
+      }
+      if (mounted) _boDieuKhien.notifyListeners();
+    });
+    _boDieuKhien.notifyListeners();
+  }
+
+  void _batNhapNhayCanXoa(_VungCanXoa x) {
+    x.dangNhapNhay = true;
+    x.sangMau = true;
+    x.henNhapNhay?.cancel();
+    var dem = 0;
+    x.henNhapNhay = Timer.periodic(const Duration(milliseconds: 250), (t) {
+      dem++;
+      x.sangMau = !x.sangMau;
+      if (dem >= 16) {
+        t.cancel();
+        _boDieuKhien.canXoa.remove(x);
+      }
+      if (mounted) _boDieuKhien.notifyListeners();
+    });
+    _boDieuKhien.notifyListeners();
+  }
+
+  /// Người dùng bấm vào đoạn ĐỀ XUẤT (xanh) cạnh một đoạn "không phù hợp".
+  Future<void> _khiBamDoanKhongPhuHop(_VungKhongPhuHop v, Offset viTriManHinh) async {
+    final chon = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        viTriManHinh.dx,
+        viTriManHinh.dy,
+        viTriManHinh.dx,
+        viTriManHinh.dy,
+      ),
+      items: const [
+        PopupMenuItem(value: 'dung', child: Text('Dùng đề xuất này')),
+        PopupMenuItem(value: 'bo', child: Text('Bỏ đề xuất này và trả lại như cũ')),
+      ],
+    );
+    if (chon == null || !mounted) return;
+    if (!_boDieuKhien.khongPhuHop.contains(v)) return; // Văn bản đổi trong lúc mở menu.
+
+    final vb = _boDieuKhien.text;
+    if (v.ketThucDeXuat > vb.length) {
+      _boDieuKhien.khongPhuHop.remove(v);
+      _boDieuKhien.notifyListeners();
+      return;
+    }
+
+    if (chon == 'dung') {
+      // Xoá đoạn GỐC, giữ đoạn ĐỀ XUẤT — cho đoạn đề xuất nhấp nháy xanh/đen.
+      final doDaiGoc = v.ketThucGoc - v.batDauGoc;
+      final moi = vb.replaceRange(v.batDauGoc, v.ketThucGoc, '');
+      _nguonKyTu.removeRange(v.batDauGoc, v.ketThucGoc);
+      _dieuChinhLoiChinhTaSauKhiSua(v.batDauGoc, doDaiGoc, 0);
+      _dieuChinhVungToanVanSauKhiSua(v.batDauGoc, doDaiGoc, 0, boQua: v);
+      v.ketThucGoc = v.batDauGoc;
+      v.batDauDeXuat -= doDaiGoc;
+      v.ketThucDeXuat -= doDaiGoc;
+      _ghiVaoO(moi, v.ketThucDeXuat);
+      _henLuu();
+      _batNhapNhayKhongPhuHop(v, 'xanh');
+    } else {
+      // Xoá đoạn ĐỀ XUẤT, giữ đoạn GỐC — cho đoạn gốc nhấp nháy đỏ/đen.
+      final doDaiDeXuat = v.ketThucDeXuat - v.batDauDeXuat;
+      final moi = vb.replaceRange(v.batDauDeXuat, v.ketThucDeXuat, '');
+      _nguonKyTu.removeRange(v.batDauDeXuat, v.ketThucDeXuat);
+      _dieuChinhLoiChinhTaSauKhiSua(v.batDauDeXuat, doDaiDeXuat, 0);
+      _dieuChinhVungToanVanSauKhiSua(v.batDauDeXuat, doDaiDeXuat, 0, boQua: v);
+      v.batDauDeXuat = v.ketThucDeXuat = v.ketThucGoc;
+      _ghiVaoO(moi, v.ketThucGoc);
+      _henLuu();
+      _batNhapNhayKhongPhuHop(v, 'do');
+    }
+  }
+
+  /// Người dùng bấm vào một đoạn AI đề xuất xoá.
+  Future<void> _khiBamDoanCanXoa(_VungCanXoa x, Offset viTriManHinh) async {
+    final chon = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        viTriManHinh.dx,
+        viTriManHinh.dy,
+        viTriManHinh.dx,
+        viTriManHinh.dy,
+      ),
+      items: const [
+        PopupMenuItem(value: 'xoa', child: Text('Chấp nhận xoá đoạn văn này')),
+        PopupMenuItem(value: 'khoiphuc', child: Text('Khôi phục đoạn văn này — không xoá')),
+      ],
+    );
+    if (chon == null || !mounted) return;
+    if (!_boDieuKhien.canXoa.contains(x)) return;
+
+    if (chon == 'xoa') {
+      final vb = _boDieuKhien.text;
+      if (x.ketThuc > vb.length) {
+        _boDieuKhien.canXoa.remove(x);
+        _boDieuKhien.notifyListeners();
+        return;
+      }
+      final doDai = x.ketThuc - x.batDau;
+      final moi = vb.replaceRange(x.batDau, x.ketThuc, '');
+      _nguonKyTu.removeRange(x.batDau, x.ketThuc);
+      _dieuChinhLoiChinhTaSauKhiSua(x.batDau, doDai, 0);
+      _dieuChinhVungToanVanSauKhiSua(x.batDau, doDai, 0, boQua: x);
+      _boDieuKhien.canXoa.remove(x);
+      _ghiVaoO(moi, x.batDau);
+      _henLuu();
+      _bao('Đã xoá đoạn văn.');
+    } else {
+      _batNhapNhayCanXoa(x);
+    }
   }
 
   // ----------------------------------------------------------- lùi/tiến tới
@@ -1376,6 +1880,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     'mình cần, hoặc khi bạn muốn dùng hẳn bàn phím và bộ gõ '
                     'riêng của Flowrite thay vì bàn phím mặc định của máy.',
               ),
+              khiBamKiemTraToanVan: _khiBamKiemTraToanVan,
             ),
             SizedBox(height: caoBanPhim),
           ],
