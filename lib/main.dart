@@ -4,6 +4,7 @@
 // đúng vị trí con trỏ. Micro không tắt khi người dùng gõ phím.
 
 import 'dart:async';
+import 'dart:math' as toan;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -55,7 +56,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   bool _dangNghe = false;
   bool _sanSang = false;
   String _loi = '';
-  double _doTo = 0;
+
+  /// Mấy mức âm gần nhất, để vẽ sóng. Mới nhất nằm ở cuối.
+  final List<double> _songAm = List<double>.filled(16, 0);
 
   /// Vị trí bắt đầu của câu đang đọc dở, và ĐÚNG đoạn chữ tạm đã chèn ở đó.
   ///
@@ -65,17 +68,27 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   int _neo = 0;
   String _chuTam = '';
 
+  /// Bỏ qua mọi kết quả còn lại của câu nói đang dở.
+  ///
+  /// Bật lên khi người dùng chạm vào bàn phím giữa chừng: đoạn chữ đã hiện ra
+  /// phải CHẾT CỨNG tại đó, không được tự sửa nữa. Nếu không bỏ qua, bộ nhận
+  /// dạng sẽ trả nốt cả câu và đổ nguyên câu ấy ra lần thứ hai.
+  bool _boQuaCauNay = false;
+  bool _dangCatCau = false;
+
   /// Bật lên khi chính ta đang sửa nội dung, để phân biệt với người gõ phím.
   /// Chỉ là lớp chắn thứ nhất: bộ gõ báo ngược trạng thái về một cách bất
   /// đồng bộ, lúc đó cờ này đã tắt rồi — nên còn hai lớp chắn nữa bên dưới.
   bool _tuSua = false;
 
-  /// Nội dung và thời điểm của lần ghi gần nhất do chính ta thực hiện.
+  /// Nội dung, vị trí con trỏ và thời điểm của lần ghi gần nhất do chính ta
+  /// thực hiện. Dùng để nhận ra đâu là trạng thái bộ gõ báo ngược về.
   String _chuGanNhat = '';
   int _viTriGanNhat = -1;
   DateTime _lucGhi = DateTime.fromMillisecondsSinceEpoch(0);
 
   Timer? _hen;
+  Timer? _henLuuTru;
   String? _maNgonNgu;
 
   @override
@@ -91,6 +104,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _hen?.cancel();
+    _henLuuTru?.cancel();
     _micro.cancel();
     _boDieuKhien.dispose();
     _oChu.dispose();
@@ -119,6 +133,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Future<void> _luuVanBan() async {
     final kho = await SharedPreferences.getInstance();
     await kho.setString(_khoaLuu, _boDieuKhien.text);
+  }
+
+  void _henLuu() {
+    _henLuuTru?.cancel();
+    _henLuuTru = Timer(const Duration(milliseconds: 600), _luuVanBan);
   }
 
   // ----------------------------------------------------------------- micro
@@ -188,13 +207,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Future<void> _batMicro() async {
     if (!_sanSang) return;
     _chotCauDangDoc();
+    _boQuaCauNay = false;
+    _dangCatCau = false;
     try {
       await _micro.listen(
         onResult: _khiCoChu,
         localeId: _maNgonNgu,
-        onSoundLevelChange: (muc) {
-          if (mounted) setState(() => _doTo = muc);
-        },
+        onSoundLevelChange: _khiDoiMucAm,
         listenOptions: SpeechListenOptions(
           partialResults: true,
           listenMode: ListenMode.dictation,
@@ -217,7 +236,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (mounted) {
       setState(() {
         _dangNghe = false;
-        _doTo = 0;
+        _songAm.fillRange(0, _songAm.length, 0);
       });
     }
   }
@@ -233,6 +252,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _datNeoTaiConTro();
       _batMicro();
     }
+  }
+
+  void _khiDoiMucAm(double muc) {
+    if (!mounted) return;
+    // Mức âm Android trả về nằm khoảng -2 đến 10. Ép về 0..1 cho dễ vẽ.
+    final chuan = ((muc + 2) / 12).clamp(0.0, 1.0);
+    setState(() {
+      for (var i = 0; i < _songAm.length - 1; i++) {
+        _songAm[i] = _songAm[i + 1];
+      }
+      _songAm[_songAm.length - 1] = chuan;
+    });
   }
 
   // ------------------------------------------------------- chèn chữ vào chỗ
@@ -265,6 +296,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void _khiCoChu(dynamic ketQua) {
     final noi = (ketQua.recognizedWords as String? ?? '').trim();
     final xong = ketQua.finalResult as bool? ?? false;
+
+    // Người dùng vừa gõ phím giữa chừng: chữ đã hiện ra phải nằm im. Nuốt hết
+    // phần còn lại của câu này, chờ câu mới.
+    if (_boQuaCauNay) {
+      if (xong) _boQuaCauNay = false;
+      return;
+    }
     if (noi.isEmpty) return;
 
     final cu = _boDieuKhien.text;
@@ -303,8 +341,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
   }
 
-  /// Mọi lần ghi do máy thực hiện đều đi qua đây, để ghi nhớ nội dung và thời
-  /// điểm — hai thứ dùng để nhận ra đâu là trạng thái bộ gõ báo ngược về.
+  /// Mọi lần ghi do máy thực hiện đều đi qua đây, để ghi nhớ nội dung, vị trí
+  /// con trỏ và thời điểm — ba thứ dùng để nhận ra trạng thái bộ gõ báo về.
   void _ghiVaoO(String chu, int viTri) {
     _tuSua = true;
     _boDieuKhien.value = TextEditingValue(
@@ -317,8 +355,27 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _lucGhi = DateTime.now();
   }
 
-  /// Người dùng gõ phím hoặc bấm để dời con trỏ. Phần chữ tạm đang hiện được
-  /// coi như đã xong, và câu nói tiếp theo sẽ rơi vào chỗ con trỏ mới.
+  /// Người dùng vừa chạm vào văn bản. Đoạn chữ đang nhảy được đóng băng ngay,
+  /// và câu nói đang dở bị cắt để nó không đổ ra lần nữa ở chỗ con trỏ mới.
+  void _dongBangDoanDangNhay() {
+    // Có đoạn nào đang được viết dở không? Không có thì chẳng có gì để đóng
+    // băng, và cũng đừng cắt câu — gõ phím lúc micro đang im mà cắt thì mỗi
+    // phím một lần khởi động lại, micro giật liên tục.
+    final dangVietDo = _chuTam.isNotEmpty;
+    _chuTam = '';
+    if (!dangVietDo) return;
+    if (!_muonNghe || _dangCatCau || !_micro.isListening) return;
+    _boQuaCauNay = true;
+    _dangCatCau = true;
+    // Cắt câu đang dở rồi mở ngay một lượt nghe mới, để người dùng nói tiếp
+    // được liền mà không mất cả câu.
+    _micro.stop().whenComplete(() {
+      _dangCatCau = false;
+      _henBatLai();
+    });
+  }
+
+  /// Người dùng gõ phím hoặc bấm để dời con trỏ.
   void _khiNguoiDungSua() {
     if (_tuSua) return;
 
@@ -327,9 +384,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (chu != _chuGanNhat) {
       // Chữ thật sự đổi mà không phải do ta → người dùng vừa gõ.
       _chuGanNhat = chu;
-      _chuTam = '';
       final chon = _boDieuKhien.selection;
       _neo = chon.isValid ? chon.end : chu.length;
+      _dongBangDoanDangNhay();
       _henLuu();
       return;
     }
@@ -346,16 +403,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         DateTime.now().difference(_lucGhi) < const Duration(milliseconds: 600);
     if (trungKhit || vuaGhiXong) return;
 
-    // (b) Người dùng thật sự chạm màn hình để dời con trỏ: chốt câu đang đọc
-    //     dở lại, câu sau sẽ rơi vào chỗ mới.
-    _chuTam = '';
+    // (b) Người dùng thật sự chạm màn hình để dời con trỏ.
     _neo = chon.end;
-  }
-
-  Timer? _henLuuTru;
-  void _henLuu() {
-    _henLuuTru?.cancel();
-    _henLuuTru = Timer(const Duration(milliseconds: 600), _luuVanBan);
+    _dongBangDoanDangNhay();
   }
 
   // ------------------------------------------------------------------- nút
@@ -379,6 +429,27 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ));
+  }
+
+  void _moModalTam(String tieuDe, IconData bieuTuong) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(bieuTuong, size: 28),
+        title: Text(tieuDe),
+        content: const Text(
+          'Tính năng đang nâng cấp.',
+          textAlign: TextAlign.center,
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
+    );
   }
 
   String _dichLoi(String ma) {
@@ -405,9 +476,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   @override
   Widget build(BuildContext context) {
-    final mau = Theme.of(context).colorScheme;
-
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         title: const Text('Ghi Nói'),
         backgroundColor: Colors.white,
@@ -422,6 +492,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         ],
       ),
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
             if (_loi.isNotEmpty)
@@ -451,7 +522,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                 child: TextField(
                   controller: _boDieuKhien,
                   focusNode: _oChu,
@@ -472,72 +543,203 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           ],
         ),
       ),
-      floatingActionButton: _NutMicro(
+      bottomNavigationBar: _ThanhCongCu(
         bat: _muonNghe,
         dangNghe: _dangNghe,
-        doTo: _doTo,
-        mau: mau,
-        khiBam: _sanSang ? _bamNutMicro : null,
+        songAm: _songAm,
+        sanSang: _sanSang,
+        khiBamMicro: _bamNutMicro,
+        khiBamCaiDat: () => _moModalTam('Cài đặt', Icons.settings_outlined),
+        khiBamHuongDan: () =>
+            _moModalTam('Hướng dẫn', Icons.help_outline_rounded),
       ),
     );
   }
 }
 
-/// Nút micro: vòng sáng quanh nút phình theo độ to của giọng nói, để người
-/// dùng biết máy đang thật sự nghe được mình.
-class _NutMicro extends StatelessWidget {
-  const _NutMicro({
+/// Thanh ngang dưới màn hình: cài đặt và hướng dẫn bên trái, micro ở giữa,
+/// sóng âm bên phải. Nằm trên bàn phím ảo khi bàn phím hiện lên.
+class _ThanhCongCu extends StatelessWidget {
+  const _ThanhCongCu({
     required this.bat,
     required this.dangNghe,
-    required this.doTo,
+    required this.songAm,
+    required this.sanSang,
+    required this.khiBamMicro,
+    required this.khiBamCaiDat,
+    required this.khiBamHuongDan,
+  });
+
+  final bool bat;
+  final bool dangNghe;
+  final List<double> songAm;
+  final bool sanSang;
+  final VoidCallback khiBamMicro;
+  final VoidCallback khiBamCaiDat;
+  final VoidCallback khiBamHuongDan;
+
+  @override
+  Widget build(BuildContext context) {
+    final mau = Theme.of(context).colorScheme;
+
+    return Material(
+      color: Colors.white,
+      elevation: 8,
+      child: SafeArea(
+        top: false,
+        child: Container(
+          height: 72,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: Color(0xFFE3E3E3))),
+          ),
+          child: Row(
+            children: [
+              // Bên trái: cài đặt rồi tới hướng dẫn.
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    IconButton(
+                      onPressed: khiBamCaiDat,
+                      icon: const Icon(Icons.settings_outlined),
+                      tooltip: 'Cài đặt',
+                      color: const Color(0xFF5F6368),
+                    ),
+                    IconButton(
+                      onPressed: khiBamHuongDan,
+                      icon: const Icon(Icons.help_outline_rounded),
+                      tooltip: 'Hướng dẫn',
+                      color: const Color(0xFF5F6368),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Giữa: nút micro.
+              _NutMicroTron(
+                bat: bat,
+                sanSang: sanSang,
+                mau: mau,
+                khiBam: sanSang ? khiBamMicro : null,
+              ),
+
+              // Bên phải: sóng âm cho biết micro có nghe được gì không.
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _SongAm(muc: songAm, dangNghe: bat && dangNghe),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NutMicroTron extends StatelessWidget {
+  const _NutMicroTron({
+    required this.bat,
+    required this.sanSang,
     required this.mau,
     required this.khiBam,
   });
 
   final bool bat;
-  final bool dangNghe;
-  final double doTo;
+  final bool sanSang;
   final ColorScheme mau;
   final VoidCallback? khiBam;
 
   @override
   Widget build(BuildContext context) {
-    final muc = (doTo.clamp(0, 10)) / 10.0;
-    // Vòng phải lớn hơn nút (96px) mới thò ra ngoài mà nhìn thấy được.
-    final vong = bat ? 104.0 + muc * 44.0 : 0.0;
+    final nen = !sanSang
+        ? Colors.grey.shade400
+        : (bat ? Colors.red.shade600 : mau.primary);
 
-    return SizedBox(
-      width: 152,
-      height: 152,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          if (bat)
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 120),
-              width: vong,
-              height: vong,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.red.withValues(alpha: 0.18),
-              ),
-            ),
-          FloatingActionButton.large(
-            onPressed: khiBam,
-            backgroundColor: khiBam == null
-                ? Colors.grey.shade400
-                : (bat ? Colors.red.shade600 : mau.primary),
-            foregroundColor: Colors.white,
-            tooltip: bat ? 'Tắt micro' : 'Bật micro',
+    return Semantics(
+      button: true,
+      label: bat ? 'Tắt micro' : 'Bật micro',
+      child: Material(
+        color: nen,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: khiBam,
+          child: SizedBox(
+            width: 56,
+            height: 56,
             child: Icon(
-              bat
-                  ? (dangNghe ? Icons.mic : Icons.mic_none)
-                  : Icons.mic_off_outlined,
-              size: 34,
+              bat ? Icons.mic : Icons.mic_none,
+              color: Colors.white,
+              size: 28,
             ),
           ),
-        ],
+        ),
       ),
     );
   }
+}
+
+/// Mấy vạch nhảy theo giọng nói. Micro tắt thì nằm im thành một đường phẳng —
+/// nhìn vào là biết ngay máy có đang nghe thấy mình hay không.
+class _SongAm extends StatelessWidget {
+  const _SongAm({required this.muc, required this.dangNghe});
+
+  final List<double> muc;
+  final bool dangNghe;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 84,
+      height: 32,
+      child: CustomPaint(
+        painter: _VeSongAm(
+          muc: muc,
+          mau: dangNghe ? Colors.red.shade600 : const Color(0xFFBDBDBD),
+          dangNghe: dangNghe,
+        ),
+      ),
+    );
+  }
+}
+
+class _VeSongAm extends CustomPainter {
+  _VeSongAm({required this.muc, required this.mau, required this.dangNghe});
+
+  final List<double> muc;
+  final Color mau;
+  final bool dangNghe;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final but = Paint()
+      ..color = mau
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 3;
+
+    final soVach = muc.length;
+    final buoc = size.width / soVach;
+    final giua = size.height / 2;
+
+    for (var i = 0; i < soVach; i++) {
+      final x = buoc * i + buoc / 2;
+      final cao = dangNghe
+          ? toan.max(3.0, muc[i] * size.height)
+          : 3.0;
+      canvas.drawLine(
+        Offset(x, giua - cao / 2),
+        Offset(x, giua + cao / 2),
+        but,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _VeSongAm cu) => true;
 }
