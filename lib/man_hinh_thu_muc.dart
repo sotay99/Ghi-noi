@@ -2,8 +2,13 @@
 // mục và ghi chú. Bấm vào một ghi chú thì trả id của nó về cho trang soạn
 // thảo qua Navigator.pop; đi dạo rồi quay lại tay không thì trả về null.
 
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'kho_du_lieu.dart';
 import 'mo_hinh.dart';
@@ -137,6 +142,26 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     await _kho.luu();
     if (xoaCaGhiChuDangMo && mounted) {
       _bao('Ghi chú đang mở nằm trong thư mục vừa xoá.');
+    }
+  }
+
+  /// Xuất ghi chú thành một tệp .txt rồi mở màn hình chia sẻ của máy — dạng
+  /// tệp đơn giản nhất, mở được và gửi đi được ở bất cứ đâu. Android hiện đại
+  /// không cho ứng dụng tự ý ghi thẳng vào thư mục Tải xuống công khai nữa
+  /// (phải xin quyền lưu trữ nặng nề), nên đi qua màn hình chia sẻ sẵn có của
+  /// máy — người dùng chọn "Lưu vào máy"/"Tệp" hoặc gửi thẳng đi nơi khác.
+  Future<void> _taiVeGhiChu(GhiChuFile g) async {
+    try {
+      final tenTep = '${g.ten.trim().isEmpty ? 'Ghi chú' : g.ten.trim()}.txt';
+      final thuMucTam = await getTemporaryDirectory();
+      final tep = File('${thuMucTam.path}/$tenTep');
+      await tep.writeAsString(g.noiDung, encoding: utf8);
+
+      await SharePlus.instance.share(
+        ShareParams(files: [XFile(tep.path)], subject: g.ten),
+      );
+    } catch (_) {
+      _bao('Không xuất được tệp. Thử lại sau.');
     }
   }
 
@@ -423,6 +448,9 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                   case 'chep':
                                     _dat(_LoaiChoDan.chepGhiChu, g.id, g.ten);
                                     break;
+                                  case 'tai_ve':
+                                    _taiVeGhiChu(g);
+                                    break;
                                   case 'xoa':
                                     _xoaGhiChu(g);
                                     break;
@@ -440,6 +468,10 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                 PopupMenuItem(
                                   value: 'chep',
                                   child: Text('Sao chép'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'tai_ve',
+                                  child: Text('Tải về'),
                                 ),
                                 PopupMenuItem(
                                   value: 'xoa',

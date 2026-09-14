@@ -16,6 +16,7 @@ import 'man_hinh_thu_muc.dart';
 import 'mo_hinh.dart';
 import 'thanh_cong_cu.dart';
 import 'thong_bao_giua.dart';
+import 'trang_huong_dan.dart';
 
 class TrangSoanThao extends StatefulWidget {
   const TrangSoanThao({
@@ -915,8 +916,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               khiBamMicro: _bamNutMicro,
               khiBamThuMuc: _moManHinhThuMuc,
               khiBamCaiDat: _moCaiDat,
-              khiBamHuongDan: () =>
-                  _moModalTam('Hướng dẫn', Icons.help_outline_rounded),
+              khiBamHuongDan: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ManHinhHuongDan()),
+              ),
               khiBamAI: () =>
                   _moModalTam('Làm việc với AI', Icons.smart_toy_outlined),
               khiBamBanPhim: () =>
