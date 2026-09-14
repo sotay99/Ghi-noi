@@ -756,15 +756,31 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (mounted) _bao('Đã xoá toàn bộ văn bản.');
   }
 
-  void _moModalTam(String tieuDe, IconData bieuTuong) {
+  void _moModalTam(String tieuDe, IconData bieuTuong, [String? moTaThem]) {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         icon: Icon(bieuTuong, size: 28),
         title: Text(tieuDe),
-        content: const Text(
-          'Tính năng đang nâng cấp.',
-          textAlign: TextAlign.center,
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Tính năng đang nâng cấp.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              if (moTaThem != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  moTaThem,
+                  textAlign: TextAlign.left,
+                  style: const TextStyle(height: 1.5, color: Color(0xFF5F6368)),
+                ),
+              ],
+            ],
+          ),
         ),
         actionsAlignment: MainAxisAlignment.center,
         actions: [
@@ -919,10 +935,25 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               khiBamHuongDan: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const ManHinhHuongDan()),
               ),
-              khiBamAI: () =>
-                  _moModalTam('Làm việc với AI', Icons.smart_toy_outlined),
-              khiBamBanPhim: () =>
-                  _moModalTam('Bàn phím', Icons.keyboard_outlined),
+              khiBamAI: () => _moModalTam(
+                'Làm việc với AI',
+                Icons.smart_toy_outlined,
+                'AI sẽ giúp bạn tóm tắt văn bản, mở rộng văn bản, gọt dũa '
+                    'câu chữ, đề xuất ý tưởng dựa trên nội dung đang có, và '
+                    'trò chuyện thêm về mọi thứ liên quan tới văn bản này.\n\n'
+                    'AI chỉ trả về kết quả bằng văn bản — không trả về âm '
+                    'thanh, hình ảnh, video hay bất kỳ loại tệp tin nào khác.',
+              ),
+              khiBamBanPhim: () => _moModalTam(
+                'Bàn phím',
+                Icons.keyboard_outlined,
+                'Bàn phím riêng của Ghi Nói sẽ cho bạn tự chọn ngôn ngữ và '
+                    'kiểu gõ, tích hợp sẵn nhiều ngôn ngữ và kiểu gõ khác '
+                    'nhau trong cùng một nơi.\n\n'
+                    'Hữu ích nhất cho máy chưa cài sẵn bàn phím ngôn ngữ '
+                    'mình cần, hoặc khi bạn muốn dùng hẳn bàn phím và bộ gõ '
+                    'riêng của Ghi Nói thay vì bàn phím mặc định của máy.',
+              ),
             ),
             SizedBox(height: caoBanPhim),
           ],

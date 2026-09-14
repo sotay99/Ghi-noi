@@ -111,6 +111,14 @@ class ManHinhHuongDan extends StatelessWidget {
                         tieuDe: 'Học gõ mười ngón, không nhìn phím',
                         noiDung: _oGoiYMuoiNgon,
                       ),
+                      SizedBox(height: 12),
+                      _OGoiY(
+                        icon: Icons.mic_external_on_outlined,
+                        mau: Color(0xFFD01884),
+                        mauNen: Color(0xFFFCE4EC),
+                        tieuDe: 'Dùng micro rời — nghe rõ hơn hẳn',
+                        noiDung: _oGoiYMicroRoi,
+                      ),
                       SizedBox(height: 28),
                       _TrichDan(),
                       SizedBox(height: 8),
@@ -173,6 +181,26 @@ class _Hero extends StatelessWidget {
               fontSize: 16,
               height: 1.5,
               fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Số phiên bản cố định tại đây — chỉ đổi khi có yêu cầu, hoặc khi
+          // app lên chợ ứng dụng thì đổi theo đúng bản phát hành thật.
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+            ),
+            child: const Text(
+              'Phiên bản v1.1',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+              ),
             ),
           ),
         ],
@@ -614,9 +642,10 @@ class _TrichDan extends StatelessWidget {
           const Icon(Icons.format_quote, color: Colors.white70, size: 30),
           const SizedBox(height: 8),
           const Text(
-            'Kết hợp cả bốn điều trên — nói và gõ không xung đột, bàn phím '
-            'tốt, bộ gõ đúng ngôn ngữ, và đôi tay đã luyện mười ngón — bạn sẽ '
-            'đứng vào nhóm những người soạn thảo văn bản nhanh nhất thế giới.',
+            'Kết hợp cả năm điều trên — nói và gõ không xung đột, bàn phím '
+            'tốt, bộ gõ đúng ngôn ngữ, đôi tay đã luyện mười ngón, và một '
+            'chiếc micro nghe rõ từng lời — bạn sẽ đứng vào nhóm những người '
+            'soạn thảo văn bản nhanh nhất thế giới.',
             style: TextStyle(color: Colors.white, fontSize: 16.5, fontWeight: FontWeight.w700, height: 1.5),
           ),
           const SizedBox(height: 14),
@@ -726,3 +755,14 @@ const _oGoiYMuoiNgon =
     'tìm "luyện gõ mười ngón" hoặc "typing practice" là ra hàng loạt lựa '
     'chọn để luyện tập mỗi ngày vài phút. Kiên trì một thời gian ngắn, tốc '
     'độ gõ của bạn có thể tăng gấp đôi, gấp ba so với gõ theo bản năng.';
+
+const _oGoiYMicroRoi =
+    'Micro của điện thoại thường nằm ở cạnh dưới máy — càng xa miệng, máy '
+    'càng khó nghe rõ, càng dễ nhận nhầm chữ. Một chiếc **micro rời** (micro '
+    'cài áo, tai nghe có micro) đặt gần miệng hơn hẳn, giúp bộ nhận dạng '
+    'nghe chuẩn hơn thấy rõ.\n\n'
+    'Vài mẹo nhỏ giúp giọng nói tới máy sạch nhất: luôn để micro **sát '
+    'miệng**, ưu tiên loại có ==bộ lọc chống ồn== nếu có điều kiện, và cố '
+    'gắng thu âm ở nơi yên tĩnh. Ở chỗ ồn mà không có micro rời, một mẹo đơn '
+    'giản là lấy tay khum lại che quanh miệng và micro của máy — vừa chắn '
+    'bớt tiếng ồn xung quanh, vừa hướng giọng nói thẳng vào micro.';
