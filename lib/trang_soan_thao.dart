@@ -445,7 +445,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Widget _goiYTrong() {
     if (_boDieuKhien.text.isNotEmpty) return const SizedBox.shrink();
     const mauChuMo = Color(0xFF9E9E9E);
-    return const RichText(
+    return RichText(
       text: TextSpan(
         style: TextStyle(fontSize: 17, height: 1.5, color: mauChuMo),
         children: [
