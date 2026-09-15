@@ -293,9 +293,18 @@ class NutNho extends StatelessWidget {
         child: InkResponse(
           onTap: khiBam,
           radius: 22,
-          child: SizedBox(
+          child: Container(
             width: 38,
             height: 38,
+            alignment: Alignment.center,
+            // Nền trắng RIÊNG của nút — không lấy màu nền của thanh công cụ
+            // (thường là trắng, nhưng đổi hồng nhạt lúc micro bật). Trắng
+            // trên trắng thì không thấy khác gì, nhưng trên nền hồng thì nút
+            // vẫn giữ nguyên trắng, không bị nhuộm theo.
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
             child: Icon(bieuTuong, size: 20, color: mau),
           ),
         ),
@@ -325,7 +334,10 @@ class _KhungNutRong extends StatelessWidget {
     return Container(
       height: 32,
       padding: const EdgeInsets.symmetric(horizontal: 10),
+      // Nền trắng riêng, không lấy màu nền của thanh công cụ — xem giải
+      // thích ở NutNho.
       decoration: BoxDecoration(
+        color: Colors.white,
         border: Border.all(color: const Color(0xFFDADCE0)),
         borderRadius: BorderRadius.circular(16),
       ),
@@ -566,15 +578,23 @@ class _NutThemMenu extends StatelessWidget {
         child: PopupMenuButton<int>(
           padding: EdgeInsets.zero,
           splashRadius: 20,
-          icon: rong
-              ? null
-              : const Icon(Icons.add_circle_outline, size: 20, color: Color(0xFF5F6368)),
           child: rong
               ? const _KhungNutRong(
                   bieuTuong: Icons.add_circle_outline,
                   nhan: 'Thêm lựa chọn',
                 )
-              : null,
+              : Container(
+                  width: 38,
+                  height: 38,
+                  alignment: Alignment.center,
+                  // Nền trắng riêng — cùng lý do với NutNho.
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.add_circle_outline,
+                      size: 20, color: Color(0xFF5F6368)),
+                ),
           onSelected: (gia) {
             if (gia == 4) khiBamBanPhim();
           },

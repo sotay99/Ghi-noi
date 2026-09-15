@@ -95,7 +95,7 @@ class _MucCanXoaToanVan extends _MucToanVan {
 const _kieuGachDoDuoiSong = TextStyle(
   decoration: TextDecoration.underline,
   decorationColor: Colors.red,
-  decorationThickness: 2,
+  decorationThickness: 4, // Gấp đôi mức cũ (2) — theo yêu cầu, nhìn rõ hơn hẳn.
   decorationStyle: TextDecorationStyle.wavy,
 );
 
@@ -360,40 +360,62 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     inherit: false,
   );
 
+  /// Khoá của chính TextField và của Stack bọc ngoài nó — `_chamCuoiVanBan`
+  /// dùng hai khoá này để tìm thẳng `RenderEditable` THẬT đang vẽ ô soạn
+  /// thảo, thay vì tự đo lại bằng một `TextPainter` riêng.
+  final _oVanBanKey = GlobalKey();
+  final _khungVanBanKey = GlobalKey();
+
+  /// Dò xuống cây RenderObject tìm `RenderEditable` — chính là render object
+  /// mà `TextField` dùng để vẽ chữ và đặt con trỏ thật. `visitChildren` không
+  /// có cách dừng giữa chừng nên vẫn duyệt hết, nhưng `??=` đảm bảo chỉ giữ
+  /// kết quả tìm thấy ĐẦU TIÊN.
+  RenderEditable? _timRenderEditable(RenderObject o) {
+    if (o is RenderEditable) return o;
+    RenderEditable? ket;
+    o.visitChildren((con) => ket ??= _timRenderEditable(con));
+    return ket;
+  }
+
   /// Chấm tròn tím báo hiệu cuối văn bản, luôn bám sát ngay sau ký tự cuối
-  /// cùng. Đo lại vị trí bằng TextPainter với cùng kiểu chữ/bề ngang khung
-  /// như TextField thật — cách duy nhất biết chữ cuối rơi vào dòng nào sau
-  /// khi tự động xuống dòng, mà không phải tự dựng lại một RenderEditable.
+  /// cùng.
   ///
-  /// Dựng TextSpan bằng CHÍNH `_boDieuKhien.buildTextSpan` (không phải một
-  /// TextSpan trần chỉ có `chu`) — ô văn bản thật vẽ các đoạn đánh dấu AI
-  /// (chính tả, không phù hợp, cần xoá) bằng kiểu chữ khác nhau xen giữa
-  /// văn bản; đo bằng một kiểu chữ đồng nhất cho cả chuỗi sẽ ra độ rộng khác
-  /// hẳn, khiến chỗ xuống dòng bị lệch và chấm tròn nhảy sai dòng.
-  Widget _chamCuoiVanBan(BuildContext context, double rongKhung) {
+  /// Lần trước dùng một `TextPainter` riêng để tự đo lại vị trí — tưởng đo
+  /// đúng kiểu chữ là khớp, nhưng NHIỀU thứ khác có thể âm thầm làm hai bên
+  /// đo ra kết quả khác nhau (hệ số phóng chữ của hệ điều hành, đệm bên
+  /// trong TextField, cách bẻ dòng...), sai một chút thôi là dồn lại thành
+  /// lệch hẳn khi câu dài. Thay vì đoán tiếp xem còn thiếu gì, HỎI THẲNG
+  /// chính `RenderEditable` (render object THẬT đang vẽ con trỏ) xem con trỏ
+  /// cuối văn bản nằm ở đâu — `getLocalRectForCaret` là hàm nội bộ Flutter
+  /// dùng để tự vẽ con trỏ thật, nên tuyệt đối khớp, không còn gì để lệch.
+  Widget _chamCuoiVanBan() {
     final chu = _boDieuKhien.text;
     if (chu.isEmpty) return const SizedBox.shrink();
 
-    final tp = TextPainter(
-      text: _boDieuKhien.buildTextSpan(
-        context: context,
-        style: _kieuVanBan,
-        withComposing: false,
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout(maxWidth: rongKhung);
-    final viTri = tp.getOffsetForCaret(
-      TextPosition(offset: chu.length),
-      Rect.zero,
-    );
-    final cuon = _cuonVanBan.hasClients ? _cuonVanBan.offset : 0.0;
+    final hopVanBan = _oVanBanKey.currentContext?.findRenderObject();
+    final khungBox = _khungVanBanKey.currentContext?.findRenderObject();
+    if (hopVanBan == null || khungBox is! RenderBox || !khungBox.hasSize) {
+      return const SizedBox.shrink();
+    }
+    final re = _timRenderEditable(hopVanBan);
+    if (re == null || !re.hasSize) return const SizedBox.shrink();
 
     const duongKinh = 17.0;
+    Rect goc;
+    Offset diem;
+    try {
+      goc = re.getLocalRectForCaret(TextPosition(offset: chu.length));
+      diem = re.localToGlobal(goc.topLeft, ancestor: khungBox);
+    } catch (_) {
+      // Render object vừa đổi kích thước giữa chừng (xoay màn hình, bàn phím
+      // ảo mở/đóng) — bỏ qua khung hình này, AnimatedBuilder sẽ tự vẽ lại
+      // ngay khi ổn định.
+      return const SizedBox.shrink();
+    }
+
     return Positioned(
-      left: viTri.dx + 2,
-      top: viTri.dy -
-          cuon +
-          (_kieuVanBan.fontSize! * _kieuVanBan.height! - duongKinh) / 2,
+      left: diem.dx + 2,
+      top: diem.dy + (goc.height - duongKinh) / 2,
       child: Container(
         width: duongKinh,
         height: duongKinh,
@@ -2158,11 +2180,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                child: LayoutBuilder(
-                  builder: (context, rangBuoc) {
-                    return Stack(
+                child: Stack(
+                      key: _khungVanBanKey,
                       children: [
                         TextField(
+                          key: _oVanBanKey,
                           controller: _boDieuKhien,
                           focusNode: _oChu,
                           scrollController: _cuonVanBan,
@@ -2198,15 +2220,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                             child: AnimatedBuilder(
                               animation: Listenable.merge([_boDieuKhien, _cuonVanBan]),
                               builder: (context, _) => Stack(
-                                children: [_chamCuoiVanBan(context, rangBuoc.maxWidth)],
+                                children: [_chamCuoiVanBan()],
                               ),
                             ),
                           ),
                         ),
                       ],
-                    );
-                  },
-                ),
+                    ),
               ),
             ),
             ThanhCongCu(
