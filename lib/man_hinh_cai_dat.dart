@@ -654,7 +654,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
 }
 
 const _giaiThichTuTatMicroNgan = '''
-Micro đang bật mà quá lâu không có thêm chữ nào (nói hay gõ tay đều tính) thì tự tắt hẳn, đỡ hao pin. Chỉnh từ **10 đến 60 giây**.
+Micro đang bật mà quá lâu không có thêm chữ nào (nói hay gõ tay đều tính) thì tự tắt hẳn, đỡ hao pin. Chỉnh từ **10 đến 120 giây**.
 ''';
 
 const _giaiThichTuTatMicro = '''

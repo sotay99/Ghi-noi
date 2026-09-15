@@ -353,7 +353,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Cài đặt (widget.caiDat.thoiGianTuTatMicroGiay).
   Timer? _henTuTatMicroImLang;
 
-  /// Chấm tròn tím cuối văn bản mờ đi còn 50% trong lúc CÒN ĐANG có ký tự
+  /// Chấm tròn tím cuối văn bản mờ đi còn 35% trong lúc CÒN ĐANG có ký tự
   /// mới xuất hiện (gõ tay hay do nói ra đều tính) — im hẳn 4 giây không
   /// thêm ký tự nào nữa thì mới sáng rõ 100% trở lại. Mỗi ký tự mới xuất
   /// hiện thì hẹn giờ này lại được đặt lại từ đầu.
@@ -438,6 +438,32 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     return ket;
   }
 
+  /// Chữ gợi ý hiện khi bài còn trống trơn — thay cho `InputDecoration
+  /// .hintText` (chỉ nhận chuỗi trần) vì cần chèn một icon "?" tròn NGAY
+  /// GIỮA câu, y hệt icon nút Hướng dẫn ở thanh công cụ ngang
+  /// (`Icons.help_outline_rounded`), không phải ký tự Unicode giả icon.
+  Widget _goiYTrong() {
+    if (_boDieuKhien.text.isNotEmpty) return const SizedBox.shrink();
+    const mauChuMo = Color(0xFF9E9E9E);
+    return const RichText(
+      text: TextSpan(
+        style: TextStyle(fontSize: 17, height: 1.5, color: mauChuMo),
+        children: [
+          TextSpan(
+            text: 'Gõ chữ và bấm Micro để nói...\n'
+                'Thực hiện song song hai việc trên cùng lúc.\n'
+                'Vui lòng đọc hướng dẫn và mẹo sử dụng App (Nút ',
+          ),
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: Icon(Icons.help_outline_rounded, size: 16, color: mauChuMo),
+          ),
+          TextSpan(text: ' )'),
+        ],
+      ),
+    );
+  }
+
   /// Chấm tròn tím báo hiệu cuối văn bản, luôn bám sát ngay sau ký tự cuối
   /// cùng.
   ///
@@ -478,7 +504,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       left: diem.dx + 2,
       top: diem.dy + (goc.height - duongKinh) / 2,
       child: AnimatedOpacity(
-        opacity: _chamCuoiMoDam ? 0.5 : 1.0,
+        opacity: _chamCuoiMoDam ? 0.35 : 1.0,
         duration: const Duration(milliseconds: 200),
         child: Container(
           width: duongKinh,
@@ -2324,6 +2350,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 child: Stack(
                       key: _khungVanBanKey,
                       children: [
+                        // Chữ gợi ý khi bài còn trống trơn — tự tay dựng
+                        // thay cho InputDecoration.hintText mặc định, vì
+                        // hintText chỉ nhận chuỗi trần, không chèn được icon
+                        // "?" tròn y hệt icon nút Hướng dẫn vào giữa câu.
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: AnimatedBuilder(
+                              animation: _boDieuKhien,
+                              builder: (context, _) => _goiYTrong(),
+                            ),
+                          ),
+                        ),
                         // Gạch chân đỏ lỗi chính tả — cố ý đặt TRƯỚC (dưới)
                         // TextField trong danh sách con của Stack, để lớp
                         // chữ của TextField vẽ ĐÈ LÊN sau đó, nét đi xuống
@@ -2353,8 +2391,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           style: _kieuVanBan,
                           decoration: const InputDecoration(
                             border: InputBorder.none,
-                            hintText: 'Gõ chữ và Bấm Micro để nói...\n'
-                                'Thực hiện song song 2 việc trên cùng lúc',
                           ),
                         ),
                         // Chấm tròn tím đánh dấu cuối văn bản — chỉ mang tính

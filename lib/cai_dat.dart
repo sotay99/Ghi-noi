@@ -17,11 +17,11 @@ class CaiDat {
   double thoiGianBatLaiGiay = 1.0;
 
   /// Số giây liên tục không có thêm chữ nào (dù do nói hay gõ tay) trong lúc
-  /// micro đang bật thì tự tắt HẲN. Mặc định 45 giây, giới hạn 10-60.
+  /// micro đang bật thì tự tắt HẲN. Mặc định 45 giây, giới hạn 10-120.
   int thoiGianTuTatMicroGiay = 45;
 
   static const gioiHanDuoiTuTatMicro = 10;
-  static const gioiHanTrenTuTatMicro = 60;
+  static const gioiHanTrenTuTatMicro = 120;
 
   /// Có tự chèn một dấu cách ngay sau đoạn chữ mỗi lần nói xong hay không.
   /// Mặc định bật.
