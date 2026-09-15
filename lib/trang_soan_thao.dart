@@ -289,7 +289,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void _tatChuThich() {
     if (_hienChuThich) {
       _hienChuThichTruocKhiTat = true;
-      setState(() => _hienChuThich = false);
+      if (mounted) setState(() => _hienChuThich = false);
     } else {
       _hienChuThichTruocKhiTat = false;
     }
@@ -340,8 +340,25 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   static const _kyTuDacBiet = {'.', ',', ';', '?', '!', ':'};
 
   /// Kiểu chữ của ô soạn thảo — dùng chung cho cả TextField thật lẫn
-  /// TextPainter đo vị trí ký tự cuối (`_chamCuoiVanBan`), để đo cho đúng.
-  static const _kieuVanBan = TextStyle(fontSize: 17, height: 1.5);
+  /// TextPainter đo vị trí ký tự cuối (`_chamCuoiVanBan`).
+  ///
+  /// `inherit: false` KHÔNG PHẢI để trang trí — nếu để mặc định (`true`),
+  /// Material tự trộn thêm kiểu chữ của theme (ví dụ letterSpacing) vào
+  /// TextField lúc vẽ THẬT, nhưng TextPainter đo ở `_chamCuoiVanBan` không hề
+  /// biết chuyện trộn đó nên đo theo đúng mỗi `_kieuVanBan` trần trụi — hai
+  /// bên ra hai độ rộng chữ khác nhau, càng lệch dần theo từng ký tự, khiến
+  /// chấm tròn trôi dần ra khỏi vị trí thật khi câu càng dài. Khoá cứng bằng
+  /// `inherit: false` (kèm đủ màu chữ, vì lúc đó không còn gì để kế thừa)
+  /// thì TextField dùng ĐÚNG y hệt kiểu chữ này, không trộn thêm gì — khớp
+  /// tuyệt đối với TextPainter.
+  static const _kieuVanBan = TextStyle(
+    fontSize: 17,
+    height: 1.5,
+    color: Color(0xFF1F1F1F),
+    fontWeight: FontWeight.normal,
+    letterSpacing: 0,
+    inherit: false,
+  );
 
   /// Chấm tròn tím báo hiệu cuối văn bản, luôn bám sát ngay sau ký tự cuối
   /// cùng. Đo lại vị trí bằng TextPainter với cùng kiểu chữ/bề ngang khung
@@ -1129,6 +1146,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 
   void _apDungChinhSuaNguoiDung(String chuMoi) {
+    // Gõ tay chèn ký tự cũng phải tắt chú thích, y hệt bấm phím rời hay chạm
+    // màn hình — bắt ngay tại đây (chữ THẬT SỰ đổi) thay vì chỉ trông chờ
+    // bắt được sự kiện bàn phím vật lý, vì trường hợp CHỮ ĐẦU TIÊN của một
+    // ghi chú vừa tạo còn trống trơn có lúc không đi qua đúng đường bắt phím
+    // đó (autofocus + khung còn đang dựng dở lúc gõ quá nhanh).
+    _tatChuThich();
+
     // Chỉ lưu điểm mốc vào LẦN GÕ ĐẦU TIÊN của một đợt — một đợt kết thúc
     // sau 5 giây liên tục không gõ thêm gì (xem _dangTrongDotGoTay). Độc lập
     // hẳn với việc micro có tự bật lại hay không.

@@ -101,31 +101,31 @@ class ThanhCongCu extends StatelessWidget {
               child: Row(
                 children: [
                   // Bên trái: hướng dẫn sát mép màn hình, rồi cài đặt, rồi
-                  // hai nút mới (AI, bàn phím), rồi thư mục, rồi ghi âm — cả
-                  // dải này (KHÔNG gồm sóng âm/micro) tô nền hồng nhạt khi
-                  // micro đang bật, đồng bộ với đường kẻ đỏ phía trên. Container
-                  // lấp kín đúng bề ngang phần Expanded này, mà Expanded lại
-                  // vừa khít tới sát mép phải nút Ghi âm (liền kề sóng âm,
-                  // không có khoảng hở), nên biên nền hồng luôn dừng đúng
-                  // chỗ, không cần tự tính toạ độ.
+                  // hai nút mới (AI, bàn phím), rồi thư mục — dải này (KHÔNG
+                  // gồm nút Ghi âm, sóng âm, micro) tô nền hồng nhạt khi micro
+                  // đang bật, đồng bộ với đường kẻ đỏ phía trên. Container chỉ
+                  // bọc riêng Expanded này, KHÔNG bọc luôn nút Ghi âm — nền
+                  // hồng vì vậy CHẠM tới mép trái nút Ghi âm (liền kề, không
+                  // khoảng hở) nhưng dừng lại đúng ở đó, không lấn vào trong
+                  // nút. Bản thân các nút (Hướng dẫn/Cài đặt/…) không tự vẽ
+                  // nền riêng, chỉ có icon/chữ, nên nền hồng của Container vẫn
+                  // hiện được ở khoảng trống quanh chúng mà không "ám" màu
+                  // lên icon hay chữ — icon/chữ luôn giữ đúng màu của nó.
                   Expanded(
                     child: Container(
                       color: bat ? Colors.red.shade50 : Colors.transparent,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              // Mặc định ScrollView CẮT mọi thứ tràn ra ngoài
-                              // khung nhìn của nó — chú thích dọc của các nút
-                              // bên trong đây cố ý vẽ TRÀN LÊN TRÊN nút
-                              // (Positioned âm), nên phải tắt hẳn việc cắt
-                              // này thì chú thích mới hiện ra được.
-                              clipBehavior: Clip.none,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        // Mặc định ScrollView CẮT mọi thứ tràn ra ngoài khung
+                        // nhìn của nó — chú thích dọc của các nút bên trong
+                        // đây cố ý vẽ TRÀN LÊN TRÊN nút (Positioned âm), nên
+                        // phải tắt hẳn việc cắt này thì chú thích mới hiện ra
+                        // được.
+                        clipBehavior: Clip.none,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
                           _NutCoChuThich(
                             hien: hienChuThich,
                             chu: 'Hướng dẫn sử dụng',
@@ -170,19 +170,17 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamBanPhim: khiBamBanPhim,
                             ),
                           ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          _NutCoChuThich(
-                            hien: hienChuThich,
-                            chu: 'Ghi âm xong rồi mới ra chữ',
-                            child: _nut(rong, Icons.settings_voice,
-                                'Ghi âm xong mới ra chữ', 'Ghi âm', khiBamGhiAmAI),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
+                  ),
+
+                  _NutCoChuThich(
+                    hien: hienChuThich,
+                    chu: 'Ghi âm xong rồi mới ra chữ',
+                    child: _nut(rong, Icons.settings_voice,
+                        'Ghi âm xong mới ra chữ', 'Ghi âm', khiBamGhiAmAI),
                   ),
 
                   // Bên phải: sóng âm, rồi micro sát mép phải. Micro luôn
