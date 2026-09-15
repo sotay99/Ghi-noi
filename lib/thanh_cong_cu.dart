@@ -105,6 +105,11 @@ class ThanhCongCu extends StatelessWidget {
                   Expanded(
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
+                      // Mặc định ScrollView CẮT mọi thứ tràn ra ngoài khung
+                      // nhìn của nó — chú thích dọc của các nút bên trong đây
+                      // cố ý vẽ TRÀN LÊN TRÊN nút (Positioned âm), nên phải
+                      // tắt hẳn việc cắt này thì chú thích mới hiện ra được.
+                      clipBehavior: Clip.none,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.start,
                         crossAxisAlignment: CrossAxisAlignment.end,

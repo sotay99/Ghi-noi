@@ -2108,10 +2108,24 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                         // trang trí, KHÔNG phải một ký tự thật, nên con trỏ
                         // không bao giờ đứng được sau nó (vị trí xa nhất của
                         // con trỏ vẫn là cuối chuỗi thật, tức trước chấm này).
-                        IgnorePointer(
-                          child: AnimatedBuilder(
-                            animation: Listenable.merge([_boDieuKhien, _cuonVanBan]),
-                            builder: (context, _) => _chamCuoiVanBan(rangBuoc.maxWidth),
+                        //
+                        // Positioned.fill phải nằm NGAY DƯỚI Stack — Positioned
+                        // là ParentDataWidget, chỉ áp dụng được khi cha trực
+                        // tiếp của nó là Stack. `_chamCuoiVanBan` trả về một
+                        // Positioned KHÁC (định vị chấm tròn); nó cần một Stack
+                        // MỚI làm cha trực tiếp, nên bọc trong Stack con ở đây
+                        // chứ không thả thẳng làm con của IgnorePointer/
+                        // AnimatedBuilder — làm vậy Flutter báo lỗi "Incorrect
+                        // use of ParentDataWidget" và cả khung soạn thảo hoá
+                        // thành ô xám lỗi.
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: AnimatedBuilder(
+                              animation: Listenable.merge([_boDieuKhien, _cuonVanBan]),
+                              builder: (context, _) => Stack(
+                                children: [_chamCuoiVanBan(rangBuoc.maxWidth)],
+                              ),
+                            ),
                           ),
                         ),
                       ],
