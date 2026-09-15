@@ -312,6 +312,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Phân biệt hai chuyện này mới biết có được tự bật lại hay không.
   bool _microNgungDeGo = false;
 
+  /// Đang ở giữa một "đợt gõ tay" cho mục đích Lùi lại/Tiến tới hay không —
+  /// độc lập hẳn với việc micro có tự bật lại hay không (người dùng có thể
+  /// chọn "Không tự động bật lại Micro" mà vẫn cần ranh giới riêng cho gõ
+  /// tay). Một đợt kết thúc sau 5 giây liên tục không gõ thêm gì.
+  bool _dangTrongDotGoTay = false;
+  Timer? _henRanhGioiGoTay;
+  static const _thoiGianRanhGioiGoTay = Duration(seconds: 5);
+
   /// Bật lên khi chính ta đang sửa nội dung, để phân biệt với người gõ phím.
   /// Chỉ là lớp chắn thứ nhất: bộ gõ báo ngược trạng thái về một cách bất
   /// đồng bộ, lúc đó cờ này đã tắt rồi — nên còn hai lớp chắn nữa bên dưới.
@@ -373,6 +381,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henLuuTru?.cancel();
     _henGoXong?.cancel();
     _henChinhTa?.cancel();
+    _henRanhGioiGoTay?.cancel();
     _micro.cancel();
     _boDieuKhien.dispose();
     _oChu.dispose();
@@ -772,6 +781,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     if (chen == _chuTam) return; // Không có gì đổi, khỏi động vào ô văn bản.
 
+    // _chuTam rỗng nghĩa là đây là mẩu đầu tiên của một đoạn nói MỚI (đoạn
+    // trước, nếu có, đã chốt xong và xoá _chuTam ở _chotCauDangDoc) — đúng
+    // ranh giới cần lưu một điểm mốc Lùi lại riêng, để một bài dài nói nhiều
+    // lần vẫn lùi được từng đoạn một, không gộp chung cả bài thành một bước.
+    if (_chuTam.isEmpty) {
+      _luuDiemMoc(vanBan: cu, viTriConTro: _neo);
+    }
+
     _thayVungTamBangGiongNoi(chen);
 
     if (xong) {
@@ -912,17 +929,21 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 
   void _apDungChinhSuaNguoiDung(String chuMoi) {
-    // Chỉ lưu điểm mốc vào LẦN GÕ ĐẦU TIÊN của một đợt (micro chưa bị cắt vì
-    // gõ trước đó) — các phím gõ tiếp theo trong cùng đợt (trước khi micro
-    // tự bật lại) không lưu thêm, để một đợt gõ trọn vẹn ứng với đúng một
-    // lần Lùi lại, không phải mỗi phím một lần.
+    // Chỉ lưu điểm mốc vào LẦN GÕ ĐẦU TIÊN của một đợt — một đợt kết thúc
+    // sau 5 giây liên tục không gõ thêm gì (xem _dangTrongDotGoTay). Độc lập
+    // hẳn với việc micro có tự bật lại hay không.
     //
     // Truyền tay _chuGanNhat (chữ CŨ) và _neo (vị trí con trỏ CŨ): bộ điều
     // khiển tại đây đã mang chữ MỚI rồi, tự đọc _boDieuKhien.text sẽ chụp
     // nhầm đúng cái vừa gõ, không lùi được.
-    if (!_microNgungDeGo) {
+    if (!_dangTrongDotGoTay) {
       _luuDiemMoc(vanBan: _chuGanNhat, viTriConTro: _neo);
+      _dangTrongDotGoTay = true;
     }
+    _henRanhGioiGoTay?.cancel();
+    _henRanhGioiGoTay = Timer(_thoiGianRanhGioiGoTay, () {
+      _dangTrongDotGoTay = false;
+    });
 
     final cu = _chuGanNhat;
 
@@ -1104,6 +1125,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       ],
     );
     if (chon == null || !mounted) return;
+    _luuDiemMoc();
 
     switch (chon.$1) {
       case 'thay':
@@ -1158,6 +1180,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// nháy của "đoạn không phù hợp" (coi như đoạn GỐC rỗng, chỉ có đoạn ĐỀ
   /// XUẤT, và nhảy thẳng vào trạng thái "đã chọn dùng đề xuất").
   void _chenVanBanTuGhiAmAI(String vanBanMoi) {
+    _luuDiemMoc();
+
     final vb = _boDieuKhien.text;
     final chon = _boDieuKhien.selection;
     final viTri = (chon.isValid ? chon.end : vb.length).clamp(0, vb.length);
@@ -1295,6 +1319,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// đầu bài tới cuối), cộng dồn độ lệch mỗi lần chèn thêm chữ — không thì
   /// các mục đứng sau sẽ trỏ nhầm chỗ.
   void _apDungKetQuaToanVan(KetQuaKiemTraToanVan kq) {
+    // Một điểm mốc DUY NHẤT trước khi áp cả loạt kết quả — Lùi lại một lần
+    // là xoá sạch mọi đề xuất AI vừa thêm, trả bài về y như trước khi bấm
+    // "Kiểm tra toàn văn bằng AI".
+    _luuDiemMoc();
+
     final tatCa = <_MucToanVan>[
       for (final c in kq.chinhTa) _MucChinhTaToanVan(c),
       for (final k in kq.khongPhuHop) _MucKhongPhuHopToanVan(k),
@@ -1403,6 +1432,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
 
+    _luuDiemMoc();
+
     if (chon == 'dung') {
       // Xoá đoạn GỐC, giữ đoạn ĐỀ XUẤT — cho đoạn đề xuất nhấp nháy xanh/đen.
       final doDaiGoc = v.ketThucGoc - v.batDauGoc;
@@ -1446,6 +1477,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (chon == null || !mounted) return;
     if (!_boDieuKhien.canXoa.contains(x)) return;
 
+    _luuDiemMoc();
+
     if (chon == 'xoa') {
       final vb = _boDieuKhien.text;
       if (x.ketThuc > vb.length) {
@@ -1468,9 +1501,37 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   // ----------------------------------------------------------- lùi/tiến tới
 
-  /// Chụp lại trọn vẹn trạng thái NGAY TRƯỚC một đợt gõ/nói sắp diễn ra.
-  /// Bỏ qua nếu chữ chưa đổi gì so với điểm mốc gần nhất (tránh những điểm
-  /// mốc thừa, ví dụ micro thử bật lại liên tiếp do lỗi mạng).
+  /// Đóng gói trạng thái hiện tại (chữ + con trỏ + mọi đánh dấu AI đang
+  /// hiển thị) thành một điểm mốc. Chỉ giữ lại những đề xuất AI CÒN ĐANG CHỜ
+  /// quyết định (`nhapNhayMau == null` / `!dangNhapNhay`) — mục nào đang
+  /// nhấp nháy sau khi vừa quyết định chỉ là hiệu ứng thoáng qua 4 giây, tự
+  /// biến mất dù có Lùi/Tiến hay không, nên không cần lưu lại nguyên trạng
+  /// hoạt ảnh của nó.
+  _TrangThaiVanBan _chupTrangThai({required String vanBan, required int viTriConTro}) {
+    return _TrangThaiVanBan(
+      vanBan: vanBan,
+      viTriConTro: viTriConTro,
+      loi: List<LoiChinhTa>.from(_boDieuKhien.loi),
+      khongPhuHop: [
+        for (final k in _boDieuKhien.khongPhuHop)
+          if (k.nhapNhayMau == null)
+            _MocVungKhongPhuHop(
+              batDauGoc: k.batDauGoc,
+              ketThucGoc: k.ketThucGoc,
+              batDauDeXuat: k.batDauDeXuat,
+              ketThucDeXuat: k.ketThucDeXuat,
+            ),
+      ],
+      canXoa: [
+        for (final x in _boDieuKhien.canXoa)
+          if (!x.dangNhapNhay) _MocVungCanXoa(batDau: x.batDau, ketThuc: x.ketThuc),
+      ],
+    );
+  }
+
+  /// Chụp lại trọn vẹn trạng thái NGAY TRƯỚC một đợt gõ/nói/hành động sắp
+  /// diễn ra. Bỏ qua nếu chữ chưa đổi gì so với điểm mốc gần nhất (tránh
+  /// những điểm mốc thừa, ví dụ micro thử bật lại liên tiếp do lỗi mạng).
   ///
   /// Nhận tham số tường minh thay vì tự đọc `_boDieuKhien.text` — ở nơi gọi
   /// từ `_apDungChinhSuaNguoiDung`, bộ điều khiển đã mang chữ MỚI (đã gõ
@@ -1480,7 +1541,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final vb = vanBan ?? _boDieuKhien.text;
     if (_lichSuLui.isNotEmpty && _lichSuLui.last.vanBan == vb) return;
     setState(() {
-      _lichSuLui.add(_TrangThaiVanBan(
+      _lichSuLui.add(_chupTrangThai(
         vanBan: vb,
         viTriConTro: viTriConTro ?? _viTriConTroHienTai(),
       ));
@@ -1496,7 +1557,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   void _lui() {
     if (_lichSuLui.isEmpty) return;
-    _lichSuToi.add(_TrangThaiVanBan(
+    _lichSuToi.add(_chupTrangThai(
       vanBan: _boDieuKhien.text,
       viTriConTro: _viTriConTroHienTai(),
     ));
@@ -1506,7 +1567,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   void _toi() {
     if (_lichSuToi.isEmpty) return;
-    _lichSuLui.add(_TrangThaiVanBan(
+    _lichSuLui.add(_chupTrangThai(
       vanBan: _boDieuKhien.text,
       viTriConTro: _viTriConTroHienTai(),
     ));
@@ -1520,14 +1581,35 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (_muonNghe) _tatMicro();
     _chuTam = '';
     _neo = tt.viTriConTro.clamp(0, tt.vanBan.length);
+
+    // Huỷ mọi hẹn giờ nhấp nháy đang chạy trước khi thay hẳn ba danh sách.
+    for (final k in _boDieuKhien.khongPhuHop) {
+      k.henNhapNhay?.cancel();
+    }
+    for (final x in _boDieuKhien.canXoa) {
+      x.henNhapNhay?.cancel();
+    }
+
+    _boDieuKhien.loi
+      ..clear()
+      ..addAll(tt.loi);
+    _boDieuKhien.khongPhuHop
+      ..clear()
+      ..addAll(tt.khongPhuHop.map((m) => _VungKhongPhuHop(
+            batDauGoc: m.batDauGoc,
+            ketThucGoc: m.ketThucGoc,
+            batDauDeXuat: m.batDauDeXuat,
+            ketThucDeXuat: m.ketThucDeXuat,
+          )));
+    _boDieuKhien.canXoa
+      ..clear()
+      ..addAll(tt.canXoa.map((m) => _VungCanXoa(batDau: m.batDau, ketThuc: m.ketThuc)));
+
     // setState trần: buộc vẽ lại AppBar để nút Lùi/Tiến bật/tắt đúng theo độ
     // dài _lichSuLui/_lichSuToi vừa đổi (bản thân chúng không tự kích rebuild).
     setState(() {});
-    // Lùi/tiến đổi hẳn nội dung bài — vị trí các gạch đỏ cũ không còn đáng
-    // tin nữa. Coi cả bài vừa khôi phục là "chưa kiểm tra", để lần kiểm tra
-    // kế tiếp (nếu tính năng đang bật) tự soát lại từ đầu bài mới này.
+
     _henChinhTa?.cancel();
-    _boDieuKhien.loi.clear();
     _viTriDaKiemTraChinhTa = tt.vanBan.length;
     _ghiVaoO(tt.vanBan, _neo);
     _henLuu();
@@ -1571,7 +1653,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         icon: const Icon(Icons.delete_outline, size: 28),
         title: const Text('Xoá tất cả?'),
         content: const Text(
-          'Toàn bộ văn bản đang soạn sẽ bị xoá và không lấy lại được.',
+          'Toàn bộ văn bản đang soạn sẽ bị xoá ngay. Vẫn có thể bấm "Lùi '
+          'lại" ở thanh trên để khôi phục lại nếu xoá nhầm.',
         ),
         actions: [
           TextButton(
@@ -1590,6 +1673,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     if (dongY != true || !mounted) return;
 
+    _luuDiemMoc();
+
     // Trả mọi mốc về vạch xuất phát, nếu không thì câu nói kế tiếp lại nhắm
     // vào một vị trí không còn tồn tại.
     _ghiVaoO('', 0);
@@ -1597,6 +1682,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _chuTam = '';
     _henChinhTa?.cancel();
     _boDieuKhien.loi.clear();
+    for (final k in _boDieuKhien.khongPhuHop) {
+      k.henNhapNhay?.cancel();
+    }
+    _boDieuKhien.khongPhuHop.clear();
+    for (final x in _boDieuKhien.canXoa) {
+      x.henNhapNhay?.cancel();
+    }
+    _boDieuKhien.canXoa.clear();
     _viTriDaKiemTraChinhTa = 0;
     _boQuaCauNay = _micro.isListening;
     await _luuVanBan();
@@ -1865,14 +1958,46 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 }
 
-/// Một điểm mốc trong lịch sử Lùi lại/Tiến tới — trọn vẹn chữ và vị trí con
-/// trỏ tại thời điểm đó.
+/// Một điểm mốc trong lịch sử Lùi lại/Tiến tới — chữ, vị trí con trỏ, và mọi
+/// đề xuất AI (chính tả, không phù hợp, cần xoá) còn đang hiển thị/chờ quyết
+/// định tại thời điểm đó.
 class _TrangThaiVanBan {
   const _TrangThaiVanBan({
     required this.vanBan,
     required this.viTriConTro,
+    required this.loi,
+    required this.khongPhuHop,
+    required this.canXoa,
   });
 
   final String vanBan;
   final int viTriConTro;
+  final List<LoiChinhTa> loi;
+  final List<_MocVungKhongPhuHop> khongPhuHop;
+  final List<_MocVungCanXoa> canXoa;
+}
+
+/// Bản chụp "phẳng" của [_VungKhongPhuHop] — chỉ giữ vị trí, không giữ trạng
+/// thái nhấp nháy hay hẹn giờ (những thứ đó thuộc về một lần hiển thị cụ
+/// thể, không phải một phần của "dữ liệu" cần khôi phục).
+class _MocVungKhongPhuHop {
+  const _MocVungKhongPhuHop({
+    required this.batDauGoc,
+    required this.ketThucGoc,
+    required this.batDauDeXuat,
+    required this.ketThucDeXuat,
+  });
+
+  final int batDauGoc;
+  final int ketThucGoc;
+  final int batDauDeXuat;
+  final int ketThucDeXuat;
+}
+
+/// Bản chụp "phẳng" của [_VungCanXoa].
+class _MocVungCanXoa {
+  const _MocVungCanXoa({required this.batDau, required this.ketThuc});
+
+  final int batDau;
+  final int ketThuc;
 }
