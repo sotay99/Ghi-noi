@@ -20,5 +20,13 @@ dependencies:
 dev_dependencies:
   flutter_lints: ^4.0.0
 
+# objective_c 9.6.1 (phát hành vài giờ trước bản build này) lỗi thật — thiếu
+# Architecture.arm64e mà chính SDK Dart bó theo Flutter hiện dùng không có.
+# Gói này chỉ phục vụ record_darwin (macOS/iOS), app này chỉ build Android,
+# nhưng vẫn bị kéo vào cây phụ thuộc và làm gãy bước biên dịch. Ghim đè về
+# 9.6.0 (bản ổn định ngay trước đó) cho tới khi bản vá xuất hiện.
+dependency_overrides:
+  objective_c: 9.6.0
+
 flutter:
   uses-material-design: true
