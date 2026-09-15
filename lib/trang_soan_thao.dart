@@ -337,12 +337,22 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// cùng. Đo lại vị trí bằng TextPainter với cùng kiểu chữ/bề ngang khung
   /// như TextField thật — cách duy nhất biết chữ cuối rơi vào dòng nào sau
   /// khi tự động xuống dòng, mà không phải tự dựng lại một RenderEditable.
-  Widget _chamCuoiVanBan(double rongKhung) {
+  ///
+  /// Dựng TextSpan bằng CHÍNH `_boDieuKhien.buildTextSpan` (không phải một
+  /// TextSpan trần chỉ có `chu`) — ô văn bản thật vẽ các đoạn đánh dấu AI
+  /// (chính tả, không phù hợp, cần xoá) bằng kiểu chữ khác nhau xen giữa
+  /// văn bản; đo bằng một kiểu chữ đồng nhất cho cả chuỗi sẽ ra độ rộng khác
+  /// hẳn, khiến chỗ xuống dòng bị lệch và chấm tròn nhảy sai dòng.
+  Widget _chamCuoiVanBan(BuildContext context, double rongKhung) {
     final chu = _boDieuKhien.text;
     if (chu.isEmpty) return const SizedBox.shrink();
 
     final tp = TextPainter(
-      text: TextSpan(text: chu, style: _kieuVanBan),
+      text: _boDieuKhien.buildTextSpan(
+        context: context,
+        style: _kieuVanBan,
+        withComposing: false,
+      ),
       textDirection: TextDirection.ltr,
     )..layout(maxWidth: rongKhung);
     final viTri = tp.getOffsetForCaret(
@@ -2123,7 +2133,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                             child: AnimatedBuilder(
                               animation: Listenable.merge([_boDieuKhien, _cuonVanBan]),
                               builder: (context, _) => Stack(
-                                children: [_chamCuoiVanBan(rangBuoc.maxWidth)],
+                                children: [_chamCuoiVanBan(context, rangBuoc.maxWidth)],
                               ),
                             ),
                           ),
