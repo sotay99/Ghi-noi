@@ -93,12 +93,53 @@ class _MucCanXoaToanVan extends _MucToanVan {
   final CanXoaMuc goc;
 }
 
-const _kieuGachDoDuoiSong = TextStyle(
-  decoration: TextDecoration.underline,
-  decorationColor: Colors.red,
-  decorationThickness: 4, // Gấp đôi mức cũ (2) — theo yêu cầu, nhìn rõ hơn hẳn.
-  decorationStyle: TextDecorationStyle.wavy,
-);
+/// Màu và độ đậm gạch chân đỏ dưới từ/cụm từ sai chính tả — vẽ ở một
+/// CustomPainter riêng (`_veGachChanLoiChinhTa` trong TrangSoanThao), không
+/// còn gắn qua TextStyle.decoration nữa. Độ đậm 4 gấp đôi mức cũ (2), theo
+/// yêu cầu, nhìn rõ hơn hẳn.
+const _mauGachChanLoi = Colors.red;
+const _damGachChanLoi = 4.0;
+
+/// Vẽ một đường lượn sóng đỏ dưới mỗi hộp toạ độ trong [hop] — mỗi hộp ứng
+/// với một dòng của một từ/cụm từ AI báo sai chính tả (một cụm dài bị ngắt
+/// dòng thì có nhiều hộp, mỗi dòng một đường sóng riêng).
+class _VeGachChanLoiChinhTa extends CustomPainter {
+  _VeGachChanLoiChinhTa(this.hop);
+  final List<Rect> hop;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final ve = Paint()
+      ..color = _mauGachChanLoi
+      ..strokeWidth = _damGachChanLoi
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    const buocSong = 6.0;
+    const bienDo = 2.5;
+    for (final h in hop) {
+      final y = h.bottom - 1;
+      final duong = Path()..moveTo(h.left, y);
+      var x = h.left;
+      var xuong = true;
+      while (x < h.right) {
+        final xTiep = (x + buocSong).clamp(h.left, h.right);
+        duong.quadraticBezierTo(
+          x + (xTiep - x) / 2,
+          y + (xuong ? bienDo : -bienDo),
+          xTiep,
+          y,
+        );
+        x = xTiep;
+        xuong = !xuong;
+      }
+      canvas.drawPath(duong, ve);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _VeGachChanLoiChinhTa cu) => true;
+}
 
 /// Bộ điều khiển ô văn bản riêng — vẽ mọi đánh dấu AI ngay trong văn bản:
 /// gạch đỏ dưới từ/cụm sai chính tả, đoạn không phù hợp (đỏ, gạch giữa thân)
@@ -147,10 +188,14 @@ class _BoDieuKhienChinhTa extends TextEditingController {
 
     for (final l in loi) {
       if (l.batDau < 0 || l.ketThuc > vb.length || l.batDau >= l.ketThuc) continue;
+      // KHÔNG gắn kiểu gạch chân ở đây nữa — gạch chân đỏ giờ được vẽ ở một
+      // lớp RIÊNG, nằm DƯỚI lớp chữ (xem `_veGachChanLoiChinhTa` ở
+      // TrangSoanThao), để những nét đi xuống của chữ (g, ệ, ụ, q, y...) đè
+      // lên được gạch chân thay vì bị gạch chân che mất. Ở đây chỉ còn giữ
+      // vùng bắt chạm để mở menu đề xuất.
       vung.add(_VungVe(
         batDau: l.batDau,
         ketThuc: l.ketThuc,
-        style: _kieuGachDoDuoiSong,
         recognizer: TapGestureRecognizer()
           ..onTapDown = (ct) => khiBamTuSai?.call(l, ct.globalPosition),
       ));
@@ -308,6 +353,21 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Cài đặt (widget.caiDat.thoiGianTuTatMicroGiay).
   Timer? _henTuTatMicroImLang;
 
+  /// Chấm tròn tím cuối văn bản mờ đi còn 50% trong lúc CÒN ĐANG có ký tự
+  /// mới xuất hiện (gõ tay hay do nói ra đều tính) — im hẳn 4 giây không
+  /// thêm ký tự nào nữa thì mới sáng rõ 100% trở lại. Mỗi ký tự mới xuất
+  /// hiện thì hẹn giờ này lại được đặt lại từ đầu.
+  bool _chamCuoiMoDam = false;
+  Timer? _henMoDamChamCuoi;
+
+  void _batDauMoDamChamCuoi() {
+    if (!_chamCuoiMoDam && mounted) setState(() => _chamCuoiMoDam = true);
+    _henMoDamChamCuoi?.cancel();
+    _henMoDamChamCuoi = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _chamCuoiMoDam = false);
+    });
+  }
+
   /// Mấy mức âm gần nhất, để vẽ sóng. Mới nhất nằm ở cuối.
   final List<double> _songAm = List<double>.filled(16, 0);
 
@@ -417,15 +477,64 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     return Positioned(
       left: diem.dx + 2,
       top: diem.dy + (goc.height - duongKinh) / 2,
-      child: Container(
-        width: duongKinh,
-        height: duongKinh,
-        decoration: const BoxDecoration(
-          color: Color(0xFF6A1B9A),
-          shape: BoxShape.circle,
+      child: AnimatedOpacity(
+        opacity: _chamCuoiMoDam ? 0.5 : 1.0,
+        duration: const Duration(milliseconds: 200),
+        child: Container(
+          width: duongKinh,
+          height: duongKinh,
+          decoration: const BoxDecoration(
+            color: Color(0xFF6A1B9A),
+            shape: BoxShape.circle,
+          ),
         ),
       ),
     );
+  }
+
+  /// Gạch chân đỏ, lượn sóng, dưới mỗi từ/cụm từ AI báo sai chính tả — vẽ ở
+  /// một lớp RIÊNG nằm DƯỚI chữ (xem giải thích ở nơi ghép layer trong
+  /// `build`), thay vì gắn qua TextStyle.decoration như trước. TextStyle
+  /// .decoration vẽ CÙNG một lượt với chữ nên có lúc đè lên cả nét đi xuống
+  /// của chữ (g, ệ, ụ, q, y...) — tách thành lớp riêng, vẽ trước rồi để chữ
+  /// vẽ đè lên sau, thì nét đi xuống luôn luôn nổi trên gạch chân, không bao
+  /// giờ bị che.
+  ///
+  /// Dùng `RenderEditable.getBoxesForSelection` (cùng kỹ thuật với
+  /// `_chamCuoiVanBan`) để lấy đúng toạ độ THẬT của từng từ sai — kể cả khi
+  /// một cụm từ sai bị ngắt xuống hai dòng, hàm này tự trả về nhiều hộp,
+  /// mỗi dòng một hộp.
+  Widget _gachChanLoiChinhTa() {
+    if (_boDieuKhien.loi.isEmpty) return const SizedBox.shrink();
+
+    final hopVanBan = _oVanBanKey.currentContext?.findRenderObject();
+    final khungBox = _khungVanBanKey.currentContext?.findRenderObject();
+    if (hopVanBan == null || khungBox is! RenderBox || !khungBox.hasSize) {
+      return const SizedBox.shrink();
+    }
+    final re = _timRenderEditable(hopVanBan);
+    if (re == null || !re.hasSize) return const SizedBox.shrink();
+
+    final vb = _boDieuKhien.text;
+    final hop = <Rect>[];
+    for (final l in _boDieuKhien.loi) {
+      if (l.batDau < 0 || l.ketThuc > vb.length || l.batDau >= l.ketThuc) continue;
+      try {
+        for (final h in re.getBoxesForSelection(
+          TextSelection(baseOffset: l.batDau, extentOffset: l.ketThuc),
+        )) {
+          hop.add(Rect.fromPoints(
+            re.localToGlobal(Offset(h.left, h.top), ancestor: khungBox),
+            re.localToGlobal(Offset(h.right, h.bottom), ancestor: khungBox),
+          ));
+        }
+      } catch (_) {
+        // Bỏ qua từ này ở khung hình hiện tại — AnimatedBuilder sẽ tự vẽ lại.
+      }
+    }
+    if (hop.isEmpty) return const SizedBox.shrink();
+
+    return CustomPaint(painter: _VeGachChanLoiChinhTa(hop));
   }
 
   /// Lịch sử Lùi lại/Tiến tới. Mỗi điểm mốc là trạng thái TRỌN VẸN của bài
@@ -447,6 +556,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// dạng sẽ trả nốt cả câu và đổ nguyên câu ấy ra lần thứ hai.
   bool _boQuaCauNay = false;
   bool _dangCatCau = false;
+
+  /// Số phiên nghe — tăng mỗi lần `_batMicro()` chạy, dùng để loại kết quả
+  /// trễ của một phiên nghe đã đóng. Xem giải thích đầy đủ trong `_batMicro`.
+  int _phienNgheHienTai = 0;
 
   /// Micro đang tắt vì người dùng gõ phím, chứ không phải vì họ bấm nút tắt.
   /// Phân biệt hai chuyện này mới biết có được tự bật lại hay không.
@@ -545,6 +658,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henChinhTa?.cancel();
     _henRanhGioiGoTay?.cancel();
     _henTuTatMicroImLang?.cancel();
+    _henMoDamChamCuoi?.cancel();
     _micro.cancel();
     _boDieuKhien.dispose();
     _oChu.dispose();
@@ -757,9 +871,23 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _luuDiemMoc(); // Mỗi lượt micro mới là một điểm có thể Lùi lại về.
     _boQuaCauNay = false;
     _dangCatCau = false;
+
+    // Đánh số PHIÊN nghe — mỗi lần _batMicro() chạy (kể cả tự bật lại sau
+    // khi hệ điều hành tự ngắt vì im lặng) là một phiên MỚI. `onResult` chỉ
+    // nhận đúng phiên vừa đăng ký (so `idPhien` chụp lúc này với
+    // `_phienNgheHienTai` tại thời điểm callback chạy); phiên cũ đóng rồi mà
+    // vẫn có kết quả trễ bay về (bộ nhận dạng đôi khi trả thêm một kết quả
+    // chốt cuối cùng sau khi đã coi như đã ngắt) thì bị vứt thẳng, không cho
+    // nhập lại vào bài — đây chính là nguồn gốc lỗi thỉnh thoảng nhân đôi cả
+    // một câu vừa nói xong: phiên mới đã coi đoạn đó là chữ THẬT rồi, kết
+    // quả trễ của phiên cũ lại chèn thêm một lần nữa.
+    final idPhien = ++_phienNgheHienTai;
     try {
       await _micro.listen(
-        onResult: _khiCoChu,
+        onResult: (ketQua) {
+          if (idPhien != _phienNgheHienTai) return;
+          _khiCoChu(ketQua);
+        },
         localeId: _maNgonNgu,
         onSoundLevelChange: _khiDoiMucAm,
         listenOptions: SpeechListenOptions(
@@ -929,6 +1057,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _ghiVaoO(moi, viTri);
     _chuTam = chenVao;
     _chuGanNhat = moi; // Để lần _khiNguoiDungSua tiếp theo không hiểu nhầm.
+    _batDauMoDamChamCuoi();
   }
 
   void _khiCoChu(dynamic ketQua) {
@@ -1163,7 +1292,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         const Duration(milliseconds: 600);
     if (trungKhit || vuaGhiXong) return;
 
-    // (b) Người dùng thật sự chạm màn hình để dời con trỏ.
+    // (b) Người dùng thật sự chạm màn hình để dời con trỏ — hoặc TÔ ĐẬM một
+    // vùng trong lúc micro vẫn đang nghe. Trường hợp sau phải đặt neo/vùng
+    // tạm lên đúng vùng vừa chọn (giống hệt lúc bấm micro với sẵn vùng đã
+    // chọn) thì câu nói tiếp theo mới đè lên được — trước đây chỉ có
+    // `_bamNutMicro()`/`_batLaiSauKhiGoXong()` gọi `_datNeoTaiConTro()`, nên
+    // chọn vùng khi micro ĐÃ bật sẵn (không qua hai hàm đó) bị bỏ sót.
+    if (_muonNghe && !chon.isCollapsed) {
+      _dongBangDoanDangNhay();
+      _datNeoTaiConTro();
+      return;
+    }
     _neo = chon.end;
     _dongBangDoanDangNhay();
   }
@@ -1175,6 +1314,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // ghi chú vừa tạo còn trống trơn có lúc không đi qua đúng đường bắt phím
     // đó (autofocus + khung còn đang dựng dở lúc gõ quá nhanh).
     _tatChuThich();
+    _batDauMoDamChamCuoi();
 
     // Chỉ lưu điểm mốc vào LẦN GÕ ĐẦU TIÊN của một đợt — một đợt kết thúc
     // sau 5 giây liên tục không gõ thêm gì (xem _dangTrongDotGoTay). Độc lập
@@ -2184,6 +2324,21 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 child: Stack(
                       key: _khungVanBanKey,
                       children: [
+                        // Gạch chân đỏ lỗi chính tả — cố ý đặt TRƯỚC (dưới)
+                        // TextField trong danh sách con của Stack, để lớp
+                        // chữ của TextField vẽ ĐÈ LÊN sau đó, nét đi xuống
+                        // của chữ (g, ệ, ụ, q, y...) nhờ vậy luôn nổi trên
+                        // gạch chân thay vì bị nó che mất.
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: AnimatedBuilder(
+                              animation: _boDieuKhien,
+                              builder: (context, _) => Stack(
+                                children: [_gachChanLoiChinhTa()],
+                              ),
+                            ),
+                          ),
+                        ),
                         TextField(
                           key: _oVanBanKey,
                           controller: _boDieuKhien,
