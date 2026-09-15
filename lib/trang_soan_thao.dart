@@ -276,19 +276,29 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   /// Đang hiện dòng chữ chú thích dọc bên trên từng nút của thanh công cụ
   /// hay không — bật bằng nút "i" (chỉ xuất hiện khi micro tắt), hoặc tự bật
-  /// khi vừa mở một ghi chú còn trống trơn. Tắt bằng bất kỳ thao tác nào.
+  /// khi vừa mở một ghi chú còn trống trơn. Tắt bằng bất kỳ thao tác nào:
+  /// chạm màn hình ở bất cứ đâu, hoặc gõ bất kỳ phím nào trên bàn phím rời.
   bool _hienChuThich = false;
 
+  /// Chụp lại trạng thái NGAY TRƯỚC khi bị `_tatChuThich()` tắt đi — nút "i"
+  /// cần biết trạng thái này để đảo (toggle) đúng, vì bản thân cú chạm vào
+  /// nút "i" cũng đi qua `_tatChuThich()` trước (Listener bọc quanh `body`
+  /// bắt sự kiện chạm xuống trước khi onTap của nút kịp chạy).
+  bool _hienChuThichTruocKhiTat = false;
+
   void _tatChuThich() {
-    if (_hienChuThich) setState(() => _hienChuThich = false);
+    if (_hienChuThich) {
+      _hienChuThichTruocKhiTat = true;
+      setState(() => _hienChuThich = false);
+    } else {
+      _hienChuThichTruocKhiTat = false;
+    }
   }
 
-  /// Nút "i" là nơi DUY NHẤT bật lại chú thích — vì bất kỳ thao tác nào khác
-  /// trên màn hình đều đã tắt nó đi ngay từ lúc pointer chạm xuống (xem
-  /// Listener bọc quanh `body`), nên tới lúc hàm này chạy thì luôn đang tắt;
-  /// gán thẳng `true` chứ không cần đảo trạng thái.
+  /// Bấm nút "i" thì ĐẢO trạng thái chú thích — đang tắt thì bật lên, đang
+  /// hiện thì tắt đi (đúng như mọi thao tác khác trên màn hình).
   void _khiBamChuThich() {
-    setState(() => _hienChuThich = true);
+    setState(() => _hienChuThich = !_hienChuThichTruocKhiTat);
   }
 
   /// Micro đang bật mà im lặng quá lâu (không thêm được chữ nào, dù do nói
@@ -432,6 +442,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Timer? _henChinhTa;
   final _dichVuChinhTa = DichVuKiemTraChinhTa();
 
+  /// Từ/cụm từ người dùng đã tự tay xử lý xong (chấp nhận đề xuất, xoá, hoặc
+  /// huỷ đề xuất) — AI không được báo lỗi lại những từ này nữa, dù có tìm
+  /// thấy y hệt ở một đoạn khác hoặc ở lượt kiểm tra sau.
+  final Set<String> _tuChinhTaDaXuLy = {};
+
   /// Đang có một lượt "Kiểm tra toàn văn bằng AI" chạy dở hay không — chặn
   /// bấm nút này thêm lần nữa trong lúc đang chờ.
   bool _dangKiemTraToanVan = false;
@@ -467,12 +482,22 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // phím tắt phải hoạt động kể cả đang gõ dở trong ô văn bản.
     HardwareKeyboard.instance.addHandler(_khiPhimTatMicro);
     HardwareKeyboard.instance.addHandler(_khiPhimTatLuiTien);
+    HardwareKeyboard.instance.addHandler(_khiGoPhimBatKyTatChuThich);
+  }
+
+  /// Gõ BẤT KỲ phím nào trên bàn phím rời cũng tắt chú thích — không riêng gì
+  /// chạm màn hình. Chỉ quan sát (luôn trả về false), không chặn phím đi
+  /// tiếp xuống ô văn bản hay các phím tắt khác.
+  bool _khiGoPhimBatKyTatChuThich(KeyEvent event) {
+    if (event is KeyDownEvent) _tatChuThich();
+    return false;
   }
 
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_khiPhimTatMicro);
     HardwareKeyboard.instance.removeHandler(_khiPhimTatLuiTien);
+    HardwareKeyboard.instance.removeHandler(_khiGoPhimBatKyTatChuThich);
     WidgetsBinding.instance.removeObserver(this);
     _hen?.cancel();
     _henLuuTru?.cancel();
@@ -1254,6 +1279,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henChinhTa = Timer(const Duration(milliseconds: 900), _kiemTraChinhTaMoi);
   }
 
+  /// Số ký tự văn bản NGAY TRƯỚC đoạn mới, gửi kèm làm ngữ cảnh cho AI — đủ
+  /// dài để bao được vài đoạn văn trước đó (không phải một câu cộc lốc, cũng
+  /// không phải toàn bộ bài).
+  static const _doDaiNguCanhChinhTa = 800;
+
   Future<void> _kiemTraChinhTaMoi() async {
     if (!widget.caiDat.kiemTraChinhTaBangAI || !mounted) return;
 
@@ -1266,10 +1296,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _viTriDaKiemTraChinhTa = vanBan.length;
       return;
     }
+    final dauNguCanh = (tuViTri - _doDaiNguCanhChinhTa).clamp(0, tuViTri);
+    final nguCanh = vanBan.substring(dauNguCanh, tuViTri);
 
     List<LoiChinhTa> loiMoi;
     try {
-      loiMoi = await _dichVuChinhTa.kiemTra(doan);
+      loiMoi = await _dichVuChinhTa.kiemTra(doan, nguCanh: nguCanh);
     } catch (_) {
       return; // Mất mạng hay máy chủ lỗi — im lặng bỏ qua, lần sau thử lại.
     }
@@ -1283,7 +1315,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
 
-    _boDieuKhien.loi.addAll(loiMoi.map((l) => l.dich(tuViTri)));
+    // Từ/cụm từ người dùng đã tự tay xử lý (chấp nhận đề xuất, xoá, hoặc huỷ
+    // đề xuất) trước đó thì không báo lỗi lại nữa, dù AI có tìm thấy y hệt.
+    final loiChuaXuLy =
+        loiMoi.where((l) => !_tuChinhTaDaXuLy.contains(l.tu));
+
+    _boDieuKhien.loi.addAll(loiChuaXuLy.map((l) => l.dich(tuViTri)));
     _viTriDaKiemTraChinhTa = tuViTri + doan.length;
     _boDieuKhien.veLai();
   }
@@ -1314,6 +1351,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
     if (chon == null || !mounted) return;
     _luuDiemMoc();
+
+    // Đã tự tay xử lý (chọn thay, xoá, hay huỷ) — đánh dấu để AI không báo
+    // lại đúng từ/cụm từ này ở những lượt kiểm tra sau.
+    _tuChinhTaDaXuLy.add(loi.tu);
 
     switch (chon.$1) {
       case 'thay':

@@ -25,7 +25,7 @@ function huongDanTheoHanhDong(action, cauHoi) {
     case 'tro_chuyen':
       return `Người dùng đang hỏi về đoạn văn bản bên dưới. Câu hỏi của họ: "${(cauHoi || '').slice(0, 2000)}". Trả lời bằng tiếng Việt, ngắn gọn, đi thẳng vào vấn đề, dựa trên nội dung văn bản được cung cấp:`;
     case 'chinh_ta':
-      return 'Bạn là bộ kiểm tra CHÍNH TẢ tiếng Việt (không kiểm tra ngữ pháp, không kiểm tra dấu câu, không kiểm tra văn phong). Tìm mọi TỪ SAI CHÍNH TẢ trong đoạn văn bản sau. Với mỗi từ sai, xác định: "tu" (đúng từ sai, nguyên vẹn như trong bài), "viTri" (vị trí ký tự đầu tiên của từ đó, đếm từ 0, tính trên ĐÚNG đoạn văn bản được cung cấp bên dưới — không đếm trên gì khác), và "deXuat" (tối đa 3 từ đúng chính tả để thay thế, từ gần nghĩa/gần âm nhất trước). CHỈ trả về một mảng JSON hợp lệ, không kèm lời giải thích, không bọc trong dấu ```, đúng khuôn: [{"tu":"...","viTri":0,"deXuat":["...","..."]}]. Không có lỗi nào thì trả về mảng rỗng []. Đoạn văn bản cần kiểm tra:';
+      return null; // Xử lý riêng trong exports.flowriteAi — cần ghép thêm vị trí ranh giới ngữ cảnh, không cố định như các action khác.
     case 'toan_van':
       return 'Bạn là biên tập viên tiếng Việt, soát lại TOÀN BỘ văn bản sau đây một cách kỹ lưỡng. Trả về DUY NHẤT một object JSON hợp lệ (không giải thích, không bọc trong dấu ```), đúng khuôn:\n' +
         '{"chinhTa":[{"tu":"...","viTri":0,"deXuat":["...","..."]}],"khongPhuHop":[{"doan":"...","viTri":0,"deXuat":"..."}],"canXoa":[{"doan":"...","viTri":0}]}\n' +
@@ -36,6 +36,20 @@ function huongDanTheoHanhDong(action, cauHoi) {
     default:
       return null;
   }
+}
+
+/// Chính tả cần một hướng dẫn ĐỘNG — phần đầu văn bản gửi lên có thể là NGỮ
+/// CẢNH (câu/đoạn trước đó, chỉ để AI hiểu mạch văn, không tìm lỗi ở đó),
+/// phần sau [boQuaTruocViTri] mới là đoạn thật sự cần soát. Gộp ngữ cảnh vào
+/// giúp AI hiểu đúng nghĩa của từ đang xét hơn hẳn so với chỉ đưa một câu cộc
+/// lốc — một câu quá ngắn dễ khiến AI bỏ sót lỗi hoặc đề xuất sai vì không
+/// biết ngữ cảnh xung quanh.
+function huongDanChinhTa(boQuaTruocViTri) {
+  return 'Bạn là bộ kiểm tra CHÍNH TẢ tiếng Việt (không kiểm tra ngữ pháp, không kiểm tra dấu câu, không kiểm tra văn phong). ' +
+    `Văn bản bên dưới gồm hai phần ghép liền nhau: ${boQuaTruocViTri} ký tự ĐẦU TIÊN là NGỮ CẢNH (câu/đoạn phía trước, chỉ để bạn hiểu mạch văn và xét đúng nghĩa của từ — TUYỆT ĐỐI không tìm lỗi hay báo lỗi nằm trong phần này), phần CÒN LẠI (từ ký tự thứ ${boQuaTruocViTri} trở đi) mới là đoạn thật sự cần soát lỗi. ` +
+    'Tìm mọi TỪ hoặc CỤM TỪ sai chính tả nằm trong phần cần soát đó (không báo lỗi nằm trong phần ngữ cảnh). Dựa vào cả ngữ cảnh lẫn nghĩa của câu để hiểu đúng ý người viết trước khi kết luận một từ là sai — đừng chỉ nhìn từng từ riêng lẻ tách rời câu. ' +
+    'Với mỗi lỗi, xác định: "tu" (đúng từ/cụm từ sai, nguyên vẹn như trong bài), "viTri" (vị trí ký tự đầu tiên của nó, đếm từ 0 trên TOÀN BỘ văn bản được cung cấp bên dưới, tức là tính luôn cả phần ngữ cảnh phía trước — không đếm lại từ đầu phần cần soát), và "deXuat" (tối đa 5 từ/cụm từ đúng chính tả để thay thế, xếp từ hợp ngữ cảnh nhất trước; mỗi đề xuất BẮT BUỘC phải khác nguyên văn với từ đang sai — kể cả chỉ khác nhau về viết hoa/viết thường cũng tính là khác, ví dụ từ sai "thành" có thể đề xuất "Thành"; TUYỆT ĐỐI không lặp lại y hệt từ sai trong danh sách đề xuất). ' +
+    'CHỈ trả về một mảng JSON hợp lệ, không kèm lời giải thích, không bọc trong dấu ```, đúng khuôn: [{"tu":"...","viTri":0,"deXuat":["...","..."]}]. Không có lỗi nào thì trả về mảng rỗng []. Văn bản (ngữ cảnh + đoạn cần soát):';
 }
 
 /// Gửi một tệp âm thanh cho Gemini phiên âm ra chữ. Khác hẳn `goiGemini()`
@@ -134,7 +148,7 @@ exports.flowriteAi = async (req, res) => {
   }
 
   const than = req.body || {};
-  const { action, text, cauHoi } = than;
+  const { action, text, cauHoi, boQuaTruocViTri } = than;
 
   if (!process.env.GEMINI_API_KEY) {
     res.status(500).json({ loi: 'Chưa cấu hình GEMINI_API_KEY.' });
@@ -173,7 +187,9 @@ exports.flowriteAi = async (req, res) => {
     return;
   }
 
-  const huongDan = huongDanTheoHanhDong(action, cauHoi);
+  const huongDan = action === 'chinh_ta'
+    ? huongDanChinhTa(Number.isInteger(boQuaTruocViTri) && boQuaTruocViTri > 0 ? boQuaTruocViTri : 0)
+    : huongDanTheoHanhDong(action, cauHoi);
   if (!huongDan) {
     res.status(400).json({ loi: `Không hỗ trợ action: "${action}".` });
     return;

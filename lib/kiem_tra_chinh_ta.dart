@@ -35,10 +35,14 @@ class LoiChinhTa {
 }
 
 class DichVuKiemTraChinhTa {
-  /// Gửi [doan] (chỉ phần văn bản CHƯA từng kiểm tra) lên máy chủ AI, nhận
-  /// về danh sách lỗi với vị trí tính TRÊN ĐÚNG [doan] này (chưa cộng dồn vào
-  /// vị trí thật trong toàn bài — việc đó do nơi gọi tự cộng thêm).
-  Future<List<LoiChinhTa>> kiemTra(String doan) async {
+  /// Gửi [doan] (phần văn bản CHƯA từng kiểm tra) lên máy chủ AI, kèm tối đa
+  /// [nguCanh] ký tự văn bản NGAY TRƯỚC đó làm ngữ cảnh — AI đọc để hiểu mạch
+  /// văn nhưng không báo lỗi trong phần này, tránh gửi một câu cộc lốc khiến
+  /// AI bỏ sót lỗi hoặc đề xuất không hợp ngữ cảnh. Trả về danh sách lỗi với
+  /// vị trí tính TRÊN ĐÚNG [doan] (đã trừ hết phần ngữ cảnh), chưa cộng dồn
+  /// vào vị trí thật trong toàn bài — việc đó do nơi gọi tự cộng thêm.
+  Future<List<LoiChinhTa>> kiemTra(String doan, {String nguCanh = ''}) async {
+    final ghep = nguCanh + doan;
     final phanHoi = await http
         .post(
           Uri.parse(diaChiMayChuAI),
@@ -46,7 +50,11 @@ class DichVuKiemTraChinhTa {
             'content-type': 'application/json',
             'x-flowrite-secret': matKhauMayChuAI,
           },
-          body: jsonEncode({'action': 'chinh_ta', 'text': doan}),
+          body: jsonEncode({
+            'action': 'chinh_ta',
+            'text': ghep,
+            'boQuaTruocViTri': nguCanh.length,
+          }),
         )
         .timeout(const Duration(seconds: 25));
 
@@ -75,7 +83,11 @@ class DichVuKiemTraChinhTa {
       final tu = phanTu['tu'] as String? ?? '';
       if (tu.isEmpty) continue;
 
-      var viTri = phanTu['viTri'] as int? ?? -1;
+      // AI được yêu cầu đếm viTri trên TOÀN BỘ [ghep] (ngữ cảnh + đoạn cần
+      // soát) — dời về hệ toạ độ của riêng [doan] bằng cách trừ đi độ dài
+      // ngữ cảnh. Lỗi rơi vào đúng phần ngữ cảnh (dời xong ra số âm) là AI
+      // làm sai yêu cầu, bỏ qua luôn.
+      var viTri = (phanTu['viTri'] as int? ?? -1) - nguCanh.length;
       final khopViTri = viTri >= 0 &&
           viTri + tu.length <= doan.length &&
           doan.substring(viTri, viTri + tu.length) == tu;
@@ -86,7 +98,7 @@ class DichVuKiemTraChinhTa {
 
       final deXuat = ((phanTu['deXuat'] as List<dynamic>?) ?? const [])
           .map((e) => e.toString())
-          .where((e) => e.isNotEmpty)
+          .where((e) => e.isNotEmpty && e != tu)
           .take(5)
           .toList();
       if (deXuat.isEmpty) continue;

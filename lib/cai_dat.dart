@@ -17,8 +17,8 @@ class CaiDat {
   double thoiGianBatLaiGiay = 1.0;
 
   /// Số giây liên tục không có thêm chữ nào (dù do nói hay gõ tay) trong lúc
-  /// micro đang bật thì tự tắt HẲN. Mặc định 15 giây, giới hạn 10-60.
-  int thoiGianTuTatMicroGiay = 15;
+  /// micro đang bật thì tự tắt HẲN. Mặc định 45 giây, giới hạn 10-60.
+  int thoiGianTuTatMicroGiay = 45;
 
   static const gioiHanDuoiTuTatMicro = 10;
   static const gioiHanTrenTuTatMicro = 60;
@@ -28,8 +28,8 @@ class CaiDat {
   bool tuDongChenKhoangCach = true;
 
   /// Có tự gọi AI kiểm tra chính tả mỗi khi có đoạn văn mới hay không.
-  /// Mặc định TẮT — tính năng này gọi mạng và tốn hạn mức AI.
-  bool kiemTraChinhTaBangAI = false;
+  /// Mặc định BẬT.
+  bool kiemTraChinhTaBangAI = true;
 
   /// Phím tắt tắt/mở micro: một tổ hợp bộ biến đổi ('Ctrl' hoặc 'Alt') và
   /// một phím khác đi kèm. Mặc định Ctrl + F. Chỉ có tác dụng khi máy có gắn
@@ -41,11 +41,11 @@ class CaiDat {
     final kho = await SharedPreferences.getInstance();
     thoiGianBatLaiGiay = kho.getDouble(_khoaThoiGianBatLai) ?? 1.0;
     tuDongChenKhoangCach = kho.getBool(_khoaTuDongChenCach) ?? true;
-    kiemTraChinhTaBangAI = kho.getBool(_khoaKiemTraChinhTaAI) ?? false;
+    kiemTraChinhTaBangAI = kho.getBool(_khoaKiemTraChinhTaAI) ?? true;
     phimTatBoBienDoi = kho.getString(_khoaPhimTatBoBienDoi) ?? 'Ctrl';
     phimTatPhim = kho.getString(_khoaPhimTatPhim) ?? 'F';
     thoiGianTuTatMicroGiay =
-        (kho.getInt(_khoaThoiGianTuTatMicro) ?? 15).clamp(gioiHanDuoiTuTatMicro, gioiHanTrenTuTatMicro);
+        (kho.getInt(_khoaThoiGianTuTatMicro) ?? 45).clamp(gioiHanDuoiTuTatMicro, gioiHanTrenTuTatMicro);
   }
 
   Future<void> datThoiGianBatLai(double giay) async {
