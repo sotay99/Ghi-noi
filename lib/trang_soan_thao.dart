@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import 'cai_dat.dart';
+import 'ghi_am_ai.dart';
 import 'kho_du_lieu.dart';
 import 'kiem_tra_chinh_ta.dart';
 import 'kiem_tra_toan_van.dart';
@@ -1206,6 +1207,50 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henLuu();
   }
 
+  // ---------------------------------------------------- ghi âm xong mới ra chữ
+
+  /// Bấm nút "Ghi âm xong mới ra chữ": mở bảng ghi âm, chèn kết quả phiên âm
+  /// vào đúng vị trí con trỏ nếu có. Việc ghi âm, gửi lên AI, chờ kết quả
+  /// đều nằm trọn trong `moBangGhiAmAI` — ở đây chỉ lo phần chèn vào bài.
+  Future<void> _khiBamGhiAmAI() async {
+    final ketQua = await moBangGhiAmAI(context);
+    if (ketQua == null || ketQua.trim().isEmpty || !mounted) return;
+    _chenVanBanTuGhiAmAI(ketQua.trim());
+  }
+
+  /// Chèn văn bản mới vào đúng vị trí con trỏ, rồi cho nó nhấp nháy xanh/đen
+  /// 4 giây trước khi hoá đen như chữ thường — dùng lại nguyên cơ chế nhấp
+  /// nháy của "đoạn không phù hợp" (coi như đoạn GỐC rỗng, chỉ có đoạn ĐỀ
+  /// XUẤT, và nhảy thẳng vào trạng thái "đã chọn dùng đề xuất").
+  void _chenVanBanTuGhiAmAI(String vanBanMoi) {
+    final vb = _boDieuKhien.text;
+    final chon = _boDieuKhien.selection;
+    final viTri = (chon.isValid ? chon.end : vb.length).clamp(0, vb.length);
+
+    var chen = vanBanMoi;
+    if (viTri > 0 && !_laKhoangTrang(vb[viTri - 1])) chen = ' $chen';
+    if (viTri < vb.length && !_laKhoangTrang(vb[viTri])) chen = '$chen ';
+
+    _dieuChinhVungToanVanSauKhiSua(viTri, 0, chen.length);
+    _dieuChinhLoiChinhTaSauKhiSua(viTri, 0, chen.length);
+
+    final moi = vb.replaceRange(viTri, viTri, chen);
+    _nguonKyTu.insertAll(viTri, List<bool>.filled(chen.length, true));
+    final viTriConTro = viTri + chen.length;
+    _neo = viTriConTro;
+    _ghiVaoO(moi, viTriConTro);
+    _henLuu();
+
+    final v = _VungKhongPhuHop(
+      batDauGoc: viTri,
+      ketThucGoc: viTri,
+      batDauDeXuat: viTri,
+      ketThucDeXuat: viTriConTro,
+    );
+    _boDieuKhien.khongPhuHop.add(v);
+    _batNhapNhayKhongPhuHop(v, 'xanh');
+  }
+
   // ------------------------------------------------- kiểm tra toàn văn bằng AI
 
   /// Bấm nút "Kiểm tra toàn văn bằng AI": gửi TOÀN BỘ văn bản hiện có lên
@@ -1886,6 +1931,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     'riêng của Flowrite thay vì bàn phím mặc định của máy.',
               ),
               khiBamKiemTraToanVan: _khiBamKiemTraToanVan,
+              khiBamGhiAmAI: _khiBamGhiAmAI,
             ),
             SizedBox(height: caoBanPhim),
           ],

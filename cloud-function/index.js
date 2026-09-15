@@ -38,6 +38,48 @@ function huongDanTheoHanhDong(action, cauHoi) {
   }
 }
 
+/// Gửi một tệp âm thanh cho Gemini phiên âm ra chữ. Khác hẳn `goiGemini()`
+/// (chỉ gửi chữ) — đây gửi kèm dữ liệu nhị phân âm thanh dạng base64 theo
+/// đúng khuôn `inline_data` của Gemini.
+async function goiGeminiAmThanh(audioBase64, mimeType) {
+  const model = process.env.GEMINI_MODEL || MODEL_MAC_DINH;
+  const url =
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent` +
+    `?key=${process.env.GEMINI_API_KEY}`;
+
+  const huongDan =
+    'Phiên âm CHÍNH XÁC đoạn ghi âm giọng nói tiếng Việt sau đây thành văn bản. ' +
+    'Chỉ trả về đúng văn bản đã phiên âm, không thêm lời dẫn, không thêm dấu ngoặc kép bao quanh, không chú thích gì thêm.';
+
+  const phanHoi = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: huongDan },
+            { inline_data: { mime_type: mimeType, data: audioBase64 } },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!phanHoi.ok) {
+    const chuLoi = await phanHoi.text();
+    throw new Error(`Gemini trả về lỗi ${phanHoi.status}: ${chuLoi.slice(0, 300)}`);
+  }
+
+  const duLieu = await phanHoi.json();
+  const chu = (duLieu?.candidates?.[0]?.content?.parts || [])
+    .map((p) => p.text || '')
+    .join('');
+  if (!chu) throw new Error('Gemini không trả về nội dung (có thể ghi âm quá nhỏ hoặc im lặng hoàn toàn).');
+  return chu;
+}
+
 async function goiGemini(huongDan, vanBan) {
   const model = process.env.GEMINI_MODEL || MODEL_MAC_DINH;
   const url =
@@ -94,6 +136,34 @@ exports.flowriteAi = async (req, res) => {
   const than = req.body || {};
   const { action, text, cauHoi } = than;
 
+  if (!process.env.GEMINI_API_KEY) {
+    res.status(500).json({ loi: 'Chưa cấu hình GEMINI_API_KEY.' });
+    return;
+  }
+
+  // Nhánh riêng cho ghi âm: gửi lên là DỮ LIỆU ÂM THANH, không phải `text`,
+  // nên không đi qua các kiểm tra dành cho văn bản ở dưới.
+  if (action === 'ghi_am') {
+    const { audioBase64, mimeType } = than;
+    if (typeof audioBase64 !== 'string' || audioBase64.trim() === '') {
+      res.status(400).json({ loi: 'Thiếu dữ liệu âm thanh (audioBase64).' });
+      return;
+    }
+    // ~15 phút ghi âm ở mức nén thoại vẫn chỉ vài MB — 30MB base64 đã rất
+    // rộng rãi, chặn sớm để khỏi tốn công gọi Gemini với file bất thường.
+    if (audioBase64.length > 30 * 1024 * 1024) {
+      res.status(400).json({ loi: 'Tệp ghi âm quá lớn.' });
+      return;
+    }
+    try {
+      const ketQua = await goiGeminiAmThanh(audioBase64, mimeType || 'audio/mp4');
+      res.status(200).json({ text: ketQua });
+    } catch (err) {
+      res.status(502).json({ loi: String(err && err.message ? err.message : err) });
+    }
+    return;
+  }
+
   if (typeof text !== 'string' || text.trim() === '') {
     res.status(400).json({ loi: 'Thiếu nội dung văn bản (text).' });
     return;
@@ -106,11 +176,6 @@ exports.flowriteAi = async (req, res) => {
   const huongDan = huongDanTheoHanhDong(action, cauHoi);
   if (!huongDan) {
     res.status(400).json({ loi: `Không hỗ trợ action: "${action}".` });
-    return;
-  }
-
-  if (!process.env.GEMINI_API_KEY) {
-    res.status(500).json({ loi: 'Chưa cấu hình GEMINI_API_KEY.' });
     return;
   }
 

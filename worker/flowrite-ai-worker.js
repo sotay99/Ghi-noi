@@ -34,7 +34,25 @@ export default {
       return traLoi({ loi: 'Dữ liệu gửi lên không phải JSON hợp lệ.' }, 400);
     }
 
+    if (!env.GEMINI_API_KEY) {
+      return traLoi({ loi: 'Worker chưa được cấu hình GEMINI_API_KEY.' }, 500);
+    }
+
     const { action, text, cauHoi } = than;
+
+    if (action === 'ghi_am') {
+      const { audioBase64, mimeType } = than;
+      if (typeof audioBase64 !== 'string' || audioBase64.trim() === '') {
+        return traLoi({ loi: 'Thiếu dữ liệu âm thanh (audioBase64).' }, 400);
+      }
+      try {
+        const ketQua = await goiGeminiAmThanh(env, audioBase64, mimeType || 'audio/mp4');
+        return traLoi({ text: ketQua });
+      } catch (err) {
+        return traLoi({ loi: String(err && err.message ? err.message : err) }, 502);
+      }
+    }
+
     if (typeof text !== 'string' || text.trim() === '') {
       return traLoi({ loi: 'Thiếu nội dung văn bản (text).' }, 400);
     }
@@ -47,10 +65,6 @@ export default {
     const huongDan = huongDanTheoHanhDong(action, cauHoi);
     if (!huongDan) {
       return traLoi({ loi: `Không hỗ trợ action: "${action}".` }, 400);
-    }
-
-    if (!env.GEMINI_API_KEY) {
-      return traLoi({ loi: 'Worker chưa được cấu hình GEMINI_API_KEY.' }, 500);
     }
 
     try {
@@ -88,6 +102,45 @@ function huongDanTheoHanhDong(action, cauHoi) {
     default:
       return null;
   }
+}
+
+async function goiGeminiAmThanh(env, audioBase64, mimeType) {
+  const model = env.GEMINI_MODEL || 'gemini-2.0-flash';
+  const url =
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent` +
+    `?key=${env.GEMINI_API_KEY}`;
+
+  const huongDan =
+    'Phiên âm CHÍNH XÁC đoạn ghi âm giọng nói tiếng Việt sau đây thành văn bản. ' +
+    'Chỉ trả về đúng văn bản đã phiên âm, không thêm lời dẫn, không thêm dấu ngoặc kép bao quanh, không chú thích gì thêm.';
+
+  const phanHoi = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: huongDan },
+            { inline_data: { mime_type: mimeType, data: audioBase64 } },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!phanHoi.ok) {
+    const chuLoi = await phanHoi.text();
+    throw new Error(`Gemini trả về lỗi ${phanHoi.status}: ${chuLoi.slice(0, 300)}`);
+  }
+
+  const duLieu = await phanHoi.json();
+  const chu = (duLieu?.candidates?.[0]?.content?.parts || [])
+    .map((p) => p.text || '')
+    .join('');
+  if (!chu) throw new Error('Gemini không trả về nội dung (có thể ghi âm quá nhỏ hoặc im lặng hoàn toàn).');
+  return chu;
 }
 
 async function goiGemini(env, huongDan, vanBan) {

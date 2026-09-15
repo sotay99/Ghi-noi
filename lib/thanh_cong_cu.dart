@@ -21,6 +21,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamAI,
     required this.khiBamBanPhim,
     required this.khiBamKiemTraToanVan,
+    required this.khiBamGhiAmAI,
   });
 
   final bool bat;
@@ -40,6 +41,7 @@ class ThanhCongCu extends StatelessWidget {
   final VoidCallback khiBamAI;
   final VoidCallback khiBamBanPhim;
   final VoidCallback khiBamKiemTraToanVan;
+  final VoidCallback khiBamGhiAmAI;
 
   @override
   Widget build(BuildContext context) {
@@ -85,11 +87,6 @@ class ThanhCongCu extends StatelessWidget {
                         khiBam: khiBamAI,
                       ),
                       NutNho(
-                        bieuTuong: Icons.keyboard_outlined,
-                        nhan: 'Bàn phím',
-                        khiBam: khiBamBanPhim,
-                      ),
-                      NutNho(
                         bieuTuong: Icons.folder_outlined,
                         nhan: 'Thư mục',
                         khiBam: khiBamThuMuc,
@@ -100,13 +97,18 @@ class ThanhCongCu extends StatelessWidget {
                         mau: Colors.green.shade600,
                         khiBam: khiBamKiemTraToanVan,
                       ),
-                      const _NutThemMenu(),
+                      _NutThemMenu(khiBamBanPhim: khiBamBanPhim),
                     ],
                   ),
                 ),
               ),
 
-              // Bên phải: sóng âm trước, micro sát mép phải màn hình.
+              // Bên phải: nút ghi âm, rồi sóng âm, rồi micro sát mép phải.
+              NutNho(
+                bieuTuong: Icons.settings_voice,
+                nhan: 'Ghi âm xong mới ra chữ',
+                khiBam: khiBamGhiAmAI,
+              ),
               SongAm(muc: songAm, dangNghe: bat && dangNghe),
               const SizedBox(width: 6),
               _NutMicroTron(
@@ -285,7 +287,11 @@ class _VeSongAm extends CustomPainter {
 /// tự tính toán vị trí). Các mục hiện tại chưa gắn logic gì, chỉ là chỗ đặt
 /// trước cho tính năng sau này.
 class _NutThemMenu extends StatelessWidget {
-  const _NutThemMenu();
+  const _NutThemMenu({required this.khiBamBanPhim});
+
+  /// Vị trí thứ 3 trong danh sách — trước đây là nút riêng ngoài thanh công
+  /// cụ, giờ dồn vào đây cho gọn.
+  final VoidCallback khiBamBanPhim;
 
   @override
   Widget build(BuildContext context) {
@@ -298,7 +304,9 @@ class _NutThemMenu extends StatelessWidget {
           padding: EdgeInsets.zero,
           splashRadius: 20,
           icon: const Icon(Icons.add_circle_outline, size: 20, color: Color(0xFF5F6368)),
-          onSelected: (_) {}, // Chưa gắn logic — làm sau.
+          onSelected: (gia) {
+            if (gia == 3) khiBamBanPhim();
+          },
           itemBuilder: (ctx) => const [
             PopupMenuItem(
               value: 1,
@@ -312,16 +320,21 @@ class _NutThemMenu extends StatelessWidget {
             PopupMenuDivider(),
             PopupMenuItem(
               value: 3,
-              child: Text('Chia sẻ ứng dụng này đến với mọi người'),
+              child: Text('Kiểu gõ bàn phím'),
             ),
             PopupMenuDivider(),
             PopupMenuItem(
               value: 4,
-              child: Text('Góp ý thêm, báo lỗi về ứng dụng'),
+              child: Text('Chia sẻ ứng dụng này đến với mọi người'),
             ),
             PopupMenuDivider(),
             PopupMenuItem(
               value: 5,
+              child: Text('Góp ý thêm, báo lỗi về ứng dụng'),
+            ),
+            PopupMenuDivider(),
+            PopupMenuItem(
+              value: 6,
               child: Text('Donate ủng hộ Tác giả'),
             ),
           ],
