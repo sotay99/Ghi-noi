@@ -49,6 +49,24 @@ class ThanhCongCu extends StatelessWidget {
   final VoidCallback khiBamKiemTraToanVan;
   final VoidCallback khiBamGhiAmAI;
 
+  /// Ngưỡng bề ngang chuẩn của Material để phân biệt điện thoại (hẹp) với
+  /// máy tính bảng/màn hình gập mở ra (rộng) — đủ chỗ để các nút giãn ra
+  /// thành khung có tên mà không giẫm chân lên nhau.
+  static const _nguongManHinhRong = 600.0;
+
+  Widget _nut(
+    bool rong,
+    IconData icon,
+    String nhanHep,
+    String nhanRong,
+    VoidCallback khiBam, {
+    Color mau = const Color(0xFF5F6368),
+  }) {
+    return rong
+        ? _NutRong(bieuTuong: icon, nhan: nhanRong, khiBam: khiBam, mau: mau)
+        : NutNho(bieuTuong: icon, nhan: nhanHep, khiBam: khiBam, mau: mau);
+  }
+
   @override
   Widget build(BuildContext context) {
     final mau = Theme.of(context).colorScheme;
@@ -59,124 +77,123 @@ class ThanhCongCu extends StatelessWidget {
       child: SafeArea(
         top: false,
         bottom: neThanhDieuHuong,
-        child: Container(
-          // Thấp hết mức còn bấm trúng: 48px vẫn đủ vùng chạm theo chuẩn
-          // Material, mà nhường gần hết màn hình cho chữ.
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          // Micro đang bật (đỏ) thì đường kẻ ngăn cách với trang soạn thảo
-          // cũng đỏ đậm và dày hẳn lên — dấu hiệu dễ thấy dù mắt đang nhìn
-          // vào bài, không cần liếc xuống tận nút micro mới biết đang ghi.
-          decoration: BoxDecoration(
-            border: Border(
-              top: BorderSide(
-                color: bat ? Colors.red.shade600 : const Color(0xFFE3E3E3),
-                width: bat ? 3 : 1,
-              ),
-            ),
-          ),
-          child: Row(
-            children: [
-              // Bên trái: hướng dẫn sát mép màn hình, rồi cài đặt, rồi hai
-              // nút mới (AI, bàn phím), rồi thư mục.
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      _NutCoChuThich(
-                        hien: hienChuThich,
-                        chu: 'Hướng dẫn sử dụng',
-                        child: NutNho(
-                          bieuTuong: Icons.help_outline_rounded,
-                          nhan: 'Hướng dẫn',
-                          khiBam: khiBamHuongDan,
-                        ),
-                      ),
-                      _NutCoChuThich(
-                        hien: hienChuThich,
-                        chu: 'Cài đặt',
-                        child: NutNho(
-                          bieuTuong: Icons.settings_outlined,
-                          nhan: 'Cài đặt',
-                          khiBam: khiBamCaiDat,
-                        ),
-                      ),
-                      _NutCoChuThich(
-                        hien: hienChuThich,
-                        chu: 'Thư mục và Tệp tin',
-                        child: NutNho(
-                          bieuTuong: Icons.folder_outlined,
-                          nhan: 'Thư mục',
-                          khiBam: khiBamThuMuc,
-                        ),
-                      ),
-                      _NutCoChuThich(
-                        hien: hienChuThich,
-                        chu: 'Làm việc với AI',
-                        child: NutNho(
-                          bieuTuong: Icons.smart_toy_outlined,
-                          nhan: 'Làm việc với AI',
-                          khiBam: khiBamAI,
-                        ),
-                      ),
-                      _NutCoChuThich(
-                        hien: hienChuThich,
-                        chu: 'Kiểm tra toàn văn (AI)',
-                        child: NutNho(
-                          bieuTuong: Icons.task_alt,
-                          nhan: 'Kiểm tra toàn văn bằng AI',
-                          mau: Colors.green.shade600,
-                          khiBam: khiBamKiemTraToanVan,
-                        ),
-                      ),
-                      _NutCoChuThich(
-                        hien: hienChuThich,
-                        chu: 'Xem thêm lựa chọn',
-                        child: _NutThemMenu(khiBamBanPhim: khiBamBanPhim),
-                      ),
-                    ],
+        child: LayoutBuilder(
+          builder: (context, rangBuoc) {
+            final rong = rangBuoc.maxWidth >= _nguongManHinhRong;
+
+            return Container(
+              // Thấp hết mức còn bấm trúng: 48px vẫn đủ vùng chạm theo chuẩn
+              // Material, mà nhường gần hết màn hình cho chữ.
+              height: 48,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              // Micro đang bật (đỏ) thì đường kẻ ngăn cách với trang soạn
+              // thảo cũng đỏ đậm và dày hẳn lên — dấu hiệu dễ thấy dù mắt
+              // đang nhìn vào bài, không cần liếc xuống tận nút micro mới
+              // biết đang ghi.
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: bat ? Colors.red.shade600 : const Color(0xFFE3E3E3),
+                    width: bat ? 3 : 1,
                   ),
                 ),
               ),
+              child: Row(
+                children: [
+                  // Bên trái: hướng dẫn sát mép màn hình, rồi cài đặt, rồi
+                  // hai nút mới (AI, bàn phím), rồi thư mục.
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          _NutCoChuThich(
+                            hien: hienChuThich,
+                            chu: 'Hướng dẫn sử dụng',
+                            child: _nut(rong, Icons.help_outline_rounded,
+                                'Hướng dẫn', 'Hướng dẫn', khiBamHuongDan),
+                          ),
+                          _NutCoChuThich(
+                            hien: hienChuThich,
+                            chu: 'Cài đặt',
+                            child: _nut(rong, Icons.settings_outlined,
+                                'Cài đặt', 'Cài đặt', khiBamCaiDat),
+                          ),
+                          _NutCoChuThich(
+                            hien: hienChuThich,
+                            chu: 'Thư mục và Tệp tin',
+                            child: _nut(rong, Icons.folder_outlined,
+                                'Thư mục', 'Thư mục', khiBamThuMuc),
+                          ),
+                          _NutCoChuThich(
+                            hien: hienChuThich,
+                            chu: 'Làm việc với AI',
+                            child: _nut(rong, Icons.smart_toy_outlined,
+                                'Làm việc với AI', 'Làm việc AI', khiBamAI),
+                          ),
+                          _NutCoChuThich(
+                            hien: hienChuThich,
+                            chu: 'Kiểm tra toàn văn (AI)',
+                            child: _nut(
+                              rong,
+                              Icons.task_alt,
+                              'Kiểm tra toàn văn bằng AI',
+                              'Kiểm toàn văn',
+                              khiBamKiemTraToanVan,
+                              mau: Colors.green.shade600,
+                            ),
+                          ),
+                          _NutCoChuThich(
+                            hien: hienChuThich,
+                            chu: 'Xem thêm lựa chọn',
+                            child: _NutThemMenu(
+                              rong: rong,
+                              khiBamBanPhim: khiBamBanPhim,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
 
-              // Bên phải: nút ghi âm, rồi sóng âm, rồi micro sát mép phải.
-              _NutCoChuThich(
-                hien: hienChuThich,
-                chu: 'Ghi âm xong rồi mới ra chữ',
-                child: NutNho(
-                  bieuTuong: Icons.settings_voice,
-                  nhan: 'Ghi âm xong mới ra chữ',
-                  khiBam: khiBamGhiAmAI,
-                ),
+                  // Bên phải: nút ghi âm, rồi sóng âm, rồi micro sát mép
+                  // phải. Micro luôn giữ nguyên giao diện tròn quen thuộc,
+                  // kể cả ở màn hình rộng.
+                  _NutCoChuThich(
+                    hien: hienChuThich,
+                    chu: 'Ghi âm xong rồi mới ra chữ',
+                    child: _nut(rong, Icons.settings_voice,
+                        'Ghi âm xong mới ra chữ', 'Ghi âm', khiBamGhiAmAI),
+                  ),
+                  _NutCoChuThich(
+                    hien: hienChuThich && !bat,
+                    chu: 'Hiện chú thích',
+                    vang: true,
+                    child: SongAm(
+                      muc: songAm,
+                      dangNghe: bat && dangNghe,
+                      micDangBat: bat,
+                      khiBamChuThich: khiBamChuThich,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  _NutCoChuThich(
+                    hien: hienChuThich,
+                    chu: 'Micro Vừa nói vừa ra chữ',
+                    child: _NutMicroTron(
+                      bat: bat,
+                      sanSang: sanSang,
+                      mau: mau,
+                      nhanPhimTat: nhanPhimTat,
+                      khiBam: sanSang ? khiBamMicro : null,
+                    ),
+                  ),
+                ],
               ),
-              _NutCoChuThich(
-                hien: hienChuThich && !bat,
-                chu: 'Hiện chú thích',
-                vang: true,
-                child: SongAm(
-                  muc: songAm,
-                  dangNghe: bat && dangNghe,
-                  micDangBat: bat,
-                  khiBamChuThich: khiBamChuThich,
-                ),
-              ),
-              const SizedBox(width: 6),
-              _NutCoChuThich(
-                hien: hienChuThich,
-                chu: 'Micro Vừa nói vừa ra chữ',
-                child: _NutMicroTron(
-                  bat: bat,
-                  sanSang: sanSang,
-                  mau: mau,
-                  nhanPhimTat: nhanPhimTat,
-                  khiBam: sanSang ? khiBamMicro : null,
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -262,6 +279,76 @@ class NutNho extends StatelessWidget {
             height: 38,
             child: Icon(bieuTuong, size: 20, color: mau),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Khung trực quan của một nút "mở rộng": icon sát mép trái bên trong khung
+/// viền bo tròn, tên nút liền ngay bên phải icon. Tách riêng phần khung khỏi
+/// phần bắt chạm (`_NutRong` bên dưới, hoặc `PopupMenuButton.child` cho nút
+/// dấu cộng) vì có chỗ cần InkWell riêng, có chỗ nút cha (PopupMenuButton) đã
+/// tự lo việc bắt chạm rồi.
+class _KhungNutRong extends StatelessWidget {
+  const _KhungNutRong({
+    required this.bieuTuong,
+    required this.nhan,
+    this.mau = const Color(0xFF5F6368),
+  });
+
+  final IconData bieuTuong;
+  final String nhan;
+  final Color mau;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 32,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFDADCE0)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(bieuTuong, size: 16, color: mau),
+          const SizedBox(width: 6),
+          Text(nhan, style: TextStyle(fontSize: 12, color: mau)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Nút "mở rộng" dùng cho màn hình rộng: cùng khung với `_KhungNutRong`,
+/// nhưng tự lo việc bắt chạm (những nút gọi thẳng một callback, khác với nút
+/// dấu cộng vốn đã nằm sẵn trong `PopupMenuButton`).
+class _NutRong extends StatelessWidget {
+  const _NutRong({
+    required this.bieuTuong,
+    required this.nhan,
+    required this.khiBam,
+    this.mau = const Color(0xFF5F6368),
+  });
+
+  final IconData bieuTuong;
+  final String nhan;
+  final VoidCallback khiBam;
+  final Color mau;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: nhan,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: khiBam,
+          borderRadius: BorderRadius.circular(16),
+          child: _KhungNutRong(bieuTuong: bieuTuong, nhan: nhan, mau: mau),
         ),
       ),
     );
@@ -427,15 +514,27 @@ class _VeSongAm extends CustomPainter {
   bool shouldRepaint(covariant _VeSongAm cu) => true;
 }
 
+/// Một dòng trong menu thả xuống của nút dấu cộng — cao vừa đủ chữ, viền sát
+/// chữ, không rộng thùng thình như PopupMenuItem mặc định (cao tối thiểu 48).
+PopupMenuItem<int> _mucMenuThem(int gia, String chu) {
+  return PopupMenuItem<int>(
+    value: gia,
+    height: 34,
+    padding: const EdgeInsets.symmetric(horizontal: 14),
+    child: Text(chu, style: const TextStyle(fontSize: 13)),
+  );
+}
+
 /// Nút dấu cộng ở thanh công cụ: mở một menu sổ lên (nằm trên đỉnh nút, vì
 /// nút ở sát đáy màn hình — PopupMenuButton tự né mép màn hình nên không cần
-/// tự tính toán vị trí). Các mục hiện tại chưa gắn logic gì, chỉ là chỗ đặt
+/// tự tính toán vị trí). Đa số các mục chưa gắn logic gì, chỉ là chỗ đặt
 /// trước cho tính năng sau này.
 class _NutThemMenu extends StatelessWidget {
-  const _NutThemMenu({required this.khiBamBanPhim});
+  const _NutThemMenu({required this.rong, required this.khiBamBanPhim});
 
-  /// Vị trí thứ 3 trong danh sách — trước đây là nút riêng ngoài thanh công
-  /// cụ, giờ dồn vào đây cho gọn.
+  final bool rong;
+
+  /// Gắn với mục "Kiểu gõ bàn phím" trong danh sách.
   final VoidCallback khiBamBanPhim;
 
   @override
@@ -448,50 +547,34 @@ class _NutThemMenu extends StatelessWidget {
         child: PopupMenuButton<int>(
           padding: EdgeInsets.zero,
           splashRadius: 20,
-          icon: const Icon(Icons.add_circle_outline, size: 20, color: Color(0xFF5F6368)),
+          icon: rong
+              ? null
+              : const Icon(Icons.add_circle_outline, size: 20, color: Color(0xFF5F6368)),
+          child: rong
+              ? const _KhungNutRong(
+                  bieuTuong: Icons.add_circle_outline,
+                  nhan: 'Thêm lựa chọn',
+                )
+              : null,
           onSelected: (gia) {
-            if (gia == 3) khiBamBanPhim();
+            if (gia == 4) khiBamBanPhim();
           },
-          itemBuilder: (ctx) => const [
-            PopupMenuItem(
-              value: 1,
-              child: Text('Luyện gõ bàn phím bằng 10 ngón tay'),
-            ),
-            PopupMenuDivider(),
-            PopupMenuItem(
-              value: 2,
-              child: Text('Bật bộ điều hướng và phím nhanh'),
-            ),
-            PopupMenuDivider(),
-            PopupMenuItem(
-              value: 3,
-              child: Text('Kiểu gõ bàn phím'),
-            ),
-            PopupMenuDivider(),
-            PopupMenuItem(
-              value: 4,
-              child: Text('Chia sẻ ứng dụng này đến với mọi người'),
-            ),
-            PopupMenuDivider(),
-            PopupMenuItem(
-              value: 5,
-              child: Text('Góp ý thêm, báo lỗi về ứng dụng'),
-            ),
-            PopupMenuDivider(),
-            PopupMenuItem(
-              value: 6,
-              child: Text('Donate ủng hộ-cảm ơn tác giả'),
-            ),
-            PopupMenuDivider(),
-            PopupMenuItem(
-              value: 7,
-              child: Text('Điều khoản sử dụng'),
-            ),
-            PopupMenuDivider(),
-            PopupMenuItem(
-              value: 8,
-              child: Text('Bảo mật và quyền riêng tư'),
-            ),
+          itemBuilder: (ctx) => [
+            _mucMenuThem(1, 'Thêm ảnh'),
+            _mucMenuThem(2, 'Chụp ảnh (camera)'),
+            const PopupMenuDivider(height: 8),
+            _mucMenuThem(3, 'Bật bộ điều hướng và phím nhanh'),
+            _mucMenuThem(4, 'Kiểu gõ bàn phím'),
+            _mucMenuThem(5, 'Luyện gõ phím bằng 10 ngón tay'),
+            const PopupMenuDivider(height: 8),
+            _mucMenuThem(6, 'Chia sẻ ứng dụng này đến với mọi người'),
+            _mucMenuThem(7, 'Góp ý thêm, báo lỗi về ứng dụng'),
+            _mucMenuThem(8, 'Donate ủng hộ-cảm ơn tác giả'),
+            const PopupMenuDivider(height: 8),
+            _mucMenuThem(9, 'Điều khoản sử dụng'),
+            _mucMenuThem(10, 'Bảo mật và quyền riêng tư'),
+            const PopupMenuDivider(height: 8),
+            _mucMenuThem(11, 'Đăng nhập tài khoản'),
           ],
         ),
       ),

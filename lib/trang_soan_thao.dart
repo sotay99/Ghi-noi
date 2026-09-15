@@ -327,7 +327,46 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   /// Năm dấu câu tự động "nhảy" qua trước một dấu cách có sẵn khi gõ tay —
   /// xem chỗ dùng trong `_apDungChinhSuaNguoiDung`.
-  static const _kyTuDacBiet = {'.', ',', ';', '?', '!'};
+  static const _kyTuDacBiet = {'.', ',', ';', '?', '!', ':'};
+
+  /// Kiểu chữ của ô soạn thảo — dùng chung cho cả TextField thật lẫn
+  /// TextPainter đo vị trí ký tự cuối (`_chamCuoiVanBan`), để đo cho đúng.
+  static const _kieuVanBan = TextStyle(fontSize: 17, height: 1.5);
+
+  /// Chấm tròn tím báo hiệu cuối văn bản, luôn bám sát ngay sau ký tự cuối
+  /// cùng. Đo lại vị trí bằng TextPainter với cùng kiểu chữ/bề ngang khung
+  /// như TextField thật — cách duy nhất biết chữ cuối rơi vào dòng nào sau
+  /// khi tự động xuống dòng, mà không phải tự dựng lại một RenderEditable.
+  Widget _chamCuoiVanBan(double rongKhung) {
+    final chu = _boDieuKhien.text;
+    if (chu.isEmpty) return const SizedBox.shrink();
+
+    final tp = TextPainter(
+      text: TextSpan(text: chu, style: _kieuVanBan),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: rongKhung);
+    final viTri = tp.getOffsetForCaret(
+      TextPosition(offset: chu.length),
+      Rect.zero,
+    );
+    final cuon = _cuonVanBan.hasClients ? _cuonVanBan.offset : 0.0;
+
+    const duongKinh = 17.0;
+    return Positioned(
+      left: viTri.dx + 2,
+      top: viTri.dy -
+          cuon +
+          (_kieuVanBan.fontSize! * _kieuVanBan.height! - duongKinh) / 2,
+      child: Container(
+        width: duongKinh,
+        height: duongKinh,
+        decoration: const BoxDecoration(
+          color: Color(0xFF6A1B9A),
+          shape: BoxShape.circle,
+        ),
+      ),
+    );
+  }
 
   /// Lịch sử Lùi lại/Tiến tới. Mỗi điểm mốc là trạng thái TRỌN VẸN của bài
   /// (chữ + vị trí con trỏ) tại một ranh giới có ý nghĩa — KHÔNG phải từng
@@ -2044,22 +2083,40 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                child: TextField(
-                  controller: _boDieuKhien,
-                  focusNode: _oChu,
-                  scrollController: _cuonVanBan,
-                  maxLines: null,
-                  expands: true,
-                  autofocus: true,
-                  textAlignVertical: TextAlignVertical.top,
-                  keyboardType: TextInputType.multiline,
-                  textCapitalization: TextCapitalization.sentences,
-                  style: const TextStyle(fontSize: 17, height: 1.5),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    hintText: 'Gõ chữ và Bấm Micro để nói...\n'
-                        'Thực hiện song song 2 việc trên cùng lúc',
-                  ),
+                child: LayoutBuilder(
+                  builder: (context, rangBuoc) {
+                    return Stack(
+                      children: [
+                        TextField(
+                          controller: _boDieuKhien,
+                          focusNode: _oChu,
+                          scrollController: _cuonVanBan,
+                          maxLines: null,
+                          expands: true,
+                          autofocus: true,
+                          textAlignVertical: TextAlignVertical.top,
+                          keyboardType: TextInputType.multiline,
+                          textCapitalization: TextCapitalization.sentences,
+                          style: _kieuVanBan,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            hintText: 'Gõ chữ và Bấm Micro để nói...\n'
+                                'Thực hiện song song 2 việc trên cùng lúc',
+                          ),
+                        ),
+                        // Chấm tròn tím đánh dấu cuối văn bản — chỉ mang tính
+                        // trang trí, KHÔNG phải một ký tự thật, nên con trỏ
+                        // không bao giờ đứng được sau nó (vị trí xa nhất của
+                        // con trỏ vẫn là cuối chuỗi thật, tức trước chấm này).
+                        IgnorePointer(
+                          child: AnimatedBuilder(
+                            animation: Listenable.merge([_boDieuKhien, _cuonVanBan]),
+                            builder: (context, _) => _chamCuoiVanBan(rangBuoc.maxWidth),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
