@@ -274,6 +274,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   bool _sanSang = false;
   String _loi = '';
 
+  /// Micro đang bật mà im lặng quá lâu (không thêm được chữ nào, dù do nói
+  /// hay do gõ tay) thì tự tắt HẲN — không tự bật lại như các cơ chế khác,
+  /// người dùng phải tự bấm nút hoặc phím tắt mới nghe lại.
+  Timer? _henTuTatMicroImLang;
+  static const _thoiGianImLangTuTatMicro = Duration(seconds: 15);
+
   /// Mấy mức âm gần nhất, để vẽ sóng. Mới nhất nằm ở cuối.
   final List<double> _songAm = List<double>.filled(16, 0);
 
@@ -285,8 +291,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   int _neo = 0;
   String _chuTam = '';
 
+  /// Đúng nguyên văn `recognizedWords` (chưa chèn dấu cách nào của ta) của
+  /// lần cập nhật gần nhất đã CHẤP NHẬN cho đoạn đang đọc dở — dùng để chặn
+  /// bộ nhận dạng quay lại rút ngắn/sửa chữ đã hiện lên màn hình (xem
+  /// `_khiCoChu`). Luôn coi là rỗng bất cứ khi nào `_chuTam` rỗng (đoạn mới).
+  String _noiGocDaKhoa = '';
+
   static bool _laKhoangTrang(String kyTu) =>
       kyTu == ' ' || kyTu == '\n' || kyTu == '\t';
+
+  /// Năm dấu câu tự động "nhảy" qua trước một dấu cách có sẵn khi gõ tay —
+  /// xem chỗ dùng trong `_apDungChinhSuaNguoiDung`.
+  static const _kyTuDacBiet = {'.', ',', ';', '?', '!'};
 
   /// Lịch sử Lùi lại/Tiến tới. Mỗi điểm mốc là trạng thái TRỌN VẸN của bài
   /// (chữ + vị trí con trỏ) tại một ranh giới có ý nghĩa — KHÔNG phải từng
@@ -371,17 +387,20 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // Lắng nghe TOÀN CỤC (không phụ thuộc widget nào đang giữ tiêu điểm) —
     // phím tắt phải hoạt động kể cả đang gõ dở trong ô văn bản.
     HardwareKeyboard.instance.addHandler(_khiPhimTatMicro);
+    HardwareKeyboard.instance.addHandler(_khiPhimTatLuiTien);
   }
 
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_khiPhimTatMicro);
+    HardwareKeyboard.instance.removeHandler(_khiPhimTatLuiTien);
     WidgetsBinding.instance.removeObserver(this);
     _hen?.cancel();
     _henLuuTru?.cancel();
     _henGoXong?.cancel();
     _henChinhTa?.cancel();
     _henRanhGioiGoTay?.cancel();
+    _henTuTatMicroImLang?.cancel();
     _micro.cancel();
     _boDieuKhien.dispose();
     _oChu.dispose();
@@ -615,6 +634,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   Future<void> _tatMicro() async {
     _muonNghe = false;
+    _henTuTatMicroImLang?.cancel();
     _hen?.cancel();
     // Chặn NGAY mọi kết quả còn đang trên đường về, trước khi ra lệnh tắt —
     // nếu không, một câu đang nói dở sẽ trả về kết quả chốt SAU KHI đã bấm
@@ -646,6 +666,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         _muonNghe = true;
         _loi = '';
       });
+      _datLaiHenTuTatMicroImLang();
       _datNeoTaiConTro();
       _batMicro();
     }
@@ -677,6 +698,25 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     return true;
   }
 
+  /// Ctrl + Z (Lùi lại) và Ctrl + Shift + Z (Tiến tới) — cố định, không cho
+  /// người dùng đổi (khác phím tắt micro, có thể tuỳ chỉnh trong Cài đặt).
+  bool _khiPhimTatLuiTien(KeyEvent event) {
+    if (!mounted || event is! KeyDownEvent) return false;
+
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return false;
+
+    if (!HardwareKeyboard.instance.isControlPressed) return false;
+    if (event.logicalKey != LogicalKeyboardKey.keyZ) return false;
+
+    if (HardwareKeyboard.instance.isShiftPressed) {
+      if (_lichSuToi.isNotEmpty) _toi();
+    } else {
+      if (_lichSuLui.isNotEmpty) _lui();
+    }
+    return true;
+  }
+
   void _khiDoiMucAm(double muc) {
     if (!mounted) return;
     // Mức âm Android trả về nằm khoảng -2 đến 10. Ép về 0..1 cho dễ vẽ.
@@ -693,8 +733,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   void _datNeoTaiConTro() {
     final chon = _boDieuKhien.selection;
-    _neo = chon.isValid ? chon.end : _boDieuKhien.text.length;
-    _chuTam = '';
+    if (chon.isValid && !chon.isCollapsed) {
+      // Đang chọn (tô đậm) một vùng — để giọng nói ĐÈ LÊN đúng vùng đó, y
+      // hệt cách gõ tay đè lên vùng đang chọn. Đặt neo ở đầu vùng và coi
+      // nguyên đoạn đang chọn là "vùng tạm" — lần nói đầu tiên sẽ tự động
+      // thay thế nó qua đúng con đường `_thayVungTamBangGiongNoi` vẫn dùng.
+      _neo = chon.start;
+      _chuTam = _boDieuKhien.text.substring(chon.start, chon.end);
+    } else {
+      _neo = chon.isValid ? chon.end : _boDieuKhien.text.length;
+      _chuTam = '';
+    }
+    _noiGocDaKhoa = '';
   }
 
   /// Coi phần chữ tạm hiện tại là đã xong, và dời neo ra sau nó.
@@ -756,43 +806,55 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _chuTam = '';
     }
 
-    var chen = noi;
-    // Nếu ngay trước neo đã có chữ mà chưa có dấu cách, thêm một dấu cách cho
-    // câu mới không dính vào câu cũ.
-    if (_neo > 0) {
-      final truoc = cu[_neo - 1];
-      if (!_laKhoangTrang(truoc)) chen = ' $chen';
+    // Chặn hồi tố: bộ nhận dạng thỉnh thoảng "nghĩ lại" và trả về một bản
+    // NGẮN HƠN hoặc KHÁC HẲN cho cùng một đoạn đang đọc dở — nhìn như thể
+    // micro tự quay lại sửa/xoá chữ đã hiện lên màn hình. Chữ đã hiện ra rồi
+    // thì phải CHẾT CỨNG: chỉ chấp nhận cập nhật khi `noi` nối dài thêm đúng
+    // từ phần đã khoá (`_noiGocDaKhoa`); coi như đoạn mới (`_chuTam` rỗng)
+    // thì không có gì để khoá, chấp nhận bất cứ nội dung nào.
+    final coBanDaKhoa = _chuTam.isEmpty ? '' : _noiGocDaKhoa;
+    if (noi.startsWith(coBanDaKhoa)) {
+      _noiGocDaKhoa = noi;
+
+      var chen = noi;
+      // Nếu ngay trước neo đã có chữ mà chưa có dấu cách, thêm một dấu cách
+      // cho câu mới không dính vào câu cũ.
+      if (_neo > 0) {
+        final truoc = cu[_neo - 1];
+        if (!_laKhoangTrang(truoc)) chen = ' $chen';
+      }
+
+      // Luôn giữ NGAY SAU CON TRỎ là một khoảng trắng trong suốt lúc câu còn
+      // đang đọc dở — không đợi tới lúc câu chốt xong mới chèn.
+      //
+      // Đây là cách DUY NHẤT thực sự chặn được lỗi bộ gõ tiếng Việt gộp ngược
+      // ('Thành' + phím 's' → 'Thánh'): ứng dụng chỉ biết được người dùng vừa
+      // gõ phím gì SAU KHI bàn phím đã xử lý xong. Nếu người dùng gõ phím tạo
+      // dấu (Telex: s, f, r, x, j...) NGAY TRONG LÚC câu còn dở — tức là chưa
+      // kịp chốt để chèn dấu cách — bộ gõ vẫn nhìn thấy nguyên âm trần ngay
+      // trước con trỏ và gộp ngược y hệt. Chèn dấu cách theo TỪNG lần nghe rõ
+      // thêm (không đợi chốt) thì tại BẤT KỲ thời điểm nào người dùng gõ phím
+      // xen vào, trước con trỏ luôn sẵn một dấu cách, không phải nguyên âm.
+      if (widget.caiDat.tuDongChenKhoangCach && !_laKhoangTrang(chen[chen.length - 1])) {
+        chen = '$chen ';
+      }
+
+      if (chen != _chuTam) {
+        // _chuTam rỗng nghĩa là đây là mẩu đầu tiên của một đoạn nói MỚI
+        // (đoạn trước, nếu có, đã chốt xong và xoá _chuTam ở _chotCauDangDoc)
+        // — đúng ranh giới cần lưu một điểm mốc Lùi lại riêng, để một bài dài
+        // nói nhiều lần vẫn lùi được từng đoạn một, không gộp chung cả bài
+        // thành một bước.
+        if (_chuTam.isEmpty) {
+          _luuDiemMoc(vanBan: cu, viTriConTro: _neo);
+        }
+        _thayVungTamBangGiongNoi(chen);
+      }
     }
-
-    // Luôn giữ NGAY SAU CON TRỎ là một khoảng trắng trong suốt lúc câu còn
-    // đang đọc dở — không đợi tới lúc câu chốt xong mới chèn.
-    //
-    // Đây là cách DUY NHẤT thực sự chặn được lỗi bộ gõ tiếng Việt gộp ngược
-    // ('Thành' + phím 's' → 'Thánh'): ứng dụng chỉ biết được người dùng vừa
-    // gõ phím gì SAU KHI bàn phím đã xử lý xong. Nếu người dùng gõ phím tạo
-    // dấu (Telex: s, f, r, x, j...) NGAY TRONG LÚC câu còn dở — tức là chưa
-    // kịp chốt để chèn dấu cách — bộ gõ vẫn nhìn thấy nguyên âm trần ngay
-    // trước con trỏ và gộp ngược y hệt. Chèn dấu cách theo TỪNG lần nghe rõ
-    // thêm (không đợi chốt) thì tại BẤT KỲ thời điểm nào người dùng gõ phím
-    // xen vào, trước con trỏ luôn sẵn một dấu cách, không phải nguyên âm.
-    if (widget.caiDat.tuDongChenKhoangCach && !_laKhoangTrang(chen[chen.length - 1])) {
-      chen = '$chen ';
-    }
-
-    if (chen == _chuTam) return; // Không có gì đổi, khỏi động vào ô văn bản.
-
-    // _chuTam rỗng nghĩa là đây là mẩu đầu tiên của một đoạn nói MỚI (đoạn
-    // trước, nếu có, đã chốt xong và xoá _chuTam ở _chotCauDangDoc) — đúng
-    // ranh giới cần lưu một điểm mốc Lùi lại riêng, để một bài dài nói nhiều
-    // lần vẫn lùi được từng đoạn một, không gộp chung cả bài thành một bước.
-    if (_chuTam.isEmpty) {
-      _luuDiemMoc(vanBan: cu, viTriConTro: _neo);
-    }
-
-    _thayVungTamBangGiongNoi(chen);
 
     if (xong) {
       _chotCauDangDoc();
+      _noiGocDaKhoa = '';
       _luuVanBan();
       _lenLichKiemTraChinhTa();
     }
@@ -811,9 +873,24 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _viTriGanNhat = viTri;
     _lucGhi = DateTime.now();
 
+    // Vừa có thêm chữ (dù do nói hay gõ tay, mọi lần ghi đều qua đây) — huỷ
+    // đếm ngược tự tắt micro vì im lặng, đặt lại từ đầu.
+    if (_muonNghe) _datLaiHenTuTatMicroImLang();
+
     // Chữ vừa thêm vào cuối bài thì kéo màn hình xuống theo, để dòng mới nhất
     // luôn nằm trong tầm mắt.
     if (viTri >= chu.length) _cuonXuongDuoi();
+  }
+
+  /// Đặt lại (hoặc bắt đầu) đếm ngược 15 giây tự tắt hẳn micro nếu không có
+  /// thêm chữ nào — gọi mỗi khi có chữ mới VÀ mỗi khi micro vừa bật, để
+  /// khoảng lặng được tính từ đúng lúc bật micro, không phải chờ có chữ đầu
+  /// tiên mới bắt đầu đếm.
+  void _datLaiHenTuTatMicroImLang() {
+    _henTuTatMicroImLang?.cancel();
+    _henTuTatMicroImLang = Timer(_thoiGianImLangTuTatMicro, () {
+      if (_muonNghe) _tatMicro();
+    });
   }
 
   /// Kéo ô văn bản xuống hết cỡ, sau khi khung hình đã dựng lại xong — lúc đó
@@ -878,6 +955,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _microNgungDeGo = false;
     _boQuaCauNay = false;
     setState(() => _muonNghe = true);
+    _datLaiHenTuTatMicroImLang();
     _datNeoTaiConTro();
     _batMicro();
   }
@@ -966,12 +1044,25 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _dieuChinhLoiChinhTaSauKhiSua(dau, soLuongXoa, doDaiChenVao);
     _dieuChinhVungToanVanSauKhiSua(dau, soLuongXoa, doDaiChenVao);
 
+    // Gõ đúng MỘT ký tự đặc biệt (. , ; ? !) ngay sau một dấu cách có sẵn —
+    // hoán đổi hai ký tự đó cho nhau, để dấu câu nằm sát vào chữ trước nó
+    // thay vì kẹt sau dấu cách: "abc |" gõ "." thành "abc. |", con trỏ vẫn
+    // đứng nguyên vị trí (chỉ đổi chỗ hai ký tự liền kề, độ dài không đổi).
+    var chuMoiCuoi = chuMoi;
+    if (soLuongXoa == 0 &&
+        doDaiChenVao == 1 &&
+        dau > 0 &&
+        cu[dau - 1] == ' ' &&
+        _kyTuDacBiet.contains(chuMoi[dau])) {
+      chuMoiCuoi = chuMoi.substring(0, dau - 1) + chuMoi[dau] + ' ' + chuMoi.substring(dau + 1);
+    }
+
     final chon = _boDieuKhien.selection;
-    final viTriConTro = chon.isValid ? chon.end : chuMoi.length;
+    final viTriConTro = chon.isValid ? chon.end : chuMoiCuoi.length;
 
     _neo = viTriConTro;
     _nguoiDungVuaGo();
-    _ghiVaoO(chuMoi, viTriConTro);
+    _ghiVaoO(chuMoiCuoi, viTriConTro);
     _henLuu();
     _lenLichKiemTraChinhTa();
   }
@@ -1792,12 +1883,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         IconButton(
           onPressed: _lichSuLui.isEmpty ? null : _lui,
           icon: const Icon(Icons.undo),
-          tooltip: 'Lùi lại',
+          tooltip: 'Lùi lại (Ctrl + Z)',
         ),
         IconButton(
           onPressed: _lichSuToi.isEmpty ? null : _toi,
           icon: const Icon(Icons.redo),
-          tooltip: 'Tiến tới',
+          tooltip: 'Tiến tới (Ctrl + Shift + Z)',
         ),
         IconButton(
           onPressed: _bamNutLuu,

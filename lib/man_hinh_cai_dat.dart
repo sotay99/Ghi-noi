@@ -358,6 +358,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
   Future<void> _moDialogSuaPhimTat() async {
     var boBienDoiTam = _phimTatBoBienDoi;
     var phimTam = _phimTatPhim;
+    var loiXungDot = false;
 
     await showDialog<void>(
       context: context,
@@ -377,24 +378,47 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
                 ],
               ),
             );
-            if (chon != null) capNhatModal(() => boBienDoiTam = chon);
+            if (chon != null) {
+              capNhatModal(() {
+                boBienDoiTam = chon;
+                loiXungDot = false;
+              });
+            }
           }
 
           Future<void> chonPhim() async {
             final chon = await _moDialogBatPhim(ctx);
-            if (chon != null) capNhatModal(() => phimTam = chon);
+            if (chon != null) {
+              capNhatModal(() {
+                phimTam = chon;
+                loiXungDot = false;
+              });
+            }
           }
 
           return AlertDialog(
             title: const Text('Phím tắt tắt/mở Micro'),
-            content: Row(
+            content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _oPhim(boBienDoiTam, chonBoBienDoi),
-                const SizedBox(width: 8),
-                const Text('+', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(width: 8),
-                _oPhim(phimTam, chonPhim),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _oPhim(boBienDoiTam, chonBoBienDoi),
+                    const SizedBox(width: 8),
+                    const Text('+', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 8),
+                    _oPhim(phimTam, chonPhim),
+                  ],
+                ),
+                if (loiXungDot) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Ctrl + Z đã là phím tắt cố định của nút "Lùi lại" — chọn tổ '
+                    'hợp khác cho micro nhé.',
+                    style: TextStyle(color: Colors.red.shade600, fontSize: 13),
+                  ),
+                ],
               ],
             ),
             actions: [
@@ -404,6 +428,10 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
               ),
               FilledButton(
                 onPressed: () async {
+                  if (boBienDoiTam == 'Ctrl' && phimTam == 'Z') {
+                    capNhatModal(() => loiXungDot = true);
+                    return;
+                  }
                   await widget.caiDat.datPhimTat(boBienDoiTam, phimTam);
                   if (mounted) {
                     setState(() {
