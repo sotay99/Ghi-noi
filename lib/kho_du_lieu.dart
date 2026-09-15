@@ -179,6 +179,27 @@ class KhoDuLieu {
     }
   }
 
+  /// Tên tự gợi ý cho một ghi chú SẮP tạo — dùng để điền sẵn vào hộp thoại
+  /// đặt tên trước khi thật sự tạo.
+  String tenGhiChuGoiY(String chaId) => _tenGhiChuTuDong(chaId);
+
+  /// Tên tự gợi ý cho một thư mục SẮP tạo, cùng vai trò với hàm trên.
+  String tenThuMucGoiY(String chaId) => _tenThuMucTuDong(chaId);
+
+  /// Kiểm tên trước khi tạo mới (chưa có id để loại trừ, khác với
+  /// `doiTenGhiChu`/`doiTenThuMuc` vốn kiểm khi ĐÃ có sẵn một mục) — cùng bộ
+  /// quy tắc: không hợp lệ hoặc trùng tên trong cùng thư mục. null là dùng
+  /// được.
+  String? loiTenTrongThuMuc(String tenTho, String chaId) {
+    final loi = loiTenKhongHopLe(tenTho);
+    if (loi != null) return loi;
+    final ten = tenTho.trim();
+    if (_daCoTen(ten, chaId)) {
+      return 'Tên "$ten" đã có trong thư mục này.';
+    }
+    return null;
+  }
+
   String _tenGhiChuTuDong(String chaId) {
     var n = 1;
     while (_daCoTen('Ghi chú $n', chaId)) {

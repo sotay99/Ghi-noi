@@ -274,10 +274,27 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   bool _sanSang = false;
   String _loi = '';
 
+  /// Đang hiện dòng chữ chú thích dọc bên trên từng nút của thanh công cụ
+  /// hay không — bật bằng nút "i" (chỉ xuất hiện khi micro tắt), hoặc tự bật
+  /// khi vừa mở một ghi chú còn trống trơn. Tắt bằng bất kỳ thao tác nào.
+  bool _hienChuThich = false;
+
+  void _tatChuThich() {
+    if (_hienChuThich) setState(() => _hienChuThich = false);
+  }
+
+  /// Nút "i" là nơi DUY NHẤT bật lại chú thích — vì bất kỳ thao tác nào khác
+  /// trên màn hình đều đã tắt nó đi ngay từ lúc pointer chạm xuống (xem
+  /// Listener bọc quanh `body`), nên tới lúc hàm này chạy thì luôn đang tắt;
+  /// gán thẳng `true` chứ không cần đảo trạng thái.
+  void _khiBamChuThich() {
+    setState(() => _hienChuThich = true);
+  }
+
   /// Micro đang bật mà im lặng quá lâu (không thêm được chữ nào, dù do nói
   /// hay do gõ tay) thì tự tắt HẲN — không tự bật lại như các cơ chế khác,
   /// người dùng phải tự bấm nút hoặc phím tắt mới nghe lại. Số phút lấy từ
-  /// Cài đặt (widget.caiDat.thoiGianTuTatMicroPhut).
+  /// Cài đặt (widget.caiDat.thoiGianTuTatMicroGiay).
   Timer? _henTuTatMicroImLang;
 
   /// Mấy mức âm gần nhất, để vẽ sóng. Mới nhất nằm ở cuối.
@@ -296,6 +313,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// bộ nhận dạng quay lại rút ngắn/sửa chữ đã hiện lên màn hình (xem
   /// `_khiCoChu`). Luôn coi là rỗng bất cứ khi nào `_chuTam` rỗng (đoạn mới).
   String _noiGocDaKhoa = '';
+
+  /// Số lần liên tiếp một kết quả tạm bị TỪ CHỐI (xem `_khiCoChu`) vì không
+  /// nối dài đúng phần đã khoá. Chỉ chặn tối đa MỘT lần liên tiếp — bộ nhận
+  /// dạng thỉnh thoảng "nghĩ lại" một lần rồi thôi thì chặn được cái đó,
+  /// nhưng nếu nó cứ liên tục trả về khác hẳn (ví dụ autoPunctuation viết
+  /// lại nguyên câu khi có thêm ngữ cảnh), chặn mãi sẽ làm sóng âm vẫn chạy
+  /// mà không ra chữ nào cả — bắt buộc phải nhượng bộ sau lần từ chối đầu.
+  int _soLanTuChoiLienTuc = 0;
 
   static bool _laKhoangTrang(String kyTu) =>
       kyTu == ' ' || kyTu == '\n' || kyTu == '\t';
@@ -379,6 +404,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final banDau = _ghiChuHienTai.noiDung;
     if (banDau.isNotEmpty) {
       _ghiVaoO(banDau, banDau.length);
+    } else {
+      // Ghi chú vừa tạo, chưa từng có ký tự nào — tự hiện chú thích ngay từ
+      // đầu, y hệt như vừa bấm nút "i", để người dùng lần đầu biết mỗi nút
+      // dùng để làm gì.
+      _hienChuThich = true;
     }
     _neo = banDau.length;
     _viTriDaKiemTraChinhTa = banDau.length;
@@ -817,8 +847,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // thì phải CHẾT CỨNG: chỉ chấp nhận cập nhật khi `noi` nối dài thêm đúng
     // từ phần đã khoá (`_noiGocDaKhoa`); coi như đoạn mới (`_chuTam` rỗng)
     // thì không có gì để khoá, chấp nhận bất cứ nội dung nào.
+    //
+    // Chỉ chặn tối đa MỘT lần liên tiếp (`_soLanTuChoiLienTuc`): nếu bộ nhận
+    // dạng cứ liên tục trả về khác hẳn phần đã khoá (ví dụ autoPunctuation
+    // viết lại nguyên câu khi có thêm ngữ cảnh), chặn mãi sẽ làm sóng âm vẫn
+    // chạy mà không ra chữ nào cả — phải nhượng bộ sau lần từ chối đầu.
     final coBanDaKhoa = _chuTam.isEmpty ? '' : _noiGocDaKhoa;
-    if (noi.startsWith(coBanDaKhoa)) {
+    final chapNhan = noi.startsWith(coBanDaKhoa) || _soLanTuChoiLienTuc >= 1;
+    if (chapNhan) {
+      _soLanTuChoiLienTuc = 0;
       _noiGocDaKhoa = noi;
 
       var chen = noi;
@@ -855,11 +892,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         }
         _thayVungTamBangGiongNoi(chen);
       }
+    } else {
+      _soLanTuChoiLienTuc++;
     }
 
     if (xong) {
       _chotCauDangDoc();
       _noiGocDaKhoa = '';
+      _soLanTuChoiLienTuc = 0;
       _luuVanBan();
       _lenLichKiemTraChinhTa();
     }
@@ -894,7 +934,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void _datLaiHenTuTatMicroImLang() {
     _henTuTatMicroImLang?.cancel();
     _henTuTatMicroImLang = Timer(
-      Duration(minutes: widget.caiDat.thoiGianTuTatMicroPhut),
+      Duration(seconds: widget.caiDat.thoiGianTuTatMicroGiay),
       () {
         if (_muonNghe) _tatMicro();
       },
@@ -1966,7 +2006,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: appBar,
-      body: SafeArea(
+      // translucent: chỉ NGHE sự kiện chạm để tắt chú thích, không chặn nó
+      // đi tiếp xuống nút/ô bên dưới — một cú bấm vừa tắt chú thích vừa làm
+      // đúng việc của nút đó (mở cài đặt, bật micro...).
+      body: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => _tatChuThich(),
+        child: SafeArea(
         bottom: false,
         child: Column(
           children: [
@@ -2022,6 +2068,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               dangNghe: _dangNghe,
               songAm: _songAm,
               sanSang: _sanSang,
+              hienChuThich: _hienChuThich,
+              khiBamChuThich: _khiBamChuThich,
               nhanPhimTat: '${widget.caiDat.phimTatBoBienDoi} + ${widget.caiDat.phimTatPhim}',
               // Bàn phím đóng thì còn phải né thanh điều hướng của máy; bàn
               // phím mở thì nó che mất thanh đó rồi, né nữa là hở một dải
@@ -2057,6 +2105,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             ),
             SizedBox(height: caoBanPhim),
           ],
+        ),
         ),
       ),
     );

@@ -60,7 +60,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     _kiemTraChinhTa = widget.caiDat.kiemTraChinhTaBangAI;
     _phimTatBoBienDoi = widget.caiDat.phimTatBoBienDoi;
     _phimTatPhim = widget.caiDat.phimTatPhim;
-    _oTuTatMicro = TextEditingController(text: '${widget.caiDat.thoiGianTuTatMicroPhut}');
+    _oTuTatMicro = TextEditingController(text: '${widget.caiDat.thoiGianTuTatMicroGiay}');
     _focusTuTatMicro.addListener(_khiMatTieuDiemTuTatMicro);
     _kiemTraQuyenMicro();
   }
@@ -79,10 +79,10 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
   }
 
   Future<void> _apDungTuTatMicro() async {
-    final gia = int.tryParse(_oTuTatMicro.text) ?? widget.caiDat.thoiGianTuTatMicroPhut;
+    final gia = int.tryParse(_oTuTatMicro.text) ?? widget.caiDat.thoiGianTuTatMicroGiay;
     final hopLe = gia.clamp(CaiDat.gioiHanDuoiTuTatMicro, CaiDat.gioiHanTrenTuTatMicro);
     _oTuTatMicro.text = '$hopLe';
-    if (hopLe != widget.caiDat.thoiGianTuTatMicroPhut) {
+    if (hopLe != widget.caiDat.thoiGianTuTatMicroGiay) {
       await widget.caiDat.datThoiGianTuTatMicro(hopLe);
     }
   }
@@ -253,7 +253,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
               ),
             ),
             const SizedBox(width: 8),
-            const Text('phút'),
+            const Text('giây'),
           ],
         ),
         _nutTimHieuThem(() => _hienGiaiThich(
@@ -654,11 +654,11 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
 }
 
 const _giaiThichTuTatMicroNgan = '''
-Micro đang bật mà quá lâu không có thêm chữ nào (nói hay gõ tay đều tính) thì tự tắt hẳn, đỡ hao pin. Chỉnh từ **10 đến 45 phút**.
+Micro đang bật mà quá lâu không có thêm chữ nào (nói hay gõ tay đều tính) thì tự tắt hẳn, đỡ hao pin. Chỉnh từ **10 đến 60 giây**.
 ''';
 
 const _giaiThichTuTatMicro = '''
-Micro bật mãi mà không dùng tới rất tốn pin. Cài đặt này quy định: nếu micro đang bật mà im lặng liên tục — không có chữ nào mới xuất hiện trong bài, dù do nói hay do bạn tự gõ tay — quá số phút đặt ở đây, ứng dụng sẽ tự tắt hẳn micro. Muốn nghe lại thì tự bấm nút micro hoặc phím tắt, ứng dụng không tự bật lại.
+Micro bật mãi mà không dùng tới rất tốn pin. Cài đặt này quy định: nếu micro đang bật mà im lặng liên tục — không có chữ nào mới xuất hiện trong bài, dù do nói hay do bạn tự gõ tay — quá số giây đặt ở đây, ứng dụng sẽ tự tắt hẳn micro. Muốn nghe lại thì tự bấm nút micro hoặc phím tắt, ứng dụng không tự bật lại.
 ''';
 
 const _giaiThichThoiGianNgan = '''

@@ -58,13 +58,79 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   }
 
   Future<void> _themThuMuc() async {
-    setState(() => _kho.taoThuMucMoi(_thuMucHienTaiId));
+    final goiY = _kho.tenThuMucGoiY(_thuMucHienTaiId);
+    final ten = await _hoiTenMoiTao(tieuDe: 'Thư mục mới', tenGoiY: goiY);
+    if (ten == null) return;
+    setState(() {
+      final t = _kho.taoThuMucMoi(_thuMucHienTaiId);
+      t.ten = ten;
+    });
     await _kho.luu();
   }
 
   Future<void> _themGhiChu() async {
-    setState(() => _kho.taoGhiChuMoi(_thuMucHienTaiId));
+    final goiY = _kho.tenGhiChuGoiY(_thuMucHienTaiId);
+    final ten = await _hoiTenMoiTao(tieuDe: 'Ghi chú mới', tenGoiY: goiY);
+    if (ten == null) return;
+    setState(() {
+      final g = _kho.taoGhiChuMoi(_thuMucHienTaiId);
+      g.ten = ten;
+    });
     await _kho.luu();
+  }
+
+  /// Hộp thoại đặt tên khi TẠO MỚI (thư mục hoặc ghi chú): tên gợi ý điền sẵn
+  /// và được BÔI ĐEN toàn bộ, gõ chữ đầu tiên là thay hẳn chứ không phải nối
+  /// vào. Kiểm tên ngay khi bấm Lưu, sai thì báo lỗi tại chỗ và không đóng.
+  Future<String?> _hoiTenMoiTao({
+    required String tieuDe,
+    required String tenGoiY,
+  }) {
+    final bo = TextEditingController(text: tenGoiY)
+      ..selection = TextSelection(baseOffset: 0, extentOffset: tenGoiY.length);
+    String? loi;
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, capNhat) {
+          return AlertDialog(
+            title: Text(tieuDe),
+            content: TextField(
+              controller: bo,
+              autofocus: true,
+              maxLength: doDaiTenToiDa,
+              inputFormatters: [FilteringTextInputFormatter.deny(kyTuCamTrongTen)],
+              decoration: InputDecoration(errorText: loi),
+              onSubmitted: (_) {
+                final k = _kho.loiTenTrongThuMuc(bo.text, _thuMucHienTaiId);
+                if (k != null) {
+                  capNhat(() => loi = k);
+                  return;
+                }
+                Navigator.of(ctx).pop(bo.text.trim());
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(null),
+                child: const Text('Huỷ'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final k = _kho.loiTenTrongThuMuc(bo.text, _thuMucHienTaiId);
+                  if (k != null) {
+                    capNhat(() => loi = k);
+                    return;
+                  }
+                  Navigator.of(ctx).pop(bo.text.trim());
+                },
+                child: const Text('Lưu'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _doiTen({
@@ -357,14 +423,32 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                 ),
           actions: [
             IconButton(
-              onPressed: _themThuMuc,
-              icon: const Icon(Icons.create_new_folder_outlined),
-              tooltip: 'Thêm thư mục',
-            ),
-            IconButton(
               onPressed: _themGhiChu,
               icon: const Icon(Icons.note_add_outlined),
               tooltip: 'Thêm ghi chú',
+            ),
+            PopupMenuButton<int>(
+              icon: const Icon(Icons.more_vert),
+              tooltip: 'Thêm',
+              onSelected: (v) {
+                switch (v) {
+                  case 1:
+                    _themThuMuc();
+                    break;
+                  // 2-5: "Chọn nhiều", "Tải và chia sẻ thư mục này",
+                  // "Thông tin thư mục này", "Thùng rác" — chỗ đặt trước,
+                  // chưa gắn logic gì cả.
+                }
+              },
+              itemBuilder: (ctx) => const [
+                PopupMenuItem(value: 1, child: Text('Tạo thư mục mới')),
+                PopupMenuDivider(),
+                PopupMenuItem(value: 2, child: Text('Chọn nhiều')),
+                PopupMenuItem(value: 3, child: Text('Tải và chia sẻ thư mục này')),
+                PopupMenuItem(value: 4, child: Text('Thông tin thư mục này')),
+                PopupMenuDivider(),
+                PopupMenuItem(value: 5, child: Text('Thùng rác')),
+              ],
             ),
           ],
         ),
