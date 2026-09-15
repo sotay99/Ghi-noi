@@ -276,9 +276,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   /// Micro đang bật mà im lặng quá lâu (không thêm được chữ nào, dù do nói
   /// hay do gõ tay) thì tự tắt HẲN — không tự bật lại như các cơ chế khác,
-  /// người dùng phải tự bấm nút hoặc phím tắt mới nghe lại.
+  /// người dùng phải tự bấm nút hoặc phím tắt mới nghe lại. Số phút lấy từ
+  /// Cài đặt (widget.caiDat.thoiGianTuTatMicroPhut).
   Timer? _henTuTatMicroImLang;
-  static const _thoiGianImLangTuTatMicro = Duration(seconds: 15);
 
   /// Mấy mức âm gần nhất, để vẽ sóng. Mới nhất nằm ở cuối.
   final List<double> _songAm = List<double>.filled(16, 0);
@@ -667,8 +667,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         _loi = '';
       });
       _datLaiHenTuTatMicroImLang();
-      _datNeoTaiConTro();
+      // Cố ý gọi _batMicro() TRƯỚC: nó chạy đồng bộ tới tận await đầu tiên,
+      // chốt xong đoạn tạm còn sót (nếu có) từ lượt nghe trước — rồi mới cho
+      // _datNeoTaiConTro() đặt neo/vùng-tạm THẬT cho lượt nghe này. Gọi
+      // ngược lại thì _chotCauDangDoc() bên trong _batMicro() sẽ xoá mất
+      // ngay vùng đang chọn mà _datNeoTaiConTro() vừa chuẩn bị để đè lên.
       _batMicro();
+      _datNeoTaiConTro();
     }
   }
 
@@ -882,15 +887,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (viTri >= chu.length) _cuonXuongDuoi();
   }
 
-  /// Đặt lại (hoặc bắt đầu) đếm ngược 15 giây tự tắt hẳn micro nếu không có
-  /// thêm chữ nào — gọi mỗi khi có chữ mới VÀ mỗi khi micro vừa bật, để
-  /// khoảng lặng được tính từ đúng lúc bật micro, không phải chờ có chữ đầu
-  /// tiên mới bắt đầu đếm.
+  /// Đặt lại (hoặc bắt đầu) đếm ngược tự tắt hẳn micro nếu không có thêm chữ
+  /// nào — gọi mỗi khi có chữ mới VÀ mỗi khi micro vừa bật, để khoảng lặng
+  /// được tính từ đúng lúc bật micro, không phải chờ có chữ đầu tiên mới bắt
+  /// đầu đếm.
   void _datLaiHenTuTatMicroImLang() {
     _henTuTatMicroImLang?.cancel();
-    _henTuTatMicroImLang = Timer(_thoiGianImLangTuTatMicro, () {
-      if (_muonNghe) _tatMicro();
-    });
+    _henTuTatMicroImLang = Timer(
+      Duration(minutes: widget.caiDat.thoiGianTuTatMicroPhut),
+      () {
+        if (_muonNghe) _tatMicro();
+      },
+    );
   }
 
   /// Kéo ô văn bản xuống hết cỡ, sau khi khung hình đã dựng lại xong — lúc đó
@@ -956,8 +964,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _boQuaCauNay = false;
     setState(() => _muonNghe = true);
     _datLaiHenTuTatMicroImLang();
+    _batMicro(); // Xem giải thích thứ tự gọi trong _bamNutMicro().
     _datNeoTaiConTro();
-    _batMicro();
   }
 
   /// Người dùng chạm để dời con trỏ, chứ không gõ chữ. Nhẹ tay hơn: chỉ đóng
@@ -1653,6 +1661,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       viTriConTro: _viTriConTroHienTai(),
     ));
     final truoc = _lichSuLui.removeLast();
+    // setState trần NGAY tại đây (không đợi _apDungTrangThai) — nút Lùi/Tiến
+    // trên AppBar phải phản ánh đúng độ dài hai danh sách vừa đổi ngay lập
+    // tức, kẻo bấm liên tiếp trước khi khung hình kịp vẽ lại sẽ tưởng nút
+    // chưa hoạt động.
+    setState(() {});
     _apDungTrangThai(truoc);
   }
 
@@ -1663,6 +1676,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       viTriConTro: _viTriConTroHienTai(),
     ));
     final sau = _lichSuToi.removeLast();
+    setState(() {});
     _apDungTrangThai(sau);
   }
 

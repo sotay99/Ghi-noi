@@ -1,6 +1,6 @@
-// Màn hình cài đặt: năm dòng — thời gian bật lại micro, tự động chèn dấu
-// cách, kiểm tra chính tả bằng AI, phím tắt tắt/mở micro, và trạng thái
-// quyền micro của thiết bị.
+// Màn hình cài đặt: sáu dòng — thời gian bật lại micro, tự động tắt micro
+// khi im lặng, tự động chèn dấu cách, kiểm tra chính tả bằng AI, phím tắt
+// tắt/mở micro, và trạng thái quyền micro của thiết bị.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -49,6 +49,9 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
   PermissionStatus? _trangThaiMicro;
   bool _dangXuLyMicro = false;
 
+  late final TextEditingController _oTuTatMicro;
+  final _focusTuTatMicro = FocusNode();
+
   @override
   void initState() {
     super.initState();
@@ -57,7 +60,31 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     _kiemTraChinhTa = widget.caiDat.kiemTraChinhTaBangAI;
     _phimTatBoBienDoi = widget.caiDat.phimTatBoBienDoi;
     _phimTatPhim = widget.caiDat.phimTatPhim;
+    _oTuTatMicro = TextEditingController(text: '${widget.caiDat.thoiGianTuTatMicroPhut}');
+    _focusTuTatMicro.addListener(_khiMatTieuDiemTuTatMicro);
     _kiemTraQuyenMicro();
+  }
+
+  @override
+  void dispose() {
+    _focusTuTatMicro.removeListener(_khiMatTieuDiemTuTatMicro);
+    _focusTuTatMicro.dispose();
+    _oTuTatMicro.dispose();
+    super.dispose();
+  }
+
+  void _khiMatTieuDiemTuTatMicro() {
+    if (_focusTuTatMicro.hasFocus) return;
+    _apDungTuTatMicro();
+  }
+
+  Future<void> _apDungTuTatMicro() async {
+    final gia = int.tryParse(_oTuTatMicro.text) ?? widget.caiDat.thoiGianTuTatMicroPhut;
+    final hopLe = gia.clamp(CaiDat.gioiHanDuoiTuTatMicro, CaiDat.gioiHanTrenTuTatMicro);
+    _oTuTatMicro.text = '$hopLe';
+    if (hopLe != widget.caiDat.thoiGianTuTatMicroPhut) {
+      await widget.caiDat.datThoiGianTuTatMicro(hopLe);
+    }
   }
 
   Future<void> _kiemTraQuyenMicro() async {
@@ -173,13 +200,15 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
         children: [
           _dong1ThoiGian(),
           const Divider(height: 40),
-          _dong2TuDongChen(),
+          _dong2TuTatMicro(),
           const Divider(height: 40),
-          _dong3AI(),
+          _dong3TuDongChen(),
           const Divider(height: 40),
-          _dong4PhimTat(),
+          _dong4AI(),
           const Divider(height: 40),
-          _dong5Micro(),
+          _dong5PhimTat(),
+          const Divider(height: 40),
+          _dong6Micro(),
         ],
       ),
     );
@@ -194,6 +223,47 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
         alignment: Alignment.centerLeft,
         child: TextButton(onPressed: onPressed, child: const Text('Tìm hiểu thêm')),
       );
+
+  Widget _dong2TuTatMicro() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Khi không nói, tự động tắt Micro sau:',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+              ),
+            ),
+            SizedBox(
+              width: 56,
+              child: TextField(
+                controller: _oTuTatMicro,
+                focusNode: _focusTuTatMicro,
+                textAlign: TextAlign.center,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                onSubmitted: (_) => _apDungTuTatMicro(),
+                decoration: const InputDecoration(
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(vertical: 8),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text('phút'),
+          ],
+        ),
+        _nutTimHieuThem(() => _hienGiaiThich(
+              'Tự động tắt Micro khi không nói',
+              _giaiThichTuTatMicroNgan,
+              _giaiThichTuTatMicro,
+            )),
+      ],
+    );
+  }
 
   Widget _dong1ThoiGian() {
     return Column(
@@ -223,7 +293,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     );
   }
 
-  Widget _dong2TuDongChen() {
+  Widget _dong3TuDongChen() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -257,7 +327,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     );
   }
 
-  Widget _dong3AI() {
+  Widget _dong4AI() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -450,7 +520,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     );
   }
 
-  Widget _dong4PhimTat() {
+  Widget _dong5PhimTat() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -491,7 +561,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     );
   }
 
-  Widget _dong5Micro() {
+  Widget _dong6Micro() {
     final tt = _trangThaiMicro;
     IconData icon;
     Color mau;
@@ -582,6 +652,14 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     );
   }
 }
+
+const _giaiThichTuTatMicroNgan = '''
+Micro đang bật mà quá lâu không có thêm chữ nào (nói hay gõ tay đều tính) thì tự tắt hẳn, đỡ hao pin. Chỉnh từ **10 đến 45 phút**.
+''';
+
+const _giaiThichTuTatMicro = '''
+Micro bật mãi mà không dùng tới rất tốn pin. Cài đặt này quy định: nếu micro đang bật mà im lặng liên tục — không có chữ nào mới xuất hiện trong bài, dù do nói hay do bạn tự gõ tay — quá số phút đặt ở đây, ứng dụng sẽ tự tắt hẳn micro. Muốn nghe lại thì tự bấm nút micro hoặc phím tắt, ứng dụng không tự bật lại.
+''';
 
 const _giaiThichThoiGianNgan = '''
 Khi bạn gõ phím, ứng dụng **tắt hẳn micro** một lúc để khỏi nghe nhầm tiếng gõ phím thành lời nói. Cài đặt này là **thời gian chờ** sau khi bạn ngừng gõ, trước khi micro tự bật lại. Để **ngắn** thì nói tiếp nhanh hơn nhưng dễ bắt nhầm âm thanh lúc bạn còn đang lơ đãng; để **dài** thì an toàn hơn nhưng phải chờ lâu hơn. Mặc định **1 giây** là hợp lý cho hầu hết mọi người. Chọn **"Không tự động bật lại Micro"** nếu bạn muốn hoàn toàn tự bấm nút micro mỗi lần muốn nói tiếp, không để ứng dụng tự quyết định thời điểm.

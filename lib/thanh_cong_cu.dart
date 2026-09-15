@@ -82,14 +82,14 @@ class ThanhCongCu extends StatelessWidget {
                         khiBam: khiBamCaiDat,
                       ),
                       NutNho(
-                        bieuTuong: Icons.smart_toy_outlined,
-                        nhan: 'Làm việc với AI',
-                        khiBam: khiBamAI,
-                      ),
-                      NutNho(
                         bieuTuong: Icons.folder_outlined,
                         nhan: 'Thư mục',
                         khiBam: khiBamThuMuc,
+                      ),
+                      NutNho(
+                        bieuTuong: Icons.smart_toy_outlined,
+                        nhan: 'Làm việc với AI',
+                        khiBam: khiBamAI,
                       ),
                       NutNho(
                         bieuTuong: Icons.task_alt,
@@ -315,7 +315,7 @@ class _NutThemMenu extends StatelessWidget {
             PopupMenuDivider(),
             PopupMenuItem(
               value: 2,
-              child: Text('Bật bộ điều hướng con trỏ văn bản'),
+              child: Text('Bật bộ điều hướng và phím nhanh'),
             ),
             PopupMenuDivider(),
             PopupMenuItem(
@@ -336,6 +336,16 @@ class _NutThemMenu extends StatelessWidget {
             PopupMenuItem(
               value: 6,
               child: Text('Donate ủng hộ Tác giả'),
+            ),
+            PopupMenuDivider(),
+            PopupMenuItem(
+              value: 7,
+              child: Text('Điều khoản sử dụng'),
+            ),
+            PopupMenuDivider(),
+            PopupMenuItem(
+              value: 8,
+              child: Text('Bảo mật và quyền riêng tư'),
             ),
           ],
         ),
