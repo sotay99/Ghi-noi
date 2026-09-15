@@ -15,8 +15,8 @@ class CaiDat {
   /// lại. Mặc định 1 giây.
   double thoiGianBatLaiGiay = 1.0;
 
-  /// Có tự chèn dấu cách trước ký tự gõ tay dính ngay sau chữ do giọng nói
-  /// tạo ra hay không. Mặc định bật.
+  /// Có tự chèn một dấu cách ngay sau đoạn chữ mỗi lần nói xong hay không.
+  /// Mặc định bật.
   bool tuDongChenKhoangCach = true;
 
   /// Có tự gọi AI kiểm tra chính tả mỗi khi có đoạn văn mới hay không.

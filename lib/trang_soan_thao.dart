@@ -285,23 +285,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   int _neo = 0;
   String _chuTam = '';
 
-  /// Mỗi ký tự trong bài được đánh dấu true (do tay gõ) hay false (do giọng
-  /// nói tạo ra). Luôn có ĐÚNG BẰNG độ dài văn bản hiện tại — mọi chỗ đổi chữ
-  /// đều phải sửa danh sách này theo cùng một nhịp, không thì hai bên lệch
-  /// nhau và mọi suy luận dựa trên nó đều sai.
-  ///
-  /// Dùng để quyết định có tự chèn dấu cách hay không: gõ dính ngay sau một
-  /// ký tự do GIỌNG NÓI tạo ra (và ký tự đó chưa phải khoảng trắng) thì chèn
-  /// một dấu cách trước. Gõ dính sau ký tự do TAY gõ thì để dính bình thường,
-  /// coi như người dùng cố ý.
-  final List<bool> _nguonKyTu = [];
-
   static bool _laKhoangTrang(String kyTu) =>
       kyTu == ' ' || kyTu == '\n' || kyTu == '\t';
 
   /// Lịch sử Lùi lại/Tiến tới. Mỗi điểm mốc là trạng thái TRỌN VẸN của bài
-  /// (chữ + đánh dấu nguồn gốc từng ký tự) tại một ranh giới có ý nghĩa —
-  /// KHÔNG phải từng ký tự một. Ranh giới đó là: bắt đầu một đợt gõ tay mới
+  /// (chữ + vị trí con trỏ) tại một ranh giới có ý nghĩa — KHÔNG phải từng
+  /// ký tự một. Ranh giới đó là: bắt đầu một đợt gõ tay mới
   /// (_apDungChinhSuaNguoiDung, chỉ lần đầu của đợt), hoặc bắt đầu một lượt
   /// micro mới (_batMicro). Nhờ đặt mốc đúng hai chỗ này, mỗi lần Lùi lại
   /// luôn lùi vừa đúng một đợt gõ hoặc một lượt nói trọn vẹn — không cắt
@@ -368,7 +357,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _ghiVaoO(banDau, banDau.length);
     }
     _neo = banDau.length;
-    _nguonKyTu.addAll(List<bool>.filled(banDau.length, true));
     _viTriDaKiemTraChinhTa = banDau.length;
 
     _khoiTaoMicro();
@@ -414,14 +402,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henLuuTru = Timer(const Duration(milliseconds: 600), _luuVanBan);
   }
 
-  /// Bấm nút Lưu: chốt bài xuống kho VÀ coi toàn bộ chữ hiện có là "do tay
-  /// gõ" — như thể vừa mở lại một ghi chú đã lưu. Xoá bộ nhớ đánh dấu ký tự
-  /// đúng nghĩa là đưa nó về trạng thái mặc định này, vì bộ nhớ đó luôn phải
-  /// dài bằng đúng văn bản, không thể "để trống" trong khi bài vẫn còn chữ.
   Future<void> _bamNutLuu() async {
-    _nguonKyTu
-      ..clear()
-      ..addAll(List<bool>.filled(_boDieuKhien.text.length, true));
     await _luuVanBan();
     if (mounted) {
       hienThongBaoGiua(context, 'Đã lưu "${_ghiChuHienTai.ten}" vào bộ nhớ máy.');
@@ -458,19 +439,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       MaterialPageRoute(
         builder: (_) => ManHinhCaiDat(
           caiDat: widget.caiDat,
-          // Người dùng vừa tắt tính năng trong màn Cài đặt — xoá bộ nhớ
-          // đánh dấu ký tự ngay tại đây, vì nó là dữ liệu riêng của trang
-          // soạn thảo, màn Cài đặt không cầm được.
-          khiTatTuDongChenKhoangCach: () {
-            setState(() {
-              _nguonKyTu
-                ..clear()
-                ..addAll(List<bool>.filled(_boDieuKhien.text.length, true));
-            });
-          },
           // Người dùng vừa tắt "kiểm tra chính tả bằng AI": xoá hết gạch đỏ
-          // đang hiển thị ngay, giống cách khiTatTuDongChenKhoangCach xoá bộ
-          // nhớ đánh dấu ký tự của nó.
+          // đang hiển thị ngay, vì đó là dữ liệu riêng của trang soạn thảo,
+          // màn Cài đặt không cầm được.
           khiTatKiemTraChinhTa: () {
             _boDieuKhien.loi.clear();
             _boDieuKhien.veLai();
@@ -533,9 +504,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     _neo = g.noiDung.length;
     _chuTam = '';
-    _nguonKyTu
-      ..clear()
-      ..addAll(List<bool>.filled(g.noiDung.length, true));
     _henChinhTa?.cancel();
     _boDieuKhien.loi.clear();
     _viTriDaKiemTraChinhTa = g.noiDung.length;
@@ -740,8 +708,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 
   /// Thay đoạn [_neo, _neo + _chuTam.length) bằng [chenVao] — dùng cho MỌI
-  /// lần giọng nói chèn hoặc sửa chữ tạm. Đoạn mới luôn đánh dấu là "giọng
-  /// nói" trong _nguonKyTu, giữ đúng nhịp với _boDieuKhien.
+  /// lần giọng nói chèn hoặc sửa chữ tạm.
   void _thayVungTamBangGiongNoi(String chenVao) {
     final cu = _boDieuKhien.text;
     final het = _neo + _chuTam.length;
@@ -749,9 +716,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     _dieuChinhLoiChinhTaSauKhiSua(_neo, het - _neo, chenVao.length);
     _dieuChinhVungToanVanSauKhiSua(_neo, het - _neo, chenVao.length);
-
-    _nguonKyTu.removeRange(_neo, het);
-    _nguonKyTu.insertAll(_neo, List<bool>.filled(chenVao.length, false));
 
     final viTri = _neo + chenVao.length;
     _ghiVaoO(moi, viTri);
@@ -916,10 +880,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     });
   }
 
-  /// Người dùng gõ phím hoặc bấm để dời con trỏ. Đây cũng là nơi duy nhất
-  /// cập nhật _nguonKyTu cho phần TAY GÕ, bằng cách so khác biệt giữa chữ cũ
-  /// (_chuGanNhat) và chữ mới — cách này gộp được cả gõ chèn, xoá, và autocorrect
-  /// của bàn phím thay nguyên một cụm chữ, vào cùng một logic duy nhất.
+  /// Người dùng gõ phím hoặc bấm để dời con trỏ. So khác biệt giữa chữ cũ
+  /// (_chuGanNhat) và chữ mới để biết đúng vùng vừa đổi — cách này gộp được
+  /// cả gõ chèn, xoá, và autocorrect của bàn phím thay nguyên một cụm chữ,
+  /// vào cùng một logic duy nhất.
   void _khiNguoiDungSua() {
     if (_tuSua) return;
 
@@ -977,42 +941,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
 
     final doDaiChenVao = chuMoi.length - dau - duoi;
-    var chuMoiCuoi = chuMoi;
-    var lechConTro = 0;
-
-    // Có chèn chữ mới (không phải chỉ xoá), ngay tại ranh giới một ký tự do
-    // GIỌNG NÓI tạo ra và chưa phải khoảng trắng → chen một dấu cách trước.
-    // Tắt trong Cài đặt thì bỏ hẳn bước này, dính liền như soạn thảo thường.
-    if (widget.caiDat.tuDongChenKhoangCach &&
-        doDaiChenVao > 0 &&
-        dau > 0 &&
-        dau <= _nguonKyTu.length &&
-        !_nguonKyTu[dau - 1] &&
-        !_laKhoangTrang(cu[dau - 1]) &&
-        !_laKhoangTrang(chuMoi[dau])) {
-      chuMoiCuoi = chuMoi.substring(0, dau) + ' ' + chuMoi.substring(dau);
-      lechConTro = 1;
-    }
-
-    // Cập nhật _nguonKyTu đúng theo đoạn vừa đổi: xoá phần cũ bị thay, chèn
-    // phần mới — mọi ký tự người dùng vừa gõ đều đánh dấu "tay", kể cả dấu
-    // cách vừa tự chèn ở trên.
-    final soLuongXoa = _nguonKyTu.length - dau - duoi;
-    _dieuChinhLoiChinhTaSauKhiSua(dau, soLuongXoa, doDaiChenVao + lechConTro);
-    _dieuChinhVungToanVanSauKhiSua(dau, soLuongXoa, doDaiChenVao + lechConTro);
-    _nguonKyTu.removeRange(dau, dau + soLuongXoa);
-    _nguonKyTu.insertAll(
-      dau,
-      List<bool>.filled(doDaiChenVao + lechConTro, true),
-    );
+    final soLuongXoa = cu.length - dau - duoi;
+    _dieuChinhLoiChinhTaSauKhiSua(dau, soLuongXoa, doDaiChenVao);
+    _dieuChinhVungToanVanSauKhiSua(dau, soLuongXoa, doDaiChenVao);
 
     final chon = _boDieuKhien.selection;
-    final viTriConTro =
-        (chon.isValid ? chon.end : chuMoiCuoi.length) + lechConTro;
+    final viTriConTro = chon.isValid ? chon.end : chuMoi.length;
 
     _neo = viTriConTro;
     _nguoiDungVuaGo();
-    _ghiVaoO(chuMoiCuoi, viTriConTro);
+    _ghiVaoO(chuMoi, viTriConTro);
     _henLuu();
     _lenLichKiemTraChinhTa();
   }
@@ -1180,8 +1118,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   /// Thay đúng vùng [loi.batDau, loi.ketThuc) bằng [thayBang] — dùng chung
   /// cho cả "chọn từ AI đề xuất" (thayBang là từ mới) và "Xoá" (thayBang
-  /// rỗng). Đi qua cùng con đường với mọi chỉnh sửa khác của app: cập nhật
-  /// _nguonKyTu (đánh dấu là "tay gõ"), dời các lỗi khác, rồi lưu bài.
+  /// rỗng).
   void _apDungThayTheChinhTa(LoiChinhTa loi, String thayBang) {
     final vb = _boDieuKhien.text;
     final conKhop = loi.ketThuc <= vb.length &&
@@ -1195,8 +1132,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
 
     final moi = vb.replaceRange(loi.batDau, loi.ketThuc, thayBang);
-    _nguonKyTu.removeRange(loi.batDau, loi.ketThuc);
-    _nguonKyTu.insertAll(loi.batDau, List<bool>.filled(thayBang.length, true));
     _boDieuKhien.loi.remove(loi);
     _dieuChinhLoiChinhTaSauKhiSua(loi.batDau, loi.ketThuc - loi.batDau, thayBang.length);
     _dieuChinhVungToanVanSauKhiSua(loi.batDau, loi.ketThuc - loi.batDau, thayBang.length);
@@ -1235,7 +1170,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _dieuChinhLoiChinhTaSauKhiSua(viTri, 0, chen.length);
 
     final moi = vb.replaceRange(viTri, viTri, chen);
-    _nguonKyTu.insertAll(viTri, List<bool>.filled(chen.length, true));
     final viTriConTro = viTri + chen.length;
     _neo = viTriConTro;
     _ghiVaoO(moi, viTriConTro);
@@ -1388,7 +1322,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           final ketThucGoc = viTriThuc + goc.doan.length;
           if (ketThucGoc > vb.length || vb.substring(viTriThuc, ketThucGoc) != goc.doan) continue;
           final moi = vb.replaceRange(ketThucGoc, ketThucGoc, goc.deXuat);
-          _nguonKyTu.insertAll(ketThucGoc, List<bool>.filled(goc.deXuat.length, true));
           final viTriConTro = ketThucGoc + goc.deXuat.length;
           _ghiVaoO(moi, viTriConTro);
           _boDieuKhien.khongPhuHop.add(_VungKhongPhuHop(
@@ -1474,7 +1407,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // Xoá đoạn GỐC, giữ đoạn ĐỀ XUẤT — cho đoạn đề xuất nhấp nháy xanh/đen.
       final doDaiGoc = v.ketThucGoc - v.batDauGoc;
       final moi = vb.replaceRange(v.batDauGoc, v.ketThucGoc, '');
-      _nguonKyTu.removeRange(v.batDauGoc, v.ketThucGoc);
       _dieuChinhLoiChinhTaSauKhiSua(v.batDauGoc, doDaiGoc, 0);
       _dieuChinhVungToanVanSauKhiSua(v.batDauGoc, doDaiGoc, 0, boQua: v);
       v.ketThucGoc = v.batDauGoc;
@@ -1487,7 +1419,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // Xoá đoạn ĐỀ XUẤT, giữ đoạn GỐC — cho đoạn gốc nhấp nháy đỏ/đen.
       final doDaiDeXuat = v.ketThucDeXuat - v.batDauDeXuat;
       final moi = vb.replaceRange(v.batDauDeXuat, v.ketThucDeXuat, '');
-      _nguonKyTu.removeRange(v.batDauDeXuat, v.ketThucDeXuat);
       _dieuChinhLoiChinhTaSauKhiSua(v.batDauDeXuat, doDaiDeXuat, 0);
       _dieuChinhVungToanVanSauKhiSua(v.batDauDeXuat, doDaiDeXuat, 0, boQua: v);
       v.batDauDeXuat = v.ketThucDeXuat = v.ketThucGoc;
@@ -1524,7 +1455,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       }
       final doDai = x.ketThuc - x.batDau;
       final moi = vb.replaceRange(x.batDau, x.ketThuc, '');
-      _nguonKyTu.removeRange(x.batDau, x.ketThuc);
       _dieuChinhLoiChinhTaSauKhiSua(x.batDau, doDai, 0);
       _dieuChinhVungToanVanSauKhiSua(x.batDau, doDai, 0, boQua: x);
       _boDieuKhien.canXoa.remove(x);
@@ -1552,7 +1482,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     setState(() {
       _lichSuLui.add(_TrangThaiVanBan(
         vanBan: vb,
-        nguonKyTu: List<bool>.from(_nguonKyTu),
         viTriConTro: viTriConTro ?? _viTriConTroHienTai(),
       ));
       if (_lichSuLui.length > _soLuongLichSuToiDa) _lichSuLui.removeAt(0);
@@ -1569,7 +1498,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (_lichSuLui.isEmpty) return;
     _lichSuToi.add(_TrangThaiVanBan(
       vanBan: _boDieuKhien.text,
-      nguonKyTu: List<bool>.from(_nguonKyTu),
       viTriConTro: _viTriConTroHienTai(),
     ));
     final truoc = _lichSuLui.removeLast();
@@ -1580,7 +1508,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (_lichSuToi.isEmpty) return;
     _lichSuLui.add(_TrangThaiVanBan(
       vanBan: _boDieuKhien.text,
-      nguonKyTu: List<bool>.from(_nguonKyTu),
       viTriConTro: _viTriConTroHienTai(),
     ));
     final sau = _lichSuToi.removeLast();
@@ -1593,11 +1520,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (_muonNghe) _tatMicro();
     _chuTam = '';
     _neo = tt.viTriConTro.clamp(0, tt.vanBan.length);
-    setState(() {
-      _nguonKyTu
-        ..clear()
-        ..addAll(tt.nguonKyTu);
-    });
+    // setState trần: buộc vẽ lại AppBar để nút Lùi/Tiến bật/tắt đúng theo độ
+    // dài _lichSuLui/_lichSuToi vừa đổi (bản thân chúng không tự kích rebuild).
+    setState(() {});
     // Lùi/tiến đổi hẳn nội dung bài — vị trí các gạch đỏ cũ không còn đáng
     // tin nữa. Coi cả bài vừa khôi phục là "chưa kiểm tra", để lần kiểm tra
     // kế tiếp (nếu tính năng đang bật) tự soát lại từ đầu bài mới này.
@@ -1670,7 +1595,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _ghiVaoO('', 0);
     _neo = 0;
     _chuTam = '';
-    _nguonKyTu.clear();
     _henChinhTa?.cancel();
     _boDieuKhien.loi.clear();
     _viTriDaKiemTraChinhTa = 0;
@@ -1941,16 +1865,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 }
 
-/// Một điểm mốc trong lịch sử Lùi lại/Tiến tới — trọn vẹn chữ và bảng đánh
-/// dấu nguồn gốc từng ký tự tại thời điểm đó.
+/// Một điểm mốc trong lịch sử Lùi lại/Tiến tới — trọn vẹn chữ và vị trí con
+/// trỏ tại thời điểm đó.
 class _TrangThaiVanBan {
   const _TrangThaiVanBan({
     required this.vanBan,
-    required this.nguonKyTu,
     required this.viTriConTro,
   });
 
   final String vanBan;
-  final List<bool> nguonKyTu;
   final int viTriConTro;
 }

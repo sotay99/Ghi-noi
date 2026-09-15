@@ -22,16 +22,11 @@ class ManHinhCaiDat extends StatefulWidget {
   const ManHinhCaiDat({
     super.key,
     required this.caiDat,
-    required this.khiTatTuDongChenKhoangCach,
     required this.khiTatKiemTraChinhTa,
     required this.khiKiemTraLaiMicro,
   });
 
   final CaiDat caiDat;
-
-  /// Gọi ngay khi người dùng gạt dòng "tự động chèn dấu cách" từ Có sang
-  /// Không — trang soạn thảo dùng đây để xoá bộ nhớ đánh dấu ký tự của nó.
-  final VoidCallback khiTatTuDongChenKhoangCach;
 
   /// Gọi ngay khi người dùng tắt "kiểm tra chính tả bằng AI" — trang soạn
   /// thảo dùng đây để xoá hết gạch đỏ chân đang hiển thị.
@@ -90,38 +85,6 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     final so =
         tron ? giay.toInt().toString() : giay.toStringAsFixed(1).replaceAll('.', ',');
     return '$so giây';
-  }
-
-  Future<void> _xacNhanTatTuDongChen() async {
-    final dongY = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.warning_amber_rounded, size: 28),
-        title: const Text('Tắt tự động chèn dấu cách?'),
-        content: const Text(
-          'Bộ nhớ đang ghi nhớ chữ nào do tay gõ, chữ nào do giọng nói tạo ra '
-          'sẽ bị XOÁ NGAY và KHÔNG LẤY LẠI ĐƯỢC — kể cả sau này bạn bật lại '
-          'tính năng này. Bật lại chỉ có tác dụng cho chữ nói/gõ về sau, chữ '
-          'đã có sẵn trong bài sẽ được coi là "gõ tay" hết.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Thôi, giữ nguyên'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
-            child: const Text('Tắt và xoá'),
-          ),
-        ],
-      ),
-    );
-    if (dongY != true) return;
-
-    setState(() => _tuDongChen = false);
-    await widget.caiDat.datTuDongChenKhoangCach(false);
-    widget.khiTatTuDongChenKhoangCach();
   }
 
   /// Chữ giữa cặp **hai dấu sao** được in đậm — cách đánh dấu nhẹ nhàng để
@@ -264,7 +227,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _tieuDeDong('Tự động chèn dấu cách trước ký tự được gõ tay'),
+        _tieuDeDong('Tự động chèn dấu cách sau mỗi lần nói'),
         const SizedBox(height: 6),
         Row(
           children: [
@@ -279,12 +242,8 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
             Switch(
               value: _tuDongChen,
               onChanged: (bat) async {
-                if (bat) {
-                  setState(() => _tuDongChen = true);
-                  await widget.caiDat.datTuDongChenKhoangCach(true);
-                } else {
-                  await _xacNhanTatTuDongChen();
-                }
+                setState(() => _tuDongChen = bat);
+                await widget.caiDat.datTuDongChenKhoangCach(bat);
               },
             ),
           ],
@@ -615,19 +574,19 @@ Mức mặc định **1 giây** là khoảng vừa phải, hợp với cách gõ
 ''';
 
 const _giaiThichChenCachNgan = '''
-Tính năng này tự thêm một **dấu cách** khi bạn gõ tay ngay sau chữ do **giọng nói** tạo ra, để hai chữ không bị dính liền sai chính tả. Tắt đi thì ứng dụng gõ dính như một trang soạn thảo bình thường, và bộ nhớ đang ghi nhớ điều này sẽ bị xoá, **không thể khôi phục lại**.
+Mỗi lần bạn nói xong một đoạn, ứng dụng tự thêm một **dấu cách** vào ngay sau đoạn đó, để chữ gõ tay tiếp theo (nếu có) không bị dính liền vào cuối câu vừa nói. Tắt đi thì để nguyên như bộ nhận dạng giọng nói trả về, không tự chèn gì thêm.
 ''';
 
 const _giaiThichChenCach = '''
-Ứng dụng này cho phép bạn vừa **nói** vừa **gõ tay** xen kẽ trong cùng một bài. Vấn đề là: khi giọng nói vừa dứt một câu, bộ nhận dạng của máy không phải lúc nào cũng tự thêm dấu cách vào cuối câu — có lúc câu vừa nói dừng lại đúng ngay sau chữ cuối, không có khoảng trắng nào theo sau cả.
+Khi giọng nói vừa dứt một câu, bộ nhận dạng của máy không phải lúc nào cũng tự thêm dấu cách vào cuối câu — có lúc câu vừa nói dừng lại đúng ngay sau chữ cuối, không có khoảng trắng nào theo sau cả.
 
-Nếu ngay lúc đó bạn gõ tay tiếp vào, chữ gõ tay sẽ bị **dính liền** vào chữ vừa nói, tạo ra một cụm chữ sai chính tả. Ví dụ: bạn nói ra được câu "Thành đẹp trai ./.", câu này kết thúc ngay sau dấu chấm cuối, không có dấu cách theo sau. Bạn gõ tay tiếp chữ "abc" ngay sau đó — nếu không có tính năng này, kết quả sẽ là "./.abc" dính chùm lại với nhau.
+Nếu ngay lúc đó bạn gõ tay tiếp vào (hoặc nói tiếp một câu khác), chữ mới sẽ bị **dính liền** vào chữ vừa nói, tạo ra một cụm chữ sai chính tả. Ví dụ: bạn nói ra được câu "Thành đẹp trai ./.", câu này kết thúc ngay sau dấu chấm cuối, không có dấu cách theo sau. Gõ tay tiếp chữ "abc" ngay sau đó — nếu không có tính năng này, kết quả sẽ là "./.abc" dính chùm lại với nhau.
 
-Bật tính năng này (mặc định là **bật**), ứng dụng sẽ tự nhớ **nguồn gốc** của từng chữ trong bài: chữ nào do bạn **nói** ra, chữ nào do bạn **tự gõ**. Khi bạn gõ tay dính ngay sau một chữ do **giọng nói** tạo ra (mà chữ đó chưa phải khoảng trắng sẵn), ứng dụng sẽ tự động chèn một dấu cách vào giữa trước, cho ra kết quả đúng: "./. abc". Nhưng nếu bạn gõ tay dính ngay sau một chữ cũng do chính tay bạn gõ trước đó, ứng dụng để dính liền như bình thường, không tự ý chèn gì — vì lúc đó rất có thể bạn **cố ý** muốn gõ liền, ví dụ đang gõ một từ dài, một mã số, hay một địa chỉ email.
+Bật tính năng này (mặc định là **bật**), mỗi khi bạn nói xong một đoạn, ứng dụng tự chèn ngay một dấu cách vào cuối đoạn đó, cho ra kết quả đúng: "./. " sẵn sàng đón chữ tiếp theo, gõ tay hay nói tiếp đều không còn bị dính.
 
-Tắt tính năng này (chọn Không), ứng dụng sẽ ứng xử như một trang soạn thảo bình thường: gõ tới đâu dính tới đó, không tự chèn thêm gì hết, kể cả khi gõ ngay sau chữ do giọng nói tạo ra.
+Tắt tính năng này (chọn Không), ứng dụng để nguyên đúng như bộ nhận dạng giọng nói trả về, không tự thêm dấu cách nào cả — gõ hay nói tiếp ngay sau đó có thể bị dính liền như ví dụ ở trên.
 
-**Cảnh báo quan trọng:** để làm được việc "nhớ nguồn gốc từng chữ" này, ứng dụng phải liên tục ghi một danh sách riêng trong bộ nhớ máy — không phải là một phần của bài viết, bạn không nhìn thấy nó, và nó không được lưu lại lâu dài như nội dung bài. Nếu bạn tắt tính năng này đi, danh sách ghi nhớ đó bị **xoá sạch ngay** và **không thể lấy lại được**, kể cả sau này bạn có bật tính năng lên lại. Bật lại chỉ giúp tính năng hoạt động cho những chữ bạn nói hoặc gõ sau thời điểm bật lại mà thôi — chữ đã có sẵn trong bài từ trước sẽ được coi là "chữ gõ tay" hết, dù trước đây có thể chúng vốn là do bạn nói ra.
+Việc chèn dấu cách này chỉ xảy ra ở cuối mỗi đoạn NÓI. Còn gõ tay ở bất kỳ đâu trong bài — kể cả ngay giữa một đoạn do nói tạo ra — luôn dính liền bình thường như một trang soạn thảo thường, không có gì tự động chèn thêm; ứng dụng không còn phân biệt chữ nào do nói, chữ nào do gõ tay nữa, mọi chữ trong bài đều bình đẳng như nhau.
 ''';
 
 const _giaiThichChinhTaNgan = '''
