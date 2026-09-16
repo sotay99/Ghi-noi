@@ -100,23 +100,27 @@ class _MucCanXoaToanVan extends _MucToanVan {
 /// luôn vẽ ĐÈ LÊN các gạch này chứ không phải ngược lại.
 const _mauGachChanLoi = Colors.red; // Lượn sóng, dưới từ/cụm từ sai chính tả — đậm.
 const _damGachChanLoi = 4.0;
-const _mauGachChanCanXoa = Colors.red; // Lượn sóng, dưới đoạn AI đề xuất xoá — mảnh.
+const _mauGachChanDeXuat = Colors.green; // Lượn sóng, dưới đoạn ĐỀ XUẤT thay thế — mảnh.
+const _mauGachChanCanXoa = Colors.green; // Lượn sóng, dưới đoạn AI đề xuất xoá — mảnh.
 const _damGachChanCanXoa = 2.0;
 const _mauGachGiuaThan = Color(0xFFFF8F00); // Thẳng, giữa thân — vàng đậm (Colors.amber.shade800).
 
-/// Một đường đánh dấu AI cần vẽ: vùng toạ độ, màu, độ đậm, kiểu lượn
-/// sóng/thẳng, và vị trí đáy dòng/giữa thân — đủ tham số để dùng chung một
-/// painter cho cả gạch chân (lỗi chính tả, đoạn cần xoá) lẫn gạch giữa thân
-/// (đoạn cần thay thế/cần xoá).
-class _DuongDanhDauAi {
-  const _DuongDanhDauAi({
-    required this.hop,
+/// Một vùng [batDau, batDau+dai) cần vẽ đánh dấu AI, cùng màu/độ đậm/kiểu
+/// riêng — CHỈ giữ TOẠ ĐỘ VĂN BẢN (không phải toạ độ điểm ảnh) vì đây là dữ
+/// liệu "logic", dựng lúc BUILD; toạ độ điểm ảnh thật được đo lúc PAINT (xem
+/// `_VeDanhDauAi.paint`), để không bao giờ dùng nhầm một khung hình bố cục
+/// (layout) đã cũ — xem giải thích đầy đủ ở đó.
+class _VungDanhDauAi {
+  const _VungDanhDauAi({
+    required this.batDau,
+    required this.ketThuc,
     required this.mau,
     required this.day,
     this.lienSong = true,
     this.giuaThan = false,
   });
-  final Rect hop;
+  final int batDau;
+  final int ketThuc;
   final Color mau;
   final double day;
   final bool lienSong;
@@ -126,46 +130,116 @@ class _DuongDanhDauAi {
 /// Vẽ nhiều đường đánh dấu AI — mỗi đường ứng với một dòng của một vùng (một
 /// cụm dài bị ngắt xuống nhiều dòng thì có nhiều đường, mỗi dòng một đường
 /// riêng, có thể khác màu/độ đậm/kiểu nếu thuộc loại khác nhau).
+///
+/// ĐO TOẠ ĐỘ ĐIỂM ẢNH NGAY TRONG `paint()`, không đo trước lúc dựng widget —
+/// đây chính là chỗ sửa lỗi "gạch chân/gạch giữa thân lâu lâu nhảy khỏi
+/// đúng chữ của nó" khi bàn phím ảo bật/tắt: Flutter dựng lại WIDGET (build)
+/// trước khi tính lại BỐ CỤC (layout) của khung mới trong cùng một khung
+/// hình. Đo toạ độ ngay lúc build (bản trước) đôi khi đọc trúng bố cục CŨ
+/// (trước khi bàn phím đổi chiều cao) — gạch vẽ ra bị lệch một khung hình so
+/// với chữ thật. `paint()` luôn chạy SAU KHI bố cục của khung hình đó đã
+/// xong hẳn, nên đo trong `paint()` luôn cho toạ độ đúng của ĐÚNG khung hình
+/// đang vẽ, không bao giờ lệch nữa.
 class _VeDanhDauAi extends CustomPainter {
-  _VeDanhDauAi(this.duong);
-  final List<_DuongDanhDauAi> duong;
+  _VeDanhDauAi({required this.re, required this.khungBox, required this.dsVung});
+  final RenderEditable re;
+  final RenderBox khungBox;
+  final List<_VungDanhDauAi> dsVung;
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (!re.hasSize || !khungBox.hasSize) return;
     const buocSong = 6.0;
     const bienDo = 2.5;
-    for (final d in duong) {
-      final ve = Paint()
-        ..color = d.mau
-        ..strokeWidth = d.day
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round;
-      final h = d.hop;
-      final y = d.giuaThan ? (h.top + h.bottom) / 2 : h.bottom - 1;
-      if (!d.lienSong) {
-        canvas.drawLine(Offset(h.left, y), Offset(h.right, y), ve);
+    for (final v in dsVung) {
+      List<TextBox> hops;
+      try {
+        hops = re.getBoxesForSelection(
+          TextSelection(baseOffset: v.batDau, extentOffset: v.ketThuc),
+        );
+      } catch (_) {
         continue;
       }
-      final net = Path()..moveTo(h.left, y);
-      var x = h.left;
-      var xuong = true;
-      while (x < h.right) {
-        final xTiep = (x + buocSong).clamp(h.left, h.right);
-        net.quadraticBezierTo(
-          x + (xTiep - x) / 2,
-          y + (xuong ? bienDo : -bienDo),
-          xTiep,
-          y,
-        );
-        x = xTiep;
-        xuong = !xuong;
+      final ve = Paint()
+        ..color = v.mau
+        ..strokeWidth = v.day
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round;
+      for (final tb in hops) {
+        Rect h;
+        try {
+          h = Rect.fromPoints(
+            re.localToGlobal(Offset(tb.left, tb.top), ancestor: khungBox),
+            re.localToGlobal(Offset(tb.right, tb.bottom), ancestor: khungBox),
+          );
+        } catch (_) {
+          continue;
+        }
+        final y = v.giuaThan ? (h.top + h.bottom) / 2 : h.bottom - 1;
+        if (!v.lienSong) {
+          canvas.drawLine(Offset(h.left, y), Offset(h.right, y), ve);
+          continue;
+        }
+        final net = Path()..moveTo(h.left, y);
+        var x = h.left;
+        var xuong = true;
+        while (x < h.right) {
+          final xTiep = (x + buocSong).clamp(h.left, h.right);
+          net.quadraticBezierTo(
+            x + (xTiep - x) / 2,
+            y + (xuong ? bienDo : -bienDo),
+            xTiep,
+            y,
+          );
+          x = xTiep;
+          xuong = !xuong;
+        }
+        canvas.drawPath(net, ve);
       }
-      canvas.drawPath(net, ve);
     }
   }
 
   @override
   bool shouldRepaint(covariant _VeDanhDauAi cu) => true;
+}
+
+/// Chấm tròn tím cuối văn bản — cùng lý do đo trong `paint()` như
+/// `_VeDanhDauAi` ở trên, để không bao giờ lệch khỏi ký tự cuối khi bàn
+/// phím ảo bật/tắt làm khung soạn thảo đổi cao liên tục.
+class _VeChamCuoiVanBan extends CustomPainter {
+  _VeChamCuoiVanBan({
+    required this.re,
+    required this.khungBox,
+    required this.viTri,
+    required this.duongKinh,
+    required this.mau,
+  });
+  final RenderEditable re;
+  final RenderBox khungBox;
+  final int viTri;
+  final double duongKinh;
+  final Color mau;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (!re.hasSize || !khungBox.hasSize) return;
+    Rect goc;
+    Offset diem;
+    try {
+      goc = re.getLocalRectForCaret(TextPosition(offset: viTri));
+      diem = re.localToGlobal(goc.topLeft, ancestor: khungBox);
+    } catch (_) {
+      return;
+    }
+    final tam = Offset(
+      diem.dx + 2 + duongKinh / 2,
+      diem.dy + goc.height / 2,
+    );
+    canvas.drawCircle(tam, duongKinh / 2, Paint()..color = mau);
+  }
+
+  @override
+  bool shouldRepaint(covariant _VeChamCuoiVanBan cu) => true;
 }
 
 // ------------------------------------------- mã hoá định dạng AI vào file
@@ -303,22 +377,14 @@ class _BoDieuKhienChinhTa extends TextEditingController {
           ));
         }
         if (k.batDauDeXuat < k.ketThucDeXuat) {
+          // Đoạn ĐỀ XUẤT THAY THẾ: chữ xanh dương. Gạch chân lượn sóng màu
+          // XANH LÁ CÂY không còn gắn qua TextStyle.decoration nữa — chuyển
+          // xuống lớp riêng nằm DƯỚI chữ (xem `_veDanhDauAi`), để chữ xanh
+          // dương luôn đè lên gạch xanh lá, cùng cách với các đánh dấu khác.
           vung.add(_VungVe(
             batDau: k.batDauDeXuat,
             ketThuc: k.ketThucDeXuat,
-            // Đoạn ĐỀ XUẤT THAY THẾ: chữ xanh dương, gạch chân xanh dương —
-            // vẫn mảnh như cũ, chỉ đổi từ thẳng sang LƯỢN SÓNG. Đây là gạch
-            // chân DUY NHẤT trong cả bốn loại còn để Flutter tự vẽ thẳng qua
-            // TextStyle (không cần lớp riêng) vì không có nét chữ đi xuống
-            // nào của MÀU XANH bị che — chỉ chữ đỏ (chính tả/cần xoá) mới cần
-            // lớp riêng do gạch chân đậm hơn hẳn nét chữ.
-            style: TextStyle(
-              color: Colors.blue.shade700,
-              decoration: TextDecoration.underline,
-              decorationColor: Colors.blue.shade700,
-              decorationThickness: 2,
-              decorationStyle: TextDecorationStyle.wavy,
-            ),
+            style: TextStyle(color: Colors.blue.shade700),
             recognizer: TapGestureRecognizer()
               ..onTapDown = (ct) => khiBamDoanKhongPhuHop?.call(k, ct.globalPosition),
           ));
@@ -570,72 +636,53 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Chấm tròn tím báo hiệu cuối văn bản, luôn bám sát ngay sau ký tự cuối
   /// cùng.
   ///
-  /// Lần trước dùng một `TextPainter` riêng để tự đo lại vị trí — tưởng đo
-  /// đúng kiểu chữ là khớp, nhưng NHIỀU thứ khác có thể âm thầm làm hai bên
-  /// đo ra kết quả khác nhau (hệ số phóng chữ của hệ điều hành, đệm bên
-  /// trong TextField, cách bẻ dòng...), sai một chút thôi là dồn lại thành
-  /// lệch hẳn khi câu dài. Thay vì đoán tiếp xem còn thiếu gì, HỎI THẲNG
-  /// chính `RenderEditable` (render object THẬT đang vẽ con trỏ) xem con trỏ
-  /// cuối văn bản nằm ở đâu — `getLocalRectForCaret` là hàm nội bộ Flutter
-  /// dùng để tự vẽ con trỏ thật, nên tuyệt đối khớp, không còn gì để lệch.
+  /// Trước đây tự đo toạ độ (bằng `RenderEditable.getLocalRectForCaret`)
+  /// NGAY TRONG hàm này — tức là ngay lúc DỰNG WIDGET (build). Khi bàn phím
+  /// ảo bật/tắt, Flutter dựng lại widget TRƯỚC khi kịp tính lại bố cục của
+  /// khung mới trong cùng khung hình — đo lúc đó có lúc trúng bố cục CŨ,
+  /// chấm tròn vẽ ra lệch khỏi ký tự cuối một khung hình. Sửa bằng cách dời
+  /// việc đo toạ độ vào `_VeChamCuoiVanBan.paint()` — hàm đó chỉ chạy SAU
+  /// KHI bố cục khung hình đã xong hẳn, nên luôn đo đúng. Ở đây chỉ còn tìm
+  /// `re`/`khungBox` (rẻ, không đọc bố cục) rồi giao painter tự đo lúc vẽ.
   Widget _chamCuoiVanBan() {
     final chu = _boDieuKhien.text;
     if (chu.isEmpty) return const SizedBox.shrink();
 
     final hopVanBan = _oVanBanKey.currentContext?.findRenderObject();
     final khungBox = _khungVanBanKey.currentContext?.findRenderObject();
-    if (hopVanBan == null || khungBox is! RenderBox || !khungBox.hasSize) {
+    if (hopVanBan == null || khungBox is! RenderBox) {
       return const SizedBox.shrink();
     }
     final re = _timRenderEditable(hopVanBan);
-    if (re == null || !re.hasSize) return const SizedBox.shrink();
+    if (re == null) return const SizedBox.shrink();
 
-    const duongKinh = 17.0;
-    Rect goc;
-    Offset diem;
-    try {
-      goc = re.getLocalRectForCaret(TextPosition(offset: chu.length));
-      diem = re.localToGlobal(goc.topLeft, ancestor: khungBox);
-    } catch (_) {
-      // Render object vừa đổi kích thước giữa chừng (xoay màn hình, bàn phím
-      // ảo mở/đóng) — bỏ qua khung hình này, AnimatedBuilder sẽ tự vẽ lại
-      // ngay khi ổn định.
-      return const SizedBox.shrink();
-    }
-
-    return Positioned(
-      left: diem.dx + 2,
-      top: diem.dy + (goc.height - duongKinh) / 2,
-      child: AnimatedOpacity(
-        opacity: _chamCuoiMoDam ? 0.35 : 1.0,
-        duration: const Duration(milliseconds: 200),
-        child: Container(
-          width: duongKinh,
-          height: duongKinh,
-          decoration: const BoxDecoration(
-            color: Color(0xFF6A1B9A),
-            shape: BoxShape.circle,
+    return AnimatedOpacity(
+      opacity: _chamCuoiMoDam ? 0.35 : 1.0,
+      duration: const Duration(milliseconds: 200),
+      child: SizedBox.expand(
+        child: CustomPaint(
+          painter: _VeChamCuoiVanBan(
+            re: re,
+            khungBox: khungBox,
+            viTri: chu.length,
+            duongKinh: 17.0,
+            mau: const Color(0xFF6A1B9A),
           ),
         ),
       ),
     );
   }
 
-  /// Mọi gạch của các đánh dấu AI (trừ đoạn ĐỀ XUẤT THAY THẾ màu xanh, vẫn
-  /// vẽ thẳng qua TextStyle vì chỉ có một kiểu gạch, không cần lớp riêng) —
-  /// gạch chân lượn sóng (lỗi chính tả: đỏ đậm; đoạn cần xoá: đỏ mảnh) VÀ
-  /// gạch giữa thân thẳng, vàng đậm (đoạn cần thay thế, đoạn cần xoá) — vẽ
-  /// chung ở một lớp RIÊNG nằm DƯỚI chữ (xem giải thích ở nơi ghép layer
-  /// trong `build`), thay vì gắn qua TextStyle.decoration. TextStyle
-  /// .decoration vẽ CÙNG một lượt với chữ nên có lúc đè lên cả nét đi xuống
-  /// của chữ (g, ệ, ụ, q, y...) — tách thành lớp riêng, vẽ trước rồi để chữ
-  /// vẽ đè lên sau, thì chữ luôn luôn nổi trên mọi gạch, không bao giờ bị
-  /// che (layer chồng layer, theo đúng yêu cầu).
+  /// Mọi gạch của các đánh dấu AI — gạch chân lượn sóng (lỗi chính tả: đỏ
+  /// đậm; đoạn đề xuất thay thế: xanh lá mảnh; đoạn cần xoá: xanh lá mảnh)
+  /// VÀ gạch giữa thân thẳng, vàng đậm (đoạn cần thay thế, đoạn cần xoá) —
+  /// vẽ chung ở một lớp RIÊNG nằm DƯỚI chữ (xem giải thích ở nơi ghép layer
+  /// trong `build`), thay vì gắn qua TextStyle.decoration, để chữ luôn luôn
+  /// nổi trên mọi gạch, không bao giờ bị che (layer chồng layer).
   ///
-  /// Dùng `RenderEditable.getBoxesForSelection` (cùng kỹ thuật với
-  /// `_chamCuoiVanBan`) để lấy đúng toạ độ THẬT của từng vùng — kể cả khi
-  /// một cụm bị ngắt xuống nhiều dòng, hàm này tự trả về nhiều hộp, mỗi dòng
-  /// một hộp.
+  /// Chỉ dựng danh sách vùng LOGIC ở đây (build) — không đo toạ độ điểm ảnh;
+  /// việc đo dời hẳn vào `_VeDanhDauAi.paint()` để tránh lệch khung hình lúc
+  /// bàn phím ảo bật/tắt (xem giải thích ở đó).
   Widget _veDanhDauAi() {
     if (_boDieuKhien.loi.isEmpty &&
         _boDieuKhien.khongPhuHop.isEmpty &&
@@ -645,14 +692,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     final hopVanBan = _oVanBanKey.currentContext?.findRenderObject();
     final khungBox = _khungVanBanKey.currentContext?.findRenderObject();
-    if (hopVanBan == null || khungBox is! RenderBox || !khungBox.hasSize) {
+    if (hopVanBan == null || khungBox is! RenderBox) {
       return const SizedBox.shrink();
     }
     final re = _timRenderEditable(hopVanBan);
-    if (re == null || !re.hasSize) return const SizedBox.shrink();
+    if (re == null) return const SizedBox.shrink();
 
     final vb = _boDieuKhien.text;
-    final duong = <_DuongDanhDauAi>[];
+    final dsVung = <_VungDanhDauAi>[];
 
     void themVung(
       int batDau,
@@ -663,24 +710,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       bool giuaThan = false,
     }) {
       if (batDau < 0 || ketThuc > vb.length || batDau >= ketThuc) return;
-      try {
-        for (final h in re.getBoxesForSelection(
-          TextSelection(baseOffset: batDau, extentOffset: ketThuc),
-        )) {
-          duong.add(_DuongDanhDauAi(
-            hop: Rect.fromPoints(
-              re.localToGlobal(Offset(h.left, h.top), ancestor: khungBox),
-              re.localToGlobal(Offset(h.right, h.bottom), ancestor: khungBox),
-            ),
-            mau: mau,
-            day: day,
-            lienSong: lienSong,
-            giuaThan: giuaThan,
-          ));
-        }
-      } catch (_) {
-        // Bỏ qua vùng này ở khung hình hiện tại — AnimatedBuilder sẽ tự vẽ lại.
-      }
+      dsVung.add(_VungDanhDauAi(
+        batDau: batDau,
+        ketThuc: ketThuc,
+        mau: mau,
+        day: day,
+        lienSong: lienSong,
+        giuaThan: giuaThan,
+      ));
     }
 
     for (final l in _boDieuKhien.loi) {
@@ -690,6 +727,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       if (k.nhapNhayMau != null) continue; // Đang nhấp nháy — không vẽ gạch.
       themVung(k.batDauGoc, k.ketThucGoc, _mauGachGiuaThan, _damGachChanLoi,
           lienSong: false, giuaThan: true);
+      themVung(k.batDauDeXuat, k.ketThucDeXuat, _mauGachChanDeXuat, _damGachChanCanXoa);
     }
     for (final x in _boDieuKhien.canXoa) {
       if (x.dangNhapNhay) continue; // Đang nhấp nháy — không vẽ gạch.
@@ -697,9 +735,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       themVung(x.batDau, x.ketThuc, _mauGachGiuaThan, _damGachChanLoi,
           lienSong: false, giuaThan: true);
     }
-    if (duong.isEmpty) return const SizedBox.shrink();
+    if (dsVung.isEmpty) return const SizedBox.shrink();
 
-    return CustomPaint(painter: _VeDanhDauAi(duong));
+    return SizedBox.expand(
+      child: CustomPaint(painter: _VeDanhDauAi(re: re, khungBox: khungBox, dsVung: dsVung)),
+    );
   }
 
   /// Lịch sử Lùi lại/Tiến tới. Mỗi điểm mốc là trạng thái TRỌN VẸN của bài
@@ -1794,6 +1834,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           // xuất này", đúng bản đã sửa (không phải bản AI trả về ban đầu) là
           // cái được giữ lại.
           k.ketThucDeXuat += lech;
+          // Xoá sạch — không còn gì để thay thế nữa. Bỏ hẳn cả mục, đoạn CẦN
+          // THAY THẾ (đỏ/vàng) bên cạnh trả về trạng thái bình thường, không
+          // còn bị khoá — coi như AI chưa từng đề xuất gì ở đây.
+          if (k.ketThucDeXuat <= k.batDauDeXuat) bo = true;
         } else if (k.ketThucDeXuat > vitri) {
           bo = true;
         }
