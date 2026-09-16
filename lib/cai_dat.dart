@@ -69,10 +69,12 @@ class CaiDat {
   ];
 
   /// Phím tắt tắt/mở micro: một tổ hợp bộ biến đổi ('Ctrl' hoặc 'Alt') và
-  /// một phím khác đi kèm. Mặc định Ctrl + F. Chỉ có tác dụng khi máy có gắn
-  /// bàn phím vật lý (bao gồm bàn phím rời cắm vào máy tính bảng).
+  /// một phím khác đi kèm. Mặc định Ctrl + G (trước đây là Ctrl + F, đã đổi
+  /// vì Ctrl+F nay là phím tắt cố định của chức năng Tìm kiếm). Chỉ có tác
+  /// dụng khi máy có gắn bàn phím vật lý (bao gồm bàn phím rời cắm vào máy
+  /// tính bảng).
   String phimTatBoBienDoi = 'Ctrl';
-  String phimTatPhim = 'F';
+  String phimTatPhim = 'G';
 
   Future<void> tai() async {
     final kho = await SharedPreferences.getInstance();
@@ -80,7 +82,7 @@ class CaiDat {
     tuDongChenKhoangCach = kho.getBool(_khoaTuDongChenCach) ?? true;
     kiemTraChinhTaBangAI = kho.getBool(_khoaKiemTraChinhTaAI) ?? true;
     phimTatBoBienDoi = kho.getString(_khoaPhimTatBoBienDoi) ?? 'Ctrl';
-    phimTatPhim = kho.getString(_khoaPhimTatPhim) ?? 'F';
+    phimTatPhim = kho.getString(_khoaPhimTatPhim) ?? 'G';
     thoiGianTuTatMicroGiay =
         (kho.getInt(_khoaThoiGianTuTatMicro) ?? 45).clamp(gioiHanDuoiTuTatMicro, gioiHanTrenTuTatMicro);
     tuDongChenDauCauBangAI = kho.getBool(_khoaTuDongChenDauCau) ?? true;
@@ -141,4 +143,23 @@ class CaiDat {
   /// Trả về khoảng (min, max) ký tự tham khảo cho mức độ dài hiện tại.
   (int, int) khoangKyTuDeXuatHienTai() =>
       khoangKyTuTheoMucDoDaiDeXuat[mucDoDaiDeXuat.clamp(0, 4)];
+
+  /// Danh sách phím tắt CỐ ĐỊNH của app — dùng chung cho cả việc kiểm tra
+  /// xung đột khi người dùng đổi phím tắt micro (`man_hinh_cai_dat.dart`) lẫn
+  /// modal "Danh sách phím tắt". Đây là NGUỒN DUY NHẤT của các tổ hợp này,
+  /// tránh lặp lại rải rác nhiều nơi.
+  ///
+  /// Khoá là "boBienDoi+PHIM" (ví dụ 'Ctrl+Z'), giá trị là mô tả ngắn để
+  /// hiện trong thông báo xung đột / modal.
+  static const Map<String, String> phimTatCoDinh = {
+    'Ctrl+Z': 'Lùi lại',
+    'Ctrl+Shift+Z': 'Tiến tới',
+  };
+
+  /// Kiểm tra một tổ hợp (boBienDoi, phim) có trùng phím tắt cố định nào
+  /// không. Trả về mô tả chức năng đang trùng, hoặc null nếu không trùng.
+  static String? tenXungDot(String boBienDoi, String phim) {
+    final khoa = '$boBienDoi+$phim';
+    return phimTatCoDinh[khoa];
+  }
 }

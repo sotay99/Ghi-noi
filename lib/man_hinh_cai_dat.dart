@@ -470,6 +470,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     var boBienDoiTam = _phimTatBoBienDoi;
     var phimTam = _phimTatPhim;
     var loiXungDot = false;
+    String? tenXungDot;
 
     await showDialog<void>(
       context: context,
@@ -525,8 +526,8 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
                 if (loiXungDot) ...[
                   const SizedBox(height: 12),
                   Text(
-                    'Ctrl + Z đã là phím tắt cố định của nút "Lùi lại" — chọn tổ '
-                    'hợp khác cho micro nhé.',
+                    'Phím tắt này đang trùng với chức năng "$tenXungDot" '
+                    '($boBienDoiTam + $phimTam) — chọn tổ hợp khác cho micro nhé.',
                     style: TextStyle(color: Colors.red.shade600, fontSize: 13),
                   ),
                 ],
@@ -539,8 +540,12 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
               ),
               FilledButton(
                 onPressed: () async {
-                  if (boBienDoiTam == 'Ctrl' && phimTam == 'Z') {
-                    capNhatModal(() => loiXungDot = true);
+                  final xungDot = CaiDat.tenXungDot(boBienDoiTam, phimTam);
+                  if (xungDot != null) {
+                    capNhatModal(() {
+                      loiXungDot = true;
+                      tenXungDot = xungDot;
+                    });
                     return;
                   }
                   await widget.caiDat.datPhimTat(boBienDoiTam, phimTam);

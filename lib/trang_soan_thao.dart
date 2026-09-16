@@ -662,7 +662,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             alignment: PlaceholderAlignment.middle,
             child: Icon(Icons.help_outline_rounded, size: 16, color: mauChuMo),
           ),
-          TextSpan(text: ' )'),
+          TextSpan(text: ')'),
         ],
       ),
     );
@@ -1307,9 +1307,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
   }
 
-  /// Bàn phím vật lý bấm đúng tổ hợp phím tắt đang cài (mặc định Ctrl + F):
+  /// Bàn phím vật lý bấm đúng tổ hợp phím tắt đang cài (mặc định Ctrl + G):
   /// tắt/mở micro, y hệt bấm nút. Trả về true để chặn phím này lan xuống ô
-  /// văn bản (không thì gõ Ctrl+F trong lúc soạn thảo cũng gõ luôn chữ "f").
+  /// văn bản (không thì gõ Ctrl+G trong lúc soạn thảo cũng gõ luôn chữ "g").
   bool _khiPhimTatMicro(KeyEvent event) {
     if (!mounted || event is! KeyDownEvent) return false;
 
@@ -2715,15 +2715,42 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
+  OverlayEntry? _baoDangHien;
+
   void _bao(String loi) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(loi),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ));
+    _baoDangHien?.remove();
+    _baoDangHien = null;
+    final overlay = Overlay.of(context, rootOverlay: true);
+    late final OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (ctx) => Center(
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF323232),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              loi,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+            ),
+          ),
+        ),
+      ),
+    );
+    _baoDangHien = entry;
+    overlay.insert(entry);
+    Future.delayed(const Duration(seconds: 2), () {
+      if (_baoDangHien == entry) {
+        entry.remove();
+        _baoDangHien = null;
+      }
+    });
   }
 
   String _dichLoi(String ma) {
