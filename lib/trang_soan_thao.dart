@@ -144,6 +144,97 @@ class _VungDanhDauAi {
   final bool giuaThan;
 }
 
+/// Một vùng [batDau, ketThuc) mang định dạng THỦ CÔNG của người dùng (đậm,
+/// nghiêng, gạch chân, gạch ngang thân, chữ trên, chữ dưới, màu chữ, màu
+/// nền) — khác hẳn `_VungDanhDauAi` (chỉ AI mới tạo ra, chỉ vẽ overlay).
+/// Định dạng thủ công là style THẬT của ký tự, ghép trực tiếp vào
+/// `TextStyle` của từng `TextSpan` trong `_BoDieuKhienChinhTa.buildTextSpan`
+/// (xem giải thích ở đó) — không phải overlay.
+///
+/// `mauChu`/`mauNen` null nghĩa là "không đặt" (giữ màu mặc định); một Color
+/// (kể cả trong suốt, alpha 0) nghĩa là người dùng đã chủ động đặt.
+class _VungDinhDangThuCong {
+  _VungDinhDangThuCong({
+    required this.batDau,
+    required this.ketThuc,
+    this.dam = false,
+    this.nghieng = false,
+    this.gachChan = false,
+    this.gachNgang = false,
+    this.treMu = false,
+    this.treChan = false,
+    this.mauChu,
+    this.mauNen,
+  });
+
+  int batDau;
+  int ketThuc;
+  bool dam;
+  bool nghieng;
+  bool gachChan;
+  bool gachNgang;
+  bool treMu;
+  bool treChan;
+  Color? mauChu;
+  Color? mauNen;
+
+  bool get rong =>
+      !dam && !nghieng && !gachChan && !gachNgang && !treMu && !treChan && mauChu == null && mauNen == null;
+
+  TextStyle apDungLen(TextStyle style) {
+    TextDecoration? decoration;
+    if (gachChan && gachNgang) {
+      decoration = TextDecoration.combine([TextDecoration.underline, TextDecoration.lineThrough]);
+    } else if (gachChan) {
+      decoration = TextDecoration.underline;
+    } else if (gachNgang) {
+      decoration = TextDecoration.lineThrough;
+    }
+    return style.copyWith(
+      fontWeight: dam ? FontWeight.bold : null,
+      fontStyle: nghieng ? FontStyle.italic : null,
+      decoration: decoration,
+      color: mauChu,
+      backgroundColor: mauNen,
+      fontSize: (treMu || treChan) ? (style.fontSize ?? 17) * 0.7 : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'vt': batDau,
+        'kt': ketThuc,
+        if (dam) 'dam': true,
+        if (nghieng) 'ngh': true,
+        if (gachChan) 'gc': true,
+        if (gachNgang) 'gn': true,
+        if (treMu) 'tm': true,
+        if (treChan) 'tc': true,
+        if (mauChu != null) 'mc': mauChu!.toARGB32(),
+        if (mauNen != null) 'mn': mauNen!.toARGB32(),
+      };
+
+  static _VungDinhDangThuCong? fromJson(Map<String, dynamic> j, int doDaiVanBan) {
+    final batDau = j['vt'];
+    final ketThuc = j['kt'];
+    if (batDau is! int || ketThuc is! int) return null;
+    if (batDau < 0 || ketThuc > doDaiVanBan || batDau >= ketThuc) return null;
+    final mc = j['mc'];
+    final mn = j['mn'];
+    return _VungDinhDangThuCong(
+      batDau: batDau,
+      ketThuc: ketThuc,
+      dam: j['dam'] == true,
+      nghieng: j['ngh'] == true,
+      gachChan: j['gc'] == true,
+      gachNgang: j['gn'] == true,
+      treMu: j['tm'] == true,
+      treChan: j['tc'] == true,
+      mauChu: mc is int ? Color(mc) : null,
+      mauNen: mn is int ? Color(mn) : null,
+    );
+  }
+}
+
 /// Vẽ nhiều đường đánh dấu AI — mỗi đường ứng với một dòng của một vùng (một
 /// cụm dài bị ngắt xuống nhiều dòng thì có nhiều đường, mỗi dòng một đường
 /// riêng, có thể khác màu/độ đậm/kiểu nếu thuộc loại khác nhau).
@@ -269,6 +360,14 @@ class _VeChamCuoiVanBan extends CustomPainter {
 /// trong một ghi chú bình thường.
 const _diemBatDauKhoiDinhDang = '\n§FLOWRITE-DINHDANG-V1§';
 
+/// Y hệt [_diemBatDauKhoiDinhDang] nhưng cho khối định dạng THỦ CÔNG (đậm,
+/// nghiêng, gạch chân...) — một khối MÃ HOÁ RIÊNG, ghép SAU khối AI (nếu có)
+/// khi lưu, để một ghi chú sạch (không định dạng thủ công) không phình thêm
+/// byte nào. Tách khối riêng thay vì gộp chung với khối AI để không phải
+/// đụng vào định dạng lưu trữ đã ổn định của AI, và để hai cơ chế không bao
+/// giờ giẫm chân nhau khi đọc/ghi.
+const _diemBatDauDinhDangThuCong = '\n§FLOWRITE-DINHDANGTHUCONG-V1§';
+
 /// Đoạn văn bản dài hơn ngần này thì đổi từ "chép nguyên văn" (chắc chắn
 /// tuyệt đối nhưng nặng dần theo độ dài) sang "mã băm" (nhẹ — độ dài cố
 /// định dù đoạn gốc dài bao nhiêu — và xác suất trùng giả gần như bằng
@@ -337,6 +436,12 @@ class _BoDieuKhienChinhTa extends TextEditingController {
   /// nháy, không phải "nguồn duy nhất của sự thật" như ba danh sách trên,
   /// vì hết hiệu ứng thì chữ đã ở trong [text] rồi, không cần theo dõi nữa.
   final List<_VungDauCauMoi> dauCauMoi = [];
+
+  /// Định dạng thủ công (đậm/nghiêng/gạch chân/…) — CŨNG là nguồn duy nhất
+  /// của sự thật, giống ba danh sách trên. Không bao giờ chồng lên vùng AI
+  /// (xem B7 trong `_TrangSoanThaoState._giaoVoiVungAi`), nên khi ghép vào
+  /// `vung` ở `buildTextSpan` không cần lo tranh chấp thứ tự với các vùng AI.
+  final List<_VungDinhDangThuCong> dinhDang = [];
 
   void Function(LoiChinhTa loi, Offset viTriManHinh)? khiBamTuSai;
   void Function(_VungKhongPhuHop vung, Offset viTriManHinh)? khiBamDoanKhongPhuHop;
@@ -463,6 +568,55 @@ class _BoDieuKhienChinhTa extends TextEditingController {
       ));
     }
 
+    // Định dạng thủ công — các vùng trong `dinhDang` được PHÉP chồng lấn
+    // nhau (ví dụ đậm và nghiêng phủ hai khoảng khác nhau nhưng giao nhau ở
+    // giữa), khác hẳn các vùng AI vốn không bao giờ chồng lấn theo thiết kế.
+    // Gộp (OR từng cờ, màu sau ghi đè màu trước) thành các đoạn liền không
+    // chồng lấn TRƯỚC khi thêm vào `vung`, để vòng ghép cuối (vốn giả định
+    // không chồng lấn) không vô tình bỏ sót vùng nào.
+    if (dinhDang.isNotEmpty) {
+      final diem = <int>{};
+      for (final d in dinhDang) {
+        if (d.batDau < 0 || d.ketThuc > vb.length || d.batDau >= d.ketThuc) continue;
+        diem.add(d.batDau);
+        diem.add(d.ketThuc);
+      }
+      final moc = diem.toList()..sort();
+      for (var i = 0; i < moc.length - 1; i++) {
+        final a = moc[i], b = moc[i + 1];
+        if (a >= b) continue;
+        var dam = false, nghieng = false, gachChan = false, gachNgang = false, treMu = false, treChan = false;
+        Color? mauChu;
+        Color? mauNen;
+        for (final d in dinhDang) {
+          if (d.batDau <= a && d.ketThuc >= b) {
+            dam = dam || d.dam;
+            nghieng = nghieng || d.nghieng;
+            gachChan = gachChan || d.gachChan;
+            gachNgang = gachNgang || d.gachNgang;
+            treMu = treMu || d.treMu;
+            treChan = treChan || d.treChan;
+            mauChu = d.mauChu ?? mauChu;
+            mauNen = d.mauNen ?? mauNen;
+          }
+        }
+        final gop = _VungDinhDangThuCong(
+          batDau: a,
+          ketThuc: b,
+          dam: dam,
+          nghieng: nghieng,
+          gachChan: gachChan,
+          gachNgang: gachNgang,
+          treMu: treMu,
+          treChan: treChan,
+          mauChu: mauChu,
+          mauNen: mauNen,
+        );
+        if (gop.rong) continue;
+        vung.add(_VungVe(batDau: a, ketThuc: b, style: gop.apDungLen(const TextStyle())));
+      }
+    }
+
     vung.sort((a, b) => a.batDau.compareTo(b.batDau));
 
     final children = <InlineSpan>[];
@@ -489,6 +643,90 @@ class _YDinhToi extends Intent {
   const _YDinhToi();
 }
 
+/// Ý định "Tìm kiếm" cho Ctrl+F — mở/đóng thanh tìm kiếm trong văn bản, cùng
+/// cách khai báo với `_YDinhLuiLai`/`_YDinhToi` ở trên.
+class _YDinhTimKiem extends Intent {
+  const _YDinhTimKiem();
+}
+
+/// Ý định định dạng thủ công (đậm/nghiêng/gạch chân/…) — dùng chung một lớp
+/// Intent mang theo loại thao tác, đỡ phải khai một lớp riêng cho mỗi phím
+/// tắt định dạng (Ctrl+B, Ctrl+I, …).
+class _YDinhDinhDang extends Intent {
+  const _YDinhDinhDang(this.loai);
+  final String loai; // 'dam' | 'nghieng' | 'gachChan' | 'gachNgang' | 'treMu' | 'treChan' | 'mauChu' | 'mauNen' | 'xoaDinhDang'
+}
+
+/// Vẽ nền gradient đỏ→vàng cho mỗi kết quả tìm kiếm trong văn bản — cùng
+/// pattern đo toạ độ NGAY TRONG `paint()` như `_VeDanhDauAi`/`_VeChamCuoiVanBan`
+/// (xem giải thích đầy đủ ở `_VeDanhDauAi`), để không bao giờ lệch khung hình
+/// khi cuộn hay khi bàn phím ảo bật/tắt.
+class _VeTimKiem extends CustomPainter {
+  _VeTimKiem({
+    required this.re,
+    required this.khungBox,
+    required this.ketQua,
+    required this.doDaiTuKhoa,
+    required this.chiSoHienTai,
+  });
+  final RenderEditable re;
+  final RenderBox khungBox;
+  final List<int> ketQua;
+  final int doDaiTuKhoa;
+  final int chiSoHienTai;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (!re.hasSize || !khungBox.hasSize || doDaiTuKhoa <= 0) return;
+    for (var i = 0; i < ketQua.length; i++) {
+      final batDau = ketQua[i];
+      final ketThuc = batDau + doDaiTuKhoa;
+      List<TextBox> hops;
+      try {
+        hops = re.getBoxesForSelection(
+          TextSelection(baseOffset: batDau, extentOffset: ketThuc),
+        );
+      } catch (_) {
+        continue;
+      }
+      final laHienTai = i == chiSoHienTai;
+      for (final tb in hops) {
+        Rect h;
+        try {
+          h = Rect.fromPoints(
+            re.localToGlobal(Offset(tb.left, tb.top), ancestor: khungBox),
+            re.localToGlobal(Offset(tb.right, tb.bottom), ancestor: khungBox),
+          );
+        } catch (_) {
+          continue;
+        }
+        final nen = Paint()
+          ..style = PaintingStyle.fill
+          ..shader = LinearGradient(
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+            colors: laHienTai
+                ? const [Color(0xFFD32F2F), Color(0xFFFFEB3B)]
+                : [const Color(0xFFD32F2F).withValues(alpha: 0.45), const Color(0xFFFFEB3B).withValues(alpha: 0.45)],
+          ).createShader(h);
+        canvas.drawRect(h, nen);
+        if (laHienTai) {
+          canvas.drawRect(
+            h,
+            Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 2
+              ..color = const Color(0xFF6A1B9A),
+          );
+        }
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _VeTimKiem cu) => true;
+}
+
 class TrangSoanThao extends StatefulWidget {
   const TrangSoanThao({
     super.key,
@@ -511,6 +749,99 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   final _oChu = FocusNode();
   final _cuonVanBan = ScrollController();
   final _micro = SpeechToText();
+
+  // -------------------------------------------------------------- tìm kiếm
+
+  bool _hienThanhTimKiem = false;
+  final _oTimKiem = TextEditingController();
+  final _focusTimKiem = FocusNode();
+  List<int> _ketQuaTimKiem = [];
+  int _chiSoTimKiemHienTai = -1;
+
+  void _moTimKiem() {
+    setState(() => _hienThanhTimKiem = true);
+    _capNhatKetQuaTimKiem();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _focusTimKiem.requestFocus());
+  }
+
+  void _dongTimKiem() {
+    setState(() {
+      _hienThanhTimKiem = false;
+      _oTimKiem.clear();
+      _ketQuaTimKiem = [];
+      _chiSoTimKiemHienTai = -1;
+    });
+    _oChu.requestFocus();
+  }
+
+  void _capNhatKetQuaTimKiem() {
+    final tuKhoa = _oTimKiem.text;
+    final vb = _boDieuKhien.text;
+    final ds = <int>[];
+    if (tuKhoa.isNotEmpty) {
+      final vbHa = vb.toLowerCase();
+      final tkHa = tuKhoa.toLowerCase();
+      var vt = 0;
+      while (true) {
+        final i = vbHa.indexOf(tkHa, vt);
+        if (i < 0) break;
+        ds.add(i);
+        vt = i + tkHa.length;
+      }
+    }
+    setState(() {
+      _ketQuaTimKiem = ds;
+      if (ds.isEmpty) {
+        _chiSoTimKiemHienTai = -1;
+      } else if (_chiSoTimKiemHienTai < 0 || _chiSoTimKiemHienTai >= ds.length) {
+        _chiSoTimKiemHienTai = 0;
+        _cuonToiKetQuaHienTai();
+      }
+    });
+  }
+
+  /// Văn bản đổi (gõ tay hay do nói) trong lúc thanh tìm kiếm đang mở thì
+  /// tính lại danh sách kết quả ngay — chỉ đọc lại vị trí, không tự nhảy tới
+  /// kết quả nào (giữ nguyên chỉ số đang chọn nếu còn hợp lệ).
+  void _capNhatTimKiemNeuDangMo() {
+    if (_hienThanhTimKiem) _capNhatKetQuaTimKiem();
+  }
+
+  void _dieuHuongTimKiem(int buoc) {
+    if (_ketQuaTimKiem.isEmpty) return;
+    setState(() {
+      _chiSoTimKiemHienTai =
+          (_chiSoTimKiemHienTai + buoc) % _ketQuaTimKiem.length;
+      if (_chiSoTimKiemHienTai < 0) _chiSoTimKiemHienTai += _ketQuaTimKiem.length;
+    });
+    _cuonToiKetQuaHienTai();
+  }
+
+  /// Cuộn ô soạn thảo tới đúng vị trí kết quả đang chọn — dùng
+  /// `RenderEditable.getLocalRectForCaret` để đo toạ độ NỘI DUNG (không phải
+  /// toạ độ đã trừ cuộn) của vị trí đó, rồi nhắm `_cuonVanBan` (scroll
+  /// controller của chính TextField) tới đó, canh giữa khung nhìn.
+  void _cuonToiKetQuaHienTai() {
+    if (_chiSoTimKiemHienTai < 0 || _chiSoTimKiemHienTai >= _ketQuaTimKiem.length) return;
+    final viTri = _ketQuaTimKiem[_chiSoTimKiemHienTai];
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final hopVanBan = _oVanBanKey.currentContext?.findRenderObject();
+      if (hopVanBan == null || !_cuonVanBan.hasClients) return;
+      final re = _timRenderEditable(hopVanBan);
+      if (re == null || !re.hasSize) return;
+      Rect goc;
+      try {
+        goc = re.getLocalRectForCaret(TextPosition(offset: viTri));
+      } catch (_) {
+        return;
+      }
+      final vpCao = _cuonVanBan.position.viewportDimension;
+      final dich = (goc.top - vpCao / 2 + goc.height / 2)
+          .clamp(0.0, _cuonVanBan.position.maxScrollExtent);
+      _cuonVanBan.animateTo(dich, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+    });
+  }
 
   late GhiChuFile _ghiChuHienTai;
   late final TextEditingController _tenController;
@@ -777,6 +1108,163 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
+  /// Nền gradient đỏ→vàng của mọi kết quả tìm kiếm — cùng cách đo toạ độ
+  /// NGAY TRONG `paint()` như `_veDanhDauAi()` ở trên (xem giải thích đầy đủ
+  /// tại `_VeDanhDauAi`), để không lệch khung hình khi cuộn/bàn phím ảo.
+  Widget _veTimKiem() {
+    if (_ketQuaTimKiem.isEmpty || _oTimKiem.text.isEmpty) return const SizedBox.shrink();
+
+    final hopVanBan = _oVanBanKey.currentContext?.findRenderObject();
+    final khungBox = _khungVanBanKey.currentContext?.findRenderObject();
+    if (hopVanBan == null || khungBox is! RenderBox) return const SizedBox.shrink();
+    final re = _timRenderEditable(hopVanBan);
+    if (re == null) return const SizedBox.shrink();
+
+    return SizedBox.expand(
+      child: CustomPaint(
+        painter: _VeTimKiem(
+          re: re,
+          khungBox: khungBox,
+          ketQua: _ketQuaTimKiem,
+          doDaiTuKhoa: _oTimKiem.text.length,
+          chiSoHienTai: _chiSoTimKiemHienTai,
+        ),
+      ),
+    );
+  }
+
+  /// Thanh tìm kiếm nổi lên trên cùng khung soạn thảo — ô nhập, số kết quả,
+  /// mũi tên lên/xuống, nút xoá và nút "Tắt" (đóng hẳn).
+  Widget _thanhTimKiem() {
+    return Container(
+      key: const ValueKey('thanhTimKiem'),
+      width: double.infinity,
+      color: const Color(0xFFF5F5F5),
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _oTimKiem,
+              focusNode: _focusTimKiem,
+              decoration: const InputDecoration(
+                isDense: true,
+                hintText: 'Tìm trong văn bản...',
+                border: OutlineInputBorder(),
+              ),
+              onSubmitted: (_) => _dieuHuongTimKiem(1),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _ketQuaTimKiem.isEmpty
+                ? '0/0'
+                : '${_chiSoTimKiemHienTai + 1}/${_ketQuaTimKiem.length}',
+            style: const TextStyle(fontSize: 13, color: Color(0xFF5F6368)),
+          ),
+          IconButton(
+            icon: const Icon(Icons.keyboard_arrow_up),
+            tooltip: 'Kết quả trước',
+            onPressed: _ketQuaTimKiem.isEmpty ? null : () => _dieuHuongTimKiem(-1),
+          ),
+          IconButton(
+            icon: const Icon(Icons.keyboard_arrow_down),
+            tooltip: 'Kết quả tiếp theo',
+            onPressed: _ketQuaTimKiem.isEmpty ? null : () => _dieuHuongTimKiem(1),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close),
+            tooltip: 'Xoá nội dung tìm',
+            onPressed: () => _oTimKiem.clear(),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: _dongTimKiem,
+            child: const Text('Tắt'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Thanh công cụ định dạng thủ công — một dòng ngang dưới thanh Lùi/Tiến/
+  /// Lưu/Tìm kiếm, chỉ hiện khi ô soạn thảo có/từng có nội dung (luôn hiện,
+  /// đơn giản hơn ẩn/hiện theo điều kiện).
+  Widget _thanhDinhDangThuCong() {
+    Widget nut(IconData icon, bool bat, String loai, String nhan) {
+      return IconButton(
+        iconSize: 20,
+        tooltip: nhan,
+        icon: Icon(icon),
+        style: IconButton.styleFrom(
+          backgroundColor: bat ? const Color(0xFFE3F2FD) : null,
+          foregroundColor: bat ? const Color(0xFF1565C0) : const Color(0xFF5F6368),
+        ),
+        onPressed: () => _apDungDinhDang(loai),
+      );
+    }
+
+    Widget nutChu(String chu, bool bat, String loai, String nhan) {
+      return IconButton(
+        iconSize: 20,
+        tooltip: nhan,
+        icon: Text(chu, style: const TextStyle(fontWeight: FontWeight.bold)),
+        style: IconButton.styleFrom(
+          backgroundColor: bat ? const Color(0xFFE3F2FD) : null,
+          foregroundColor: bat ? const Color(0xFF1565C0) : const Color(0xFF5F6368),
+        ),
+        onPressed: () => _apDungDinhDang(loai),
+      );
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          nut(Icons.format_bold, _damDangCho, 'dam', 'Đậm (Ctrl+B)'),
+          nut(Icons.format_italic, _nghiengDangCho, 'nghieng', 'Nghiêng (Ctrl+I)'),
+          nut(Icons.format_underlined, _gachChanDangCho, 'gachChan', 'Gạch chân (Ctrl+U)'),
+          nut(Icons.strikethrough_s, _gachNganDangCho, 'gachNgang', 'Gạch ngang thân (Ctrl+Shift+X)'),
+          nutChu('x²', _treMuDangCho, 'treMu', 'Chữ trên (Ctrl+Shift+=)'),
+          nutChu('x₂', _treChanDangCho, 'treChan', 'Chữ dưới (Ctrl+=)'),
+          _NutMauDinhDang(
+            nhan: 'Màu chữ (Ctrl+Shift+C)',
+            bat: _mauChuDangCho != null,
+            mauHienThi: widget.caiDat.mauChuGanNhat,
+            khiBam: () => _apDungDinhDang('mauChu'),
+            khiChonMau: (m) {
+              widget.caiDat.datMauChuGanNhat(m);
+              setState(() {});
+              _apDungDinhDang('mauChu', mau: m);
+            },
+            choPhepTrongSuot: false,
+          ),
+          _NutMauDinhDang(
+            nhan: 'Màu nền chữ (Ctrl+Shift+H)',
+            bat: _mauNenDangCho != null,
+            mauHienThi: widget.caiDat.mauNenGanNhat,
+            khiBam: () => _apDungDinhDang('mauNen'),
+            khiChonMau: (m) {
+              widget.caiDat.datMauNenGanNhat(m);
+              setState(() {});
+              _apDungDinhDang('mauNen', mau: m);
+            },
+            choPhepTrongSuot: true,
+          ),
+          IconButton(
+            iconSize: 20,
+            tooltip: 'Xoá định dạng văn bản (Ctrl+Q)',
+            icon: const Icon(Icons.format_clear),
+            onPressed: () => _apDungDinhDang('xoaDinhDang'),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Lịch sử Lùi lại/Tiến tới. Mỗi điểm mốc là trạng thái TRỌN VẸN của bài
   /// (chữ + vị trí con trỏ) tại một ranh giới có ý nghĩa — KHÔNG phải từng
   /// ký tự một. Ranh giới đó là: bắt đầu một đợt gõ tay mới
@@ -854,22 +1342,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     WidgetsBinding.instance.addObserver(this);
     _boDieuKhien.addListener(_khiNguoiDungSua);
+    _boDieuKhien.addListener(_capNhatTimKiemNeuDangMo);
     _boDieuKhien.khiBamTuSai = _khiBamTuSai;
     _boDieuKhien.khiBamDoanKhongPhuHop = _khiBamDoanKhongPhuHop;
     _boDieuKhien.khiBamDoanCanXoa = _khiBamDoanCanXoa;
+    _oTimKiem.addListener(_capNhatKetQuaTimKiem);
 
     // Nội dung lưu trữ có thể mang thêm một khối định dạng AI mã hoá ở cuối
     // (xem `_macDinhDangAi`/`_apDungDinhDangAi`) — tách nó ra TRƯỚC khi đưa
     // vào ô soạn thảo, để `_boDieuKhien.text` chỉ chứa đúng văn bản THẬT,
     // không lộ khối mã hoá ra màn hình.
     final rawNoiDung = _ghiChuHienTai.noiDung;
-    var banDau = rawNoiDung;
-    String? khoiDinhDang;
-    final viTriKhoi = rawNoiDung.indexOf(_diemBatDauKhoiDinhDang);
-    if (viTriKhoi >= 0) {
-      banDau = rawNoiDung.substring(0, viTriKhoi);
-      khoiDinhDang = rawNoiDung.substring(viTriKhoi + _diemBatDauKhoiDinhDang.length);
-    }
+    final (banDau, khoiDinhDang, khoiDinhDangThuCong) = _tachCacKhoiDinhDang(rawNoiDung);
 
     if (banDau.isNotEmpty) {
       _ghiVaoO(banDau, banDau.length);
@@ -882,6 +1366,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _neo = banDau.length;
     _viTriDaKiemTraChinhTa = banDau.length;
     if (khoiDinhDang != null) _apDungDinhDangAi(khoiDinhDang);
+    if (khoiDinhDangThuCong != null) _apDungDinhDangThuCong(khoiDinhDangThuCong);
 
     _khoiTaoMicro();
     // Lắng nghe TOÀN CỤC (không phụ thuộc widget nào đang giữ tiêu điểm) —
@@ -918,6 +1403,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _cuonVanBan.dispose();
     _tenController.dispose();
     _oTen.dispose();
+    _oTimKiem.dispose();
+    _focusTimKiem.dispose();
     super.dispose();
   }
 
@@ -933,11 +1420,66 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   Future<void> _luuVanBan() async {
     final khoiDinhDang = _macDinhDangAi();
-    final noiDungLuu = khoiDinhDang == null
-        ? _boDieuKhien.text
-        : _boDieuKhien.text + _diemBatDauKhoiDinhDang + khoiDinhDang;
+    final khoiDinhDangThuCong = _macDinhDangThuCong();
+    var noiDungLuu = _boDieuKhien.text;
+    if (khoiDinhDang != null) noiDungLuu += _diemBatDauKhoiDinhDang + khoiDinhDang;
+    if (khoiDinhDangThuCong != null) {
+      noiDungLuu += _diemBatDauDinhDangThuCong + khoiDinhDangThuCong;
+    }
     widget.kho.suaNoiDungGhiChu(_ghiChuHienTai.id, noiDungLuu);
     await widget.kho.luu();
+  }
+
+  /// Tách chuỗi lưu trữ thành (văn bản THẬT, khối AI mã hoá?, khối định dạng
+  /// thủ công mã hoá?) — chịu được cả hai thứ tự khối lỡ xuất hiện, dù khi
+  /// lưu luôn ghi khối AI trước rồi mới tới khối thủ công.
+  (String, String?, String?) _tachCacKhoiDinhDang(String raw) {
+    final viTriAi = raw.indexOf(_diemBatDauKhoiDinhDang);
+    final viTriTc = raw.indexOf(_diemBatDauDinhDangThuCong);
+    if (viTriAi < 0 && viTriTc < 0) return (raw, null, null);
+
+    final viTriSom = (viTriAi >= 0 && (viTriTc < 0 || viTriAi < viTriTc)) ? viTriAi : viTriTc;
+    final banDau = raw.substring(0, viTriSom);
+
+    String? khoiAi;
+    if (viTriAi >= 0) {
+      final ketThucAi = (viTriTc > viTriAi) ? viTriTc : raw.length;
+      khoiAi = raw.substring(viTriAi + _diemBatDauKhoiDinhDang.length, ketThucAi);
+    }
+    String? khoiTc;
+    if (viTriTc >= 0) {
+      khoiTc = raw.substring(viTriTc + _diemBatDauDinhDangThuCong.length);
+    }
+    return (banDau, khoiAi, khoiTc);
+  }
+
+  /// Đóng gói mọi vùng định dạng thủ công thành chuỗi base64 — null nếu
+  /// không có vùng nào (ghi chú sạch không phình byte). Xem
+  /// [_diemBatDauDinhDangThuCong].
+  String? _macDinhDangThuCong() {
+    final ds = _boDieuKhien.dinhDang.where((d) => !d.rong).map((d) => d.toJson()).toList();
+    if (ds.isEmpty) return null;
+    return base64Encode(utf8.encode(jsonEncode(ds)));
+  }
+
+  /// Ngược lại [_macDinhDangThuCong] — hỏng khuôn ở đâu thì bỏ qua đúng chỗ
+  /// đó (từng mục được kiểm biên độc lập trong `_VungDinhDangThuCong.fromJson`),
+  /// không làm hỏng cả ghi chú.
+  void _apDungDinhDangThuCong(String maHoa) {
+    try {
+      final ds = jsonDecode(utf8.decode(base64Decode(maHoa)));
+      if (ds is! List) return;
+      final vb = _boDieuKhien.text;
+      for (final j in ds) {
+        if (j is Map) {
+          final v = _VungDinhDangThuCong.fromJson(Map<String, dynamic>.from(j), vb.length);
+          if (v != null) _boDieuKhien.dinhDang.add(v);
+        }
+      }
+    } catch (_) {
+      // Khối hỏng (dữ liệu cũ, lỗi mã hoá...) — bỏ qua toàn bộ, mất định
+      // dạng còn hơn app không mở được ghi chú.
+    }
   }
 
   /// Đóng gói mọi đánh dấu AI CÒN ĐANG CHỜ quyết định (lỗi chính tả, đoạn
@@ -1798,6 +2340,25 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // Đoạn đã kiểm tra bị sửa giữa chừng — coi như chưa kiểm tra từ đó.
       _viTriDaKiemTraChinhTa = vitri;
     }
+
+    // Dời/co giãn các vùng định dạng thủ công theo cùng phép biến đổi —
+    // gõ thêm chữ NGAY TRONG một vùng thì vùng đó tự nới rộng ra (chữ mới
+    // mang định dạng cũ), xoá bớt thì vùng co lại, còn vùng nằm hẳn SAU chỗ
+    // sửa thì chỉ dời nguyên khối theo [lech].
+    for (final d in List<_VungDinhDangThuCong>.of(_boDieuKhien.dinhDang)) {
+      final batDauMoi = d.batDau <= vitri
+          ? d.batDau
+          : (d.batDau >= ketThucXoa ? d.batDau + lech : vitri);
+      final ketThucMoi = d.ketThuc <= vitri
+          ? d.ketThuc
+          : (d.ketThuc >= ketThucXoa ? d.ketThuc + lech : vitri);
+      if (batDauMoi >= ketThucMoi) {
+        _boDieuKhien.dinhDang.remove(d);
+      } else {
+        d.batDau = batDauMoi;
+        d.ketThuc = ketThucMoi;
+      }
+    }
     // scheduleMicrotask, KHÔNG gọi notifyListeners() ngay tại đây: hàm này
     // chạy ngay bên trong _khiNguoiDungSua — chính nó là một listener của
     // _boDieuKhien. Gọi notifyListeners() đồng bộ ở đây sẽ gọi lại ngay lập
@@ -1822,6 +2383,25 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     for (final x in _boDieuKhien.canXoa) {
       if (x.dangNhapNhay) continue;
+      if (batDau < x.ketThuc && ketThuc > x.batDau) return true;
+    }
+    return false;
+  }
+
+  /// ĐIỀU CẤM KỴ của định dạng thủ công (mục B7): [batDau, ketThuc) có giao
+  /// (dù chỉ một phần) với BẤT KỲ vùng AI nào không — lỗi chính tả, đoạn cần
+  /// thay thế, đoạn đề xuất thay thế, hay đoạn cần xoá. Có giao thì cả thao
+  /// tác định dạng bị BỎ QUA TOÀN BỘ (không áp phần nào), đơn giản và an toàn
+  /// hơn hẳn so với cắt riêng phần nằm ngoài vùng AI.
+  bool _giaoVoiVungAi(int batDau, int ketThuc) {
+    for (final l in _boDieuKhien.loi) {
+      if (batDau < l.ketThuc && ketThuc > l.batDau) return true;
+    }
+    for (final k in _boDieuKhien.khongPhuHop) {
+      if (batDau < k.ketThucGoc && ketThuc > k.batDauGoc) return true;
+      if (batDau < k.ketThucDeXuat && ketThuc > k.batDauDeXuat) return true;
+    }
+    for (final x in _boDieuKhien.canXoa) {
       if (batDau < x.ketThuc && ketThuc > x.batDau) return true;
     }
     return false;
@@ -2491,6 +3071,174 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
   }
 
+  // ---------------------------------------------------- định dạng thủ công
+
+  /// Trạng thái "đang chờ áp" — có tác dụng khi con trỏ chỉ ĐỨNG (không tô
+  /// đậm vùng nào): ký tự gõ MỚI kể từ lúc bật sẽ mang định dạng này, cho
+  /// tới khi người dùng tự bấm tắt (xem B4 trong yêu cầu — không theo dõi
+  /// "rời vị trí" cho đơn giản).
+  bool _damDangCho = false;
+  bool _nghiengDangCho = false;
+  bool _gachChanDangCho = false;
+  bool _gachNganDangCho = false;
+  bool _treMuDangCho = false;
+  bool _treChanDangCho = false;
+  Color? _mauChuDangCho;
+  Color? _mauNenDangCho;
+
+  bool get _coDinhDangDangCho =>
+      _damDangCho ||
+      _nghiengDangCho ||
+      _gachChanDangCho ||
+      _gachNganDangCho ||
+      _treMuDangCho ||
+      _treChanDangCho ||
+      _mauChuDangCho != null ||
+      _mauNenDangCho != null;
+
+  /// Điểm vào chính của mọi nút/phím tắt định dạng. [loai] là một trong:
+  /// 'dam', 'nghieng', 'gachChan', 'gachNgang', 'treMu', 'treChan', 'mauChu',
+  /// 'mauNen', 'xoaDinhDang'. [mau] chỉ dùng cho 'mauChu'/'mauNen'.
+  void _apDungDinhDang(String loai, {Color? mau}) {
+    final chon = _boDieuKhien.selection;
+    if (chon.isValid && !chon.isCollapsed) {
+      final batDau = chon.start, ketThuc = chon.end;
+      // ĐIỀU CẤM KỴ (B7): có giao với vùng AI thì bỏ qua TOÀN BỘ thao tác.
+      if (_giaoVoiVungAi(batDau, ketThuc)) return;
+      if (loai == 'xoaDinhDang') {
+        _xoaDinhDangTrongVung(batDau, ketThuc);
+      } else {
+        final v = _VungDinhDangThuCong(batDau: batDau, ketThuc: ketThuc);
+        if (loai == 'dam') {
+          v.dam = true;
+        } else if (loai == 'nghieng') {
+          v.nghieng = true;
+        } else if (loai == 'gachChan') {
+          v.gachChan = true;
+        } else if (loai == 'gachNgang') {
+          v.gachNgang = true;
+        } else if (loai == 'treMu') {
+          v.treMu = true;
+        } else if (loai == 'treChan') {
+          v.treChan = true;
+        } else if (loai == 'mauChu') {
+          v.mauChu = mau ?? widget.caiDat.mauChuGanNhat;
+        } else if (loai == 'mauNen') {
+          v.mauNen = mau ?? widget.caiDat.mauNenGanNhat;
+        }
+        _boDieuKhien.dinhDang.add(v);
+      }
+      _boDieuKhien.veLai();
+      _henLuu();
+      return;
+    }
+
+    // Con trỏ đứng yên (không tô vùng nào): đảo trạng thái "đang chờ áp".
+    setState(() {
+      if (loai == 'dam') {
+        _damDangCho = !_damDangCho;
+      } else if (loai == 'nghieng') {
+        _nghiengDangCho = !_nghiengDangCho;
+      } else if (loai == 'gachChan') {
+        _gachChanDangCho = !_gachChanDangCho;
+      } else if (loai == 'gachNgang') {
+        _gachNganDangCho = !_gachNganDangCho;
+      } else if (loai == 'treMu') {
+        _treMuDangCho = !_treMuDangCho;
+        if (_treMuDangCho) _treChanDangCho = false;
+      } else if (loai == 'treChan') {
+        _treChanDangCho = !_treChanDangCho;
+        if (_treChanDangCho) _treMuDangCho = false;
+      } else if (loai == 'mauChu') {
+        _mauChuDangCho = _mauChuDangCho == null ? (mau ?? widget.caiDat.mauChuGanNhat) : null;
+      } else if (loai == 'mauNen') {
+        _mauNenDangCho = _mauNenDangCho == null ? (mau ?? widget.caiDat.mauNenGanNhat) : null;
+      } else if (loai == 'xoaDinhDang') {
+        _damDangCho = false;
+        _nghiengDangCho = false;
+        _gachChanDangCho = false;
+        _gachNganDangCho = false;
+        _treMuDangCho = false;
+        _treChanDangCho = false;
+        _mauChuDangCho = null;
+        _mauNenDangCho = null;
+      }
+    });
+    _capNhatVungDangChoTaiConTro();
+  }
+
+  /// Tạo/cập nhật một vùng 0-ký-tự ngay tại con trỏ mang đúng tổ hợp thuộc
+  /// tính "đang chờ áp" hiện tại — vùng này tự NỚI RỘNG khi người dùng gõ
+  /// thêm chữ ngay tại đó (xem `_dieuChinhLoiChinhTaSauKhiSua`, nhánh
+  /// batDau<=vitri && ketThuc>=ketThucXoa tự dời ketThuc theo [lech]).
+  void _capNhatVungDangChoTaiConTro() {
+    final vt = _viTriConTroHienTai();
+    if (_giaoVoiVungAi(vt, vt)) return; // Đứng ngay biên vùng AI — bỏ qua an toàn.
+    if (!_coDinhDangDangCho) return;
+    _VungDinhDangThuCong? vung;
+    for (final d in _boDieuKhien.dinhDang) {
+      if (d.batDau == vt && d.ketThuc == vt) {
+        vung = d;
+        break;
+      }
+    }
+    if (vung == null) {
+      vung = _VungDinhDangThuCong(batDau: vt, ketThuc: vt);
+      _boDieuKhien.dinhDang.add(vung);
+    }
+    vung
+      ..dam = _damDangCho
+      ..nghieng = _nghiengDangCho
+      ..gachChan = _gachChanDangCho
+      ..gachNgang = _gachNganDangCho
+      ..treMu = _treMuDangCho
+      ..treChan = _treChanDangCho
+      ..mauChu = _mauChuDangCho
+      ..mauNen = _mauNenDangCho;
+    _boDieuKhien.veLai();
+  }
+
+  /// Xoá phần định dạng thủ công nằm TRONG [batDau, ketThuc) khỏi mọi vùng
+  /// hiện có — vùng nào bị cắt đôi (định dạng trải dài qua cả hai biên) thì
+  /// tách thành hai vùng con giữ nguyên phần còn lại NGOÀI khoảng bị xoá.
+  void _xoaDinhDangTrongVung(int batDau, int ketThuc) {
+    final ds = _boDieuKhien.dinhDang;
+    final moi = <_VungDinhDangThuCong>[];
+    for (final d in List<_VungDinhDangThuCong>.of(ds)) {
+      if (d.ketThuc <= batDau || d.batDau >= ketThuc) continue; // Không giao.
+      ds.remove(d);
+      if (d.batDau < batDau) {
+        moi.add(_VungDinhDangThuCong(
+          batDau: d.batDau,
+          ketThuc: batDau,
+          dam: d.dam,
+          nghieng: d.nghieng,
+          gachChan: d.gachChan,
+          gachNgang: d.gachNgang,
+          treMu: d.treMu,
+          treChan: d.treChan,
+          mauChu: d.mauChu,
+          mauNen: d.mauNen,
+        ));
+      }
+      if (d.ketThuc > ketThuc) {
+        moi.add(_VungDinhDangThuCong(
+          batDau: ketThuc,
+          ketThuc: d.ketThuc,
+          dam: d.dam,
+          nghieng: d.nghieng,
+          gachChan: d.gachChan,
+          gachNgang: d.gachNgang,
+          treMu: d.treMu,
+          treChan: d.treChan,
+          mauChu: d.mauChu,
+          mauNen: d.mauNen,
+        ));
+      }
+    }
+    ds.addAll(moi);
+  }
+
   // ----------------------------------------------------------- lùi/tiến tới
 
   /// Đóng gói trạng thái hiện tại (chữ + con trỏ + mọi đánh dấu AI đang
@@ -2678,6 +3426,87 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     moModalCaiDatKiemTraToanVan(context, widget.caiDat);
   }
 
+  /// Modal "Danh sách phím tắt" — đọc TRỰC TIẾP từ `CaiDat.phimTatCoDinh`
+  /// (nguồn động DUY NHẤT, xem B6), cộng thêm dòng riêng cho "Bật/tắt micro"
+  /// (đọc `widget.caiDat.phimTatBoBienDoi`/`phimTatPhim`, cũng động).
+  void _moDanhSachPhimTat() {
+    String tim(String khoa) => CaiDat.phimTatCoDinh[khoa] ?? khoa;
+
+    Widget dong(String phim, String chuc) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 110,
+                child: Text(phim, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              ),
+              Expanded(child: Text(chuc, style: const TextStyle(fontSize: 13))),
+            ],
+          ),
+        );
+
+    Widget deMuc(String chu) => Padding(
+          padding: const EdgeInsets.only(top: 12, bottom: 4),
+          child: Text(chu, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade700)),
+        );
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.keyboard_alt_outlined, size: 28),
+        title: const Text('Danh sách phím tắt'),
+        content: SizedBox(
+          width: 360,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                deMuc('Micro'),
+                dong(
+                  '${widget.caiDat.phimTatBoBienDoi} + ${widget.caiDat.phimTatPhim}',
+                  'Bật/tắt micro',
+                ),
+                deMuc('Điều hướng'),
+                dong('Ctrl + Z', tim('Ctrl+Z')),
+                dong('Ctrl + Shift + Z', tim('Ctrl+Shift+Z')),
+                deMuc('Chung'),
+                dong('Ctrl + F', tim('Ctrl+F')),
+                dong('Ctrl + A', tim('Ctrl+A')),
+                dong('Ctrl + S', tim('Ctrl+S')),
+                dong('Ctrl + X', tim('Ctrl+X')),
+                dong('Ctrl + C', tim('Ctrl+C')),
+                dong('Ctrl + V', tim('Ctrl+V')),
+                deMuc('Định dạng văn bản'),
+                dong('Ctrl + B', tim('Ctrl+B')),
+                dong('Ctrl + I', tim('Ctrl+I')),
+                dong('Ctrl + U', tim('Ctrl+U')),
+                dong('Ctrl + Shift + X', tim('Ctrl+Shift+X')),
+                dong('Ctrl + Shift + =', tim('Ctrl+Shift+Equal')),
+                dong('Ctrl + =', tim('Ctrl+Equal')),
+                dong('Ctrl + Shift + C', tim('Ctrl+Shift+C')),
+                dong('Ctrl + Shift + H', tim('Ctrl+Shift+H')),
+                dong('Ctrl + Q',
+                    '${tim('Ctrl+Q')} — đưa văn bản về trạng thái ban đầu (không áp dụng cho các đoạn AI đang đề xuất)'),
+                const SizedBox(height: 12),
+                const Text(
+                  'Để sử dụng phím tắt: Một ngón tay bấm và giữ im phím Ctrl, '
+                  'sau đó ngón tay thứ hai bấm phím còn lại.',
+                  style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12, color: Color(0xFF5F6368)),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Đóng')),
+        ],
+      ),
+    );
+  }
+
   void _moModalTam(String tieuDe, IconData bieuTuong, [String? moTaThem]) {
     showDialog<void>(
       context: context,
@@ -2816,6 +3645,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           icon: const Icon(Icons.save_outlined),
           tooltip: 'Lưu',
         ),
+        IconButton(
+          onPressed: _hienThanhTimKiem ? _dongTimKiem : _moTimKiem,
+          icon: const Icon(Icons.search),
+          tooltip: 'Tìm kiếm (Ctrl + F)',
+        ),
       ];
 
   @override
@@ -2900,6 +3734,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   ],
                 ),
               ),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 150),
+              child: _hienThanhTimKiem ? _thanhTimKiem() : const SizedBox(width: double.infinity),
+            ),
+            _thanhDinhDangThuCong(),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -2917,11 +3756,33 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 // đây thắng chắc chắn, bất kể ô văn bản tự xử lý gì bên
                 // trong.
                 child: Shortcuts(
-                  shortcuts: const {
-                    SingleActivator(LogicalKeyboardKey.keyZ, control: true):
-                        _YDinhLuiLai(),
-                    SingleActivator(LogicalKeyboardKey.keyZ, control: true, shift: true):
-                        _YDinhToi(),
+                  shortcuts: {
+                    const SingleActivator(LogicalKeyboardKey.keyZ, control: true):
+                        const _YDinhLuiLai(),
+                    const SingleActivator(LogicalKeyboardKey.keyZ, control: true, shift: true):
+                        const _YDinhToi(),
+                    const SingleActivator(LogicalKeyboardKey.keyF, control: true):
+                        const _YDinhTimKiem(),
+                    const SingleActivator(LogicalKeyboardKey.keyB, control: true):
+                        const _YDinhDinhDang('dam'),
+                    const SingleActivator(LogicalKeyboardKey.keyI, control: true):
+                        const _YDinhDinhDang('nghieng'),
+                    const SingleActivator(LogicalKeyboardKey.keyU, control: true):
+                        const _YDinhDinhDang('gachChan'),
+                    const SingleActivator(LogicalKeyboardKey.keyX, control: true, shift: true):
+                        const _YDinhDinhDang('gachNgang'),
+                    const SingleActivator(LogicalKeyboardKey.equal, control: true, shift: true):
+                        const _YDinhDinhDang('treMu'),
+                    const SingleActivator(LogicalKeyboardKey.equal, control: true):
+                        const _YDinhDinhDang('treChan'),
+                    const SingleActivator(LogicalKeyboardKey.keyC, control: true, shift: true):
+                        const _YDinhDinhDang('mauChu'),
+                    const SingleActivator(LogicalKeyboardKey.keyH, control: true, shift: true):
+                        const _YDinhDinhDang('mauNen'),
+                    const SingleActivator(LogicalKeyboardKey.keyQ, control: true):
+                        const _YDinhDinhDang('xoaDinhDang'),
+                    const SingleActivator(LogicalKeyboardKey.keyS, control: true):
+                        const _YDinhDinhDang('luu'),
                   },
                   child: Actions(
                     actions: {
@@ -2934,6 +3795,26 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       _YDinhToi: CallbackAction<_YDinhToi>(
                         onInvoke: (_) {
                           if (_lichSuToi.isNotEmpty) _toi();
+                          return null;
+                        },
+                      ),
+                      _YDinhTimKiem: CallbackAction<_YDinhTimKiem>(
+                        onInvoke: (_) {
+                          if (_hienThanhTimKiem) {
+                            _dongTimKiem();
+                          } else {
+                            _moTimKiem();
+                          }
+                          return null;
+                        },
+                      ),
+                      _YDinhDinhDang: CallbackAction<_YDinhDinhDang>(
+                        onInvoke: (y) {
+                          if (y.loai == 'luu') {
+                            _bamNutLuu();
+                          } else {
+                            _apDungDinhDang(y.loai);
+                          }
                           return null;
                         },
                       ),
@@ -2976,6 +3857,20 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                               animation: Listenable.merge([_boDieuKhien, _cuonVanBan]),
                               builder: (context, _) => Stack(
                                 children: [_veDanhDauAi()],
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Nền gradient đỏ→vàng của kết quả tìm kiếm — cùng lớp
+                        // "dưới chữ" như gạch chân AI ở trên, và cùng lý do
+                        // phải lắng nghe cả `_cuonVanBan` lẫn `_oTimKiem` (đổi
+                        // từ khoá cũng phải vẽ lại ngay).
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: AnimatedBuilder(
+                              animation: Listenable.merge([_boDieuKhien, _cuonVanBan, _oTimKiem]),
+                              builder: (context, _) => Stack(
+                                children: [_veTimKiem()],
                               ),
                             ),
                           ),
@@ -3060,6 +3955,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               khiBamChepTatCa: () => _chepTatCa(),
               khiBamChepRoiXoaTatCa: _chepRoiXoaTatCa,
               khiBamXoaTatCa: () => _xoaTatCa(),
+              khiBamDanhSachPhimTat: _moDanhSachPhimTat,
             ),
             SizedBox(height: caoBanPhim),
           ],
@@ -3068,6 +3964,137 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       ),
     );
   }
+}
+
+/// Nút màu chữ/màu nền của thanh định dạng thủ công: bấm THẲNG vào nút áp
+/// ngay màu "gần nhất" (giống hành vi phím tắt); bấm mũi tên nhỏ bên cạnh mở
+/// lưới màu cơ bản để chọn màu khác — chọn xong màu đó vừa trở thành màu
+/// "gần nhất" mới, vừa áp lên luôn.
+class _NutMauDinhDang extends StatelessWidget {
+  const _NutMauDinhDang({
+    required this.nhan,
+    required this.bat,
+    required this.mauHienThi,
+    required this.khiBam,
+    required this.khiChonMau,
+    required this.choPhepTrongSuot,
+  });
+
+  final String nhan;
+  final bool bat;
+  final Color mauHienThi;
+  final VoidCallback khiBam;
+  final ValueChanged<Color> khiChonMau;
+  final bool choPhepTrongSuot;
+
+  static const List<Color> _bangMauCoBan = [
+    Colors.red,
+    Colors.orange,
+    Colors.yellow,
+    Colors.green,
+    Colors.blue,
+    Colors.purple,
+    Colors.black,
+    Colors.white,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: bat ? const Color(0xFFE3F2FD) : null,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            iconSize: 20,
+            tooltip: nhan,
+            onPressed: khiBam,
+            icon: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('A', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, height: 1)),
+                Container(width: 16, height: 3, color: mauHienThi),
+              ],
+            ),
+          ),
+          IconButton(
+            iconSize: 18,
+            tooltip: 'Chọn màu khác',
+            icon: const Icon(Icons.arrow_drop_down),
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (dialogCtx) => AlertDialog(
+                title: const Text('Chọn màu'),
+                content: Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (final m in _bangMauCoBan)
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.of(dialogCtx).pop();
+                          khiChonMau(m);
+                        },
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: m,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xFFBDBDBD)),
+                          ),
+                        ),
+                      ),
+                    if (choPhepTrongSuot)
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.of(dialogCtx).pop();
+                          khiChonMau(Colors.transparent);
+                        },
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xFFBDBDBD)),
+                          ),
+                          // Hoạ tiết gạch chéo biểu thị "Trong suốt".
+                          child: CustomPaint(painter: _VeOTrongSuot()),
+                        ),
+                      ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogCtx).pop(),
+                    child: const Text('Đóng'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Vẽ một đường chéo đỏ trong ô tròn — biểu thị lựa chọn "Trong suốt" (không
+/// màu) ở bảng chọn màu nền.
+class _VeOTrongSuot extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final ve = Paint()
+      ..color = Colors.red
+      ..strokeWidth = 1.5;
+    canvas.drawLine(Offset(2, size.height - 2), Offset(size.width - 2, 2), ve);
+  }
+
+  @override
+  bool shouldRepaint(covariant _VeOTrongSuot cu) => false;
 }
 
 /// Một điểm mốc trong lịch sử Lùi lại/Tiến tới — chữ, vị trí con trỏ, và mọi

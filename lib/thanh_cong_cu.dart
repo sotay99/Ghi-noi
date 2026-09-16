@@ -27,6 +27,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamChepTatCa,
     required this.khiBamChepRoiXoaTatCa,
     required this.khiBamXoaTatCa,
+    required this.khiBamDanhSachPhimTat,
   });
 
   final bool bat;
@@ -62,6 +63,9 @@ class ThanhCongCu extends StatelessWidget {
   final VoidCallback khiBamChepTatCa;
   final VoidCallback khiBamChepRoiXoaTatCa;
   final VoidCallback khiBamXoaTatCa;
+
+  /// Gắn với mục "Danh sách phím tắt", ngay dưới "Kiểu gõ bàn phím".
+  final VoidCallback khiBamDanhSachPhimTat;
 
   /// Ngưỡng bề ngang chuẩn của Material để phân biệt điện thoại (hẹp) với
   /// máy tính bảng/màn hình gập mở ra (rộng) — đủ chỗ để các nút giãn ra
@@ -187,6 +191,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamChepTatCa: khiBamChepTatCa,
                               khiBamChepRoiXoaTatCa: khiBamChepRoiXoaTatCa,
                               khiBamXoaTatCa: khiBamXoaTatCa,
+                              khiBamDanhSachPhimTat: khiBamDanhSachPhimTat,
                             ),
                           ),
                           ],
@@ -586,6 +591,7 @@ class _NutThemMenu extends StatelessWidget {
     required this.khiBamChepTatCa,
     required this.khiBamChepRoiXoaTatCa,
     required this.khiBamXoaTatCa,
+    required this.khiBamDanhSachPhimTat,
   });
 
   final bool rong;
@@ -596,6 +602,7 @@ class _NutThemMenu extends StatelessWidget {
   final VoidCallback khiBamChepTatCa;
   final VoidCallback khiBamChepRoiXoaTatCa;
   final VoidCallback khiBamXoaTatCa;
+  final VoidCallback khiBamDanhSachPhimTat;
 
   @override
   Widget build(BuildContext context) {
@@ -629,6 +636,9 @@ class _NutThemMenu extends StatelessWidget {
               case 4:
                 khiBamBanPhim();
                 break;
+              case 23:
+                khiBamDanhSachPhimTat();
+                break;
               case 20:
                 khiBamChepTatCa();
                 break;
@@ -653,6 +663,7 @@ class _NutThemMenu extends StatelessWidget {
             const PopupMenuDivider(height: 8),
             _mucMenuThem(3, 'Bật bộ điều hướng và phím nhanh'),
             _mucMenuThem(4, 'Kiểu gõ bàn phím'),
+            _mucMenuThem(23, 'Danh sách phím tắt'),
             _mucMenuThem(5, 'Luyện gõ phím bằng 10 ngón tay'),
             const PopupMenuDivider(height: 8),
             _mucMenuThem(6, 'Chia sẻ ứng dụng này đến với mọi người'),

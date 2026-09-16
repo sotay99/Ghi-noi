@@ -2,6 +2,7 @@
 // chú vì đây là tuỳ chọn của NGƯỜI DÙNG về cách app vận hành, không phải nội
 // dung ghi chú của họ.
 
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class CaiDat {
@@ -15,6 +16,8 @@ class CaiDat {
   static const _khoaMucDoDaiDeXuat = 'ghi_noi_muc_do_dai_de_xuat';
   static const _khoaCauLenhTuyChinhKiemTraToanVan =
       'ghi_noi_cau_lenh_tuy_chinh_kiem_tra_toan_van';
+  static const _khoaMauChuGanNhat = 'ghi_noi_mau_chu_gan_nhat';
+  static const _khoaMauNenGanNhat = 'ghi_noi_mau_nen_gan_nhat';
 
   /// Số giây chờ, kể từ lúc người dùng ngừng gõ phím, tới khi micro tự bật
   /// lại. Mặc định 1 giây.
@@ -76,6 +79,13 @@ class CaiDat {
   String phimTatBoBienDoi = 'Ctrl';
   String phimTatPhim = 'G';
 
+  /// Màu chữ/màu nền gần nhất người dùng dùng ở công cụ định dạng thủ công —
+  /// nút màu chữ/màu nền trên thanh công cụ và phím tắt Ctrl+Shift+C /
+  /// Ctrl+Shift+H đều dùng lại đúng màu này. Mặc định đỏ (chữ) / vàng (nền)
+  /// khi chưa từng dùng lần nào.
+  Color mauChuGanNhat = Colors.red;
+  Color mauNenGanNhat = Colors.yellow;
+
   Future<void> tai() async {
     final kho = await SharedPreferences.getInstance();
     thoiGianBatLaiGiay = kho.getDouble(_khoaThoiGianBatLai) ?? 1.0;
@@ -88,6 +98,22 @@ class CaiDat {
     tuDongChenDauCauBangAI = kho.getBool(_khoaTuDongChenDauCau) ?? true;
     mucDoDaiDeXuat = (kho.getInt(_khoaMucDoDaiDeXuat) ?? 2).clamp(0, 4);
     cauLenhTuyChinhKiemTraToanVan = kho.getString(_khoaCauLenhTuyChinhKiemTraToanVan) ?? '';
+    final mc = kho.getInt(_khoaMauChuGanNhat);
+    if (mc != null) mauChuGanNhat = Color(mc);
+    final mn = kho.getInt(_khoaMauNenGanNhat);
+    if (mn != null) mauNenGanNhat = Color(mn);
+  }
+
+  Future<void> datMauChuGanNhat(Color mau) async {
+    mauChuGanNhat = mau;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setInt(_khoaMauChuGanNhat, mau.toARGB32());
+  }
+
+  Future<void> datMauNenGanNhat(Color mau) async {
+    mauNenGanNhat = mau;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setInt(_khoaMauNenGanNhat, mau.toARGB32());
   }
 
   Future<void> datThoiGianBatLai(double giay) async {
@@ -154,6 +180,21 @@ class CaiDat {
   static const Map<String, String> phimTatCoDinh = {
     'Ctrl+Z': 'Lùi lại',
     'Ctrl+Shift+Z': 'Tiến tới',
+    'Ctrl+F': 'Tìm kiếm',
+    'Ctrl+A': 'Chọn tất cả',
+    'Ctrl+S': 'Lưu',
+    'Ctrl+X': 'Cắt',
+    'Ctrl+C': 'Sao chép',
+    'Ctrl+V': 'Dán',
+    'Ctrl+B': 'Đậm',
+    'Ctrl+I': 'Nghiêng',
+    'Ctrl+U': 'Gạch chân',
+    'Ctrl+Shift+X': 'Gạch ngang thân',
+    'Ctrl+Shift+Equal': 'Chữ trên (superscript)',
+    'Ctrl+Equal': 'Chữ dưới (subscript)',
+    'Ctrl+Shift+C': 'Màu chữ',
+    'Ctrl+Shift+H': 'Màu nền chữ',
+    'Ctrl+Q': 'Xoá định dạng văn bản',
   };
 
   /// Kiểm tra một tổ hợp (boBienDoi, phim) có trùng phím tắt cố định nào
