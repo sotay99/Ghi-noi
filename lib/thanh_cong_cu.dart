@@ -24,6 +24,9 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamGhiAmAI,
     required this.hienChuThich,
     required this.khiBamChuThich,
+    required this.khiBamChepTatCa,
+    required this.khiBamChepRoiXoaTatCa,
+    required this.khiBamXoaTatCa,
   });
 
   final bool bat;
@@ -52,6 +55,13 @@ class ThanhCongCu extends StatelessWidget {
   final VoidCallback khiBamBanPhim;
   final VoidCallback khiBamKiemTraToanVan;
   final VoidCallback khiBamGhiAmAI;
+
+  /// Ba mục đầu của menu "+ Thêm lựa chọn" — trước đây là ba nút riêng
+  /// (Sao chép tất cả/Xoá tất cả trên thanh công cụ trên, cộng thêm mục gộp
+  /// mới "Sao chép rồi xoá tất cả"), nay dồn cả vào đây.
+  final VoidCallback khiBamChepTatCa;
+  final VoidCallback khiBamChepRoiXoaTatCa;
+  final VoidCallback khiBamXoaTatCa;
 
   /// Ngưỡng bề ngang chuẩn của Material để phân biệt điện thoại (hẹp) với
   /// máy tính bảng/màn hình gập mở ra (rộng) — đủ chỗ để các nút giãn ra
@@ -174,6 +184,9 @@ class ThanhCongCu extends StatelessWidget {
                             child: _NutThemMenu(
                               rong: rong,
                               khiBamBanPhim: khiBamBanPhim,
+                              khiBamChepTatCa: khiBamChepTatCa,
+                              khiBamChepRoiXoaTatCa: khiBamChepRoiXoaTatCa,
+                              khiBamXoaTatCa: khiBamXoaTatCa,
                             ),
                           ),
                           ],
@@ -567,12 +580,22 @@ PopupMenuItem<int> _mucMenuThem(int gia, String chu) {
 /// tự tính toán vị trí). Đa số các mục chưa gắn logic gì, chỉ là chỗ đặt
 /// trước cho tính năng sau này.
 class _NutThemMenu extends StatelessWidget {
-  const _NutThemMenu({required this.rong, required this.khiBamBanPhim});
+  const _NutThemMenu({
+    required this.rong,
+    required this.khiBamBanPhim,
+    required this.khiBamChepTatCa,
+    required this.khiBamChepRoiXoaTatCa,
+    required this.khiBamXoaTatCa,
+  });
 
   final bool rong;
 
   /// Gắn với mục "Kiểu gõ bàn phím" trong danh sách.
   final VoidCallback khiBamBanPhim;
+
+  final VoidCallback khiBamChepTatCa;
+  final VoidCallback khiBamChepRoiXoaTatCa;
+  final VoidCallback khiBamXoaTatCa;
 
   @override
   Widget build(BuildContext context) {
@@ -602,9 +625,29 @@ class _NutThemMenu extends StatelessWidget {
                       size: 20, color: Color(0xFF5F6368)),
                 ),
           onSelected: (gia) {
-            if (gia == 4) khiBamBanPhim();
+            switch (gia) {
+              case 4:
+                khiBamBanPhim();
+                break;
+              case 20:
+                khiBamChepTatCa();
+                break;
+              case 21:
+                khiBamChepRoiXoaTatCa();
+                break;
+              case 22:
+                khiBamXoaTatCa();
+                break;
+            }
           },
           itemBuilder: (ctx) => [
+            // Ba mục đầu — dời từ ba nút riêng trên thanh công cụ trên
+            // (Sao chép tất cả/Xoá tất cả) xuống đây, cộng thêm mục gộp mới
+            // "Sao chép rồi xoá tất cả".
+            _mucMenuThem(20, 'Sao chép tất cả'),
+            _mucMenuThem(21, 'Sao chép rồi xoá tất cả'),
+            _mucMenuThem(22, 'Xoá tất cả'),
+            const PopupMenuDivider(height: 8),
             _mucMenuThem(1, 'Thêm ảnh'),
             _mucMenuThem(2, 'Chụp ảnh (camera)'),
             const PopupMenuDivider(height: 8),

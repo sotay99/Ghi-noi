@@ -62,7 +62,13 @@ const _giaiThichDoDaiDeXuat =
     'lệch ý hơn, nhưng có thể chưa đủ mượt vì AI phải sửa từng mẩu nhỏ.\n\n'
     'Đoạn đề xuất càng DÀI thì AI càng có chỗ để viết lại cho gọn gàng, súc '
     'tích hơn, nhưng cũng dễ lệch khỏi ý gốc của bạn hơn vì AI phải diễn đạt '
-    'lại nhiều hơn.';
+    'lại nhiều hơn.\n\n'
+    'Khoảng ký tự tham khảo cho từng mức:\n'
+    'Rất ngắn: khoảng 4–8 ký tự\n'
+    'Ngắn: khoảng 8–14 ký tự\n'
+    'Trung bình: khoảng 12–20 ký tự\n'
+    'Dài: khoảng 20–34 ký tự\n'
+    'Rất dài: khoảng 34–56 ký tự';
 
 const _giaiThichCauLenhTuyChinh =
     'Đây là câu lệnh RIÊNG của bạn, gửi kèm theo chỉ dẫn gốc của hệ thống mỗi '

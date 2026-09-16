@@ -2615,61 +2615,30 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   // ------------------------------------------------------------------- nút
 
-  Future<void> _chepTatCa() async {
+  /// Sao chép toàn bộ văn bản vào bộ nhớ tạm. Dùng cả cho mục "Sao chép tất
+  /// cả" và làm bước đầu của "Sao chép rồi xoá tất cả" trong menu "+ Thêm
+  /// lựa chọn" — [baoKetQua] tắt đi khi gọi từ đó để tránh hiện hai popup
+  /// liên tiếp, nhường popup cuối cho hành động gộp.
+  Future<bool> _chepTatCa({bool baoKetQua = true}) async {
     final chu = _boDieuKhien.text;
     if (chu.isEmpty) {
-      _bao('Chưa có chữ nào để chép.');
-      return;
+      if (baoKetQua) _bao('Chưa có chữ nào để chép.');
+      return false;
     }
     await Clipboard.setData(ClipboardData(text: chu));
-    if (mounted) {
-      hienThongBaoGiua(
-        context,
-        'Đã sao chép tất cả văn bản vào bộ nhớ tạm của thiết bị',
-      );
-    }
+    if (baoKetQua && mounted) _bao('Đã sao chép tất cả');
+    return true;
   }
 
-  /// Bôi đen toàn bộ văn bản, để người dùng dùng menu chọn sẵn có của máy
-  /// (Sao chép, Cắt, Chia sẻ...) thao tác tiếp trên phần đã chọn.
-  void _chonTatCa() {
-    final chu = _boDieuKhien.text;
-    if (chu.isEmpty) return;
-    _oChu.requestFocus();
-    _boDieuKhien.selection = TextSelection(baseOffset: 0, extentOffset: chu.length);
-  }
-
-  Future<void> _xoaTatCa() async {
+  /// Xoá toàn bộ văn bản. Không hỏi xác nhận — Lùi lại (Ctrl + Z) đã là lưới
+  /// an toàn cho việc xoá nhầm, nên thực hiện ngay khi bấm. Dùng chung cho
+  /// mục "Xoá tất cả" và bước sau của "Sao chép rồi xoá tất cả" — [baoKetQua]
+  /// tắt đi khi gọi từ đó với cùng lý do như ở [_chepTatCa].
+  Future<bool> _xoaTatCa({bool baoKetQua = true}) async {
     if (_boDieuKhien.text.isEmpty) {
-      _bao('Trang đang trống, không có gì để xoá.');
-      return;
+      if (baoKetQua) _bao('Trang đang trống, không có gì để xoá.');
+      return false;
     }
-
-    final dongY = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.delete_outline, size: 28),
-        title: const Text('Xoá tất cả?'),
-        content: const Text(
-          'Toàn bộ văn bản đang soạn sẽ bị xoá ngay. Vẫn có thể bấm "Lùi '
-          'lại" ở thanh trên để khôi phục lại nếu xoá nhầm.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Không'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style:
-                FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
-            child: const Text('Có, xoá tất cả'),
-          ),
-        ],
-      ),
-    );
-
-    if (dongY != true || !mounted) return;
 
     _luuDiemMoc();
 
@@ -2691,7 +2660,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _viTriDaKiemTraChinhTa = 0;
     _boQuaCauNay = _micro.isListening;
     await _luuVanBan();
-    if (mounted) _bao('Đã xoá toàn bộ văn bản.');
+    if (baoKetQua && mounted) _bao('Đã xoá tất cả');
+    return true;
+  }
+
+  /// Sao chép rồi xoá tất cả, gộp hai thao tác trên thành một mục trong menu
+  /// "+ Thêm lựa chọn" — tái dùng nguyên logic của cả hai, chỉ tự lo popup
+  /// thông báo cuối cùng.
+  Future<void> _chepRoiXoaTatCa() async {
+    final daChep = await _chepTatCa(baoKetQua: false);
+    if (!daChep || !mounted) return;
+    await _xoaTatCa(baoKetQua: false);
+    if (mounted) _bao('Đã sao chép tất cả và xoá');
   }
 
   void _moModalCaiDatKiemTraToanVan() {
@@ -2790,6 +2770,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
+  // "Sao chép tất cả", "Sao chép rồi xoá tất cả" và "Xoá tất cả" đã dời vào
+  // menu "+ Thêm lựa chọn" của thanh công cụ dưới (xem `ThanhCongCu`), và nút
+  // "Chọn tất cả" đã bỏ hẳn — thanh trên giờ chỉ còn Lùi lại/Tiến tới/Lưu.
   List<Widget> _dsNutCongCu() => [
         IconButton(
           onPressed: _lichSuLui.isEmpty ? null : _lui,
@@ -2805,21 +2788,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           onPressed: _bamNutLuu,
           icon: const Icon(Icons.save_outlined),
           tooltip: 'Lưu',
-        ),
-        IconButton(
-          onPressed: _chepTatCa,
-          icon: const Icon(Icons.copy_all_outlined),
-          tooltip: 'Chép toàn bộ văn bản',
-        ),
-        IconButton(
-          onPressed: _xoaTatCa,
-          icon: const Icon(Icons.delete_outline),
-          tooltip: 'Xoá tất cả',
-        ),
-        IconButton(
-          onPressed: _chonTatCa,
-          icon: const Icon(Icons.select_all),
-          tooltip: 'Chọn tất cả',
         ),
       ];
 
@@ -2845,9 +2813,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               preferredSize: const Size.fromHeight(40),
               child: SizedBox(
                 height: 40,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(children: _dsNutCongCu()),
+                // Chỉ còn 3 nút (Lùi/Tiến/Lưu) sau khi dời phần còn lại vào
+                // menu "+ Thêm lựa chọn" — Align đẩy cả cụm sát mép phải
+                // thay vì nằm lệch trái như một Row thường trong
+                // SingleChildScrollView.
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(children: _dsNutCongCu()),
+                  ),
                 ),
               ),
             ),
@@ -2958,8 +2933,20 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                         // gạch chân thay vì bị nó che mất.
                         Positioned.fill(
                           child: IgnorePointer(
+                            // Phải lắng nghe CẢ `_cuonVanBan` (giống chấm
+                            // tròn tím cuối văn bản ở dưới), không chỉ
+                            // `_boDieuKhien` — painter đo toạ độ ngay lúc
+                            // paint() nên bản thân nó luôn đúng, nhưng
+                            // AnimatedBuilder chỉ gọi lại build() (và do đó
+                            // paint()) khi Listenable nó nghe đổi giá trị.
+                            // Cuộn (vuốt) đổi `_cuonVanBan.offset`, không đổi
+                            // nội dung `_boDieuKhien`, nên nếu chỉ nghe
+                            // `_boDieuKhien` thì gạch chân/gạch giữa thân
+                            // đứng hình tại vị trí cũ cho tới khi có việc
+                            // khác (tap đặt con trỏ) làm rebuild theo đường
+                            // khác.
                             child: AnimatedBuilder(
-                              animation: _boDieuKhien,
+                              animation: Listenable.merge([_boDieuKhien, _cuonVanBan]),
                               builder: (context, _) => Stack(
                                 children: [_veDanhDauAi()],
                               ),
@@ -3043,6 +3030,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               ),
               khiBamKiemTraToanVan: _khiBamKiemTraToanVan,
               khiBamGhiAmAI: _khiBamGhiAmAI,
+              khiBamChepTatCa: () => _chepTatCa(),
+              khiBamChepRoiXoaTatCa: _chepRoiXoaTatCa,
+              khiBamXoaTatCa: () => _xoaTatCa(),
             ),
             SizedBox(height: caoBanPhim),
           ],
