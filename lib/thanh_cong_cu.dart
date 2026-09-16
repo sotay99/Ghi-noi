@@ -18,7 +18,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamThuMuc,
     required this.khiBamCaiDat,
     required this.khiBamHuongDan,
-    required this.khiBamAI,
+    required this.khiBamCaiDatKiemTraToanVan,
     required this.khiBamBanPhim,
     required this.khiBamKiemTraToanVan,
     required this.khiBamGhiAmAI,
@@ -44,7 +44,11 @@ class ThanhCongCu extends StatelessWidget {
   final VoidCallback khiBamThuMuc;
   final VoidCallback khiBamCaiDat;
   final VoidCallback khiBamHuongDan;
-  final VoidCallback khiBamAI;
+
+  /// Gắn với mục "Cài đặt nút "Kiểm tra toàn văn"" trong menu "Làm việc với
+  /// AI" — mục duy nhất trong menu đó đã gắn logic thật, các mục còn lại
+  /// (trò chuyện, tóm tắt, mở rộng, viết lại) chỉ là chỗ đặt trước.
+  final VoidCallback khiBamCaiDatKiemTraToanVan;
   final VoidCallback khiBamBanPhim;
   final VoidCallback khiBamKiemTraToanVan;
   final VoidCallback khiBamGhiAmAI;
@@ -147,8 +151,10 @@ class ThanhCongCu extends StatelessWidget {
                           _NutCoChuThich(
                             hien: hienChuThich,
                             chu: 'Làm việc với AI',
-                            child: _nut(rong, Icons.smart_toy_outlined,
-                                'Làm việc với AI', 'Làm việc AI', khiBamAI),
+                            child: _NutAIMenu(
+                              rong: rong,
+                              khiBamCaiDatKiemTraToanVan: khiBamCaiDatKiemTraToanVan,
+                            ),
                           ),
                           _NutCoChuThich(
                             hien: hienChuThich,
@@ -614,6 +620,73 @@ class _NutThemMenu extends StatelessWidget {
             _mucMenuThem(10, 'Bảo mật và quyền riêng tư'),
             const PopupMenuDivider(height: 8),
             _mucMenuThem(11, 'Đăng nhập tài khoản'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Menu thả xuống của nút "Làm việc với AI" — cùng cơ chế với
+/// `_NutThemMenu` (PopupMenuButton tự neo ngay phía trên nút vì nút nằm sát
+/// đáy màn hình). Bốn mục đầu chưa gắn logic, chỉ mục cuối "Cài đặt nút
+/// "Kiểm tra toàn văn"" gọi callback thật.
+class _NutAIMenu extends StatelessWidget {
+  const _NutAIMenu({required this.rong, required this.khiBamCaiDatKiemTraToanVan});
+
+  final bool rong;
+  final VoidCallback khiBamCaiDatKiemTraToanVan;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Làm việc với AI',
+      child: Tooltip(
+        message: 'Làm việc với AI',
+        child: PopupMenuButton<int>(
+          padding: EdgeInsets.zero,
+          splashRadius: 20,
+          child: rong
+              ? const _KhungNutRong(
+                  bieuTuong: Icons.smart_toy_outlined,
+                  nhan: 'Làm việc với AI',
+                )
+              : Container(
+                  width: 38,
+                  height: 38,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.smart_toy_outlined,
+                      size: 20, color: Color(0xFF5F6368)),
+                ),
+          onSelected: (gia) {
+            if (gia == 5) khiBamCaiDatKiemTraToanVan();
+          },
+          itemBuilder: (ctx) => [
+            _mucMenuThem(1, 'Trò chuyện về văn bản này'),
+            _mucMenuThem(2, 'Tóm tắt toàn văn'),
+            _mucMenuThem(3, 'Mở rộng toàn văn'),
+            _mucMenuThem(4, 'Viết lại cho hay hơn'),
+            const PopupMenuDivider(height: 8),
+            PopupMenuItem<int>(
+              value: 5,
+              height: 34,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.task_alt, size: 16, color: Colors.green.shade600),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Cài đặt nút "Kiểm tra toàn văn"',
+                    style: TextStyle(color: Colors.green.shade600),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

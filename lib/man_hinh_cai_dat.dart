@@ -1,6 +1,7 @@
-// Màn hình cài đặt: sáu dòng — thời gian bật lại micro, tự động tắt micro
-// khi im lặng, tự động chèn dấu cách, kiểm tra chính tả bằng AI, phím tắt
-// tắt/mở micro, và trạng thái quyền micro của thiết bị.
+// Màn hình cài đặt: bảy dòng — thời gian bật lại micro, tự động tắt micro
+// khi im lặng, tự động chèn dấu cách, kiểm tra chính tả bằng AI, tự động
+// chèn dấu câu bằng AI, phím tắt tắt/mở micro, và trạng thái quyền micro
+// của thiết bị.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -44,6 +45,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
   late double _thoiGian;
   late bool _tuDongChen;
   late bool _kiemTraChinhTa;
+  late bool _tuDongChenDauCau;
   late String _phimTatBoBienDoi;
   late String _phimTatPhim;
   PermissionStatus? _trangThaiMicro;
@@ -58,6 +60,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     _thoiGian = widget.caiDat.thoiGianBatLaiGiay;
     _tuDongChen = widget.caiDat.tuDongChenKhoangCach;
     _kiemTraChinhTa = widget.caiDat.kiemTraChinhTaBangAI;
+    _tuDongChenDauCau = widget.caiDat.tuDongChenDauCauBangAI;
     _phimTatBoBienDoi = widget.caiDat.phimTatBoBienDoi;
     _phimTatPhim = widget.caiDat.phimTatPhim;
     _oTuTatMicro = TextEditingController(text: '${widget.caiDat.thoiGianTuTatMicroGiay}');
@@ -205,6 +208,8 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
           _dong3TuDongChen(),
           const Divider(height: 40),
           _dong4AI(),
+          const Divider(height: 40),
+          _dong4bChenDauCauAI(),
           const Divider(height: 40),
           _dong5PhimTat(),
           const Divider(height: 40),
@@ -359,6 +364,42 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
               'Kiểm tra chính tả bằng AI',
               _giaiThichChinhTaNgan,
               _giaiThichChinhTa,
+            )),
+      ],
+    );
+  }
+
+  Widget _dong4bChenDauCauAI() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _tieuDeDong('Tự động chèn dấu câu vào giữa các đoạn văn bằng AI'),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                _tuDongChenDauCau ? 'Đang bật (Có)' : 'Đang tắt (Không)',
+                style: TextStyle(
+                  color: _tuDongChenDauCau
+                      ? const Color(0xFF1A73E8)
+                      : const Color(0xFF9AA0A6),
+                ),
+              ),
+            ),
+            Switch(
+              value: _tuDongChenDauCau,
+              onChanged: (bat) async {
+                setState(() => _tuDongChenDauCau = bat);
+                await widget.caiDat.datTuDongChenDauCauBangAI(bat);
+              },
+            ),
+          ],
+        ),
+        _nutTimHieuThem(() => _hienGiaiThich(
+              'Tự động chèn dấu câu bằng AI',
+              _giaiThichChenDauCauNgan,
+              _giaiThichChenDauCau,
             )),
       ],
     );
@@ -709,4 +750,16 @@ Từ nào AI cho là sai chính tả sẽ được **gạch chân màu đỏ** n
 - Dòng **"Huỷ đề xuất"** (màu xanh lá) — bấm vào thì không có gì đổi trong bài, chỉ là ứng dụng thôi coi từ đó là sai nữa (hết gạch đỏ chân).
 
 Tắt tính năng này đi thì mọi gạch đỏ đang hiện biến mất ngay, và ứng dụng ngừng gọi AI kiểm tra chính tả cho tới khi bạn bật lại.
+''';
+
+const _giaiThichChenDauCauNgan = '''
+Bật lên, AI tự chèn thêm dấu câu còn thiếu (dấu chấm, phẩy, hỏi, than...) vào những chỗ hợp lý trong bài. Đoạn dấu câu vừa chèn nhấp nháy **nền xanh dương** trong 4 giây rồi trở về chữ bình thường.
+''';
+
+const _giaiThichChenDauCau = '''
+Khi tính năng này bật, cùng lúc với việc kiểm tra chính tả (nếu tính năng đó cũng đang bật), AI còn tự chèn thêm những dấu câu còn thiếu vào bài: dấu chấm, phẩy, hỏi, than, chấm phẩy, hai chấm, ba chấm, ngoặc đơn, ngoặc kép, gạch ngang... tuỳ chỗ nào AI thấy cần.
+
+Ngay sau khi AI chèn xong, đúng đoạn dấu câu đó **nhấp nháy nền xanh dương** trong 4 giây để bạn dễ nhận ra chỗ AI vừa sửa, rồi tự động biến mất — trở về chữ bình thường như mọi ký tự khác trong bài, không cần bấm gì thêm.
+
+Nếu cả hai tính năng "Kiểm tra chính tả bằng AI" và "Tự động chèn dấu câu bằng AI" đều bật, chúng gộp chung vào MỘT lần gọi AI duy nhất để đỡ tốn hạn mức. Tắt tính năng này đi thì AI chỉ còn sửa chính tả, không tự thêm dấu câu nào nữa.
 ''';

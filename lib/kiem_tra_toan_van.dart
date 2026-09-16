@@ -34,19 +34,51 @@ class CanXoaMuc {
   final int viTri;
 }
 
+/// Một dấu câu AI đề xuất chèn thêm vào giữa bài (mục 3 — "Tự động chèn dấu
+/// câu vào giữa các đoạn văn bằng AI"), vị trí tính trên văn bản GỐC gửi lên.
+class DauCauMoiToanVanMuc {
+  const DauCauMoiToanVanMuc({required this.dauCau, required this.viTri});
+  final String dauCau;
+  final int viTri;
+}
+
+/// Một khoảng [batDau, ketThuc) đã được đánh dấu ở lượt kiểm tra trước —
+/// gửi kèm lên AI để nó coi là NGỮ CẢNH THAM KHẢO đã xử lý xong, không can
+/// thiệp lại (mục 1).
+class VungDaXuLy {
+  const VungDaXuLy(this.batDau, this.ketThuc);
+  final int batDau;
+  final int ketThuc;
+
+  Map<String, int> toJson() => {'batDau': batDau, 'ketThuc': ketThuc};
+}
+
 class KetQuaKiemTraToanVan {
   const KetQuaKiemTraToanVan({
     required this.chinhTa,
     required this.khongPhuHop,
     required this.canXoa,
+    this.dauCauMoi = const [],
   });
   final List<ChinhTaMuc> chinhTa;
   final List<KhongPhuHopMuc> khongPhuHop;
   final List<CanXoaMuc> canXoa;
+  final List<DauCauMoiToanVanMuc> dauCauMoi;
 }
 
 class DichVuKiemTraToanVan {
-  Future<KetQuaKiemTraToanVan> kiemTra(String vanBan) async {
+  /// [vungDaXuLy]: các khoảng đã đánh dấu ở (những) lượt kiểm tra trước —
+  /// gửi kèm để AI không đụng lại vào đó (mục 1). [chenDauCau]: có nhờ AI
+  /// tìm thêm dấu câu còn thiếu hay không (mục 3). [khoangKyTu]: khoảng ký
+  /// tự tham khảo cho đoạn đề xuất (mục 5). [cauLenhTuyChinh]: câu lệnh
+  /// riêng của người dùng, gửi kèm chỉ dẫn hệ thống (mục 5).
+  Future<KetQuaKiemTraToanVan> kiemTra(
+    String vanBan, {
+    List<VungDaXuLy> vungDaXuLy = const [],
+    bool chenDauCau = false,
+    (int, int)? khoangKyTu,
+    String cauLenhTuyChinh = '',
+  }) async {
     final phanHoi = await http
         .post(
           Uri.parse(diaChiMayChuAI),
@@ -54,7 +86,15 @@ class DichVuKiemTraToanVan {
             'content-type': 'application/json',
             'x-flowrite-secret': matKhauMayChuAI,
           },
-          body: jsonEncode({'action': 'toan_van', 'text': vanBan}),
+          body: jsonEncode({
+            'action': 'toan_van',
+            'text': vanBan,
+            'vungDaXuLy': vungDaXuLy.map((v) => v.toJson()).toList(),
+            'chenDauCau': chenDauCau,
+            if (khoangKyTu != null) 'doDaiMin': khoangKyTu.$1,
+            if (khoangKyTu != null) 'doDaiMax': khoangKyTu.$2,
+            'cauLenhTuyChinh': cauLenhTuyChinh,
+          }),
         )
         .timeout(const Duration(seconds: 60));
 
@@ -127,6 +167,38 @@ class DichVuKiemTraToanVan {
       canXoa.add(CanXoaMuc(doan: doan, viTri: viTri));
     }
 
-    return KetQuaKiemTraToanVan(chinhTa: chinhTa, khongPhuHop: khongPhuHop, canXoa: canXoa);
+    // Không cho phép bất kỳ mục mới nào (kể cả dấu câu) chồng lấn lên vùng
+    // ĐÃ XỬ LÝ gửi kèm — lưới bảo vệ phía app, đề phòng AI lỡ không tuân
+    // theo chỉ dẫn trong prompt (mục 1).
+    bool chongLenVungDaXuLy(int batDau, int ketThuc) =>
+        vungDaXuLy.any((v) => batDau < v.ketThuc && ketThuc > v.batDau);
+
+    chinhTa.removeWhere((c) => chongLenVungDaXuLy(c.viTri, c.viTri + c.tu.length));
+    khongPhuHop.removeWhere((k) => chongLenVungDaXuLy(k.viTri, k.viTri + k.doan.length));
+    canXoa.removeWhere((x) => chongLenVungDaXuLy(x.viTri, x.viTri + x.doan.length));
+
+    final dauCauMoi = <DauCauMoiToanVanMuc>[];
+    if (chenDauCau) {
+      for (final m in (doiTuong['dauCauMoi'] as List<dynamic>? ?? const [])) {
+        if (m is! Map<String, dynamic>) continue;
+        final dauCau = m['dauCau'] as String? ?? '';
+        if (dauCau.isEmpty) continue;
+        final viTri = m['viTri'] as int? ?? -1;
+        if (viTri < 0 || viTri > vanBan.length) continue;
+        if (chongLenVungDaXuLy(viTri, viTri)) continue;
+        // Không được rơi vào trong một cụm "chinhTa" vừa tìm được — dấu câu
+        // bên trong cụm lỗi phải nằm trong đề xuất sửa của chính cụm đó.
+        final chongLoi = chinhTa.any((c) => viTri >= c.viTri && viTri <= c.viTri + c.tu.length);
+        if (chongLoi) continue;
+        dauCauMoi.add(DauCauMoiToanVanMuc(dauCau: dauCau, viTri: viTri));
+      }
+    }
+
+    return KetQuaKiemTraToanVan(
+      chinhTa: chinhTa,
+      khongPhuHop: khongPhuHop,
+      canXoa: canXoa,
+      dauCauMoi: dauCauMoi,
+    );
   }
 }

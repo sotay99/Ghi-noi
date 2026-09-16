@@ -34,14 +34,39 @@ class LoiChinhTa {
       );
 }
 
+/// Một dấu câu AI đề xuất chèn thêm — vị trí tính TRÊN ĐÚNG đoạn văn gửi lên
+/// (đã trừ ngữ cảnh), giống [LoiChinhTa.batDau].
+class DauCauMoiChinhTa {
+  const DauCauMoiChinhTa({required this.dauCau, required this.viTri});
+  final String dauCau;
+  final int viTri;
+}
+
+/// Kết quả một lượt kiểm tra chính tả tự động — có thể gồm lỗi chính tả,
+/// dấu câu mới đề xuất chèn, hoặc cả hai, tuỳ theo cờ [layLoiChinhTa]/
+/// [chenDauCau] lúc gọi.
+class KetQuaKiemTraChinhTaMoi {
+  const KetQuaKiemTraChinhTaMoi({required this.loi, required this.dauCauMoi});
+  final List<LoiChinhTa> loi;
+  final List<DauCauMoiChinhTa> dauCauMoi;
+}
+
 class DichVuKiemTraChinhTa {
   /// Gửi [doan] (phần văn bản CHƯA từng kiểm tra) lên máy chủ AI, kèm tối đa
   /// [nguCanh] ký tự văn bản NGAY TRƯỚC đó làm ngữ cảnh — AI đọc để hiểu mạch
   /// văn nhưng không báo lỗi trong phần này, tránh gửi một câu cộc lốc khiến
-  /// AI bỏ sót lỗi hoặc đề xuất không hợp ngữ cảnh. Trả về danh sách lỗi với
-  /// vị trí tính TRÊN ĐÚNG [doan] (đã trừ hết phần ngữ cảnh), chưa cộng dồn
-  /// vào vị trí thật trong toàn bài — việc đó do nơi gọi tự cộng thêm.
-  Future<List<LoiChinhTa>> kiemTra(String doan, {String nguCanh = ''}) async {
+  /// AI bỏ sót lỗi hoặc đề xuất không hợp ngữ cảnh. [layLoiChinhTa] tắt thì
+  /// không hỏi AI tìm lỗi chính tả nữa (chỉ dùng khi "Tự động chèn dấu câu"
+  /// bật riêng lẻ); [chenDauCau] bật thì AI còn tìm thêm dấu câu còn thiếu.
+  /// Trả về vị trí tính TRÊN ĐÚNG [doan] (đã trừ hết phần ngữ cảnh), chưa
+  /// cộng dồn vào vị trí thật trong toàn bài — việc đó do nơi gọi tự cộng
+  /// thêm.
+  Future<KetQuaKiemTraChinhTaMoi> kiemTra(
+    String doan, {
+    String nguCanh = '',
+    bool layLoiChinhTa = true,
+    bool chenDauCau = false,
+  }) async {
     final ghep = nguCanh + doan;
     final phanHoi = await http
         .post(
@@ -54,6 +79,8 @@ class DichVuKiemTraChinhTa {
             'action': 'chinh_ta',
             'text': ghep,
             'boQuaTruocViTri': nguCanh.length,
+            'layLoiChinhTa': layLoiChinhTa,
+            'chenDauCau': chenDauCau,
           }),
         )
         .timeout(const Duration(seconds: 25));
@@ -76,9 +103,10 @@ class DichVuKiemTraChinhTa {
           .trim();
     }
 
-    final ds = jsonDecode(sach) as List<dynamic>;
-    final ketQua = <LoiChinhTa>[];
-    for (final phanTu in ds) {
+    final doiTuong = jsonDecode(sach) as Map<String, dynamic>;
+
+    final ketQuaLoi = <LoiChinhTa>[];
+    for (final phanTu in (doiTuong['chinhTa'] as List<dynamic>? ?? const [])) {
       if (phanTu is! Map<String, dynamic>) continue;
       final tu = phanTu['tu'] as String? ?? '';
       if (tu.isEmpty) continue;
@@ -103,13 +131,29 @@ class DichVuKiemTraChinhTa {
           .toList();
       if (deXuat.isEmpty) continue;
 
-      ketQua.add(LoiChinhTa(
+      ketQuaLoi.add(LoiChinhTa(
         batDau: viTri,
         ketThuc: viTri + tu.length,
         tu: tu,
         deXuat: deXuat,
       ));
     }
-    return ketQua;
+
+    final ketQuaDauCau = <DauCauMoiChinhTa>[];
+    for (final phanTu in (doiTuong['dauCauMoi'] as List<dynamic>? ?? const [])) {
+      if (phanTu is! Map<String, dynamic>) continue;
+      final dauCau = phanTu['dauCau'] as String? ?? '';
+      if (dauCau.isEmpty) continue;
+      final viTri = (phanTu['viTri'] as int? ?? -1) - nguCanh.length;
+      if (viTri < 0 || viTri > doan.length) continue;
+      // Dấu câu KHÔNG được nằm trong một vùng lỗi chính tả vừa tìm được —
+      // dấu câu bên trong một cụm lỗi phải nằm trong "deXuat" của chính lỗi
+      // đó, không tách riêng ra.
+      final chongLoi = ketQuaLoi.any((l) => viTri >= l.batDau && viTri <= l.ketThuc);
+      if (chongLoi) continue;
+      ketQuaDauCau.add(DauCauMoiChinhTa(dauCau: dauCau, viTri: viTri));
+    }
+
+    return KetQuaKiemTraChinhTaMoi(loi: ketQuaLoi, dauCauMoi: ketQuaDauCau);
   }
 }

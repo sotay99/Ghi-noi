@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'mo_hinh.dart';
 
 /// Độ dài tối đa của tên thư mục/ghi chú.
-const doDaiTenToiDa = 50;
+const doDaiTenToiDa = 100;
 
 /// Ký tự bị cấm trong tên thư mục/ghi chú — đúng bộ ký tự Windows cấm dùng
 /// trong tên file, chặt nhất trong các hệ điều hành phổ biến nên áp dụng

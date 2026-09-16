@@ -11,6 +11,10 @@ class CaiDat {
   static const _khoaPhimTatBoBienDoi = 'ghi_noi_phim_tat_bo_bien_doi';
   static const _khoaPhimTatPhim = 'ghi_noi_phim_tat_phim';
   static const _khoaThoiGianTuTatMicro = 'ghi_noi_thoi_gian_tu_tat_micro_giay';
+  static const _khoaTuDongChenDauCau = 'ghi_noi_tu_dong_chen_dau_cau_ai';
+  static const _khoaMucDoDaiDeXuat = 'ghi_noi_muc_do_dai_de_xuat';
+  static const _khoaCauLenhTuyChinhKiemTraToanVan =
+      'ghi_noi_cau_lenh_tuy_chinh_kiem_tra_toan_van';
 
   /// Số giây chờ, kể từ lúc người dùng ngừng gõ phím, tới khi micro tự bật
   /// lại. Mặc định 1 giây.
@@ -31,6 +35,39 @@ class CaiDat {
   /// Mặc định BẬT.
   bool kiemTraChinhTaBangAI = true;
 
+  /// Có tự gọi AI chèn dấu câu còn thiếu vào giữa các đoạn văn hay không.
+  /// Mặc định BẬT.
+  bool tuDongChenDauCauBangAI = true;
+
+  /// Mức độ dài của từng đoạn văn được AI đề xuất khi "Kiểm tra toàn văn",
+  /// chỉ số 0-4 tương ứng Rất ngắn/Ngắn/Trung bình/Dài/Rất dài. Mặc định 2
+  /// (Trung bình).
+  int mucDoDaiDeXuat = 2;
+
+  /// Câu lệnh riêng của người dùng, gửi kèm chỉ dẫn hệ thống mỗi khi bấm
+  /// "Kiểm tra toàn văn". Mặc định rỗng (không có).
+  String cauLenhTuyChinhKiemTraToanVan = '';
+
+  /// Giới hạn độ dài của [cauLenhTuyChinhKiemTraToanVan].
+  static const gioiHanCauLenhTuyChinh = 500;
+
+  /// Khoảng ký tự (min, max) tham khảo cho từng mức của [mucDoDaiDeXuat].
+  static const List<(int, int)> khoangKyTuTheoMucDoDaiDeXuat = [
+    (4, 8), // Rất ngắn
+    (8, 14), // Ngắn
+    (12, 20), // Trung bình
+    (20, 34), // Dài
+    (34, 56), // Rất dài
+  ];
+
+  static const List<String> tenMucDoDaiDeXuat = [
+    'Rất ngắn',
+    'Ngắn',
+    'Trung bình',
+    'Dài',
+    'Rất dài',
+  ];
+
   /// Phím tắt tắt/mở micro: một tổ hợp bộ biến đổi ('Ctrl' hoặc 'Alt') và
   /// một phím khác đi kèm. Mặc định Ctrl + F. Chỉ có tác dụng khi máy có gắn
   /// bàn phím vật lý (bao gồm bàn phím rời cắm vào máy tính bảng).
@@ -46,6 +83,9 @@ class CaiDat {
     phimTatPhim = kho.getString(_khoaPhimTatPhim) ?? 'F';
     thoiGianTuTatMicroGiay =
         (kho.getInt(_khoaThoiGianTuTatMicro) ?? 45).clamp(gioiHanDuoiTuTatMicro, gioiHanTrenTuTatMicro);
+    tuDongChenDauCauBangAI = kho.getBool(_khoaTuDongChenDauCau) ?? true;
+    mucDoDaiDeXuat = (kho.getInt(_khoaMucDoDaiDeXuat) ?? 2).clamp(0, 4);
+    cauLenhTuyChinhKiemTraToanVan = kho.getString(_khoaCauLenhTuyChinhKiemTraToanVan) ?? '';
   }
 
   Future<void> datThoiGianBatLai(double giay) async {
@@ -79,4 +119,26 @@ class CaiDat {
     final kho = await SharedPreferences.getInstance();
     await kho.setInt(_khoaThoiGianTuTatMicro, thoiGianTuTatMicroGiay);
   }
+
+  Future<void> datTuDongChenDauCauBangAI(bool bat) async {
+    tuDongChenDauCauBangAI = bat;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setBool(_khoaTuDongChenDauCau, bat);
+  }
+
+  Future<void> datMucDoDaiDeXuat(int mucDo) async {
+    mucDoDaiDeXuat = mucDo.clamp(0, 4);
+    final kho = await SharedPreferences.getInstance();
+    await kho.setInt(_khoaMucDoDaiDeXuat, mucDoDaiDeXuat);
+  }
+
+  Future<void> datCauLenhTuyChinhKiemTraToanVan(String cauLenh) async {
+    cauLenhTuyChinhKiemTraToanVan = cauLenh;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setString(_khoaCauLenhTuyChinhKiemTraToanVan, cauLenh);
+  }
+
+  /// Trả về khoảng (min, max) ký tự tham khảo cho mức độ dài hiện tại.
+  (int, int) khoangKyTuDeXuatHienTai() =>
+      khoangKyTuTheoMucDoDaiDeXuat[mucDoDaiDeXuat.clamp(0, 4)];
 }

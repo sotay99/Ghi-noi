@@ -38,7 +38,7 @@ export default {
       return traLoi({ loi: 'Worker chưa được cấu hình GEMINI_API_KEY.' }, 500);
     }
 
-    const { action, text, cauHoi } = than;
+    const { action, text, cauHoi, boQuaTruocViTri, layLoiChinhTa, chenDauCau } = than;
 
     if (action === 'ghi_am') {
       const { audioBase64, mimeType } = than;
@@ -62,7 +62,18 @@ export default {
       return traLoi({ loi: 'Văn bản quá dài (tối đa 20.000 ký tự).' }, 400);
     }
 
-    const huongDan = huongDanTheoHanhDong(action, cauHoi);
+    let huongDan;
+    if (action === 'chinh_ta') {
+      huongDan = huongDanChinhTa(
+        Number.isInteger(boQuaTruocViTri) && boQuaTruocViTri > 0 ? boQuaTruocViTri : 0,
+        layLoiChinhTa !== false,
+        chenDauCau === true,
+      );
+    } else if (action === 'toan_van') {
+      huongDan = huongDanToanVan(than);
+    } else {
+      huongDan = huongDanTheoHanhDong(action, cauHoi);
+    }
     if (!huongDan) {
       return traLoi({ loi: `Không hỗ trợ action: "${action}".` }, 400);
     }
@@ -75,6 +86,13 @@ export default {
     }
   },
 };
+
+/// Đoạn hướng dẫn DÙNG CHUNG cho mọi nơi AI sửa chính tả — xem cùng khối này
+/// trong `cloud-function/index.js` (bản chính, hai nơi phải khớp nhau).
+const QUY_TAC_CHINH_TA_CHUNG =
+  'QUY TẮC SỬA CHÍNH TẢ: Ưu tiên đề xuất sửa NGUYÊN CỤM TỪ thay vì từng từ đơn lẻ, kể cả khi trong cụm đó có từ vốn không sai chính tả — nếu cả cụm không hợp ngữ cảnh thì vẫn đề xuất thay cả cụm cho mạch lạc hơn là chỉ vá một từ. Sửa từng từ đơn lẻ vẫn được, khi đó là cách hợp lý nhất. ' +
+  'Văn bản là hỗn hợp chữ từ HAI nguồn: gõ tay và giọng nói (voice-to-text). Chữ GÕ TAY ít khi sai ngữ cảnh nhưng có thể gõ nhầm phím thành từ sai chính tả. Chữ GIỌNG NÓI hầu như không bao giờ sai chính tả (bộ nhận dạng luôn trả về từ có nghĩa) nhưng RẤT DỄ sai NGỮ CẢNH vì nghe nhầm âm gần giống — ví dụ "con trỏ văn bản" bị nhận nhầm thành "con chó văn bản". Hãy cảnh giác hơn với những cụm nghe giống nhau về âm nhưng lệch hẳn về nghĩa so với mạch văn xung quanh, đó là loại lỗi giọng nói hay mắc nhất. ' +
+  'Đề xuất thay thế được phép MANG THEO dấu câu bên trong nếu hợp lý, ví dụ "Nhà" có thể đề xuất thành "nhà," nếu sau đó là một mệnh đề khác, hoặc "người iu tới rùi" có thể đề xuất thành "Người yêu, tới rồi!".';
 
 /// Mỗi tính năng AI trong app ứng với một "hành động" ở đây. Muốn thêm tính
 /// năng mới thì thêm một case, không cần sửa gì khác.
@@ -90,18 +108,80 @@ function huongDanTheoHanhDong(action, cauHoi) {
       return 'Dựa vào đoạn văn bản tiếng Việt sau đây, đề xuất 3-5 ý tưởng hoặc hướng phát triển tiếp theo, trình bày dạng gạch đầu dòng, ngắn gọn:';
     case 'tro_chuyen':
       return `Người dùng đang hỏi về đoạn văn bản bên dưới. Câu hỏi của họ: "${(cauHoi || '').slice(0, 2000)}". Trả lời bằng tiếng Việt, ngắn gọn, đi thẳng vào vấn đề, dựa trên nội dung văn bản được cung cấp:`;
-    case 'chinh_ta':
-      return 'Bạn là bộ kiểm tra CHÍNH TẢ tiếng Việt (không kiểm tra ngữ pháp, không kiểm tra dấu câu, không kiểm tra văn phong). Tìm mọi TỪ SAI CHÍNH TẢ trong đoạn văn bản sau. Với mỗi từ sai, xác định: "tu" (đúng từ sai, nguyên vẹn như trong bài), "viTri" (vị trí ký tự đầu tiên của từ đó, đếm từ 0, tính trên ĐÚNG đoạn văn bản được cung cấp bên dưới — không đếm trên gì khác), và "deXuat" (tối đa 3 từ đúng chính tả để thay thế, từ gần nghĩa/gần âm nhất trước). CHỈ trả về một mảng JSON hợp lệ, không kèm lời giải thích, không bọc trong dấu ```, đúng khuôn: [{"tu":"...","viTri":0,"deXuat":["...","..."]}]. Không có lỗi nào thì trả về mảng rỗng []. Đoạn văn bản cần kiểm tra:';
-    case 'toan_van':
-      return 'Bạn là biên tập viên tiếng Việt, soát lại TOÀN BỘ văn bản sau đây một cách kỹ lưỡng. Trả về DUY NHẤT một object JSON hợp lệ (không giải thích, không bọc trong dấu ```), đúng khuôn:\n' +
-        '{"chinhTa":[{"tu":"...","viTri":0,"deXuat":["...","..."]}],"khongPhuHop":[{"doan":"...","viTri":0,"deXuat":"..."}],"canXoa":[{"doan":"...","viTri":0}]}\n' +
-        '- "chinhTa": các từ hoặc CỤM TỪ sai chính tả. "tu" là nguyên văn cụm sai, "viTri" là vị trí ký tự bắt đầu (đếm từ 0) TRÊN TOÀN BỘ văn bản được cung cấp, "deXuat" tối đa 3 cụm đúng để thay thế.\n' +
-        '- "khongPhuHop": các ĐOẠN VĂN (một câu hoặc vài câu liền nhau) không phù hợp — câu từ lủng củng, lạc đề so với toàn bài, thừa ý, lặp đi lặp lại, có quá nhiều lỗi chính tả trong cùng đoạn, hoặc nên dùng đoạn khác hay hơn để thay. "doan" là NGUYÊN VĂN đúng từng ký tự của đoạn đó như trong bài (kể cả dấu câu, khoảng trắng), "viTri" là vị trí ký tự bắt đầu của "doan" trên toàn bộ văn bản, "deXuat" là đoạn văn bạn đề xuất để thay thế toàn bộ đoạn đó.\n' +
-        '- "canXoa": các ĐOẠN VĂN nên xoá hẳn, không cần thay bằng gì (thừa hoàn toàn, không đóng góp gì cho bài). "doan" là nguyên văn đoạn đó, "viTri" là vị trí ký tự bắt đầu.\n' +
-        'Mọi "viTri" đều đếm trên văn bản GỐC (chưa sửa gì). Loại nào không có gì thì để mảng rỗng []. Văn bản cần kiểm tra:';
     default:
       return null;
   }
+}
+
+function huongDanChinhTa(boQuaTruocViTri, layLoiChinhTa, chenDauCau) {
+  let huongDan = '';
+  if (layLoiChinhTa) {
+    huongDan += 'Bạn là bộ kiểm tra CHÍNH TẢ tiếng Việt (không kiểm tra ngữ pháp, không kiểm tra văn phong). ' + QUY_TAC_CHINH_TA_CHUNG + ' ';
+  }
+  if (chenDauCau) {
+    huongDan += 'Bạn còn cần tìm những chỗ CÒN THIẾU dấu câu (chấm, phẩy, hỏi, than, chấm phẩy, hai chấm, ba chấm, ngoặc đơn, ngoặc kép, gạch ngang...) và đề xuất CHÈN THÊM vào, không phải sửa từ sai — dấu câu nằm trong một cụm sai chính tả thì phải nằm trong "deXuat" của "chinhTa" đó, không tách riêng thành "dauCauMoi". ';
+  }
+  huongDan +=
+    `Văn bản bên dưới gồm hai phần ghép liền nhau: ${boQuaTruocViTri} ký tự ĐẦU TIÊN là NGỮ CẢNH (câu/đoạn phía trước, chỉ để bạn hiểu mạch văn và xét đúng nghĩa của từ — TUYỆT ĐỐI không tìm lỗi hay báo lỗi nằm trong phần này), phần CÒN LẠI (từ ký tự thứ ${boQuaTruocViTri} trở đi) mới là đoạn thật sự cần soát. ` +
+    'Dựa vào cả ngữ cảnh lẫn nghĩa của câu để hiểu đúng ý người viết trước khi kết luận — đừng chỉ nhìn từng từ riêng lẻ tách rời câu. Mọi "viTri" đếm từ 0 trên TOÀN BỘ văn bản được cung cấp bên dưới (tính luôn phần ngữ cảnh phía trước, không đếm lại từ đầu phần cần soát). ';
+  if (layLoiChinhTa) {
+    huongDan += 'Với mỗi lỗi chính tả, xác định: "tu" (đúng từ HOẶC CỤM NHIỀU TỪ sai, nguyên vẹn như trong bài), "viTri", và "deXuat" (tối đa 5 từ/cụm đúng để thay thế, xếp từ hợp ngữ cảnh nhất trước; so sánh CHÍNH XÁC TỪNG KÝ TỰ, phân biệt hoa/thường: chỉ cấm đề xuất giống hệt "tu" từng ký tự một, kể cả khi chỉ khác nhau ở viết hoa chữ cái đầu vẫn là đề xuất hợp lệ). ';
+  }
+  const truong = [];
+  if (layLoiChinhTa) truong.push('"chinhTa":[{"tu":"...","viTri":0,"deXuat":["...","..."]}]');
+  if (chenDauCau) truong.push('"dauCauMoi":[{"dauCau":"...","viTri":0}]');
+  if (truong.length === 0) truong.push('"chinhTa":[]');
+  huongDan +=
+    `CHỈ trả về DUY NHẤT một object JSON hợp lệ, không kèm lời giải thích, không bọc trong dấu \`\`\`, đúng khuôn: {${truong.join(',')}}. ` +
+    (chenDauCau ? '"dauCauMoi.viTri" là vị trí ký tự chèn dấu câu vào NGAY TRƯỚC (chèn sau ký tự viTri-1, trước ký tự viTri). ' : '') +
+    'Loại nào không có gì thì để mảng rỗng []. Văn bản (ngữ cảnh + đoạn cần soát):';
+  return huongDan;
+}
+
+function huongDanToanVan(than) {
+  const chenDauCau = than.chenDauCau === true;
+  const vungDaXuLy = Array.isArray(than.vungDaXuLy) ? than.vungDaXuLy : [];
+  const doDaiMin = Number.isInteger(than.doDaiMin) ? than.doDaiMin : null;
+  const doDaiMax = Number.isInteger(than.doDaiMax) ? than.doDaiMax : null;
+  const cauLenhTuyChinh = typeof than.cauLenhTuyChinh === 'string' ? than.cauLenhTuyChinh.trim() : '';
+
+  let huongDan =
+    'Bạn là biên tập viên tiếng Việt, soát lại TOÀN BỘ văn bản sau đây một cách kỹ lưỡng. ' + QUY_TAC_CHINH_TA_CHUNG + ' ';
+
+  if (vungDaXuLy.length > 0) {
+    const ds = vungDaXuLy
+      .filter((v) => v && Number.isInteger(v.batDau) && Number.isInteger(v.ketThuc))
+      .map((v) => `[${v.batDau},${v.ketThuc})`)
+      .join(', ');
+    huongDan +=
+      `NGỮ CẢNH ĐÃ XỬ LÝ: các khoảng vị trí ký tự sau đây trên văn bản GỐC đã được xử lý xong ở lượt kiểm tra trước, TUYỆT ĐỐI không báo lỗi mới, không đề xuất "khongPhuHop"/"canXoa" mới, và không chèn "dauCauMoi" mới nằm trong hoặc chồng lấn bất kỳ khoảng nào trong số này — coi chúng là NGỮ CẢNH THAM KHẢO đã xong việc, không phải văn bản cần bạn can thiệp: ${ds}. `;
+  }
+
+  huongDan +=
+    'Trả về DUY NHẤT một object JSON hợp lệ (không giải thích, không bọc trong dấu ```), đúng khuôn:\n' +
+    '{"chinhTa":[{"tu":"...","viTri":0,"deXuat":["...","..."]}],"khongPhuHop":[{"doan":"...","viTri":0,"deXuat":"..."}],"canXoa":[{"doan":"...","viTri":0}]' +
+    (chenDauCau ? ',"dauCauMoi":[{"dauCau":"...","viTri":0}]}' : '}') + '\n' +
+    '- "chinhTa": các từ hoặc CỤM TỪ sai chính tả. "tu" là nguyên văn cụm sai, "viTri" là vị trí ký tự bắt đầu (đếm từ 0) TRÊN TOÀN BỘ văn bản được cung cấp, "deXuat" tối đa 3 cụm đúng để thay thế.\n' +
+    '- "khongPhuHop": các ĐOẠN VĂN (một câu hoặc vài câu liền nhau) không phù hợp — câu từ lủng củng, lạc đề so với toàn bài, thừa ý, lặp đi lặp lại, có quá nhiều lỗi chính tả trong cùng đoạn, hoặc nên dùng đoạn khác hay hơn để thay. "doan" là NGUYÊN VĂN đúng từng ký tự của đoạn đó như trong bài (kể cả dấu câu, khoảng trắng), "viTri" là vị trí ký tự bắt đầu của "doan" trên toàn bộ văn bản, "deXuat" là đoạn văn bạn đề xuất để thay thế toàn bộ đoạn đó.\n' +
+    '- "canXoa": các ĐOẠN VĂN nên xoá hẳn, không cần thay bằng gì (thừa hoàn toàn, không đóng góp gì cho bài). "doan" là nguyên văn đoạn đó, "viTri" là vị trí ký tự bắt đầu.\n';
+
+  if (chenDauCau) {
+    huongDan +=
+      '- "dauCauMoi": những chỗ CÒN THIẾU dấu câu mà bạn muốn CHÈN THÊM vào — không phải sửa từ sai. "dauCau" là chuỗi dấu câu cần chèn, "viTri" là vị trí ký tự (trên văn bản GỐC) ngay TRƯỚC chỗ chèn. TUYỆT ĐỐI không đặt "viTri" của "dauCauMoi" nằm bên trong khoảng ký tự của bất kỳ mục "chinhTa" nào.\n';
+  }
+
+  huongDan += 'Mọi "viTri" đều đếm trên văn bản GỐC (chưa sửa gì). Loại nào không có gì thì để mảng rỗng [].';
+
+  if (doDaiMin != null && doDaiMax != null) {
+    huongDan += ` Với mỗi đoạn "deXuat" trong "khongPhuHop": khoảng ${doDaiMin}-${doDaiMax} ký tự là ĐỘ DÀI THAM KHẢO mong muốn, không phải giới hạn cứng — có thể vượt ra ngoài nếu ngữ cảnh đòi hỏi, và đoạn đề xuất có thể NGẮN HƠN nhiều so với đoạn "doan" gốc nếu cô đọng lại hợp lý.`;
+  }
+
+  if (cauLenhTuyChinh) {
+    huongDan += `\n\nNGOÀI chỉ dẫn hệ thống ở trên, đây còn có CHỈ DẪN RIÊNG của người dùng — ưu tiên làm theo ý người dùng trước, nếu có xung đột với chỉ dẫn hệ thống thì theo ý người dùng: "${cauLenhTuyChinh.slice(0, 800)}"`;
+  }
+
+  huongDan += ' Văn bản cần kiểm tra:';
+  return huongDan;
 }
 
 async function goiGeminiAmThanh(env, audioBase64, mimeType) {
