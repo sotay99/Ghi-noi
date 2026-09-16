@@ -4,6 +4,7 @@
 // hẳn micro trong một giây rồi tự bật lại.
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -93,38 +94,50 @@ class _MucCanXoaToanVan extends _MucToanVan {
   final CanXoaMuc goc;
 }
 
-/// Màu và độ đậm gạch chân đỏ dưới từ/cụm từ sai chính tả — vẽ ở một
-/// CustomPainter riêng (`_veGachChanLoiChinhTa` trong TrangSoanThao), không
-/// còn gắn qua TextStyle.decoration nữa. Độ đậm 4 gấp đôi mức cũ (2), theo
-/// yêu cầu, nhìn rõ hơn hẳn.
-const _mauGachChanLoi = Colors.red;
+/// Màu/độ đậm của mỗi loại gạch chân LƯỢN SÓNG — tất cả vẽ ở một
+/// CustomPainter riêng (`_veCacDuongLuonSong` trong TrangSoanThao), không
+/// gắn qua TextStyle.decoration, để nét chữ đi xuống (g, ệ, ụ, q, y...) luôn
+/// đè lên được gạch chân thay vì bị che mất.
+const _mauGachChanLoi = Colors.red; // Từ/cụm từ sai chính tả — đậm.
 const _damGachChanLoi = 4.0;
+const _mauGachChanCanXoa = Colors.red; // Đoạn AI đề xuất xoá — mảnh.
+const _damGachChanCanXoa = 2.0;
 
-/// Vẽ một đường lượn sóng đỏ dưới mỗi hộp toạ độ trong [hop] — mỗi hộp ứng
-/// với một dòng của một từ/cụm từ AI báo sai chính tả (một cụm dài bị ngắt
-/// dòng thì có nhiều hộp, mỗi dòng một đường sóng riêng).
-class _VeGachChanLoiChinhTa extends CustomPainter {
-  _VeGachChanLoiChinhTa(this.hop);
-  final List<Rect> hop;
+/// Một đường lượn sóng cần vẽ: vùng toạ độ, màu, và độ đậm riêng — mỗi loại
+/// đánh dấu AI (lỗi chính tả, đoạn cần xoá...) có thể khác màu/độ đậm nhau,
+/// nên không dùng chung một màu/độ đậm cố định như bản trước.
+class _DuongLuonSong {
+  const _DuongLuonSong({required this.hop, required this.mau, required this.day});
+  final Rect hop;
+  final Color mau;
+  final double day;
+}
+
+/// Vẽ nhiều đường lượn sóng — mỗi đường ứng với một dòng của một vùng đánh
+/// dấu AI (một cụm dài bị ngắt xuống nhiều dòng thì có nhiều đường, mỗi dòng
+/// một đường sóng riêng, có thể khác màu/độ đậm nếu thuộc loại khác nhau).
+class _VeCacDuongLuonSong extends CustomPainter {
+  _VeCacDuongLuonSong(this.duong);
+  final List<_DuongLuonSong> duong;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final ve = Paint()
-      ..color = _mauGachChanLoi
-      ..strokeWidth = _damGachChanLoi
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
     const buocSong = 6.0;
     const bienDo = 2.5;
-    for (final h in hop) {
+    for (final d in duong) {
+      final ve = Paint()
+        ..color = d.mau
+        ..strokeWidth = d.day
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round;
+      final h = d.hop;
       final y = h.bottom - 1;
-      final duong = Path()..moveTo(h.left, y);
+      final net = Path()..moveTo(h.left, y);
       var x = h.left;
       var xuong = true;
       while (x < h.right) {
         final xTiep = (x + buocSong).clamp(h.left, h.right);
-        duong.quadraticBezierTo(
+        net.quadraticBezierTo(
           x + (xTiep - x) / 2,
           y + (xuong ? bienDo : -bienDo),
           xTiep,
@@ -133,12 +146,72 @@ class _VeGachChanLoiChinhTa extends CustomPainter {
         x = xTiep;
         xuong = !xuong;
       }
-      canvas.drawPath(duong, ve);
+      canvas.drawPath(net, ve);
     }
   }
 
   @override
-  bool shouldRepaint(covariant _VeGachChanLoiChinhTa cu) => true;
+  bool shouldRepaint(covariant _VeCacDuongLuonSong cu) => true;
+}
+
+// ------------------------------------------- mã hoá định dạng AI vào file
+
+/// Điểm bắt đầu khối định dạng AI (lỗi chính tả / đoạn không phù hợp / đoạn
+/// cần xoá) được mã hoá gắn ở CUỐI nội dung ghi chú lúc lưu — xem
+/// `_macDinhDangAi`/`_apDungDinhDangAi` trong `_TrangSoanThaoState`. Nhờ vậy
+/// những đánh dấu AI người dùng chưa quyết định vẫn còn nguyên khi thoát app
+/// rồi mở lại — kể cả một năm sau. Chuỗi cố ý lạ, khó lòng xuất hiện tình cờ
+/// trong một ghi chú bình thường.
+const _diemBatDauKhoiDinhDang = '\n§FLOWRITE-DINHDANG-V1§';
+
+/// Đoạn văn bản dài hơn ngần này thì đổi từ "chép nguyên văn" (chắc chắn
+/// tuyệt đối nhưng nặng dần theo độ dài) sang "mã băm" (nhẹ — độ dài cố
+/// định dù đoạn gốc dài bao nhiêu — và xác suất trùng giả gần như bằng
+/// không) khi lưu vào khối định dạng.
+const _nguongMaBamDinhDang = 20;
+
+/// Băm FNV-1a 32-bit — chỉ để XÁC MINH một đoạn văn bản còn nguyên vẹn hay
+/// không (không phải mục đích bảo mật), nên một thuật toán đơn giản, tự viết
+/// vài dòng, không cần thêm gói phụ thuộc nào là đủ.
+String _bamFnv1a(String chu) {
+  const soNguyenTo = 16777619;
+  const mat32Bit = 0xFFFFFFFF;
+  var h = 2166136261;
+  for (final donVi in chu.codeUnits) {
+    h = ((h ^ donVi) * soNguyenTo) & mat32Bit;
+  }
+  return h.toRadixString(16).padLeft(8, '0');
+}
+
+/// Đóng gói một vùng [batDau, batDau+dai) của [vanBan] thành một mục để lưu
+/// vào khối định dạng — chép nguyên văn nếu ngắn, băm nếu dài (xem
+/// `_nguongMaBamDinhDang`).
+Map<String, dynamic> _macVungDinhDang(String vanBan, int batDau, int dai) {
+  final chu = vanBan.substring(batDau, batDau + dai);
+  final m = <String, dynamic>{'vt': batDau, 'dai': dai};
+  if (dai <= _nguongMaBamDinhDang) {
+    m['chu'] = chu;
+  } else {
+    m['ham'] = _bamFnv1a(chu);
+  }
+  return m;
+}
+
+/// Xác minh một mục đã lưu còn ĐÚNG Y HỆT với [vanBan] hiện tại không — sai
+/// khuôn, lệch vị trí, hay nội dung khác đi dù chỉ một ký tự đều coi là
+/// KHÔNG khớp. Thà bỏ một định dạng còn hơn hiển thị sai chỗ.
+bool _khopVungDinhDang(String vanBan, Map<String, dynamic>? m) {
+  if (m == null) return false;
+  final batDau = m['vt'];
+  final dai = m['dai'];
+  if (batDau is! int || dai is! int) return false;
+  if (batDau < 0 || dai < 0 || batDau + dai > vanBan.length) return false;
+  final chuThat = vanBan.substring(batDau, batDau + dai);
+  final chuLuu = m['chu'];
+  if (chuLuu is String) return chuThat == chuLuu;
+  final hamLuu = m['ham'];
+  if (hamLuu is String) return _bamFnv1a(chuThat) == hamLuu;
+  return false;
 }
 
 /// Bộ điều khiển ô văn bản riêng — vẽ mọi đánh dấu AI ngay trong văn bản:
@@ -208,11 +281,15 @@ class _BoDieuKhienChinhTa extends TextEditingController {
           vung.add(_VungVe(
             batDau: k.batDauGoc,
             ketThuc: k.ketThucGoc,
+            // Đoạn CẦN THAY THẾ: chữ đỏ, gạch giữa thân màu VÀNG đậm (gấp đôi
+            // mức mảnh trước đây, bằng đúng độ đậm gạch chân lượn sóng lỗi
+            // chính tả) — theo yêu cầu, để phân biệt hẳn với gạch chân lượn
+            // sóng đỏ mảnh của đoạn CẦN XOÁ bên dưới.
             style: TextStyle(
               color: Colors.red.shade700,
               decoration: TextDecoration.lineThrough,
-              decorationColor: Colors.red.shade700,
-              decorationThickness: 2,
+              decorationColor: Colors.amber.shade800,
+              decorationThickness: _damGachChanLoi,
             ),
           ));
         }
@@ -220,11 +297,18 @@ class _BoDieuKhienChinhTa extends TextEditingController {
           vung.add(_VungVe(
             batDau: k.batDauDeXuat,
             ketThuc: k.ketThucDeXuat,
+            // Đoạn ĐỀ XUẤT THAY THẾ: chữ xanh dương, gạch chân xanh dương —
+            // vẫn mảnh như cũ, chỉ đổi từ thẳng sang LƯỢN SÓNG. Đây là gạch
+            // chân DUY NHẤT trong cả bốn loại còn để Flutter tự vẽ thẳng qua
+            // TextStyle (không cần lớp riêng) vì không có nét chữ đi xuống
+            // nào của MÀU XANH bị che — chỉ chữ đỏ (chính tả/cần xoá) mới cần
+            // lớp riêng do gạch chân đậm hơn hẳn nét chữ.
             style: TextStyle(
               color: Colors.blue.shade700,
               decoration: TextDecoration.underline,
               decorationColor: Colors.blue.shade700,
               decorationThickness: 2,
+              decorationStyle: TextDecorationStyle.wavy,
             ),
             recognizer: TapGestureRecognizer()
               ..onTapDown = (ct) => khiBamDoanKhongPhuHop?.call(k, ct.globalPosition),
@@ -248,14 +332,20 @@ class _BoDieuKhienChinhTa extends TextEditingController {
     for (final x in canXoa) {
       if (x.batDau < 0 || x.ketThuc > vb.length || x.batDau >= x.ketThuc) continue;
       if (!x.dangNhapNhay) {
+        // Đoạn CẦN XOÁ: cùng giao diện chữ đỏ + gạch giữa thân vàng đậm như
+        // đoạn CẦN THAY THẾ ở trên, CỘNG THÊM một gạch chân lượn sóng đỏ
+        // mảnh riêng (vẽ ở lớp dưới, xem `_veCacDuongLuonSong`) để phân biệt
+        // với đoạn cần thay thế — TextStyle chỉ vẽ được MỘT kiểu gạch mỗi
+        // lúc nên gạch chân phải tách ra lớp riêng, không ghép chung được
+        // với gạch giữa thân ở đây.
         vung.add(_VungVe(
           batDau: x.batDau,
           ketThuc: x.ketThuc,
           style: TextStyle(
             color: Colors.red.shade700,
             decoration: TextDecoration.lineThrough,
-            decorationColor: Colors.red.shade700,
-            decorationThickness: 2,
+            decorationColor: Colors.amber.shade800,
+            decorationThickness: _damGachChanLoi,
           ),
           recognizer: TapGestureRecognizer()
             ..onTapDown = (ct) => khiBamDoanCanXoa?.call(x, ct.globalPosition),
@@ -518,20 +608,24 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
-  /// Gạch chân đỏ, lượn sóng, dưới mỗi từ/cụm từ AI báo sai chính tả — vẽ ở
-  /// một lớp RIÊNG nằm DƯỚI chữ (xem giải thích ở nơi ghép layer trong
-  /// `build`), thay vì gắn qua TextStyle.decoration như trước. TextStyle
-  /// .decoration vẽ CÙNG một lượt với chữ nên có lúc đè lên cả nét đi xuống
-  /// của chữ (g, ệ, ụ, q, y...) — tách thành lớp riêng, vẽ trước rồi để chữ
-  /// vẽ đè lên sau, thì nét đi xuống luôn luôn nổi trên gạch chân, không bao
-  /// giờ bị che.
+  /// Mọi gạch chân LƯỢN SÓNG của các đánh dấu AI — từ/cụm từ sai chính tả
+  /// (đỏ, đậm) và đoạn AI đề xuất xoá (đỏ, mảnh) — vẽ chung ở một lớp RIÊNG
+  /// nằm DƯỚI chữ (xem giải thích ở nơi ghép layer trong `build`), thay vì
+  /// gắn qua TextStyle.decoration. TextStyle.decoration vẽ CÙNG một lượt với
+  /// chữ nên có lúc đè lên cả nét đi xuống của chữ (g, ệ, ụ, q, y...) — tách
+  /// thành lớp riêng, vẽ trước rồi để chữ vẽ đè lên sau, thì nét đi xuống
+  /// luôn luôn nổi trên gạch chân, không bao giờ bị che. Đoạn CẦN THAY THẾ
+  /// không có mặt ở đây — gạch giữa thân màu vàng của nó chỉ có MỘT kiểu
+  /// gạch nên vẽ thẳng qua TextStyle vẫn đủ, không cần lớp riêng.
   ///
   /// Dùng `RenderEditable.getBoxesForSelection` (cùng kỹ thuật với
-  /// `_chamCuoiVanBan`) để lấy đúng toạ độ THẬT của từng từ sai — kể cả khi
-  /// một cụm từ sai bị ngắt xuống hai dòng, hàm này tự trả về nhiều hộp,
-  /// mỗi dòng một hộp.
-  Widget _gachChanLoiChinhTa() {
-    if (_boDieuKhien.loi.isEmpty) return const SizedBox.shrink();
+  /// `_chamCuoiVanBan`) để lấy đúng toạ độ THẬT của từng vùng — kể cả khi
+  /// một cụm bị ngắt xuống nhiều dòng, hàm này tự trả về nhiều hộp, mỗi dòng
+  /// một hộp.
+  Widget _gachChanLuonSong() {
+    if (_boDieuKhien.loi.isEmpty && _boDieuKhien.canXoa.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     final hopVanBan = _oVanBanKey.currentContext?.findRenderObject();
     final khungBox = _khungVanBanKey.currentContext?.findRenderObject();
@@ -542,25 +636,38 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (re == null || !re.hasSize) return const SizedBox.shrink();
 
     final vb = _boDieuKhien.text;
-    final hop = <Rect>[];
-    for (final l in _boDieuKhien.loi) {
-      if (l.batDau < 0 || l.ketThuc > vb.length || l.batDau >= l.ketThuc) continue;
+    final duong = <_DuongLuonSong>[];
+
+    void themVung(int batDau, int ketThuc, Color mau, double day) {
+      if (batDau < 0 || ketThuc > vb.length || batDau >= ketThuc) return;
       try {
         for (final h in re.getBoxesForSelection(
-          TextSelection(baseOffset: l.batDau, extentOffset: l.ketThuc),
+          TextSelection(baseOffset: batDau, extentOffset: ketThuc),
         )) {
-          hop.add(Rect.fromPoints(
-            re.localToGlobal(Offset(h.left, h.top), ancestor: khungBox),
-            re.localToGlobal(Offset(h.right, h.bottom), ancestor: khungBox),
+          duong.add(_DuongLuonSong(
+            hop: Rect.fromPoints(
+              re.localToGlobal(Offset(h.left, h.top), ancestor: khungBox),
+              re.localToGlobal(Offset(h.right, h.bottom), ancestor: khungBox),
+            ),
+            mau: mau,
+            day: day,
           ));
         }
       } catch (_) {
-        // Bỏ qua từ này ở khung hình hiện tại — AnimatedBuilder sẽ tự vẽ lại.
+        // Bỏ qua vùng này ở khung hình hiện tại — AnimatedBuilder sẽ tự vẽ lại.
       }
     }
-    if (hop.isEmpty) return const SizedBox.shrink();
 
-    return CustomPaint(painter: _VeGachChanLoiChinhTa(hop));
+    for (final l in _boDieuKhien.loi) {
+      themVung(l.batDau, l.ketThuc, _mauGachChanLoi, _damGachChanLoi);
+    }
+    for (final x in _boDieuKhien.canXoa) {
+      if (x.dangNhapNhay) continue; // Đang nhấp nháy — không vẽ gạch chân.
+      themVung(x.batDau, x.ketThuc, _mauGachChanCanXoa, _damGachChanCanXoa);
+    }
+    if (duong.isEmpty) return const SizedBox.shrink();
+
+    return CustomPaint(painter: _VeCacDuongLuonSong(duong));
   }
 
   /// Lịch sử Lùi lại/Tiến tới. Mỗi điểm mốc là trạng thái TRỌN VẸN của bài
@@ -644,7 +751,19 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _boDieuKhien.khiBamDoanKhongPhuHop = _khiBamDoanKhongPhuHop;
     _boDieuKhien.khiBamDoanCanXoa = _khiBamDoanCanXoa;
 
-    final banDau = _ghiChuHienTai.noiDung;
+    // Nội dung lưu trữ có thể mang thêm một khối định dạng AI mã hoá ở cuối
+    // (xem `_macDinhDangAi`/`_apDungDinhDangAi`) — tách nó ra TRƯỚC khi đưa
+    // vào ô soạn thảo, để `_boDieuKhien.text` chỉ chứa đúng văn bản THẬT,
+    // không lộ khối mã hoá ra màn hình.
+    final rawNoiDung = _ghiChuHienTai.noiDung;
+    var banDau = rawNoiDung;
+    String? khoiDinhDang;
+    final viTriKhoi = rawNoiDung.indexOf(_diemBatDauKhoiDinhDang);
+    if (viTriKhoi >= 0) {
+      banDau = rawNoiDung.substring(0, viTriKhoi);
+      khoiDinhDang = rawNoiDung.substring(viTriKhoi + _diemBatDauKhoiDinhDang.length);
+    }
+
     if (banDau.isNotEmpty) {
       _ghiVaoO(banDau, banDau.length);
     } else {
@@ -655,6 +774,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     _neo = banDau.length;
     _viTriDaKiemTraChinhTa = banDau.length;
+    if (khoiDinhDang != null) _apDungDinhDangAi(khoiDinhDang);
 
     _khoiTaoMicro();
     // Lắng nghe TOÀN CỤC (không phụ thuộc widget nào đang giữ tiêu điểm) —
@@ -705,8 +825,113 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   // ---------------------------------------------------------------- lưu trữ
 
   Future<void> _luuVanBan() async {
-    widget.kho.suaNoiDungGhiChu(_ghiChuHienTai.id, _boDieuKhien.text);
+    final khoiDinhDang = _macDinhDangAi();
+    final noiDungLuu = khoiDinhDang == null
+        ? _boDieuKhien.text
+        : _boDieuKhien.text + _diemBatDauKhoiDinhDang + khoiDinhDang;
+    widget.kho.suaNoiDungGhiChu(_ghiChuHienTai.id, noiDungLuu);
     await widget.kho.luu();
+  }
+
+  /// Đóng gói mọi đánh dấu AI CÒN ĐANG CHỜ quyết định (lỗi chính tả, đoạn
+  /// không phù hợp, đoạn cần xoá) thành một chuỗi mã hoá base64 — trả về
+  /// null nếu không có gì để lưu, để một ghi chú sạch không phình thêm byte
+  /// nào cả. Mục đang nhấp nháy (vừa quyết định xong, hiệu ứng thoáng qua 4
+  /// giây) không được lưu — không còn ý nghĩa gì để giữ qua một lần mở lại.
+  String? _macDinhDangAi() {
+    final vb = _boDieuKhien.text;
+
+    final loiDs = _boDieuKhien.loi
+        .where((l) => l.batDau >= 0 && l.ketThuc <= vb.length && l.batDau < l.ketThuc)
+        .map((l) => {
+              ..._macVungDinhDang(vb, l.batDau, l.ketThuc - l.batDau),
+              'dx': l.deXuat,
+            })
+        .toList();
+
+    final kphDs = _boDieuKhien.khongPhuHop
+        .where((k) =>
+            k.nhapNhayMau == null &&
+            k.batDauGoc >= 0 &&
+            k.ketThucDeXuat <= vb.length &&
+            k.batDauGoc <= k.ketThucGoc &&
+            k.batDauDeXuat <= k.ketThucDeXuat)
+        .map((k) => {
+              'g': _macVungDinhDang(vb, k.batDauGoc, k.ketThucGoc - k.batDauGoc),
+              'd': _macVungDinhDang(vb, k.batDauDeXuat, k.ketThucDeXuat - k.batDauDeXuat),
+            })
+        .toList();
+
+    final cxDs = _boDieuKhien.canXoa
+        .where((x) =>
+            !x.dangNhapNhay && x.batDau >= 0 && x.ketThuc <= vb.length && x.batDau < x.ketThuc)
+        .map((x) => _macVungDinhDang(vb, x.batDau, x.ketThuc - x.batDau))
+        .toList();
+
+    if (loiDs.isEmpty && kphDs.isEmpty && cxDs.isEmpty) return null;
+
+    final goi = <String, dynamic>{};
+    if (loiDs.isNotEmpty) goi['loi'] = loiDs;
+    if (kphDs.isNotEmpty) goi['kph'] = kphDs;
+    if (cxDs.isNotEmpty) goi['cx'] = cxDs;
+
+    return base64Encode(utf8.encode(jsonEncode(goi)));
+  }
+
+  /// Ngược lại `_macDinhDangAi` — đọc lại khối mã hoá, XÁC MINH từng mục còn
+  /// khớp với văn bản hiện tại không, mục nào không khớp thì ÂM THẦM bỏ qua.
+  /// Không được để lỗi thoát ra ngoài — một khối hỏng (do app khác sửa file,
+  /// hay bất cứ lý do gì) không bao giờ được phép chặn việc mở ghi chú.
+  void _apDungDinhDangAi(String maHoa) {
+    try {
+      final goi = jsonDecode(utf8.decode(base64Decode(maHoa))) as Map<String, dynamic>;
+      final vb = _boDieuKhien.text;
+
+      for (final m in (goi['loi'] as List<dynamic>? ?? const [])) {
+        if (m is! Map<String, dynamic> || !_khopVungDinhDang(vb, m)) continue;
+        final batDau = m['vt'] as int;
+        final dai = m['dai'] as int;
+        final dx = ((m['dx'] as List<dynamic>?) ?? const [])
+            .map((e) => e.toString())
+            .where((e) => e.isNotEmpty)
+            .toList();
+        if (dx.isEmpty) continue;
+        _boDieuKhien.loi.add(LoiChinhTa(
+          batDau: batDau,
+          ketThuc: batDau + dai,
+          tu: vb.substring(batDau, batDau + dai),
+          deXuat: dx,
+        ));
+      }
+
+      for (final m in (goi['kph'] as List<dynamic>? ?? const [])) {
+        if (m is! Map<String, dynamic>) continue;
+        final g = m['g'];
+        final d = m['d'];
+        if (g is! Map<String, dynamic> || d is! Map<String, dynamic>) continue;
+        if (!_khopVungDinhDang(vb, g) || !_khopVungDinhDang(vb, d)) continue;
+        final gVt = g['vt'] as int;
+        final gDai = g['dai'] as int;
+        final dVt = d['vt'] as int;
+        final dDai = d['dai'] as int;
+        _boDieuKhien.khongPhuHop.add(_VungKhongPhuHop(
+          batDauGoc: gVt,
+          ketThucGoc: gVt + gDai,
+          batDauDeXuat: dVt,
+          ketThucDeXuat: dVt + dDai,
+        ));
+      }
+
+      for (final m in (goi['cx'] as List<dynamic>? ?? const [])) {
+        if (m is! Map<String, dynamic> || !_khopVungDinhDang(vb, m)) continue;
+        final batDau = m['vt'] as int;
+        final dai = m['dai'] as int;
+        _boDieuKhien.canXoa.add(_VungCanXoa(batDau: batDau, ketThuc: batDau + dai));
+      }
+    } catch (_) {
+      // Khối định dạng hỏng hoặc sai khuôn — bỏ hẳn, ghi chú vẫn mở bình
+      // thường với đúng phần văn bản thật, chỉ là không còn đánh dấu AI nào.
+    }
   }
 
   void _henLuu() {
@@ -1459,6 +1684,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         if (k.batDauDeXuat >= ketThucXoa) {
           k.batDauDeXuat += lech;
           k.ketThucDeXuat += lech;
+        } else if (vitri >= k.batDauDeXuat &&
+            ketThucXoa <= k.ketThucDeXuat &&
+            k.nhapNhayMau == null) {
+          // Sửa NẰM TRỌN bên trong đoạn đề xuất (xanh) — người dùng đang tự
+          // tay chỉnh sửa đề xuất của AI (gõ tay/nói/xoá bớt sau khi bấm vào
+          // đoạn xanh, xem `_khiBamDoanKhongPhuHop`). GIÃN đoạn đề xuất theo
+          // đúng phần vừa thêm/bớt thay vì bỏ cả mục — để lúc bấm "Dùng đề
+          // xuất này", đúng bản đã sửa (không phải bản AI trả về ban đầu) là
+          // cái được giữ lại.
+          k.ketThucDeXuat += lech;
         } else if (k.ketThucDeXuat > vitri) {
           bo = true;
         }
@@ -1850,7 +2085,30 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 
   /// Người dùng bấm vào đoạn ĐỀ XUẤT (xanh) cạnh một đoạn "không phù hợp".
+  /// Đổi toạ độ MÀN HÌNH (nơi ngón tay vừa chạm) thành đúng vị trí ký tự
+  /// trong bài, rồi đặt con trỏ ngay đó — dùng `RenderEditable
+  /// .getPositionForPoint` (nhận thẳng toạ độ toàn cục, không cần tự quy
+  /// đổi hệ trục). Chỉ áp dụng cho đoạn ĐỀ XUẤT THAY THẾ (xanh dương): người
+  /// dùng bấm vào để mở menu, NHƯNG cũng có thể bấm xong rồi tự tay gõ/nói
+  /// thêm để sửa lại đúng đề xuất đó trước khi quyết định — con trỏ phải
+  /// nằm sẵn đúng chỗ thì mới gõ/nói chèn đúng vào đó được.
+  void _datConTroTaiDiemCham(Offset viTriManHinh) {
+    final hopVanBan = _oVanBanKey.currentContext?.findRenderObject();
+    if (hopVanBan == null) return;
+    final re = _timRenderEditable(hopVanBan);
+    if (re == null || !re.hasSize) return;
+    try {
+      final viTri = re.getPositionForPoint(viTriManHinh);
+      if (!_oChu.hasFocus) _oChu.requestFocus();
+      _boDieuKhien.selection = TextSelection.collapsed(offset: viTri.offset);
+    } catch (_) {
+      // Render object chưa ổn định (đổi kích thước giữa chừng) — bỏ qua,
+      // không chặn việc mở menu bên dưới.
+    }
+  }
+
   Future<void> _khiBamDoanKhongPhuHop(_VungKhongPhuHop v, Offset viTriManHinh) async {
+    _datConTroTaiDiemCham(viTriManHinh);
     final chon = await showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -2372,7 +2630,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                             child: AnimatedBuilder(
                               animation: _boDieuKhien,
                               builder: (context, _) => Stack(
-                                children: [_gachChanLoiChinhTa()],
+                                children: [_gachChanLuonSong()],
                               ),
                             ),
                           ),
