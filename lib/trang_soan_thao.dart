@@ -94,31 +94,41 @@ class _MucCanXoaToanVan extends _MucToanVan {
   final CanXoaMuc goc;
 }
 
-/// Màu/độ đậm của mỗi loại gạch chân LƯỢN SÓNG — tất cả vẽ ở một
-/// CustomPainter riêng (`_veCacDuongLuonSong` trong TrangSoanThao), không
-/// gắn qua TextStyle.decoration, để nét chữ đi xuống (g, ệ, ụ, q, y...) luôn
-/// đè lên được gạch chân thay vì bị che mất.
-const _mauGachChanLoi = Colors.red; // Từ/cụm từ sai chính tả — đậm.
+/// Màu/độ đậm của mỗi loại gạch đánh dấu AI — tất cả vẽ ở một CustomPainter
+/// riêng (`_veDanhDauAi` trong TrangSoanThao), không gắn qua
+/// TextStyle.decoration, để chữ (kể cả nét đi xuống của g, ệ, ụ, q, y...)
+/// luôn vẽ ĐÈ LÊN các gạch này chứ không phải ngược lại.
+const _mauGachChanLoi = Colors.red; // Lượn sóng, dưới từ/cụm từ sai chính tả — đậm.
 const _damGachChanLoi = 4.0;
-const _mauGachChanCanXoa = Colors.red; // Đoạn AI đề xuất xoá — mảnh.
+const _mauGachChanCanXoa = Colors.red; // Lượn sóng, dưới đoạn AI đề xuất xoá — mảnh.
 const _damGachChanCanXoa = 2.0;
+const _mauGachGiuaThan = Color(0xFFFF8F00); // Thẳng, giữa thân — vàng đậm (Colors.amber.shade800).
 
-/// Một đường lượn sóng cần vẽ: vùng toạ độ, màu, và độ đậm riêng — mỗi loại
-/// đánh dấu AI (lỗi chính tả, đoạn cần xoá...) có thể khác màu/độ đậm nhau,
-/// nên không dùng chung một màu/độ đậm cố định như bản trước.
-class _DuongLuonSong {
-  const _DuongLuonSong({required this.hop, required this.mau, required this.day});
+/// Một đường đánh dấu AI cần vẽ: vùng toạ độ, màu, độ đậm, kiểu lượn
+/// sóng/thẳng, và vị trí đáy dòng/giữa thân — đủ tham số để dùng chung một
+/// painter cho cả gạch chân (lỗi chính tả, đoạn cần xoá) lẫn gạch giữa thân
+/// (đoạn cần thay thế/cần xoá).
+class _DuongDanhDauAi {
+  const _DuongDanhDauAi({
+    required this.hop,
+    required this.mau,
+    required this.day,
+    this.lienSong = true,
+    this.giuaThan = false,
+  });
   final Rect hop;
   final Color mau;
   final double day;
+  final bool lienSong;
+  final bool giuaThan;
 }
 
-/// Vẽ nhiều đường lượn sóng — mỗi đường ứng với một dòng của một vùng đánh
-/// dấu AI (một cụm dài bị ngắt xuống nhiều dòng thì có nhiều đường, mỗi dòng
-/// một đường sóng riêng, có thể khác màu/độ đậm nếu thuộc loại khác nhau).
-class _VeCacDuongLuonSong extends CustomPainter {
-  _VeCacDuongLuonSong(this.duong);
-  final List<_DuongLuonSong> duong;
+/// Vẽ nhiều đường đánh dấu AI — mỗi đường ứng với một dòng của một vùng (một
+/// cụm dài bị ngắt xuống nhiều dòng thì có nhiều đường, mỗi dòng một đường
+/// riêng, có thể khác màu/độ đậm/kiểu nếu thuộc loại khác nhau).
+class _VeDanhDauAi extends CustomPainter {
+  _VeDanhDauAi(this.duong);
+  final List<_DuongDanhDauAi> duong;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -131,7 +141,11 @@ class _VeCacDuongLuonSong extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round;
       final h = d.hop;
-      final y = h.bottom - 1;
+      final y = d.giuaThan ? (h.top + h.bottom) / 2 : h.bottom - 1;
+      if (!d.lienSong) {
+        canvas.drawLine(Offset(h.left, y), Offset(h.right, y), ve);
+        continue;
+      }
       final net = Path()..moveTo(h.left, y);
       var x = h.left;
       var xuong = true;
@@ -151,7 +165,7 @@ class _VeCacDuongLuonSong extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _VeCacDuongLuonSong cu) => true;
+  bool shouldRepaint(covariant _VeDanhDauAi cu) => true;
 }
 
 // ------------------------------------------- mã hoá định dạng AI vào file
@@ -278,19 +292,14 @@ class _BoDieuKhienChinhTa extends TextEditingController {
       if (k.batDauGoc < 0 || k.ketThucDeXuat > vb.length) continue;
       if (k.nhapNhayMau == null) {
         if (k.batDauGoc < k.ketThucGoc) {
+          // Đoạn CẦN THAY THẾ: chữ đỏ. Gạch giữa thân màu VÀNG đậm KHÔNG còn
+          // gắn qua TextStyle.decoration nữa — vẽ ở lớp riêng NẰM DƯỚI chữ
+          // (xem `_veDanhDauAi`), để chữ đỏ luôn đè lên gạch vàng, không bị
+          // gạch che mất (layer chồng layer, đúng yêu cầu).
           vung.add(_VungVe(
             batDau: k.batDauGoc,
             ketThuc: k.ketThucGoc,
-            // Đoạn CẦN THAY THẾ: chữ đỏ, gạch giữa thân màu VÀNG đậm (gấp đôi
-            // mức mảnh trước đây, bằng đúng độ đậm gạch chân lượn sóng lỗi
-            // chính tả) — theo yêu cầu, để phân biệt hẳn với gạch chân lượn
-            // sóng đỏ mảnh của đoạn CẦN XOÁ bên dưới.
-            style: TextStyle(
-              color: Colors.red.shade700,
-              decoration: TextDecoration.lineThrough,
-              decorationColor: Colors.amber.shade800,
-              decorationThickness: _damGachChanLoi,
-            ),
+            style: TextStyle(color: Colors.red.shade700),
           ));
         }
         if (k.batDauDeXuat < k.ketThucDeXuat) {
@@ -332,21 +341,15 @@ class _BoDieuKhienChinhTa extends TextEditingController {
     for (final x in canXoa) {
       if (x.batDau < 0 || x.ketThuc > vb.length || x.batDau >= x.ketThuc) continue;
       if (!x.dangNhapNhay) {
-        // Đoạn CẦN XOÁ: cùng giao diện chữ đỏ + gạch giữa thân vàng đậm như
-        // đoạn CẦN THAY THẾ ở trên, CỘNG THÊM một gạch chân lượn sóng đỏ
-        // mảnh riêng (vẽ ở lớp dưới, xem `_veCacDuongLuonSong`) để phân biệt
-        // với đoạn cần thay thế — TextStyle chỉ vẽ được MỘT kiểu gạch mỗi
-        // lúc nên gạch chân phải tách ra lớp riêng, không ghép chung được
-        // với gạch giữa thân ở đây.
+        // Đoạn CẦN XOÁ: cùng chữ đỏ như đoạn CẦN THAY THẾ. Cả gạch giữa thân
+        // vàng đậm LẪN gạch chân lượn sóng đỏ mảnh đều vẽ ở lớp riêng nằm
+        // dưới chữ (xem `_veDanhDauAi`) — TextStyle chỉ vẽ được một kiểu
+        // gạch mỗi lúc nên không ghép chung hai gạch khác kiểu vào một
+        // TextStyle được, phải tách lớp.
         vung.add(_VungVe(
           batDau: x.batDau,
           ketThuc: x.ketThuc,
-          style: TextStyle(
-            color: Colors.red.shade700,
-            decoration: TextDecoration.lineThrough,
-            decorationColor: Colors.amber.shade800,
-            decorationThickness: _damGachChanLoi,
-          ),
+          style: TextStyle(color: Colors.red.shade700),
           recognizer: TapGestureRecognizer()
             ..onTapDown = (ct) => khiBamDoanCanXoa?.call(x, ct.globalPosition),
         ));
@@ -373,6 +376,16 @@ class _BoDieuKhienChinhTa extends TextEditingController {
 
     return TextSpan(style: style, children: children);
   }
+}
+
+/// Ý định "Lùi lại"/"Tiến tới" cho Ctrl+Z / Ctrl+Shift+Z — xem giải thích ở
+/// nơi dùng (`Shortcuts`/`Actions` bọc quanh ô soạn thảo trong `build`).
+class _YDinhLuiLai extends Intent {
+  const _YDinhLuiLai();
+}
+
+class _YDinhToi extends Intent {
+  const _YDinhToi();
 }
 
 class TrangSoanThao extends StatefulWidget {
@@ -608,22 +621,25 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
-  /// Mọi gạch chân LƯỢN SÓNG của các đánh dấu AI — từ/cụm từ sai chính tả
-  /// (đỏ, đậm) và đoạn AI đề xuất xoá (đỏ, mảnh) — vẽ chung ở một lớp RIÊNG
-  /// nằm DƯỚI chữ (xem giải thích ở nơi ghép layer trong `build`), thay vì
-  /// gắn qua TextStyle.decoration. TextStyle.decoration vẽ CÙNG một lượt với
-  /// chữ nên có lúc đè lên cả nét đi xuống của chữ (g, ệ, ụ, q, y...) — tách
-  /// thành lớp riêng, vẽ trước rồi để chữ vẽ đè lên sau, thì nét đi xuống
-  /// luôn luôn nổi trên gạch chân, không bao giờ bị che. Đoạn CẦN THAY THẾ
-  /// không có mặt ở đây — gạch giữa thân màu vàng của nó chỉ có MỘT kiểu
-  /// gạch nên vẽ thẳng qua TextStyle vẫn đủ, không cần lớp riêng.
+  /// Mọi gạch của các đánh dấu AI (trừ đoạn ĐỀ XUẤT THAY THẾ màu xanh, vẫn
+  /// vẽ thẳng qua TextStyle vì chỉ có một kiểu gạch, không cần lớp riêng) —
+  /// gạch chân lượn sóng (lỗi chính tả: đỏ đậm; đoạn cần xoá: đỏ mảnh) VÀ
+  /// gạch giữa thân thẳng, vàng đậm (đoạn cần thay thế, đoạn cần xoá) — vẽ
+  /// chung ở một lớp RIÊNG nằm DƯỚI chữ (xem giải thích ở nơi ghép layer
+  /// trong `build`), thay vì gắn qua TextStyle.decoration. TextStyle
+  /// .decoration vẽ CÙNG một lượt với chữ nên có lúc đè lên cả nét đi xuống
+  /// của chữ (g, ệ, ụ, q, y...) — tách thành lớp riêng, vẽ trước rồi để chữ
+  /// vẽ đè lên sau, thì chữ luôn luôn nổi trên mọi gạch, không bao giờ bị
+  /// che (layer chồng layer, theo đúng yêu cầu).
   ///
   /// Dùng `RenderEditable.getBoxesForSelection` (cùng kỹ thuật với
   /// `_chamCuoiVanBan`) để lấy đúng toạ độ THẬT của từng vùng — kể cả khi
   /// một cụm bị ngắt xuống nhiều dòng, hàm này tự trả về nhiều hộp, mỗi dòng
   /// một hộp.
-  Widget _gachChanLuonSong() {
-    if (_boDieuKhien.loi.isEmpty && _boDieuKhien.canXoa.isEmpty) {
+  Widget _veDanhDauAi() {
+    if (_boDieuKhien.loi.isEmpty &&
+        _boDieuKhien.khongPhuHop.isEmpty &&
+        _boDieuKhien.canXoa.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -636,21 +652,30 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (re == null || !re.hasSize) return const SizedBox.shrink();
 
     final vb = _boDieuKhien.text;
-    final duong = <_DuongLuonSong>[];
+    final duong = <_DuongDanhDauAi>[];
 
-    void themVung(int batDau, int ketThuc, Color mau, double day) {
+    void themVung(
+      int batDau,
+      int ketThuc,
+      Color mau,
+      double day, {
+      bool lienSong = true,
+      bool giuaThan = false,
+    }) {
       if (batDau < 0 || ketThuc > vb.length || batDau >= ketThuc) return;
       try {
         for (final h in re.getBoxesForSelection(
           TextSelection(baseOffset: batDau, extentOffset: ketThuc),
         )) {
-          duong.add(_DuongLuonSong(
+          duong.add(_DuongDanhDauAi(
             hop: Rect.fromPoints(
               re.localToGlobal(Offset(h.left, h.top), ancestor: khungBox),
               re.localToGlobal(Offset(h.right, h.bottom), ancestor: khungBox),
             ),
             mau: mau,
             day: day,
+            lienSong: lienSong,
+            giuaThan: giuaThan,
           ));
         }
       } catch (_) {
@@ -661,13 +686,20 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     for (final l in _boDieuKhien.loi) {
       themVung(l.batDau, l.ketThuc, _mauGachChanLoi, _damGachChanLoi);
     }
+    for (final k in _boDieuKhien.khongPhuHop) {
+      if (k.nhapNhayMau != null) continue; // Đang nhấp nháy — không vẽ gạch.
+      themVung(k.batDauGoc, k.ketThucGoc, _mauGachGiuaThan, _damGachChanLoi,
+          lienSong: false, giuaThan: true);
+    }
     for (final x in _boDieuKhien.canXoa) {
-      if (x.dangNhapNhay) continue; // Đang nhấp nháy — không vẽ gạch chân.
+      if (x.dangNhapNhay) continue; // Đang nhấp nháy — không vẽ gạch.
       themVung(x.batDau, x.ketThuc, _mauGachChanCanXoa, _damGachChanCanXoa);
+      themVung(x.batDau, x.ketThuc, _mauGachGiuaThan, _damGachChanLoi,
+          lienSong: false, giuaThan: true);
     }
     if (duong.isEmpty) return const SizedBox.shrink();
 
-    return CustomPaint(painter: _VeCacDuongLuonSong(duong));
+    return CustomPaint(painter: _VeDanhDauAi(duong));
   }
 
   /// Lịch sử Lùi lại/Tiến tới. Mỗi điểm mốc là trạng thái TRỌN VẸN của bài
@@ -1228,8 +1260,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   /// Ctrl + Z (Lùi lại) và Ctrl + Shift + Z (Tiến tới) — cố định, không cho
   /// người dùng đổi (khác phím tắt micro, có thể tuỳ chỉnh trong Cài đặt).
+  ///
+  /// Chỉ còn lo trường hợp Ô SOẠN THẢO KHÔNG giữ tiêu điểm (bấm ra ngoài, hay
+  /// đang ở ô tên bài) — lúc ô văn bản GIỮ tiêu điểm, một `Shortcuts` khai
+  /// báo ngay trên nó (xem `build`) đã chiếm chắc chắn tổ hợp phím này rồi,
+  /// tầng nghe toàn cục ở đây phải nhường, không thì có thể gọi trùng
+  /// `_lui()`/`_toi()` hai lần cho cùng một lần bấm phím.
   bool _khiPhimTatLuiTien(KeyEvent event) {
     if (!mounted || event is! KeyDownEvent) return false;
+    if (_oChu.hasFocus) return false;
 
     final route = ModalRoute.of(context);
     if (route != null && !route.isCurrent) return false;
@@ -1543,6 +1582,19 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         const Duration(milliseconds: 600);
     if (trungKhit || vuaGhiXong) return;
 
+    // (b0) Con trỏ (không phải vùng chọn) vừa đáp xuống NGAY TRONG một đoạn
+    // bị khoá (đoạn CẦN THAY THẾ hay CẦN XOÁ — chữ đỏ) — đẩy nó ra biên gần
+    // nhất. Hai đoạn này không cho gõ/xoá/chèn bên trong, chỉ bấm được để mở
+    // menu (xem `_dungVaoVungKhoa`); không đẩy con trỏ ra thì người dùng vẫn
+    // gõ được ngay giữa chữ đỏ dù đã chặn ở tầng sửa văn bản.
+    if (chon.isCollapsed) {
+      final viTriMoi = _diemNgoaiVungKhoa(chon.end);
+      if (viTriMoi != chon.end) {
+        _boDieuKhien.selection = TextSelection.collapsed(offset: viTriMoi);
+        return;
+      }
+    }
+
     // (b) Người dùng thật sự chạm màn hình để dời con trỏ — hoặc TÔ ĐẬM một
     // vùng trong lúc micro vẫn đang nghe. Trường hợp sau phải đặt neo/vùng
     // tạm lên đúng vùng vừa chọn (giống hệt lúc bấm micro với sẵn vùng đã
@@ -1559,6 +1611,35 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 
   void _apDungChinhSuaNguoiDung(String chuMoi) {
+    final cu = _chuGanNhat;
+
+    // So khác biệt: phần đầu giống nhau dài bao nhiêu, phần đuôi giống nhau
+    // dài bao nhiêu. Khoảng giữa còn lại chính là chỗ vừa bị đổi.
+    final gioiHan = cu.length < chuMoi.length ? cu.length : chuMoi.length;
+    var dau = 0;
+    while (dau < gioiHan && cu[dau] == chuMoi[dau]) {
+      dau++;
+    }
+    var duoi = 0;
+    final gioiHanDuoi = gioiHan - dau;
+    while (duoi < gioiHanDuoi &&
+        cu[cu.length - 1 - duoi] == chuMoi[chuMoi.length - 1 - duoi]) {
+      duoi++;
+    }
+
+    final doDaiChenVao = chuMoi.length - dau - duoi;
+    final soLuongXoa = cu.length - dau - duoi;
+
+    // Đoạn CẦN THAY THẾ / CẦN XOÁ (chữ đỏ) KHÔNG cho gõ/xoá/chèn bên trong —
+    // chỉ bấm được để mở menu. Chỗ vừa đổi đè vào một trong hai thì HUỶ
+    // THẲNG thay đổi, trả nguyên văn bản cũ, đặt lại con trỏ ở biên gần nhất
+    // — coi như chưa có gì xảy ra, không lưu mốc Lùi lại, không tính là một
+    // lần gõ.
+    if (_dungVaoVungKhoa(dau, dau + soLuongXoa)) {
+      _ghiVaoO(cu, _diemNgoaiVungKhoa(dau));
+      return;
+    }
+
     // Gõ tay chèn ký tự cũng phải tắt chú thích, y hệt bấm phím rời hay chạm
     // màn hình — bắt ngay tại đây (chữ THẬT SỰ đổi) thay vì chỉ trông chờ
     // bắt được sự kiện bàn phím vật lý, vì trường hợp CHỮ ĐẦU TIÊN của một
@@ -1583,24 +1664,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _dangTrongDotGoTay = false;
     });
 
-    final cu = _chuGanNhat;
-
-    // So khác biệt: phần đầu giống nhau dài bao nhiêu, phần đuôi giống nhau
-    // dài bao nhiêu. Khoảng giữa còn lại chính là chỗ vừa bị đổi.
-    final gioiHan = cu.length < chuMoi.length ? cu.length : chuMoi.length;
-    var dau = 0;
-    while (dau < gioiHan && cu[dau] == chuMoi[dau]) {
-      dau++;
-    }
-    var duoi = 0;
-    final gioiHanDuoi = gioiHan - dau;
-    while (duoi < gioiHanDuoi &&
-        cu[cu.length - 1 - duoi] == chuMoi[chuMoi.length - 1 - duoi]) {
-      duoi++;
-    }
-
-    final doDaiChenVao = chuMoi.length - dau - duoi;
-    final soLuongXoa = cu.length - dau - duoi;
     _dieuChinhLoiChinhTaSauKhiSua(dau, soLuongXoa, doDaiChenVao);
     _dieuChinhVungToanVanSauKhiSua(dau, soLuongXoa, doDaiChenVao);
 
@@ -1659,6 +1722,43 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // việc thông báo ra một microtask thì nó chạy SAU KHI toàn bộ lệnh gọi
     // hiện tại (kể cả _ghiVaoO cập nhật _chuGanNhat) đã xong.
     scheduleMicrotask(_boDieuKhien.veLai);
+  }
+
+  /// Đoạn CẦN THAY THẾ (đỏ, thuộc một `_VungKhongPhuHop` còn chờ quyết định)
+  /// hoặc đoạn CẦN XOÁ (đỏ, một `_VungCanXoa` còn chờ) có đè vào khoảng
+  /// [batDau, ketThuc) này không — hai loại đoạn này KHOÁ CỨNG, không cho
+  /// gõ/xoá/chèn ký tự bên trong, chỉ bấm được để mở menu chấp nhận/huỷ.
+  /// Đoạn ĐỀ XUẤT THAY THẾ (xanh) không nằm trong danh sách khoá — vẫn sửa
+  /// tay thoải mái như đã thiết kế riêng.
+  bool _dungVaoVungKhoa(int batDau, int ketThuc) {
+    for (final k in _boDieuKhien.khongPhuHop) {
+      if (k.nhapNhayMau != null) continue;
+      if (batDau < k.ketThucGoc && ketThuc > k.batDauGoc) return true;
+    }
+    for (final x in _boDieuKhien.canXoa) {
+      if (x.dangNhapNhay) continue;
+      if (batDau < x.ketThuc && ketThuc > x.batDau) return true;
+    }
+    return false;
+  }
+
+  /// [viTri] đang nằm NGAY TRONG một đoạn bị khoá thì trả về biên GẦN NHẤT
+  /// (đầu hoặc cuối đoạn đó) để đẩy con trỏ ra ngoài; không thì trả về
+  /// nguyên [viTri].
+  int _diemNgoaiVungKhoa(int viTri) {
+    for (final k in _boDieuKhien.khongPhuHop) {
+      if (k.nhapNhayMau != null) continue;
+      if (viTri > k.batDauGoc && viTri < k.ketThucGoc) {
+        return (viTri - k.batDauGoc) <= (k.ketThucGoc - viTri) ? k.batDauGoc : k.ketThucGoc;
+      }
+    }
+    for (final x in _boDieuKhien.canXoa) {
+      if (x.dangNhapNhay) continue;
+      if (viTri > x.batDau && viTri < x.ketThuc) {
+        return (viTri - x.batDau) <= (x.ketThuc - viTri) ? x.batDau : x.ketThuc;
+      }
+    }
+    return viTri;
   }
 
   /// Y hệt [_dieuChinhLoiChinhTaSauKhiSua] nhưng cho hai danh sách của lượt
@@ -2605,7 +2705,42 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                child: Stack(
+                // Ctrl+Z / Ctrl+Shift+Z bấm ra "liệt" khi con trỏ đang nằm
+                // trong ô soạn thảo (nhưng chạy bình thường khi không có con
+                // trỏ ở đó) — vì `HardwareKeyboard.addHandler` là một tầng
+                // nghe TOÀN CỤC riêng biệt, không hề chặn được tầng
+                // Shortcuts/Actions của chính ô văn bản đang giữ tiêu điểm
+                // (EditableText có sẵn logic tự xử lý một số tổ hợp phím
+                // ngay tại tiêu điểm, tầng đó chạy TRƯỚC hoặc ĐÈ LÊN tầng
+                // nghe toàn cục). Cách chắc chắn duy nhất để CHIẾM lại tổ
+                // hợp phím này khi ô văn bản đang giữ tiêu điểm là khai báo
+                // một `Shortcuts` NGAY TRÊN nó — Flutter luôn ưu tiên
+                // `Shortcuts` gần tiêu điểm nhất trong cây, nên khai báo ở
+                // đây thắng chắc chắn, bất kể ô văn bản tự xử lý gì bên
+                // trong.
+                child: Shortcuts(
+                  shortcuts: const {
+                    SingleActivator(LogicalKeyboardKey.keyZ, control: true):
+                        _YDinhLuiLai(),
+                    SingleActivator(LogicalKeyboardKey.keyZ, control: true, shift: true):
+                        _YDinhToi(),
+                  },
+                  child: Actions(
+                    actions: {
+                      _YDinhLuiLai: CallbackAction<_YDinhLuiLai>(
+                        onInvoke: (_) {
+                          if (_lichSuLui.isNotEmpty) _lui();
+                          return null;
+                        },
+                      ),
+                      _YDinhToi: CallbackAction<_YDinhToi>(
+                        onInvoke: (_) {
+                          if (_lichSuToi.isNotEmpty) _toi();
+                          return null;
+                        },
+                      ),
+                    },
+                    child: Stack(
                       key: _khungVanBanKey,
                       children: [
                         // Chữ gợi ý khi bài còn trống trơn — tự tay dựng
@@ -2630,7 +2765,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                             child: AnimatedBuilder(
                               animation: _boDieuKhien,
                               builder: (context, _) => Stack(
-                                children: [_gachChanLuonSong()],
+                                children: [_veDanhDauAi()],
                               ),
                             ),
                           ),
@@ -2677,6 +2812,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                         ),
                       ],
                     ),
+                  ),
+                ),
               ),
             ),
             ThanhCongCu(
