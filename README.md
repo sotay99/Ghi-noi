@@ -16,8 +16,11 @@ Mỗi lần đẩy mã lên, GitHub Actions tự dựng APK và đưa vào mục
 **Releases** của kho này. Mở bằng điện thoại, tải tệp `Flowrite-vN.apk`,
 Android hỏi "cài từ nguồn không xác định" thì đồng ý.
 
-APK ký bằng khoá thử (debug key): cài vào máy riêng thì được, đưa lên
-Google Play thì chưa được.
+APK ký bằng một khoá CỐ ĐỊNH của riêng Flowrite (`tool/ky/flowrite-release
+.keystore`, xem `tool/va_android.py`), không phải debug key ngẫu nhiên của
+máy dựng — nhờ vậy cài đè bản mới lên bản cũ được bình thường, không cần gỡ
+cài đặt trước (Android từ chối cập nhật nếu chữ ký thay đổi giữa các lần).
+Vẫn chưa ký được cho Google Play (cần khoá riêng do Google quản lý).
 
 ## Cấu trúc mã nguồn
 

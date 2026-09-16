@@ -6,6 +6,7 @@ tự sinh lại nó bằng đúng phiên bản Flutter đang dùng, rồi chạy
 thêm những thứ riêng của Flowrite. Nhờ vậy không bao giờ lệch phiên bản Gradle.
 """
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -13,6 +14,25 @@ GOC = Path(sys.argv[1] if len(sys.argv) > 1 else '.')
 MANIFEST = GOC / 'android' / 'app' / 'src' / 'main' / 'AndroidManifest.xml'
 GRADLE_KTS = GOC / 'android' / 'app' / 'build.gradle.kts'
 GRADLE_GROOVY = GOC / 'android' / 'app' / 'build.gradle'
+
+# Khoá ký CỐ ĐỊNH của Flowrite — một khoá DUY NHẤT, dùng lại cho MỌI lần
+# dựng, mãi mãi về sau. Không phải bí mật cần giấu (app chỉ cài tay, không
+# lên Google Play, khoá này không bảo vệ gì có giá trị) — commit thẳng vào
+# kho mã cho đơn giản.
+#
+# Lý do khoá này BẮT BUỘC phải cố định: trước đây `android/` bị sinh MỚI
+# HOÀN TOÀN mỗi lần dựng (không nằm trong git), nên Gradle lúc không thấy cấu
+# hình ký nào sẽ tự ký bản release bằng debug.keystore MẶC ĐỊNH — mà máy dựng
+# của GitHub Actions cũng là máy ảo MỚI TINH mỗi lần, nên debug.keystore đó
+# cũng tự sinh ngẫu nhiên lại mỗi lần, ra một chữ ký KHÁC NHAU cho mỗi bản
+# APK. Android bắt buộc chữ ký của bản cập nhật phải khớp bản đang cài — chữ
+# ký đổi liên tục là đúng nguyên nhân lỗi "xung đột ứng dụng hiện có" mỗi lần
+# cập nhật, phải gỡ cài đặt bản cũ mới cài được bản mới. Ký bằng MỘT khoá cố
+# định, không đổi qua các lần dựng, thì Android luôn coi là cùng một ứng
+# dụng, cập nhật đè lên được bình thường — không bao giờ phải gỡ cài đặt nữa.
+KHOA_KY = GOC / 'tool' / 'ky' / 'flowrite-release.keystore'
+KHOA_KY_ALIAS = 'flowrite'
+KHOA_KY_MAT_KHAU = 'flowrite-app-signing-2026'
 
 # permission_handler_android đòi compileSdk 37; Flutter tạo project mới với
 # compileSdk mặc định của chính nó (36 ở thời điểm viết script này), thấp hơn
@@ -66,6 +86,78 @@ def _va_compile_sdk() -> int:
     return 0
 
 
+def _va_ky_ten() -> int:
+    """Chép khoá ký cố định vào android/app/, rồi trỏ signingConfig của bản
+    release sang khoá đó thay vì debug.keystore ngẫu nhiên mặc định — xem
+    giải thích đầy đủ ở khai báo KHOA_KY phía trên."""
+    if not KHOA_KY.exists():
+        print(f'LOI: khong thay khoa ky {KHOA_KY}', file=sys.stderr)
+        return 1
+
+    dich = GOC / 'android' / 'app' / KHOA_KY.name
+    shutil.copyfile(KHOA_KY, dich)
+
+    tep = GRADLE_KTS if GRADLE_KTS.exists() else GRADLE_GROOVY
+    if not tep.exists():
+        print(f'Khong thay {GRADLE_KTS} lan {GRADLE_GROOVY}', file=sys.stderr)
+        return 1
+    la_kts = tep == GRADLE_KTS
+
+    chu = tep.read_text(encoding='utf-8')
+
+    if la_kts:
+        khoi_ky = (
+            'android {\n'
+            '    signingConfigs {\n'
+            '        create("release") {\n'
+            f'            storeFile = file("{KHOA_KY.name}")\n'
+            f'            storePassword = "{KHOA_KY_MAT_KHAU}"\n'
+            f'            keyAlias = "{KHOA_KY_ALIAS}"\n'
+            f'            keyPassword = "{KHOA_KY_MAT_KHAU}"\n'
+            '        }\n'
+            '    }\n'
+        )
+        chu, n1 = re.subn(r'android \{', khoi_ky, chu, count=1)
+        chu, n2 = re.subn(
+            r'signingConfig\s*=\s*signingConfigs\.getByName\("debug"\)',
+            'signingConfig = signingConfigs.getByName("release")',
+            chu,
+        )
+    else:
+        khoi_ky = (
+            'android {\n'
+            '    signingConfigs {\n'
+            '        release {\n'
+            f'            storeFile file("{KHOA_KY.name}")\n'
+            f'            storePassword "{KHOA_KY_MAT_KHAU}"\n'
+            f'            keyAlias "{KHOA_KY_ALIAS}"\n'
+            f'            keyPassword "{KHOA_KY_MAT_KHAU}"\n'
+            '        }\n'
+            '    }\n'
+        )
+        chu, n1 = re.subn(r'android \{', khoi_ky, chu, count=1)
+        chu, n2 = re.subn(
+            r'signingConfig\s+signingConfigs\.debug',
+            'signingConfig signingConfigs.release',
+            chu,
+        )
+
+    if n1 == 0:
+        print(f'LOI: khong tim thay "android {{" trong {tep}', file=sys.stderr)
+        return 1
+    if n2 == 0:
+        print(
+            f'LOI: khong tim thay dong signingConfig cua debug trong {tep} '
+            '(mau flutter create co the da doi cu phap)',
+            file=sys.stderr,
+        )
+        return 1
+
+    tep.write_text(chu, encoding='utf-8')
+    print(f'Da tro signingConfig sang khoa ky co dinh trong {tep.name}.')
+    return 0
+
+
 def main() -> int:
     if not MANIFEST.exists():
         print(f'Khong thay {MANIFEST}', file=sys.stderr)
@@ -74,6 +166,10 @@ def main() -> int:
     ket_qua_gradle = _va_compile_sdk()
     if ket_qua_gradle != 0:
         return ket_qua_gradle
+
+    ket_qua_ky = _va_ky_ten()
+    if ket_qua_ky != 0:
+        return ket_qua_ky
 
     chu = MANIFEST.read_text(encoding='utf-8')
 
