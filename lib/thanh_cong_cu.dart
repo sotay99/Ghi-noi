@@ -593,31 +593,109 @@ PopupMenuItem<int> _mucMenuThem(int gia, String chu) {
   );
 }
 
+/// (VIỆC 2) Nút tròn nhỏ dùng chung cho hai nút cuộn (lên đầu/xuống cuối)
+/// nằm cạnh nút X trong `_mucDongMenu`. Dùng `GestureDetector` riêng (không
+/// phải `IconButton` — kích thước tối thiểu 48 của nó quá to cho hàng cao
+/// 28) để bấm vào đây KHÔNG đóng menu: một widget bấm được lồng BÊN TRONG
+/// `PopupMenuItem` luôn thắng trong đấu trường cử chỉ (gesture arena) trước
+/// `InkWell` mặc định bọc ngoài của `PopupMenuItem` (cái vẫn khiến bấm vào
+/// nút X đóng menu, vì X không có `onTap` riêng) — đây là hành vi chuẩn của
+/// Flutter với các widget bấm được lồng nhau, không cần tự chặn sự kiện nổi
+/// bọt (bubbling) thủ công.
+class _NutCuonMenu extends StatelessWidget {
+  const _NutCuonMenu({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final duocBam = onTap != null;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 20,
+        height: 20,
+        decoration: BoxDecoration(
+          color: duocBam ? Colors.grey.shade300 : Colors.grey.shade200,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          icon,
+          size: 13,
+          color: duocBam ? Colors.grey.shade800 : Colors.grey.shade400,
+        ),
+      ),
+    );
+  }
+}
+
 /// (VIỆC 2) Mục đầu tiên của cả hai menu (`_NutThemMenu`, `_NutAIMenu`): một
-/// nút tròn đỏ có chữ X, nằm cuối hàng bên phải, chỉ để đóng menu ngay lập
-/// tức. Dùng `value: -1` (không khớp case nào trong `onSelected`) để việc
-/// bấm nút tự đóng menu theo đúng cơ chế mặc định của `PopupMenuItem` — vì
-/// đây vẫn là một `PopupMenuItem` bình thường (enabled mặc định) trong cùng
-/// danh sách, không phải widget tự vẽ lồng bên trong, nên KHÔNG bị ăn màu mờ
-/// và không đẩy các mục khác vào một khung cuộn bó hẹp.
+/// hàng gồm hai nút cuộn (lên đầu / xuống cuối) và nút tròn đỏ chữ X đóng
+/// menu ngay lập tức. Dùng `value: -1` (không khớp case nào trong
+/// `onSelected`) để việc bấm nút X tự đóng menu theo đúng cơ chế mặc định
+/// của `PopupMenuItem` — vì đây vẫn là một `PopupMenuItem` bình thường
+/// (enabled mặc định) trong cùng danh sách, không phải widget tự vẽ lồng bên
+/// trong, nên KHÔNG bị ăn màu mờ và không đẩy các mục khác vào một khung
+/// cuộn bó hẹp.
+///
+/// Hai nút cuộn không có `ScrollController` nào được truyền vào từ ngoài —
+/// `PopupMenuButton` tự dựng route và không lộ bộ điều khiển cuộn ra
+/// `itemBuilder`. Cách lấy được nó: bọc nội dung trong `Builder` để có đúng
+/// `BuildContext` NẰM BÊN TRONG cây widget của chính `PopupMenuItem` này
+/// (khác context của nút bấm mở menu), rồi gọi `Scrollable.maybeOf(context)`
+/// — khung cuộn nội bộ của route popup menu (`SingleChildScrollView` bọc
+/// toàn bộ cột các mục) tự nó dựng lên MỘT `Scrollable` thật trong cây, nên
+/// tra ngược từ context của một mục con tìm đúng `ScrollableState` đó, không
+/// cần route hay `itemBuilder` lộ thêm gì ra ngoài. Dùng bản `maybeOf`
+/// (không ném lỗi) làm lưới an toàn: nếu vì lý do nào đó không tìm thấy
+/// (thay đổi cách dựng route ở một bản Flutter khác), hai nút tự vô hiệu
+/// (xám mờ, không bấm được) thay vì làm vỡ cả menu.
 PopupMenuItem<int> _mucDongMenu() {
   return PopupMenuItem<int>(
     value: -1,
     height: 28,
     padding: EdgeInsets.zero,
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(right: 10),
-          child: Container(
-            width: 20,
-            height: 20,
-            decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-            child: const Icon(Icons.close, size: 14, color: Colors.white),
-          ),
-        ),
-      ],
+    child: Builder(
+      builder: (context) {
+        ScrollPosition? viTriCuon() => Scrollable.maybeOf(context)?.position;
+        void cuonToi(double dich) {
+          final vt = viTriCuon();
+          if (vt == null) return;
+          vt.animateTo(
+            dich,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+          );
+        }
+
+        final coTheCuon = viTriCuon() != null;
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            _NutCuonMenu(
+              icon: Icons.vertical_align_top,
+              onTap: coTheCuon ? () => cuonToi(0) : null,
+            ),
+            const SizedBox(width: 6),
+            _NutCuonMenu(
+              icon: Icons.vertical_align_bottom,
+              onTap: coTheCuon ? () => cuonToi(viTriCuon()!.maxScrollExtent) : null,
+            ),
+            const SizedBox(width: 10),
+            Padding(
+              padding: const EdgeInsets.only(right: 10),
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                child: const Icon(Icons.close, size: 14, color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
     ),
   );
 }

@@ -2074,7 +2074,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final het = _neo + _chuTam.length;
     final moi = cu.replaceRange(_neo, het, chenVao);
 
-    _dieuChinhLoiChinhTaSauKhiSua(_neo, het - _neo, chenVao.length);
+    _dieuChinhLoiChinhTaSauKhiSua(_neo, het - _neo, chenVao.length, viTriConTroThat: _neo);
     _dieuChinhVungToanVanSauKhiSua(_neo, het - _neo, chenVao.length);
     // (VIỆC 2, điểm iii/v — đường GIỌNG NÓI) Y hệt đường gõ tay: chữ vừa
     // được giọng nói chèn có thể vừa bị vùng treMu "nuốt" vào — lọc ngay.
@@ -2349,6 +2349,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   void _apDungChinhSuaNguoiDung(String chuMoi) {
     final cu = _chuGanNhat;
+    // Vị trí con trỏ THẬT ngay TRƯỚC khi văn bản này đổi — chụp tại đây, còn
+    // trước bất kỳ mutation nào trong hàm. `_neo` luôn được ghi lại ở CUỐI
+    // mỗi lượt sửa trước đó (xem cuối hàm này, dòng `_neo = viTriConTro;`)
+    // nên đúng là vị trí con trỏ cũ, khác hẳn `dau` bên dưới — `dau` chỉ là
+    // kết quả SUY RA từ phép so 2 đầu (chung tiền tố/hậu tố), có thể lệch
+    // khỏi vị trí con trỏ thật khi một lần `onChanged` gộp HAI chỗ đổi rời
+    // rạc (ví dụ tự viết hoa đầu câu ở xa ĐỒNG THỜI với tự sửa lỗi ngay tại
+    // con trỏ). Dùng `_neo` (đáng tin, không qua suy diễn) thay cho `dau`/
+    // `vitri` ở hai chỗ nhạy cảm nhất: vùng định dạng 0-ký-tự đang chờ áp và
+    // `_viTriOverrideDangCho`.
+    final viTriConTroThat = _neo;
 
     // So khác biệt: phần đầu giống nhau dài bao nhiêu, phần đuôi giống nhau
     // dài bao nhiêu. Khoảng giữa còn lại chính là chỗ vừa bị đổi.
@@ -2401,7 +2412,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _dangTrongDotGoTay = false;
     });
 
-    _dieuChinhLoiChinhTaSauKhiSua(dau, soLuongXoa, doDaiChenVao, vanBanCu: cu, vanBanMoi: chuMoi);
+    _dieuChinhLoiChinhTaSauKhiSua(
+      dau,
+      soLuongXoa,
+      doDaiChenVao,
+      vanBanCu: cu,
+      vanBanMoi: chuMoi,
+      viTriConTroThat: viTriConTroThat,
+    );
     _dieuChinhVungToanVanSauKhiSua(dau, soLuongXoa, doDaiChenVao);
     // (VIỆC 2, điểm iii/v) Ký tự vừa chèn (gõ tay hoặc giọng nói) có thể vừa
     // được vùng treMu (chữ trên) "nuốt" vào — do vùng chờ áp tại con trỏ tự
@@ -2445,6 +2463,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     int soChen, {
     String? vanBanCu,
     String? vanBanMoi,
+    // Vị trí con trỏ THẬT, chụp TRƯỚC khi văn bản đổi (xem lời gọi trong
+    // `_apDungChinhSuaNguoiDung`) — đáng tin hơn [vitri] (suy từ phép so 2
+    // đầu, có thể lệch khi một lần đổi gộp hai chỗ rời rạc). `null` khi
+    // người gọi không có giá trị này (các lời gọi lập trình khác, [vitri]
+    // vốn đã chính xác) — khi đó dùng lại [vitri] như trước, không đổi hành
+    // vi cũ.
+    int? viTriConTroThat,
   }) {
     if (soXoa == 0 && soChen == 0) return;
     final ketThucXoa = vitri + soXoa;
@@ -2455,8 +2480,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // phải làm offset này "trôi" theo cùng cách vùng 0-ký-tự bên dưới nới
     // rộng, nếu không `_tinhTrangThaiDinhDangHienTai` sẽ thấy con trỏ mới
     // "lệch chỗ" và tự huỷ override sau đúng MỘT ký tự.
-    if (_viTriOverrideDangCho != null && _viTriOverrideDangCho == vitri && soChen > 0) {
-      _viTriOverrideDangCho = vitri + soChen;
+    final viTriSoSanh = viTriConTroThat ?? vitri;
+    if (_viTriOverrideDangCho != null && _viTriOverrideDangCho == viTriSoSanh && soChen > 0) {
+      _viTriOverrideDangCho = viTriSoSanh + soChen;
     }
 
     _boDieuKhien.loi.removeWhere((l) => l.batDau < ketThucXoa && l.ketThuc > vitri);
@@ -2518,7 +2544,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // chèn (soChen > 0) thì nới `ketThuc` theo đúng số ký tự vừa chèn, để
       // ký tự gõ tiếp theo ngay tại đó vẫn mang override đang chờ, gõ liên
       // tục bao nhiêu ký tự cũng "trôi" theo đúng vị trí con trỏ mới.
-      if (d.batDau == d.ketThuc && d.ketThuc == vitri && soChen > 0) {
+      if (d.batDau == d.ketThuc && d.ketThuc == viTriSoSanh && soChen > 0) {
         ketThucMoi = d.ketThuc + soChen;
       } else {
         ketThucMoi = d.ketThuc <= vitri
