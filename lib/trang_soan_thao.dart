@@ -1471,6 +1471,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     WidgetsBinding.instance.addObserver(this);
     _boDieuKhien.addListener(_khiNguoiDungSua);
     _boDieuKhien.addListener(_capNhatTimKiemNeuDangMo);
+    // TextField (Material) không có tham số `onSelectionChanged` — đó là
+    // API của EditableText, không lộ ra ở TextField. Vì
+    // `_tinhTrangThaiDinhDangHienTai` vốn đã an toàn gọi mỗi lần selection
+    // đổi, KỂ CẢ mỗi lần gõ phím (xem chú thích ngay tại khai báo hàm),
+    // đăng ký nó như một listener bình thường ở đây là đủ và không lặp lại
+    // lỗi ANR cũ (hàm chỉ làm việc O(k) nhỏ, không quét toàn văn bản).
+    _boDieuKhien.addListener(_tinhTrangThaiDinhDangHienTai);
     _boDieuKhien.khiBamTuSai = _khiBamTuSai;
     _boDieuKhien.khiBamDoanKhongPhuHop = _khiBamDoanKhongPhuHop;
     _boDieuKhien.khiBamDoanCanXoa = _khiBamDoanCanXoa;
@@ -4555,15 +4562,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           decoration: const InputDecoration(
                             border: InputBorder.none,
                           ),
-                          // D3/D4: chỉ nghe đúng lúc SELECTION đổi (không
-                          // phải mọi thay đổi nội dung) — nhẹ, đúng mục đích,
-                          // và KHÁC HẲN việc thêm một `_boDieuKhien.addListener`
-                          // mới (tránh cộng dồn thêm một listener chạy trên
-                          // MỌI thay đổi văn bản, kiểu lỗi đã gây ANR trước
-                          // đây). Việc bên trong là O(k) nhỏ, không quét toàn
-                          // văn bản — xem `_tinhTrangThaiDinhDangHienTai`.
-                          onSelectionChanged: (selection, cause) =>
-                              _tinhTrangThaiDinhDangHienTai(),
+                          // D3/D4: cập nhật trạng thái định dạng theo vị trí
+                          // con trỏ/selection. TextField không có tham số
+                          // `onSelectionChanged` (đó là API của EditableText),
+                          // nên việc gọi `_tinhTrangThaiDinhDangHienTai` được
+                          // đăng ký qua `_boDieuKhien.addListener` ở
+                          // `initState` — xem chú thích ở đó.
                         ),
                         // Chấm tròn tím đánh dấu cuối văn bản — chỉ mang tính
                         // trang trí, KHÔNG phải một ký tự thật, nên con trỏ
