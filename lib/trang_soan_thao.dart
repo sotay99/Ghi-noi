@@ -266,6 +266,21 @@ class _VungDinhDangThuCong {
   }
 }
 
+/// (VIỆC 2) Bản ghi 8 giá trị định dạng — kiểu trả về DUY NHẤT của
+/// `_dinhDangHopTaiViTri`, dùng chung cho CẢ việc tô sáng nút toolbar LẪN
+/// việc quyết định định dạng của ký tự mới chèn. Không có hai nguồn tính
+/// riêng rẽ nào khác — đây chính là bài học từ các lỗi "bộ nhớ đệm" trước.
+typedef _HopDinhDang = ({
+  bool dam,
+  bool nghieng,
+  bool gachChan,
+  bool gachNgang,
+  bool treMu,
+  bool treChan,
+  Color? mauChu,
+  Color? mauNen,
+});
+
 /// Vẽ nhiều đường đánh dấu AI — mỗi đường ứng với một dòng của một vùng (một
 /// cụm dài bị ngắt xuống nhiều dòng thì có nhiều đường, mỗi dòng một đường
 /// riêng, có thể khác màu/độ đậm/kiểu nếu thuộc loại khác nhau).
@@ -2074,8 +2089,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final het = _neo + _chuTam.length;
     final moi = cu.replaceRange(_neo, het, chenVao);
 
-    _dieuChinhLoiChinhTaSauKhiSua(_neo, het - _neo, chenVao.length, viTriConTroThat: _neo);
+    // Hợp (OR) định dạng của ký tự NGAY TRƯỚC neo và ký tự NGAY SAU vùng tạm
+    // cũ — tính TRƯỚC khi `_dieuChinhLoiChinhTaSauKhiSua` dời/nới các vùng
+    // `dinhDang`, vì hàm đó đọc theo toạ độ CŨ. Đây là NGUỒN DUY NHẤT quyết
+    // định định dạng của chữ vừa được giọng nói chèn — không có override nào
+    // khác chen vào (xem `_dinhDangHopTaiViTri`).
+    final hopMoi = _dinhDangHopTaiViTri(_neo, het, cu.length);
+
+    _dieuChinhLoiChinhTaSauKhiSua(_neo, het - _neo, chenVao.length);
     _dieuChinhVungToanVanSauKhiSua(_neo, het - _neo, chenVao.length);
+    if (chenVao.isNotEmpty) {
+      _apDinhDangHopChoDoanMoiChen(_neo, _neo + chenVao.length, hopMoi);
+    }
     // (VIỆC 2, điểm iii/v — đường GIỌNG NÓI) Y hệt đường gõ tay: chữ vừa
     // được giọng nói chèn có thể vừa bị vùng treMu "nuốt" vào — lọc ngay.
     _gioiHanTreMuSauKhiChen(_neo, chenVao.length, moi);
@@ -2349,17 +2374,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   void _apDungChinhSuaNguoiDung(String chuMoi) {
     final cu = _chuGanNhat;
-    // Vị trí con trỏ THẬT ngay TRƯỚC khi văn bản này đổi — chụp tại đây, còn
-    // trước bất kỳ mutation nào trong hàm. `_neo` luôn được ghi lại ở CUỐI
-    // mỗi lượt sửa trước đó (xem cuối hàm này, dòng `_neo = viTriConTro;`)
-    // nên đúng là vị trí con trỏ cũ, khác hẳn `dau` bên dưới — `dau` chỉ là
-    // kết quả SUY RA từ phép so 2 đầu (chung tiền tố/hậu tố), có thể lệch
-    // khỏi vị trí con trỏ thật khi một lần `onChanged` gộp HAI chỗ đổi rời
-    // rạc (ví dụ tự viết hoa đầu câu ở xa ĐỒNG THỜI với tự sửa lỗi ngay tại
-    // con trỏ). Dùng `_neo` (đáng tin, không qua suy diễn) thay cho `dau`/
-    // `vitri` ở hai chỗ nhạy cảm nhất: vùng định dạng 0-ký-tự đang chờ áp và
-    // `_viTriOverrideDangCho`.
-    final viTriConTroThat = _neo;
 
     // So khác biệt: phần đầu giống nhau dài bao nhiêu, phần đuôi giống nhau
     // dài bao nhiêu. Khoảng giữa còn lại chính là chỗ vừa bị đổi.
@@ -2412,20 +2426,30 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _dangTrongDotGoTay = false;
     });
 
+    // Hợp (OR) định dạng của ký tự NGAY TRƯỚC [dau] và ký tự NGAY SAU đoạn bị
+    // xoá (đầu cũ tại [dau + soLuongXoa]) — tính TRƯỚC khi
+    // `_dieuChinhLoiChinhTaSauKhiSua` dời/nới các vùng `dinhDang`, vì hàm đó
+    // đọc theo toạ độ CŨ. Đây là NGUỒN DUY NHẤT quyết định định dạng của ký
+    // tự vừa gõ — không có "bộ nhớ đệm"/override nào khác chen vào (xem
+    // `_dinhDangHopTaiViTri`), và cùng một hàm này cũng quyết định nút nào
+    // sáng trên thanh công cụ (xem `_tinhTrangThaiDinhDangHienTai`).
+    final hopMoi = _dinhDangHopTaiViTri(dau, dau + soLuongXoa, cu.length);
+
     _dieuChinhLoiChinhTaSauKhiSua(
       dau,
       soLuongXoa,
       doDaiChenVao,
       vanBanCu: cu,
       vanBanMoi: chuMoi,
-      viTriConTroThat: viTriConTroThat,
     );
     _dieuChinhVungToanVanSauKhiSua(dau, soLuongXoa, doDaiChenVao);
+    if (doDaiChenVao > 0) {
+      _apDinhDangHopChoDoanMoiChen(dau, dau + doDaiChenVao, hopMoi);
+    }
     // (VIỆC 2, điểm iii/v) Ký tự vừa chèn (gõ tay hoặc giọng nói) có thể vừa
-    // được vùng treMu (chữ trên) "nuốt" vào — do vùng chờ áp tại con trỏ tự
-    // nới rộng (D4), hoặc do nằm liền kề một vùng treMu có sẵn nên kế thừa
-    // (D3/D5) — ngay trong lệnh gọi `_dieuChinhLoiChinhTaSauKhiSua` phía
-    // trên. Lọc ngay ký tự không hợp lệ ra khỏi treMu tại đây.
+    // được gán treMu (chữ trên) qua `_apDinhDangHopChoDoanMoiChen` ở trên nếu
+    // một trong hai bên đang mang treMu. Lọc ngay ký tự không hợp lệ ra khỏi
+    // treMu tại đây.
     _gioiHanTreMuSauKhiChen(dau, doDaiChenVao, chuMoi);
 
     // Gõ đúng MỘT ký tự đặc biệt (. , ; ? !) ngay sau một dấu cách có sẵn —
@@ -2463,27 +2487,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     int soChen, {
     String? vanBanCu,
     String? vanBanMoi,
-    // Vị trí con trỏ THẬT, chụp TRƯỚC khi văn bản đổi (xem lời gọi trong
-    // `_apDungChinhSuaNguoiDung`) — đáng tin hơn [vitri] (suy từ phép so 2
-    // đầu, có thể lệch khi một lần đổi gộp hai chỗ rời rạc). `null` khi
-    // người gọi không có giá trị này (các lời gọi lập trình khác, [vitri]
-    // vốn đã chính xác) — khi đó dùng lại [vitri] như trước, không đổi hành
-    // vi cũ.
-    int? viTriConTroThat,
   }) {
     if (soXoa == 0 && soChen == 0) return;
     final ketThucXoa = vitri + soXoa;
     final lech = soChen - soXoa;
-
-    // (VIỆC 4c) Override "chờ áp tại con trỏ" (D4) ghi nhớ ĐÚNG offset lúc
-    // đặt — gõ tiếp NGAY tại đó (không di chuyển con trỏ đi chỗ khác trước)
-    // phải làm offset này "trôi" theo cùng cách vùng 0-ký-tự bên dưới nới
-    // rộng, nếu không `_tinhTrangThaiDinhDangHienTai` sẽ thấy con trỏ mới
-    // "lệch chỗ" và tự huỷ override sau đúng MỘT ký tự.
-    final viTriSoSanh = viTriConTroThat ?? vitri;
-    if (_viTriOverrideDangCho != null && _viTriOverrideDangCho == viTriSoSanh && soChen > 0) {
-      _viTriOverrideDangCho = viTriSoSanh + soChen;
-    }
 
     _boDieuKhien.loi.removeWhere((l) => l.batDau < ketThucXoa && l.ketThuc > vitri);
     for (var i = 0; i < _boDieuKhien.loi.length; i++) {
@@ -2535,22 +2542,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       var batDauMoi = d.batDau <= vitri
           ? d.batDau
           : (d.batDau >= ketThucXoa ? d.batDau + lech : vitri);
-      int ketThucMoi;
-      // (VIỆC 4c) Vùng "chờ áp tại con trỏ" (D4) là một mốc 0-ký-tự
-      // (batDau == ketThuc) đúng ngay tại điểm chèn — điều kiện `<= vitri`
-      // bên dưới coi trường hợp BẰNG là "đứng trước chỗ sửa" nên KHÔNG bao
-      // giờ chạm nhánh nới rộng, dù comment gốc mô tả nó sẽ nới. Xử lý riêng
-      // trường hợp này TRƯỚC: mốc 0-ký-tự đúng tại [vitri] có ký tự MỚI được
-      // chèn (soChen > 0) thì nới `ketThuc` theo đúng số ký tự vừa chèn, để
-      // ký tự gõ tiếp theo ngay tại đó vẫn mang override đang chờ, gõ liên
-      // tục bao nhiêu ký tự cũng "trôi" theo đúng vị trí con trỏ mới.
-      if (d.batDau == d.ketThuc && d.ketThuc == viTriSoSanh && soChen > 0) {
-        ketThucMoi = d.ketThuc + soChen;
-      } else {
-        ketThucMoi = d.ketThuc <= vitri
-            ? d.ketThuc
-            : (d.ketThuc >= ketThucXoa ? d.ketThuc + lech : vitri);
-      }
+      var ketThucMoi = d.ketThuc <= vitri
+          ? d.ketThuc
+          : (d.ketThuc >= ketThucXoa ? d.ketThuc + lech : vitri);
       if (vanBanCu != null &&
           vanBanMoi != null &&
           d.batDau >= 0 &&
@@ -2587,17 +2581,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// (VIỆC 2, điểm iii/v) Gọi ngay SAU khi các vùng `dinhDang` đã được
   /// dời/nới theo phép chèn/xoá ở trên — [batDauChen, batDauChen+soChen) là
   /// đúng khoảng ký tự VỪA CHÈN trong văn bản mới [vanBanMoi]. Khoảng này có
-  /// thể đã bị một vùng treMu "nuốt" vào, theo hai cách: vùng "chờ áp treMu"
-  /// 0-ký-tự tại con trỏ tự nới rộng (D4), hoặc một vùng treMu có sẵn liền
-  /// kề "kế thừa" (D3/D5) — cả hai cùng đi qua đúng phép nới ở trên, nên chỉ
-  /// cần lọc MỘT chỗ này là đủ, không cần phân biệt nguồn gốc.
+  /// thể vừa được `_apDinhDangHopChoDoanMoiChen` gán treMu (nếu một trong
+  /// hai bên "hợp 2 bên" đang mang treMu) — lọc ngay ký tự không hợp lệ ra
+  /// khỏi treMu tại đây.
   ///
   /// Với mỗi vùng treMu giao với khoảng vừa chèn: ký tự nào không hợp lệ
   /// theo [_kyTuHopLeChoTreMu] bị TÁCH RA khỏi vùng treMu (tắt treMu CHỈ cho
   /// đúng ký tự đó, giữ nguyên các cờ định dạng khác nếu có) — không phải
-  /// fallback co nhỏ, mà chặn hẳn treMu cho ký tự đó. Cờ "chờ áp treMu" tại
-  /// `_treMuDangCho` được GIỮ NGUYÊN (không tự tắt) để ký tự tiếp theo, nếu
-  /// hợp lệ, vẫn được áp bình thường.
+  /// fallback co nhỏ, mà chặn hẳn treMu cho ký tự đó.
   ///
   /// O(số vùng treMu giao khoảng vừa chèn × độ dài khoảng đó) — khoảng vừa
   /// chèn thường chỉ 1 ký tự (gõ tay) hoặc một câu ngắn (giọng nói), không
@@ -3429,10 +3420,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   // ---------------------------------------------------- định dạng thủ công
 
-  /// Trạng thái "đang chờ áp" — có tác dụng khi con trỏ chỉ ĐỨNG (không tô
-  /// đậm vùng nào): ký tự gõ MỚI kể từ lúc bật sẽ mang định dạng này, cho
-  /// tới khi người dùng tự bấm tắt (xem B4 trong yêu cầu — không theo dõi
-  /// "rời vị trí" cho đơn giản).
+  /// Trạng thái SÁNG/TẮT của 8 nút định dạng trên thanh công cụ — thuần tuý
+  /// để VẼ nút, không phải "bộ nhớ đệm"/override nào cả. Luôn được ghi bởi
+  /// `_tinhTrangThaiDinhDangHienTai`: khi vùng chọn rỗng, giá trị là HỢP (OR)
+  /// định dạng của ký tự ngay TRƯỚC và ngay SAU con trỏ (xem
+  /// `_dinhDangHopTaiViTri`); khi có vùng chọn, giá trị là "toàn vùng chọn
+  /// đồng nhất định dạng đó hay không" (D1, không đổi). Bấm nút khi vùng
+  /// chọn rỗng KHÔNG ghi vào các biến này — xem `_apDungDinhDang`.
   bool _damDangCho = false;
   bool _nghiengDangCho = false;
   bool _gachChanDangCho = false;
@@ -3441,24 +3435,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   bool _treChanDangCho = false;
   Color? _mauChuDangCho;
   Color? _mauNenDangCho;
-
-  /// D4: vị trí con trỏ LÚC người dùng bấm nút đặt "đang chờ áp" thủ công
-  /// (nhánh selection rỗng của `_apDungDinhDang`) — null nghĩa là không có
-  /// override nào đang chờ. `_tinhTrangThaiDinhDangHienTai` so vị trí con
-  /// trỏ MỚI với giá trị này: còn ĐÚNG chỗ cũ (kể cả sau khi gõ tiếp ngay
-  /// tại đó — xem giải thích ở nơi gọi) thì giữ nguyên override, khác chỗ
-  /// thì phải tính lại theo tài liệu tại vị trí mới.
-  int? _viTriOverrideDangCho;
-
-  bool get _coDinhDangDangCho =>
-      _damDangCho ||
-      _nghiengDangCho ||
-      _gachChanDangCho ||
-      _gachNganDangCho ||
-      _treMuDangCho ||
-      _treChanDangCho ||
-      _mauChuDangCho != null ||
-      _mauNenDangCho != null;
 
   /// Điểm vào chính của mọi nút/phím tắt định dạng. [loai] là một trong:
   /// 'dam', 'nghieng', 'gachChan', 'gachNgang', 'treMu', 'treChan', 'mauChu',
@@ -3654,152 +3630,85 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 
   void _apDungDinhDang(String loai, {Color? mau}) {
-    // Mục 5: mỗi lần áp/bỏ định dạng là MỘT mốc lịch sử riêng, để Ctrl+Z
-    // hoàn tác đúng thao tác này (không đụng tới chữ, chỉ đụng `dinhDang`).
-    _luuDiemMocDinhDang();
     final chon = _boDieuKhien.selection;
-    if (chon.isValid && !chon.isCollapsed) {
-      final batDau = chon.start, ketThuc = chon.end;
-      // ĐIỀU CẤM KỴ (B7): có giao với vùng AI thì bỏ qua TOÀN BỘ thao tác.
-      if (_giaoVoiVungAi(batDau, ketThuc)) return;
-      // Chặn treMu (chữ trên) nếu vùng chọn chứa BẤT KỲ ký tự nào không hợp
-      // lệ (ngoài a-z/0-9) — chặn TOÀN BỘ thao tác, không áp cho cả những ký
-      // tự hợp lệ nằm trong cùng vùng chọn. Chỉ cần kiểm tra khi vùng chọn
-      // SẮP được chuyển sang mang treMu (không cần kiểm tra khi đang TẮT
-      // treMu hoặc áp cờ khác). Một lượt duyệt O(độ dài vùng chọn), gọi đúng
-      // MỘT LẦN tại đây — không lặp lại trong buildTextSpan/paint.
-      if (loai == 'treMu') {
-        final dangDongNhatTreMu = _coDongNhatTrongVung(batDau, ketThuc, (d) => d.treMu);
-        if (!dangDongNhatTreMu) {
-          final vb = _boDieuKhien.text;
-          for (var i = batDau; i < ketThuc; i++) {
-            if (!_kyTuHopLeChoTreMu(vb[i])) {
-              _baoLoiTreMu();
-              return;
-            }
-          }
-        }
-      }
-      if (loai == 'xoaDinhDang') {
-        _xoaDinhDangTrongVung(batDau, ketThuc);
-      } else if (loai == 'mauChu' || loai == 'mauNen') {
-        // D1 áp cho màu: bấm nút màu lần 1 → áp màu gần nhất; bấm lại lần 2
-        // (vùng chọn đã đang mang ĐÚNG màu gần nhất đó, đồng nhất suốt vùng)
-        // → xoá màu đó (trả về null), đúng quy tắc toggle chung — không có
-        // logic riêng nào khác ngoài quy tắc này.
-        final mauApDung = mau ?? (loai == 'mauChu' ? widget.caiDat.mauChuGanNhat : widget.caiDat.mauNenGanNhat);
-        final dongNhatMauNay = _coDongNhatTrongVung(
-          batDau,
-          ketThuc,
-          (d) => loai == 'mauChu' ? d.mauChu == mauApDung : d.mauNen == mauApDung,
-        );
-        _datMauTrongVung(batDau, ketThuc, loai, dongNhatMauNay ? null : mauApDung);
-      } else {
-        // D1 áp cho các cờ đậm/nghiêng/gạch chân/gạch ngang/chữ trên/chữ
-        // dưới: vùng chọn ĐỒNG NHẤT đã có [loai] rồi thì bấm lại là TẮT; còn
-        // không đồng nhất (hoặc chưa ai có) thì bấm là ÁP cho toàn vùng —
-        // đúng hành vi chuẩn của Word/Google Docs, không phải luôn ÁP như
-        // trước (thiếu nhánh TẮT).
-        final dangDongNhatCo = _coDongNhatTrongVung(batDau, ketThuc, (d) => _coCoDinhDang(d, loai));
-        _datCoDinhDangTrongVung(batDau, ketThuc, loai, !dangDongNhatCo);
-      }
-      // Áp định dạng không đổi độ dài văn bản, nên vùng chọn cũ vẫn còn hợp
-      // lệ nguyên offset — bấm nút toolbar làm ô soạn thảo tạm mất focus
-      // (nút tự nhận focus khi bấm) và có thể khiến vùng chọn bị co lại;
-      // đặt lại đúng vùng cũ ở đây để nút toolbar giữ được vùng bôi đen
-      // giống hệt phím tắt (phím tắt không rời focus khỏi ô soạn thảo nên
-      // không gặp vấn đề này).
-      _boDieuKhien.selection = chon;
-      // (VIỆC 3) `requestFocus()` gọi ngay trong `onPressed` có thể bị chính
-      // IconButton GHI ĐÈ ngay sau đó — Flutter tự cho nút nhận focus khi
-      // bấm (nút cũng là một focusable widget), và việc đó xảy ra SAU
-      // callback `onPressed` trong cùng frame, nên con trỏ nháy biến mất dù
-      // `selection` vẫn đúng offset. Hoãn `requestFocus()` sang
-      // `addPostFrameCallback` để nó là hành động CUỐI CÙNG trong frame,
-      // thắng focus của nút. Phím tắt (Shortcuts/Actions) không đi qua
-      // nhánh này vì TextField không hề rời focus khi bấm phím.
+    // Không có "bộ nhớ đệm"/override nào để đặt nữa (đã bỏ hẳn), và vùng
+    // chọn rỗng thì cũng không có vùng nào để áp — bấm nút/phím tắt lúc này
+    // ĐƠN GIẢN LÀ KHÔNG LÀM GÌ: không lưu mốc lịch sử, không đổi `dinhDang`,
+    // không đụng tới các cờ `_xxxDangCho` (chúng chỉ do
+    // `_tinhTrangThaiDinhDangHienTai` ghi, phản ánh "hợp 2 bên" tại con trỏ).
+    if (!chon.isValid || chon.isCollapsed) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _oChu.requestFocus();
       });
-      _boDieuKhien.veLai();
-      _henLuu();
       return;
     }
 
-    // Con trỏ đứng yên (không tô vùng nào): đảo trạng thái "đang chờ áp".
-    setState(() {
-      if (loai == 'dam') {
-        _damDangCho = !_damDangCho;
-      } else if (loai == 'nghieng') {
-        _nghiengDangCho = !_nghiengDangCho;
-      } else if (loai == 'gachChan') {
-        _gachChanDangCho = !_gachChanDangCho;
-      } else if (loai == 'gachNgang') {
-        _gachNganDangCho = !_gachNganDangCho;
-      } else if (loai == 'treMu') {
-        _treMuDangCho = !_treMuDangCho;
-        if (_treMuDangCho) _treChanDangCho = false;
-      } else if (loai == 'treChan') {
-        _treChanDangCho = !_treChanDangCho;
-        if (_treChanDangCho) _treMuDangCho = false;
-      } else if (loai == 'mauChu') {
-        _mauChuDangCho = _mauChuDangCho == null ? (mau ?? widget.caiDat.mauChuGanNhat) : null;
-      } else if (loai == 'mauNen') {
-        _mauNenDangCho = _mauNenDangCho == null ? (mau ?? widget.caiDat.mauNenGanNhat) : null;
-      } else if (loai == 'xoaDinhDang') {
-        _damDangCho = false;
-        _nghiengDangCho = false;
-        _gachChanDangCho = false;
-        _gachNganDangCho = false;
-        _treMuDangCho = false;
-        _treChanDangCho = false;
-        _mauChuDangCho = null;
-        _mauNenDangCho = null;
+    // Mục 5: mỗi lần áp/bỏ định dạng là MỘT mốc lịch sử riêng, để Ctrl+Z
+    // hoàn tác đúng thao tác này (không đụng tới chữ, chỉ đụng `dinhDang`).
+    _luuDiemMocDinhDang();
+    final batDau = chon.start, ketThuc = chon.end;
+    // ĐIỀU CẤM KỴ (B7): có giao với vùng AI thì bỏ qua TOÀN BỘ thao tác.
+    if (_giaoVoiVungAi(batDau, ketThuc)) return;
+    // Chặn treMu (chữ trên) nếu vùng chọn chứa BẤT KỲ ký tự nào không hợp
+    // lệ (ngoài a-z/0-9) — chặn TOÀN BỘ thao tác, không áp cho cả những ký
+    // tự hợp lệ nằm trong cùng vùng chọn. Chỉ cần kiểm tra khi vùng chọn
+    // SẮP được chuyển sang mang treMu (không cần kiểm tra khi đang TẮT
+    // treMu hoặc áp cờ khác). Một lượt duyệt O(độ dài vùng chọn), gọi đúng
+    // MỘT LẦN tại đây — không lặp lại trong buildTextSpan/paint.
+    if (loai == 'treMu') {
+      final dangDongNhatTreMu = _coDongNhatTrongVung(batDau, ketThuc, (d) => d.treMu);
+      if (!dangDongNhatTreMu) {
+        final vb = _boDieuKhien.text;
+        for (var i = batDau; i < ketThuc; i++) {
+          if (!_kyTuHopLeChoTreMu(vb[i])) {
+            _baoLoiTreMu();
+            return;
+          }
+        }
       }
-    });
-    // D4: ghi lại ĐÚNG vị trí con trỏ lúc đặt override này — con trỏ rời
-    // khỏi đây (không phải do gõ tiếp ngay tại chỗ) sẽ làm
-    // `_tinhTrangThaiDinhDangHienTai` tự huỷ override và tính lại theo tài
-    // liệu ở vị trí mới.
-    _viTriOverrideDangCho = _coDinhDangDangCho ? _viTriConTroHienTai() : null;
-    _capNhatVungDangChoTaiConTro();
-    // (VIỆC 3) Nhánh con trỏ đứng yên (selection rỗng) cũng bị bấm nút
-    // toolbar cướp mất focus của ô soạn thảo — lấy lại focus y hệt nhánh có
-    // vùng chọn ở trên, cũng hoãn sang cuối frame.
+    }
+    if (loai == 'xoaDinhDang') {
+      _xoaDinhDangTrongVung(batDau, ketThuc);
+    } else if (loai == 'mauChu' || loai == 'mauNen') {
+      // D1 áp cho màu: bấm nút màu lần 1 → áp màu gần nhất; bấm lại lần 2
+      // (vùng chọn đã đang mang ĐÚNG màu gần nhất đó, đồng nhất suốt vùng)
+      // → xoá màu đó (trả về null), đúng quy tắc toggle chung — không có
+      // logic riêng nào khác ngoài quy tắc này.
+      final mauApDung = mau ?? (loai == 'mauChu' ? widget.caiDat.mauChuGanNhat : widget.caiDat.mauNenGanNhat);
+      final dongNhatMauNay = _coDongNhatTrongVung(
+        batDau,
+        ketThuc,
+        (d) => loai == 'mauChu' ? d.mauChu == mauApDung : d.mauNen == mauApDung,
+      );
+      _datMauTrongVung(batDau, ketThuc, loai, dongNhatMauNay ? null : mauApDung);
+    } else {
+      // D1 áp cho các cờ đậm/nghiêng/gạch chân/gạch ngang/chữ trên/chữ dưới:
+      // vùng chọn ĐỒNG NHẤT đã có [loai] rồi thì bấm lại là TẮT; còn không
+      // đồng nhất (hoặc chưa ai có) thì bấm là ÁP cho toàn vùng — đúng hành
+      // vi chuẩn của Word/Google Docs, không phải luôn ÁP như trước (thiếu
+      // nhánh TẮT).
+      final dangDongNhatCo = _coDongNhatTrongVung(batDau, ketThuc, (d) => _coCoDinhDang(d, loai));
+      _datCoDinhDangTrongVung(batDau, ketThuc, loai, !dangDongNhatCo);
+    }
+    // Áp định dạng không đổi độ dài văn bản, nên vùng chọn cũ vẫn còn hợp
+    // lệ nguyên offset — bấm nút toolbar làm ô soạn thảo tạm mất focus (nút tự
+    // nhận focus khi bấm) và có thể khiến vùng chọn bị co lại; đặt lại đúng
+    // vùng cũ ở đây để nút toolbar giữ được vùng bôi đen giống hệt phím tắt
+    // (phím tắt không rời focus khỏi ô soạn thảo nên không gặp vấn đề này).
+    _boDieuKhien.selection = chon;
+    // (VIỆC 3) `requestFocus()` gọi ngay trong `onPressed` có thể bị chính
+    // IconButton GHI ĐÈ ngay sau đó — Flutter tự cho nút nhận focus khi bấm
+    // (nút cũng là một focusable widget), và việc đó xảy ra SAU callback
+    // `onPressed` trong cùng frame, nên con trỏ nháy biến mất dù `selection`
+    // vẫn đúng offset. Hoãn `requestFocus()` sang `addPostFrameCallback` để
+    // nó là hành động CUỐI CÙNG trong frame, thắng focus của nút. Phím tắt
+    // (Shortcuts/Actions) không đi qua nhánh này vì TextField không hề rời
+    // focus khi bấm phím.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _oChu.requestFocus();
     });
-  }
-
-  /// Tạo/cập nhật một vùng 0-ký-tự ngay tại con trỏ mang đúng tổ hợp thuộc
-  /// tính "đang chờ áp" hiện tại — vùng này tự NỚI RỘNG khi người dùng gõ
-  /// thêm chữ ngay tại đó (xem `_dieuChinhLoiChinhTaSauKhiSua`, nhánh
-  /// batDau<=vitri && ketThuc>=ketThucXoa tự dời ketThuc theo [lech]).
-  void _capNhatVungDangChoTaiConTro() {
-    final vt = _viTriConTroHienTai();
-    if (_giaoVoiVungAi(vt, vt)) return; // Đứng ngay biên vùng AI — bỏ qua an toàn.
-    if (!_coDinhDangDangCho) return;
-    _VungDinhDangThuCong? vung;
-    for (final d in _boDieuKhien.dinhDang) {
-      if (d.batDau == vt && d.ketThuc == vt) {
-        vung = d;
-        break;
-      }
-    }
-    if (vung == null) {
-      vung = _VungDinhDangThuCong(batDau: vt, ketThuc: vt);
-      _boDieuKhien.dinhDang.add(vung);
-    }
-    vung
-      ..dam = _damDangCho
-      ..nghieng = _nghiengDangCho
-      ..gachChan = _gachChanDangCho
-      ..gachNgang = _gachNganDangCho
-      ..treMu = _treMuDangCho
-      ..treChan = _treChanDangCho
-      ..mauChu = _mauChuDangCho
-      ..mauNen = _mauNenDangCho;
     _boDieuKhien.veLai();
+    _henLuu();
   }
 
   /// D3: [batDau, ketThuc) có phải MỌI đoạn con đều mang CÙNG một giá trị
@@ -3837,17 +3746,81 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     return coDoan ? chung : null;
   }
 
+  /// NGUỒN DUY NHẤT của logic "kế thừa 2 bên": hợp (OR) riêng từng loại định
+  /// dạng giữa ký tự ở [vtTrai - 1, vtTrai) (bên TRÁI) và ký tự ở
+  /// [vtPhai, vtPhai + 1) (bên PHẢI) trong một văn bản dài [doDaiVanBan] ký
+  /// tự — kể cả khi một trong hai bên là dấu cách mang định dạng ngầm, tra
+  /// cứu y hệt ký tự thường qua `_coDongNhatTrongVung`/`_mauDongNhatTrongVung`,
+  /// không có ngoại lệ. Thiếu một bên (đầu/cuối văn bản) thì chỉ dùng bên còn
+  /// lại. [vtTrai] và [vtPhai] tách rời để gọi được cả hai cách:
+  /// - Con trỏ ĐANG ĐỨNG tại [vt]: gọi `_dinhDangHopTaiViTri(vt, vt, doDai)`
+  ///   (bên trái là ký tự ngay trước [vt], bên phải là ký tự ngay tại [vt]).
+  /// - VỪA CHÈN/THAY [soXoa] ký tự tại [dau] (TRƯỚC khi các vùng `dinhDang`
+  ///   bị dời/nới bởi `_dieuChinhLoiChinhTaSauKhiSua`): gọi
+  ///   `_dinhDangHopTaiViTri(dau, dau + soXoa, cu.length)` — bên trái là ký
+  ///   tự ngay trước điểm sửa, bên phải là ký tự ngay SAU đoạn vừa bị xoá
+  ///   (đứng yên, không dịch chuyển bởi chính phép sửa này).
+  ///
+  /// KHÔNG dùng khi vùng chọn không rỗng — trường hợp đó dùng D1
+  /// (`_coDongNhatTrongVung` áp cho TOÀN vùng chọn), giữ nguyên như cũ.
+  _HopDinhDang _dinhDangHopTaiViTri(int vtTrai, int vtPhai, int doDaiVanBan) {
+    final coTrai = vtTrai - 1 >= 0;
+    final coPhai = vtPhai >= 0 && vtPhai < doDaiVanBan;
+
+    bool hopCo(bool Function(_VungDinhDangThuCong) doc) {
+      final trai = coTrai && _coDongNhatTrongVung(vtTrai - 1, vtTrai, doc);
+      final phai = coPhai && _coDongNhatTrongVung(vtPhai, vtPhai + 1, doc);
+      return trai || phai;
+    }
+
+    Color? hopMau({required bool laMauChu}) {
+      final trai = coTrai ? _mauDongNhatTrongVung(vtTrai - 1, vtTrai, laMauChu: laMauChu) : null;
+      if (trai != null) return trai;
+      return coPhai ? _mauDongNhatTrongVung(vtPhai, vtPhai + 1, laMauChu: laMauChu) : null;
+    }
+
+    return (
+      dam: hopCo((d) => d.dam),
+      nghieng: hopCo((d) => d.nghieng),
+      gachChan: hopCo((d) => d.gachChan),
+      gachNgang: hopCo((d) => d.gachNgang),
+      treMu: hopCo((d) => d.treMu),
+      treChan: hopCo((d) => d.treChan),
+      mauChu: hopMau(laMauChu: true),
+      mauNen: hopMau(laMauChu: false),
+    );
+  }
+
+  /// Gán [hop] (kết quả `_dinhDangHopTaiViTri` tính TRƯỚC khi chèn) cho đúng
+  /// đoạn [batDau, ketThuc) vừa được chèn vào văn bản — GHI ĐÈ toàn bộ 8
+  /// thuộc tính, không quan tâm đoạn đó vừa "kế thừa" được gì một cách tự
+  /// nhiên qua phép nới vùng của `_dieuChinhLoiChinhTaSauKhiSua` (có thể chỉ
+  /// đúng MỘT bên, không phải hợp cả hai) — đây là bước áp cuối cùng, đảm bảo
+  /// luôn đúng "hợp 2 bên" bất kể cách nới ở tầng dưới.
+  void _apDinhDangHopChoDoanMoiChen(int batDau, int ketThuc, _HopDinhDang hop) {
+    _ghiDeDinhDangTrongVung(batDau, ketThuc, (v) {
+      v
+        ..dam = hop.dam
+        ..nghieng = hop.nghieng
+        ..gachChan = hop.gachChan
+        ..gachNgang = hop.gachNgang
+        ..treMu = hop.treMu
+        ..treChan = hop.treChan
+        ..mauChu = hop.mauChu
+        ..mauNen = hop.mauNen;
+    });
+  }
+
   /// D3: tính trạng thái 8 loại định dạng (dam/nghieng/gachChan/gachNgang/
   /// treMu/treChan/mauChu/mauNen) cho vị trí/vùng chọn HIỆN TẠI, rồi GHI vào
   /// đúng các cờ `_xxxDangCho` mà thanh công cụ đang đọc để tô sáng nút —
   /// tái dùng luôn các cờ có sẵn, không thêm biến trạng thái mới cho UI.
   ///
-  /// - Vùng chọn KHÔNG rỗng: đồng nhất trên TOÀN vùng chọn (`_coDongNhatTrongVung`).
-  /// - Vùng chọn rỗng: xét đúng MỘT ký tự ngay TRƯỚC con trỏ; không có ký tự
-  ///   trước (đầu bài) thì mọi cờ tắt.
-  /// - D4: nếu đang có override thủ công (`_coDinhDangDangCho`) VÀ con trỏ
-  ///   còn ĐÚNG vị trí lúc override được đặt (`_viTriOverrideDangCho`) thì
-  ///   GIỮ NGUYÊN, không tính lại đè lên quyết định của người dùng.
+  /// - Vùng chọn KHÔNG rỗng: đồng nhất trên TOÀN vùng chọn (`_coDongNhatTrongVung`,
+  ///   D1 — không đổi).
+  /// - Vùng chọn rỗng: gọi thẳng `_dinhDangHopTaiViTri` — hợp (OR) định dạng
+  ///   của ký tự ngay TRƯỚC và ngay SAU con trỏ. KHÔNG còn "bộ nhớ đệm"/
+  ///   override nào chen vào nữa — đây là nguồn DUY NHẤT.
   ///
   /// O(k) với k = số `_VungDinhDangThuCong` giao vùng đang xét (thường vài
   /// chục vùng) — không quét toàn văn bản, không lặp lồng vòng lặp trên mỗi
@@ -3860,74 +3833,28 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (!chon.isCollapsed) {
       batDau = chon.start;
       ketThuc = chon.end;
-      _viTriOverrideDangCho = null; // D4: có vùng chọn thì bỏ override cũ.
     } else {
       final vt = chon.start;
-      if (_coDinhDangDangCho && _viTriOverrideDangCho == vt) return; // D4: giữ nguyên.
-      _viTriOverrideDangCho = null;
-      // (VIỆC 4a/4b) Con trỏ đứng yên: ký tự SẮP chèn (và vì vậy trạng thái
-      // nút toolbar) không còn chỉ xét ký tự BÊN TRÁI như D3 cũ — mà là HỢP
-      // (OR) riêng từng loại định dạng giữa ký tự bên TRÁI và ký tự bên
-      // PHẢI con trỏ. Đầu/cuối văn bản (thiếu một bên) thì chỉ xét bên còn
-      // lại. Cả hai đường "tính định dạng cho ký tự mới" (D5, qua vùng chờ
-      // 0-ký-tự tự nới) và "sáng nút toolbar" (D3) cùng đọc từ các cờ
-      // `_xxxDangCho` được hàm này ghi ra, nên một lần sửa ở đây áp dụng
-      // đúng cho cả hai, không lệch nhau.
-      final coTrai = vt - 1 >= 0;
-      final coPhai = vt < _boDieuKhien.text.length;
-      if (!coTrai && !coPhai) {
-        if (!_coDinhDangDangCho) return; // Đã tắt sẵn hết — khỏi rebuild vô ích.
-        setState(() {
-          _damDangCho = false;
-          _nghiengDangCho = false;
-          _gachChanDangCho = false;
-          _gachNganDangCho = false;
-          _treMuDangCho = false;
-          _treChanDangCho = false;
-          _mauChuDangCho = null;
-          _mauNenDangCho = null;
-        });
-        return;
-      }
-      bool hopCo(bool Function(_VungDinhDangThuCong) doc) {
-        final trai = coTrai && _coDongNhatTrongVung(vt - 1, vt, doc);
-        final phai = coPhai && _coDongNhatTrongVung(vt, vt + 1, doc);
-        return trai || phai;
-      }
-
-      Color? hopMau({required bool laMauChu}) {
-        final trai = coTrai ? _mauDongNhatTrongVung(vt - 1, vt, laMauChu: laMauChu) : null;
-        if (trai != null) return trai;
-        return coPhai ? _mauDongNhatTrongVung(vt, vt + 1, laMauChu: laMauChu) : null;
-      }
-
-      final dam = hopCo((d) => d.dam);
-      final nghieng = hopCo((d) => d.nghieng);
-      final gachChan = hopCo((d) => d.gachChan);
-      final gachNgang = hopCo((d) => d.gachNgang);
-      final treMu = hopCo((d) => d.treMu);
-      final treChan = hopCo((d) => d.treChan);
-      final mauChu = hopMau(laMauChu: true);
-      final mauNen = hopMau(laMauChu: false);
-      if (dam == _damDangCho &&
-          nghieng == _nghiengDangCho &&
-          gachChan == _gachChanDangCho &&
-          gachNgang == _gachNganDangCho &&
-          treMu == _treMuDangCho &&
-          treChan == _treChanDangCho &&
-          mauChu == _mauChuDangCho &&
-          mauNen == _mauNenDangCho) {
+      final hop = _dinhDangHopTaiViTri(vt, vt, _boDieuKhien.text.length);
+      if (hop.dam == _damDangCho &&
+          hop.nghieng == _nghiengDangCho &&
+          hop.gachChan == _gachChanDangCho &&
+          hop.gachNgang == _gachNganDangCho &&
+          hop.treMu == _treMuDangCho &&
+          hop.treChan == _treChanDangCho &&
+          hop.mauChu == _mauChuDangCho &&
+          hop.mauNen == _mauNenDangCho) {
         return; // Không đổi gì — khỏi setState vô ích.
       }
       setState(() {
-        _damDangCho = dam;
-        _nghiengDangCho = nghieng;
-        _gachChanDangCho = gachChan;
-        _gachNganDangCho = gachNgang;
-        _treMuDangCho = treMu;
-        _treChanDangCho = treChan;
-        _mauChuDangCho = mauChu;
-        _mauNenDangCho = mauNen;
+        _damDangCho = hop.dam;
+        _nghiengDangCho = hop.nghieng;
+        _gachChanDangCho = hop.gachChan;
+        _gachNganDangCho = hop.gachNgang;
+        _treMuDangCho = hop.treMu;
+        _treChanDangCho = hop.treChan;
+        _mauChuDangCho = hop.mauChu;
+        _mauNenDangCho = hop.mauNen;
       });
       return;
     }
@@ -4839,7 +4766,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           decoration: const InputDecoration(
                             border: InputBorder.none,
                           ),
-                          // D3/D4: cập nhật trạng thái định dạng theo vị trí
+                          // D3: cập nhật trạng thái định dạng theo vị trí
                           // con trỏ/selection. TextField không có tham số
                           // `onSelectionChanged` (đó là API của EditableText),
                           // nên việc gọi `_tinhTrangThaiDinhDangHienTai` được
