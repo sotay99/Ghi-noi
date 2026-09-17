@@ -76,6 +76,17 @@ class _VungDauCauMoi {
 /// Một khoảng chữ cần vẽ với kiểu riêng — bước trung gian để gộp cả ba nguồn
 /// (lỗi chính tả, đoạn không phù hợp, đoạn cần xoá) thành một danh sách duy
 /// nhất trước khi dựng TextSpan.
+/// true nếu mã UTF-16 [donVi] (một `codeUnit` của chuỗi) thuộc tập chắc chắn
+/// được `FontFeature.enable('sups')`/`'subs'` hỗ trợ tốt trên font hệ thống
+/// (Roboto Android): chữ cái La-tinh không dấu A-Z/a-z và số 0-9. Tiếng Việt
+/// có dấu và ký tự đặc biệt (#$$@###...) KHÔNG thuộc tập này — xem giải
+/// thích ở `_VungDinhDangThuCong.apDungLen`.
+bool _maUnicodeDuocSupsSubsHoTro(int donVi) {
+  return (donVi >= 0x30 && donVi <= 0x39) || // 0-9
+      (donVi >= 0x41 && donVi <= 0x5A) || // A-Z
+      (donVi >= 0x61 && donVi <= 0x7A); // a-z
+}
+
 class _VungVe {
   _VungVe({required this.batDau, required this.ketThuc, this.style, this.recognizer});
   final int batDau;
@@ -181,7 +192,22 @@ class _VungDinhDangThuCong {
   bool get rong =>
       !dam && !nghieng && !gachChan && !gachNgang && !treMu && !treChan && mauChu == null && mauNen == null;
 
-  TextStyle apDungLen(TextStyle style) {
+  /// [duPhong] chọn phương án cho phần chữ trên/dưới:
+  /// - `false` (mặc định — dùng cho ký tự thuộc [_maUnicodeDuocSupsSubsHoTro],
+  ///   tức chữ cái La-tinh A-Z/a-z và số 0-9): CHỈ áp `FontFeature` 'sups'/'subs',
+  ///   KHÔNG giảm `fontSize`. Font (Roboto trên Android) tự thay glyph
+  ///   superscript/subscript chuẩn của nó — glyph đó đã được thiết kế nhỏ và
+  ///   đẩy lên/xuống khỏi đường cơ sở theo đúng tỷ lệ riêng. Nhân thêm 0.7 ở
+  ///   đây sẽ THU NHỎ KÉP (glyph đã nhỏ theo font, rồi nhỏ thêm theo code) —
+  ///   đây chính là lý do "chữ trên" (treMu, dùng 'sups' — hoạt động) từng
+  ///   hiện NHỎ HƠN "chữ dưới" (treChan, dùng 'subs' — không tạo hiệu ứng gì
+  ///   trên font hệ thống) dù cả hai cùng nhân 0.7: treMu bị thu nhỏ kép,
+  ///   treChan chỉ bị thu nhỏ đơn.
+  /// - `true` (ký tự KHÔNG thuộc tập trên — tiếng Việt có dấu, ký tự đặc
+  ///   biệt): FontFeature không có tác dụng gì với các ký tự này (font không
+  ///   có glyph sups/subs thay thế), nên dùng fontSize*0.7 làm phương án dự
+  ///   phòng THUẦN — không kèm FontFeature vì nó chỉ thêm chi phí vô ích.
+  TextStyle apDungLen(TextStyle style, {bool duPhong = false}) {
     TextDecoration? decoration;
     if (gachChan && gachNgang) {
       decoration = TextDecoration.combine([TextDecoration.underline, TextDecoration.lineThrough]);
@@ -190,23 +216,17 @@ class _VungDinhDangThuCong {
     } else if (gachNgang) {
       decoration = TextDecoration.lineThrough;
     }
+    final treMuChan = treMu || treChan;
     return style.copyWith(
       fontWeight: dam ? FontWeight.bold : null,
       fontStyle: nghieng ? FontStyle.italic : null,
       decoration: decoration,
       color: mauChu,
       backgroundColor: mauNen,
-      fontSize: (treMu || treChan) ? (style.fontSize ?? 17) * 0.7 : null,
-      // Cỡ chữ nhỏ hơn là phương án dự phòng chắc chắn (luôn hiện được);
-      // fontFeatures 'sups'/'subs' là tính năng OpenType chuẩn của font,
-      // nếu font đang dùng hỗ trợ thì chữ còn được ĐẨY LÊN/XUỐNG khỏi
-      // đường cơ sở, không chỉ nhỏ lại — nếu font không hỗ trợ thì
-      // thuộc tính này không có tác dụng phụ nào (an toàn, không lỗi).
-      fontFeatures: treMu
-          ? const [FontFeature.enable('sups')]
-          : treChan
-              ? const [FontFeature.enable('subs')]
-              : null,
+      fontSize: (treMuChan && duPhong) ? (style.fontSize ?? 17) * 0.7 : null,
+      fontFeatures: (treMuChan && !duPhong)
+          ? (treMu ? const [FontFeature.enable('sups')] : const [FontFeature.enable('subs')])
+          : null,
     );
   }
 
@@ -654,7 +674,26 @@ class _BoDieuKhienChinhTa extends TextEditingController {
           mauNen: mauNen,
         );
         if (gop.rong) continue;
-        vung.add(_VungVe(batDau: a, ketThuc: b, style: gop.apDungLen(const TextStyle())));
+        if (gop.treMu || gop.treChan) {
+          // Tách đoạn [a,b) theo từng đoạn ký tự liên tục CÙNG nhóm "được
+          // FontFeature hỗ trợ hay không" — một lượt duyệt tuyến tính, gộp
+          // ký tự liên tiếp cùng nhóm thành một `_VungVe`, KHÔNG lặp lồng
+          // vòng lặp nào (an toàn về hiệu năng, xem `apDungLen`).
+          final hoTroStyle = gop.apDungLen(const TextStyle());
+          final duPhongStyle = gop.apDungLen(const TextStyle(), duPhong: true);
+          var i = a;
+          while (i < b) {
+            final hoTro = _maUnicodeDuocSupsSubsHoTro(vb.codeUnitAt(i));
+            var j = i + 1;
+            while (j < b && _maUnicodeDuocSupsSubsHoTro(vb.codeUnitAt(j)) == hoTro) {
+              j++;
+            }
+            vung.add(_VungVe(batDau: i, ketThuc: j, style: hoTro ? hoTroStyle : duPhongStyle));
+            i = j;
+          }
+        } else {
+          vung.add(_VungVe(batDau: a, ketThuc: b, style: gop.apDungLen(const TextStyle())));
+        }
       }
     }
 
@@ -3235,6 +3274,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Color? _mauChuDangCho;
   Color? _mauNenDangCho;
 
+  /// D4: vị trí con trỏ LÚC người dùng bấm nút đặt "đang chờ áp" thủ công
+  /// (nhánh selection rỗng của `_apDungDinhDang`) — null nghĩa là không có
+  /// override nào đang chờ. `_tinhTrangThaiDinhDangHienTai` so vị trí con
+  /// trỏ MỚI với giá trị này: còn ĐÚNG chỗ cũ (kể cả sau khi gõ tiếp ngay
+  /// tại đó — xem giải thích ở nơi gọi) thì giữ nguyên override, khác chỗ
+  /// thì phải tính lại theo tài liệu tại vị trí mới.
+  int? _viTriOverrideDangCho;
+
   bool get _coDinhDangDangCho =>
       _damDangCho ||
       _nghiengDangCho ||
@@ -3514,6 +3561,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         _mauNenDangCho = null;
       }
     });
+    // D4: ghi lại ĐÚNG vị trí con trỏ lúc đặt override này — con trỏ rời
+    // khỏi đây (không phải do gõ tiếp ngay tại chỗ) sẽ làm
+    // `_tinhTrangThaiDinhDangHienTai` tự huỷ override và tính lại theo tài
+    // liệu ở vị trí mới.
+    _viTriOverrideDangCho = _coDinhDangDangCho ? _viTriConTroHienTai() : null;
     _capNhatVungDangChoTaiConTro();
   }
 
@@ -3546,6 +3598,116 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       ..mauChu = _mauChuDangCho
       ..mauNen = _mauNenDangCho;
     _boDieuKhien.veLai();
+  }
+
+  /// D3: [batDau, ketThuc) có phải MỌI đoạn con đều mang CÙNG một giá trị
+  /// màu (mauChu nếu [laMauChu], ngược lại mauNen) — trả về màu đó nếu đồng
+  /// nhất và không null ở đâu, `null` nếu không (kể cả khi không ai có màu).
+  /// Cùng cách chia đoạn con như `_coDongNhatTrongVung` — một lượt duyệt
+  /// tuyến tính qua các mốc, không lặp lồng vòng lặp trên từng ký tự.
+  Color? _mauDongNhatTrongVung(int batDau, int ketThuc, {required bool laMauChu}) {
+    if (batDau >= ketThuc) return null;
+    final diem = <int>{batDau, ketThuc};
+    for (final d in _boDieuKhien.dinhDang) {
+      if (d.batDau > batDau && d.batDau < ketThuc) diem.add(d.batDau);
+      if (d.ketThuc > batDau && d.ketThuc < ketThuc) diem.add(d.ketThuc);
+    }
+    final moc = diem.toList()..sort();
+    Color? chung;
+    var coDoan = false;
+    for (var i = 0; i < moc.length - 1; i++) {
+      final a = moc[i], b = moc[i + 1];
+      if (a >= b) continue;
+      Color? mauDoan;
+      for (final d in _boDieuKhien.dinhDang) {
+        if (d.batDau <= a && d.ketThuc >= b) {
+          mauDoan = laMauChu ? (d.mauChu ?? mauDoan) : (d.mauNen ?? mauDoan);
+        }
+      }
+      if (mauDoan == null) return null;
+      if (!coDoan) {
+        chung = mauDoan;
+        coDoan = true;
+      } else if (chung != mauDoan) {
+        return null;
+      }
+    }
+    return coDoan ? chung : null;
+  }
+
+  /// D3: tính trạng thái 8 loại định dạng (dam/nghieng/gachChan/gachNgang/
+  /// treMu/treChan/mauChu/mauNen) cho vị trí/vùng chọn HIỆN TẠI, rồi GHI vào
+  /// đúng các cờ `_xxxDangCho` mà thanh công cụ đang đọc để tô sáng nút —
+  /// tái dùng luôn các cờ có sẵn, không thêm biến trạng thái mới cho UI.
+  ///
+  /// - Vùng chọn KHÔNG rỗng: đồng nhất trên TOÀN vùng chọn (`_coDongNhatTrongVung`).
+  /// - Vùng chọn rỗng: xét đúng MỘT ký tự ngay TRƯỚC con trỏ; không có ký tự
+  ///   trước (đầu bài) thì mọi cờ tắt.
+  /// - D4: nếu đang có override thủ công (`_coDinhDangDangCho`) VÀ con trỏ
+  ///   còn ĐÚNG vị trí lúc override được đặt (`_viTriOverrideDangCho`) thì
+  ///   GIỮ NGUYÊN, không tính lại đè lên quyết định của người dùng.
+  ///
+  /// O(k) với k = số `_VungDinhDangThuCong` giao vùng đang xét (thường vài
+  /// chục vùng) — không quét toàn văn bản, không lặp lồng vòng lặp trên mỗi
+  /// ký tự, an toàn gọi mỗi lần selection đổi (kể cả mỗi lần gõ phím).
+  void _tinhTrangThaiDinhDangHienTai() {
+    final chon = _boDieuKhien.selection;
+    if (!chon.isValid) return;
+    int batDau;
+    int ketThuc;
+    if (!chon.isCollapsed) {
+      batDau = chon.start;
+      ketThuc = chon.end;
+      _viTriOverrideDangCho = null; // D4: có vùng chọn thì bỏ override cũ.
+    } else {
+      final vt = chon.start;
+      if (_coDinhDangDangCho && _viTriOverrideDangCho == vt) return; // D4: giữ nguyên.
+      _viTriOverrideDangCho = null;
+      batDau = vt - 1;
+      ketThuc = vt;
+      if (batDau < 0) {
+        if (!_coDinhDangDangCho) return; // Đã tắt sẵn hết — khỏi rebuild vô ích.
+        setState(() {
+          _damDangCho = false;
+          _nghiengDangCho = false;
+          _gachChanDangCho = false;
+          _gachNganDangCho = false;
+          _treMuDangCho = false;
+          _treChanDangCho = false;
+          _mauChuDangCho = null;
+          _mauNenDangCho = null;
+        });
+        return;
+      }
+    }
+    final dam = _coDongNhatTrongVung(batDau, ketThuc, (d) => d.dam);
+    final nghieng = _coDongNhatTrongVung(batDau, ketThuc, (d) => d.nghieng);
+    final gachChan = _coDongNhatTrongVung(batDau, ketThuc, (d) => d.gachChan);
+    final gachNgang = _coDongNhatTrongVung(batDau, ketThuc, (d) => d.gachNgang);
+    final treMu = _coDongNhatTrongVung(batDau, ketThuc, (d) => d.treMu);
+    final treChan = _coDongNhatTrongVung(batDau, ketThuc, (d) => d.treChan);
+    final mauChu = _mauDongNhatTrongVung(batDau, ketThuc, laMauChu: true);
+    final mauNen = _mauDongNhatTrongVung(batDau, ketThuc, laMauChu: false);
+    if (dam == _damDangCho &&
+        nghieng == _nghiengDangCho &&
+        gachChan == _gachChanDangCho &&
+        gachNgang == _gachNganDangCho &&
+        treMu == _treMuDangCho &&
+        treChan == _treChanDangCho &&
+        mauChu == _mauChuDangCho &&
+        mauNen == _mauNenDangCho) {
+      return; // Không đổi gì — khỏi setState vô ích.
+    }
+    setState(() {
+      _damDangCho = dam;
+      _nghiengDangCho = nghieng;
+      _gachChanDangCho = gachChan;
+      _gachNganDangCho = gachNgang;
+      _treMuDangCho = treMu;
+      _treChanDangCho = treChan;
+      _mauChuDangCho = mauChu;
+      _mauNenDangCho = mauNen;
+    });
   }
 
   /// Mục 6c: [batDau, ketThuc) (đoạn GỐC sắp bị xoá khi chấp nhận thay thế)
@@ -4393,6 +4555,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           decoration: const InputDecoration(
                             border: InputBorder.none,
                           ),
+                          // D3/D4: chỉ nghe đúng lúc SELECTION đổi (không
+                          // phải mọi thay đổi nội dung) — nhẹ, đúng mục đích,
+                          // và KHÁC HẲN việc thêm một `_boDieuKhien.addListener`
+                          // mới (tránh cộng dồn thêm một listener chạy trên
+                          // MỌI thay đổi văn bản, kiểu lỗi đã gây ANR trước
+                          // đây). Việc bên trong là O(k) nhỏ, không quét toàn
+                          // văn bản — xem `_tinhTrangThaiDinhDangHienTai`.
+                          onSelectionChanged: (selection, cause) =>
+                              _tinhTrangThaiDinhDangHienTai(),
                         ),
                         // Chấm tròn tím đánh dấu cuối văn bản — chỉ mang tính
                         // trang trí, KHÔNG phải một ký tự thật, nên con trỏ
