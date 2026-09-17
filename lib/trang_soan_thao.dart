@@ -76,14 +76,17 @@ class _VungDauCauMoi {
 /// Một khoảng chữ cần vẽ với kiểu riêng — bước trung gian để gộp cả ba nguồn
 /// (lỗi chính tả, đoạn không phù hợp, đoạn cần xoá) thành một danh sách duy
 /// nhất trước khi dựng TextSpan.
-/// true nếu mã UTF-16 [donVi] (một `codeUnit` của chuỗi) thuộc tập chắc chắn
-/// được `FontFeature.enable('sups')`/`'subs'` hỗ trợ tốt trên font hệ thống
-/// (Roboto Android): chữ cái La-tinh không dấu A-Z/a-z và số 0-9. Tiếng Việt
-/// có dấu và ký tự đặc biệt (#$$@###...) KHÔNG thuộc tập này — xem giải
-/// thích ở `_VungDinhDangThuCong.apDungLen`.
-bool _maUnicodeDuocSupsSubsHoTro(int donVi) {
+/// true nếu ký tự [kyTu] (đúng MỘT ký tự) hợp lệ cho "chữ trên" (treMu):
+/// CHỈ chữ cái La-tinh thường a-z (0x61-0x7A) hoặc số 0-9 (0x30-0x39).
+/// `FontFeature.enable('sups')` chỉ được font hệ thống (Roboto Android) hỗ
+/// trợ tốt với đúng tập này — chữ HOA, tiếng Việt có dấu, ký tự đặc biệt đều
+/// KHÔNG có glyph superscript thay thế, nên treMu bị CHẶN HẲN với chúng
+/// (không còn phương án dự phòng "co nhỏ" như trước) — xem các điểm chặn ở
+/// `_baoLoiTreMu` và nơi gọi nó.
+bool _kyTuHopLeChoTreMu(String kyTu) {
+  if (kyTu.isEmpty) return false;
+  final donVi = kyTu.codeUnitAt(0);
   return (donVi >= 0x30 && donVi <= 0x39) || // 0-9
-      (donVi >= 0x41 && donVi <= 0x5A) || // A-Z
       (donVi >= 0x61 && donVi <= 0x7A); // a-z
 }
 
@@ -192,22 +195,16 @@ class _VungDinhDangThuCong {
   bool get rong =>
       !dam && !nghieng && !gachChan && !gachNgang && !treMu && !treChan && mauChu == null && mauNen == null;
 
-  /// [duPhong] chọn phương án cho phần chữ trên/dưới:
-  /// - `false` (mặc định — dùng cho ký tự thuộc [_maUnicodeDuocSupsSubsHoTro],
-  ///   tức chữ cái La-tinh A-Z/a-z và số 0-9): CHỈ áp `FontFeature` 'sups'/'subs',
-  ///   KHÔNG giảm `fontSize`. Font (Roboto trên Android) tự thay glyph
-  ///   superscript/subscript chuẩn của nó — glyph đó đã được thiết kế nhỏ và
-  ///   đẩy lên/xuống khỏi đường cơ sở theo đúng tỷ lệ riêng. Nhân thêm 0.7 ở
-  ///   đây sẽ THU NHỎ KÉP (glyph đã nhỏ theo font, rồi nhỏ thêm theo code) —
-  ///   đây chính là lý do "chữ trên" (treMu, dùng 'sups' — hoạt động) từng
-  ///   hiện NHỎ HƠN "chữ dưới" (treChan, dùng 'subs' — không tạo hiệu ứng gì
-  ///   trên font hệ thống) dù cả hai cùng nhân 0.7: treMu bị thu nhỏ kép,
-  ///   treChan chỉ bị thu nhỏ đơn.
-  /// - `true` (ký tự KHÔNG thuộc tập trên — tiếng Việt có dấu, ký tự đặc
-  ///   biệt): FontFeature không có tác dụng gì với các ký tự này (font không
-  ///   có glyph sups/subs thay thế), nên dùng fontSize*0.7 làm phương án dự
-  ///   phòng THUẦN — không kèm FontFeature vì nó chỉ thêm chi phí vô ích.
-  TextStyle apDungLen(TextStyle style, {bool duPhong = false}) {
+  /// - "Chữ dưới" (treChan): đơn giản, áp dụng ĐỒNG ĐỀU cho mọi ký tự — chỉ
+  ///   co nhỏ `fontSize` còn 0.7 lần, không dùng `FontFeature`.
+  /// - "Chữ trên" (treMu): dùng `FontFeature.enable('sups')`, KHÔNG giảm
+  ///   `fontSize` — font (Roboto trên Android) tự thay glyph superscript
+  ///   chuẩn của nó, đã được thiết kế nhỏ và đẩy lên khỏi đường cơ sở theo
+  ///   đúng tỷ lệ riêng; nhân thêm 0.7 sẽ THU NHỎ KÉP. treMu chỉ được đặt
+  ///   `true` cho ký tự hợp lệ theo [_kyTuHopLeChoTreMu] — việc chặn xảy ra
+  ///   TRƯỚC khi gán, ở nơi gọi (`_baoLoiTreMu` và các điểm kiểm tra), nên
+  ///   tới đây không cần kiểm tra lại ký tự.
+  TextStyle apDungLen(TextStyle style) {
     TextDecoration? decoration;
     if (gachChan && gachNgang) {
       decoration = TextDecoration.combine([TextDecoration.underline, TextDecoration.lineThrough]);
@@ -216,17 +213,14 @@ class _VungDinhDangThuCong {
     } else if (gachNgang) {
       decoration = TextDecoration.lineThrough;
     }
-    final treMuChan = treMu || treChan;
     return style.copyWith(
       fontWeight: dam ? FontWeight.bold : null,
       fontStyle: nghieng ? FontStyle.italic : null,
       decoration: decoration,
       color: mauChu,
       backgroundColor: mauNen,
-      fontSize: (treMuChan && duPhong) ? (style.fontSize ?? 17) * 0.7 : null,
-      fontFeatures: (treMuChan && !duPhong)
-          ? (treMu ? const [FontFeature.enable('sups')] : const [FontFeature.enable('subs')])
-          : null,
+      fontSize: treChan ? (style.fontSize ?? 17) * 0.7 : null,
+      fontFeatures: treMu ? const [FontFeature.enable('sups')] : null,
     );
   }
 
@@ -674,26 +668,7 @@ class _BoDieuKhienChinhTa extends TextEditingController {
           mauNen: mauNen,
         );
         if (gop.rong) continue;
-        if (gop.treMu || gop.treChan) {
-          // Tách đoạn [a,b) theo từng đoạn ký tự liên tục CÙNG nhóm "được
-          // FontFeature hỗ trợ hay không" — một lượt duyệt tuyến tính, gộp
-          // ký tự liên tiếp cùng nhóm thành một `_VungVe`, KHÔNG lặp lồng
-          // vòng lặp nào (an toàn về hiệu năng, xem `apDungLen`).
-          final hoTroStyle = gop.apDungLen(const TextStyle());
-          final duPhongStyle = gop.apDungLen(const TextStyle(), duPhong: true);
-          var i = a;
-          while (i < b) {
-            final hoTro = _maUnicodeDuocSupsSubsHoTro(vb.codeUnitAt(i));
-            var j = i + 1;
-            while (j < b && _maUnicodeDuocSupsSubsHoTro(vb.codeUnitAt(j)) == hoTro) {
-              j++;
-            }
-            vung.add(_VungVe(batDau: i, ketThuc: j, style: hoTro ? hoTroStyle : duPhongStyle));
-            i = j;
-          }
-        } else {
-          vung.add(_VungVe(batDau: a, ketThuc: b, style: gop.apDungLen(const TextStyle())));
-        }
+        vung.add(_VungVe(batDau: a, ketThuc: b, style: gop.apDungLen(const TextStyle())));
       }
     }
 
@@ -2094,6 +2069,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     _dieuChinhLoiChinhTaSauKhiSua(_neo, het - _neo, chenVao.length);
     _dieuChinhVungToanVanSauKhiSua(_neo, het - _neo, chenVao.length);
+    // (VIỆC 2, điểm iii/v — đường GIỌNG NÓI) Y hệt đường gõ tay: chữ vừa
+    // được giọng nói chèn có thể vừa bị vùng treMu "nuốt" vào — lọc ngay.
+    _gioiHanTreMuSauKhiChen(_neo, chenVao.length, moi);
 
     final viTri = _neo + chenVao.length;
     _ghiVaoO(moi, viTri);
@@ -2418,6 +2396,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     _dieuChinhLoiChinhTaSauKhiSua(dau, soLuongXoa, doDaiChenVao, vanBanCu: cu, vanBanMoi: chuMoi);
     _dieuChinhVungToanVanSauKhiSua(dau, soLuongXoa, doDaiChenVao);
+    // (VIỆC 2, điểm iii/v) Ký tự vừa chèn (gõ tay hoặc giọng nói) có thể vừa
+    // được vùng treMu (chữ trên) "nuốt" vào — do vùng chờ áp tại con trỏ tự
+    // nới rộng (D4), hoặc do nằm liền kề một vùng treMu có sẵn nên kế thừa
+    // (D3/D5) — ngay trong lệnh gọi `_dieuChinhLoiChinhTaSauKhiSua` phía
+    // trên. Lọc ngay ký tự không hợp lệ ra khỏi treMu tại đây.
+    _gioiHanTreMuSauKhiChen(dau, doDaiChenVao, chuMoi);
 
     // Gõ đúng MỘT ký tự đặc biệt (. , ; ? !) ngay sau một dấu cách có sẵn —
     // hoán đổi hai ký tự đó cho nhau, để dấu câu nằm sát vào chữ trước nó
@@ -2543,6 +2527,101 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // việc thông báo ra một microtask thì nó chạy SAU KHI toàn bộ lệnh gọi
     // hiện tại (kể cả _ghiVaoO cập nhật _chuGanNhat) đã xong.
     scheduleMicrotask(_boDieuKhien.veLai);
+  }
+
+  /// (VIỆC 2, điểm iii/v) Gọi ngay SAU khi các vùng `dinhDang` đã được
+  /// dời/nới theo phép chèn/xoá ở trên — [batDauChen, batDauChen+soChen) là
+  /// đúng khoảng ký tự VỪA CHÈN trong văn bản mới [vanBanMoi]. Khoảng này có
+  /// thể đã bị một vùng treMu "nuốt" vào, theo hai cách: vùng "chờ áp treMu"
+  /// 0-ký-tự tại con trỏ tự nới rộng (D4), hoặc một vùng treMu có sẵn liền
+  /// kề "kế thừa" (D3/D5) — cả hai cùng đi qua đúng phép nới ở trên, nên chỉ
+  /// cần lọc MỘT chỗ này là đủ, không cần phân biệt nguồn gốc.
+  ///
+  /// Với mỗi vùng treMu giao với khoảng vừa chèn: ký tự nào không hợp lệ
+  /// theo [_kyTuHopLeChoTreMu] bị TÁCH RA khỏi vùng treMu (tắt treMu CHỈ cho
+  /// đúng ký tự đó, giữ nguyên các cờ định dạng khác nếu có) — không phải
+  /// fallback co nhỏ, mà chặn hẳn treMu cho ký tự đó. Cờ "chờ áp treMu" tại
+  /// `_treMuDangCho` được GIỮ NGUYÊN (không tự tắt) để ký tự tiếp theo, nếu
+  /// hợp lệ, vẫn được áp bình thường.
+  ///
+  /// O(số vùng treMu giao khoảng vừa chèn × độ dài khoảng đó) — khoảng vừa
+  /// chèn thường chỉ 1 ký tự (gõ tay) hoặc một câu ngắn (giọng nói), không
+  /// lặp lồng thêm vòng nào khác, không gọi trong buildTextSpan/paint.
+  void _gioiHanTreMuSauKhiChen(int batDauChen, int soChen, String vanBanMoi) {
+    if (soChen <= 0) return;
+    final ketThucChen = batDauChen + soChen;
+    if (ketThucChen > vanBanMoi.length) return;
+    var coCanBao = false;
+    for (final d in List<_VungDinhDangThuCong>.of(_boDieuKhien.dinhDang)) {
+      if (!d.treMu) continue;
+      final a = d.batDau < batDauChen ? batDauChen : d.batDau;
+      final b = d.ketThuc > ketThucChen ? ketThucChen : d.ketThuc;
+      if (a >= b) continue;
+      var coKyTuXau = false;
+      for (var i = a; i < b; i++) {
+        if (!_kyTuHopLeChoTreMu(vanBanMoi[i])) {
+          coKyTuXau = true;
+          break;
+        }
+      }
+      if (!coKyTuXau) continue;
+      coCanBao = true;
+      // Tách [d.batDau, d.ketThuc) thành: phần ngoài [a, b) giữ nguyên, và
+      // bên trong [a, b) chia thành các đoạn con liên tục CÙNG trạng thái
+      // hợp lệ — đoạn hợp lệ giữ treMu, đoạn không hợp lệ tắt treMu.
+      _boDieuKhien.dinhDang.remove(d);
+      if (d.batDau < a) {
+        _boDieuKhien.dinhDang.add(_VungDinhDangThuCong(
+          batDau: d.batDau,
+          ketThuc: a,
+          dam: d.dam,
+          nghieng: d.nghieng,
+          gachChan: d.gachChan,
+          gachNgang: d.gachNgang,
+          treMu: d.treMu,
+          treChan: d.treChan,
+          mauChu: d.mauChu,
+          mauNen: d.mauNen,
+        ));
+      }
+      var i = a;
+      while (i < b) {
+        final hopLe = _kyTuHopLeChoTreMu(vanBanMoi[i]);
+        var j = i + 1;
+        while (j < b && _kyTuHopLeChoTreMu(vanBanMoi[j]) == hopLe) {
+          j++;
+        }
+        final vung = _VungDinhDangThuCong(
+          batDau: i,
+          ketThuc: j,
+          dam: d.dam,
+          nghieng: d.nghieng,
+          gachChan: d.gachChan,
+          gachNgang: d.gachNgang,
+          treMu: hopLe,
+          treChan: d.treChan,
+          mauChu: d.mauChu,
+          mauNen: d.mauNen,
+        );
+        if (!vung.rong) _boDieuKhien.dinhDang.add(vung);
+        i = j;
+      }
+      if (d.ketThuc > b) {
+        _boDieuKhien.dinhDang.add(_VungDinhDangThuCong(
+          batDau: b,
+          ketThuc: d.ketThuc,
+          dam: d.dam,
+          nghieng: d.nghieng,
+          gachChan: d.gachChan,
+          gachNgang: d.gachNgang,
+          treMu: d.treMu,
+          treChan: d.treChan,
+          mauChu: d.mauChu,
+          mauNen: d.mauNen,
+        ));
+      }
+    }
+    if (coCanBao) _baoLoiTreMu();
   }
 
   /// Đoạn CẦN THAY THẾ (đỏ, thuộc một `_VungKhongPhuHop` còn chờ quyết định)
@@ -2740,6 +2819,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         _dieuChinhLoiChinhTaSauKhiSua(d.viTri, 0, d.dauCau.length);
         _dieuChinhVungToanVanSauKhiSua(d.viTri, 0, d.dauCau.length);
         final moi = vbHienTai.replaceRange(d.viTri, d.viTri, d.dauCau);
+        // (VIỆC 2, điểm vi) Dấu câu AI tự chèn không thể hợp lệ cho treMu —
+        // lọc ngay nếu lỡ rơi vào một vùng treMu có sẵn.
+        _gioiHanTreMuSauKhiChen(d.viTri, d.dauCau.length, moi);
         _ghiVaoO(moi, d.viTri + d.dauCau.length);
         final v = _VungDauCauMoi(batDau: d.viTri, ketThuc: d.viTri + d.dauCau.length);
         _boDieuKhien.dauCauMoi.add(v);
@@ -2813,6 +2895,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _boDieuKhien.loi.remove(loi);
     _dieuChinhLoiChinhTaSauKhiSua(loi.batDau, loi.ketThuc - loi.batDau, thayBang.length);
     _dieuChinhVungToanVanSauKhiSua(loi.batDau, loi.ketThuc - loi.batDau, thayBang.length);
+    // (VIỆC 2, điểm vi) Từ AI đề xuất thay chính tả có thể lọt vào vùng
+    // treMu có sẵn — lọc ngay.
+    _gioiHanTreMuSauKhiChen(loi.batDau, thayBang.length, moi);
 
     final viTri = loi.batDau + thayBang.length;
     _neo = viTri;
@@ -2850,6 +2935,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _dieuChinhLoiChinhTaSauKhiSua(viTri, 0, chen.length);
 
     final moi = vb.replaceRange(viTri, viTri, chen);
+    // (VIỆC 2, điểm vi) Văn bản ghi âm AI chèn thẳng vào bài có thể lọt vào
+    // vùng treMu có sẵn ngay tại con trỏ — lọc ngay.
+    _gioiHanTreMuSauKhiChen(viTri, chen.length, moi);
     final viTriConTro = viTri + chen.length;
     _neo = viTriConTro;
     _ghiVaoO(moi, viTriConTro);
@@ -3209,6 +3297,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           mauChu: dinhDangKeThua.mauChu,
           mauNen: dinhDangKeThua.mauNen,
         ));
+        // (VIỆC 2, điểm vi) Đoạn ĐỀ XUẤT kế thừa treMu từ đoạn GỐC nhưng có
+        // thể mang ký tự khác đoạn gốc (AI đề xuất thay bằng chữ khác) — lọc
+        // lại y hệt lúc gõ tay, đừng để treMu dính vào ký tự không hợp lệ.
+        _gioiHanTreMuSauKhiChen(v.batDauDeXuat, v.ketThucDeXuat - v.batDauDeXuat, moi);
       }
       _ghiVaoO(moi, v.ketThucDeXuat);
       _henLuu();
@@ -3501,6 +3593,24 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       final batDau = chon.start, ketThuc = chon.end;
       // ĐIỀU CẤM KỴ (B7): có giao với vùng AI thì bỏ qua TOÀN BỘ thao tác.
       if (_giaoVoiVungAi(batDau, ketThuc)) return;
+      // Chặn treMu (chữ trên) nếu vùng chọn chứa BẤT KỲ ký tự nào không hợp
+      // lệ (ngoài a-z/0-9) — chặn TOÀN BỘ thao tác, không áp cho cả những ký
+      // tự hợp lệ nằm trong cùng vùng chọn. Chỉ cần kiểm tra khi vùng chọn
+      // SẮP được chuyển sang mang treMu (không cần kiểm tra khi đang TẮT
+      // treMu hoặc áp cờ khác). Một lượt duyệt O(độ dài vùng chọn), gọi đúng
+      // MỘT LẦN tại đây — không lặp lại trong buildTextSpan/paint.
+      if (loai == 'treMu') {
+        final dangDongNhatTreMu = _coDongNhatTrongVung(batDau, ketThuc, (d) => d.treMu);
+        if (!dangDongNhatTreMu) {
+          final vb = _boDieuKhien.text;
+          for (var i = batDau; i < ketThuc; i++) {
+            if (!_kyTuHopLeChoTreMu(vb[i])) {
+              _baoLoiTreMu();
+              return;
+            }
+          }
+        }
+      }
       if (loai == 'xoaDinhDang') {
         _xoaDinhDangTrongVung(batDau, ketThuc);
       } else if (loai == 'mauChu' || loai == 'mauNen') {
@@ -4204,6 +4314,39 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         entry.remove();
         _baoDangHien = null;
       }
+    });
+  }
+
+  /// Chặn mở CHỒNG nhiều hộp thoại lỗi treMu khi người dùng gõ nhanh/giọng
+  /// nói đổ về nhiều ký tự không hợp lệ liên tiếp — chỉ hộp thoại ĐẦU TIÊN
+  /// mở ra, các lần gọi tiếp theo trong lúc nó còn mở đều bị bỏ qua.
+  bool _dangHienLoiTreMu = false;
+
+  /// Hộp thoại cảnh báo dùng chung cho MỌI điểm treMu bị chặn (bấm nút/phím
+  /// tắt với vùng chọn có ký tự không hợp lệ, gõ tay/giọng nói chèn ký tự
+  /// không hợp lệ khi đang "chờ áp treMu" hoặc đang kế thừa treMu từ ký tự
+  /// liền trước) — khác `_bao()` (tự biến mất sau 2 giây): cái này cần người
+  /// dùng chủ động bấm "Đã hiểu" để đóng, nên dùng `showDialog` chuẩn.
+  void _baoLoiTreMu() {
+    if (!mounted || _dangHienLoiTreMu) return;
+    _dangHienLoiTreMu = true;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Không áp dụng được chữ trên'),
+        content: const Text(
+          'Định dạng chữ trên (superscript) chỉ áp dụng cho con số và chữ cái '
+          '(chữ thường) trong bảng chữ cái Quốc tế.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Đã hiểu'),
+          ),
+        ],
+      ),
+    ).then((_) {
+      _dangHienLoiTreMu = false;
     });
   }
 
