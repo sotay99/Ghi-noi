@@ -582,156 +582,44 @@ class _VeSongAm extends CustomPainter {
   bool shouldRepaint(covariant _VeSongAm cu) => true;
 }
 
-/// (VIỆC 5) `PopupMenuButton` mặc định của Flutter dựng menu qua một ROUTE
-/// nội bộ (`_PopupMenuRoute`) không có điểm chèn UI tuỳ biến an toàn nào cho
-/// "hai nút cuộn lên đầu/xuống cuối" hay "nút X đóng" — không thể chèn thêm
-/// widget NGOÀI danh sách `PopupMenuEntry` mà `itemBuilder` trả về.
-///
-/// Thay vì viết lại toàn bộ kiến trúc route (rủi ro cao, không build-test
-/// được trong phiên này), dùng đúng khả năng CÓ SẴN của `PopupMenuButton`:
-/// một `PopupMenuItem` có thể chứa BẤT KỲ widget nào, kể cả một danh sách
-/// cuộn phức tạp. Nên `itemBuilder` của cả hai menu (`_NutThemMenu`,
-/// `_NutAIMenu`) giờ chỉ trả về ĐÚNG MỘT `PopupMenuItem` (`enabled: false`
-/// để bản thân nó không tự đóng menu khi bấm, `padding: EdgeInsets.zero` để
-/// không cộng thêm viền của PopupMenuItem mặc định) chứa trọn widget này —
-/// nó tự vẽ danh sách mục, tự xử lý việc "chọn một mục" bằng cách gọi thẳng
-/// `Navigator.pop(context, gia)` giống hệt PopupMenuItem thật làm ngầm bên
-/// trong, và tự vẽ hai nút cuộn + nút X đóng đè lên trên.
-class _NoiDungMenuCuon extends StatefulWidget {
-  const _NoiDungMenuCuon({required this.mucList});
-
-  /// Mỗi phần tử: hoặc một dòng mục (`_MucMenuCuon`), hoặc một đường kẻ
-  /// ngăn cách (`null`).
-  final List<_MucMenuCuon?> mucList;
-
-  @override
-  State<_NoiDungMenuCuon> createState() => _NoiDungMenuCuonState();
+/// Một dòng trong menu thả xuống của nút dấu cộng — cao vừa đủ chữ, viền sát
+/// chữ, không rộng thùng thình như PopupMenuItem mặc định (cao tối thiểu 48).
+PopupMenuItem<int> _mucMenuThem(int gia, String chu) {
+  return PopupMenuItem<int>(
+    value: gia,
+    height: 34,
+    padding: const EdgeInsets.symmetric(horizontal: 14),
+    child: Text(chu, style: const TextStyle(fontSize: 13)),
+  );
 }
 
-class _MucMenuCuon {
-  const _MucMenuCuon(this.gia, this.chu, {this.icon, this.mauChu});
-  final int gia;
-  final String chu;
-  final Widget? icon;
-  final Color? mauChu;
-}
-
-class _NoiDungMenuCuonState extends State<_NoiDungMenuCuon> {
-  final _cuon = ScrollController();
-
-  @override
-  void dispose() {
-    _cuon.dispose();
-    super.dispose();
-  }
-
-  void _cuonLenDau() {
-    _cuon.animateTo(0, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
-  }
-
-  void _cuonXuongCuoi() {
-    if (!_cuon.hasClients) return;
-    _cuon.animateTo(
-      _cuon.position.maxScrollExtent,
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOut,
-    );
-  }
-
-  Widget _nutCuon(IconData icon, VoidCallback khiBam, String nhan) {
-    return Tooltip(
-      message: nhan,
-      child: InkResponse(
-        onTap: khiBam,
-        radius: 16,
-        child: Padding(
-          padding: const EdgeInsets.all(4),
-          child: Icon(icon, size: 16, color: const Color(0xFF5F6368)),
+/// (VIỆC 2) Mục đầu tiên của cả hai menu (`_NutThemMenu`, `_NutAIMenu`): một
+/// nút tròn đỏ có chữ X, nằm cuối hàng bên phải, chỉ để đóng menu ngay lập
+/// tức. Dùng `value: -1` (không khớp case nào trong `onSelected`) để việc
+/// bấm nút tự đóng menu theo đúng cơ chế mặc định của `PopupMenuItem` — vì
+/// đây vẫn là một `PopupMenuItem` bình thường (enabled mặc định) trong cùng
+/// danh sách, không phải widget tự vẽ lồng bên trong, nên KHÔNG bị ăn màu mờ
+/// và không đẩy các mục khác vào một khung cuộn bó hẹp.
+PopupMenuItem<int> _mucDongMenu() {
+  return PopupMenuItem<int>(
+    value: -1,
+    height: 28,
+    padding: EdgeInsets.zero,
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(right: 10),
+          child: Container(
+            width: 20,
+            height: 20,
+            decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+            child: const Icon(Icons.close, size: 14, color: Colors.white),
+          ),
         ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // Cao tối đa 320 — đủ để thấy vài mục cùng lúc mà vẫn chắc chắn cần cuộn
-    // với danh sách dài của hai menu này, chứng minh hai nút cuộn có tác
-    // dụng thật (không phải lúc nào cũng vừa khít trong một màn hình).
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxHeight: 320, minWidth: 220),
-      child: Stack(
-        children: [
-          SingleChildScrollView(
-            controller: _cuon,
-            padding: const EdgeInsets.only(top: 28, bottom: 4),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (final m in widget.mucList)
-                  if (m == null)
-                    const Divider(height: 8)
-                  else
-                    InkWell(
-                      onTap: () => Navigator.pop(context, m.gia),
-                      child: Container(
-                        height: 34,
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        alignment: Alignment.centerLeft,
-                        child: m.icon == null
-                            ? Text(
-                                m.chu,
-                                style: TextStyle(fontSize: 13, color: m.mauChu),
-                              )
-                            : Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  m.icon!,
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    m.chu,
-                                    style: TextStyle(fontSize: 13, color: m.mauChu),
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ),
-              ],
-            ),
-          ),
-          // Hai nút cuộn lên đầu/xuống cuối, mép phải khung menu — không che
-          // chữ vì chữ căn trái.
-          Positioned(
-            top: 2,
-            right: 2,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _nutCuon(Icons.vertical_align_top, _cuonLenDau, 'Lên đầu'),
-                _nutCuon(Icons.vertical_align_bottom, _cuonXuongCuoi, 'Xuống cuối'),
-              ],
-            ),
-          ),
-          // (VIỆC 5b) Nút X đỏ đóng menu — góc trên bên phải, đè lên trên
-          // hai nút cuộn (mở sau nên cùng bên phải, đặt kế ngay bên phải hai
-          // nút kia để không chồng lấn).
-          Positioned(
-            top: 2,
-            right: 60,
-            child: InkResponse(
-              onTap: () => Navigator.pop(context),
-              radius: 14,
-              child: Container(
-                width: 20,
-                height: 20,
-                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                child: const Icon(Icons.close, size: 14, color: Colors.white),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+      ],
+    ),
+  );
 }
 
 /// Nút dấu cộng ở thanh công cụ: mở một menu sổ lên (nằm trên đỉnh nút, vì
@@ -820,41 +708,35 @@ class _NutThemMenu extends StatelessWidget {
             }
           },
           itemBuilder: (ctx) => [
-            PopupMenuItem<int>(
-              enabled: false,
-              padding: EdgeInsets.zero,
-              child: _NoiDungMenuCuon(
-                mucList: [
-                  // Ba mục đầu — dời từ ba nút riêng trên thanh công cụ trên
-                  // (Sao chép tất cả/Xoá tất cả) xuống đây, cộng thêm mục
-                  // gộp mới "Sao chép rồi xoá tất cả".
-                  const _MucMenuCuon(20, 'Sao chép tất cả'),
-                  const _MucMenuCuon(21, 'Sao chép rồi xoá tất cả'),
-                  const _MucMenuCuon(22, 'Xoá tất cả'),
-                  null,
-                  // "Thêm ảnh"/"Chụp ảnh (camera)" đã dời sang menu "Làm
-                  // việc với AI" (đổi tên "Chuyển hình ảnh thành văn bản") —
-                  // "Cài đặt" và "Tìm kiếm và thay thế" (trước đây là hai
-                  // nút riêng ngoài thanh công cụ) vào thay đúng vị trí này.
-                  const _MucMenuCuon(24, 'Cài đặt'),
-                  const _MucMenuCuon(25, 'Tìm kiếm và thay thế'),
-                  null,
-                  const _MucMenuCuon(3, 'Bật bộ điều hướng và phím nhanh'),
-                  const _MucMenuCuon(4, 'Kiểu gõ bàn phím'),
-                  const _MucMenuCuon(23, 'Danh sách phím tắt'),
-                  const _MucMenuCuon(5, 'Luyện gõ phím bằng 10 ngón tay'),
-                  null,
-                  const _MucMenuCuon(6, 'Chia sẻ ứng dụng này đến với mọi người'),
-                  const _MucMenuCuon(7, 'Góp ý thêm, báo lỗi về ứng dụng'),
-                  const _MucMenuCuon(8, 'Donate ủng hộ-cảm ơn tác giả'),
-                  null,
-                  const _MucMenuCuon(9, 'Điều khoản sử dụng'),
-                  const _MucMenuCuon(10, 'Bảo mật và quyền riêng tư'),
-                  null,
-                  const _MucMenuCuon(11, 'Đăng nhập tài khoản'),
-                ],
-              ),
-            ),
+            // (VIỆC 2) Nút X đỏ đóng menu — luôn ở đầu danh sách.
+            _mucDongMenu(),
+            // Ba mục đầu — dời từ ba nút riêng trên thanh công cụ trên
+            // (Sao chép tất cả/Xoá tất cả) xuống đây, cộng thêm mục gộp mới
+            // "Sao chép rồi xoá tất cả".
+            _mucMenuThem(20, 'Sao chép tất cả'),
+            _mucMenuThem(21, 'Sao chép rồi xoá tất cả'),
+            _mucMenuThem(22, 'Xoá tất cả'),
+            const PopupMenuDivider(height: 8),
+            // "Thêm ảnh"/"Chụp ảnh (camera)" đã dời sang menu "Làm việc với
+            // AI" (đổi tên "Chuyển hình ảnh thành văn bản") — "Cài đặt" và
+            // "Tìm kiếm và thay thế" (trước đây là hai nút riêng ngoài thanh
+            // công cụ) vào thay đúng vị trí này.
+            _mucMenuThem(24, 'Cài đặt'),
+            _mucMenuThem(25, 'Tìm kiếm và thay thế'),
+            const PopupMenuDivider(height: 8),
+            _mucMenuThem(3, 'Bật bộ điều hướng và phím nhanh'),
+            _mucMenuThem(4, 'Kiểu gõ bàn phím'),
+            _mucMenuThem(23, 'Danh sách phím tắt'),
+            _mucMenuThem(5, 'Luyện gõ phím bằng 10 ngón tay'),
+            const PopupMenuDivider(height: 8),
+            _mucMenuThem(6, 'Chia sẻ ứng dụng này đến với mọi người'),
+            _mucMenuThem(7, 'Góp ý thêm, báo lỗi về ứng dụng'),
+            _mucMenuThem(8, 'Donate ủng hộ-cảm ơn tác giả'),
+            const PopupMenuDivider(height: 8),
+            _mucMenuThem(9, 'Điều khoản sử dụng'),
+            _mucMenuThem(10, 'Bảo mật và quyền riêng tư'),
+            const PopupMenuDivider(height: 8),
+            _mucMenuThem(11, 'Đăng nhập tài khoản'),
           ],
         ),
       ),
@@ -911,37 +793,42 @@ class _NutAIMenu extends StatelessWidget {
             if (gia == 9) khiBamKiemTraToanVan();
           },
           itemBuilder: (ctx) => [
+            // (VIỆC 2) Nút X đỏ đóng menu — luôn ở đầu danh sách.
+            _mucDongMenu(),
+            // Ba mục mới đầu menu — "Thêm ảnh"/"Chụp ảnh (camera)" dời từ
+            // menu "+ Thêm lựa chọn" sang đây (đổi tên mục ảnh), cộng thêm
+            // mục hoàn toàn mới cho âm thanh (chưa gắn logic).
+            _mucMenuThem(6, 'Chuyển hình ảnh thành văn bản'),
+            _mucMenuThem(7, 'Chụp ảnh (camera)'),
+            _mucMenuThem(8, 'Chuyển file âm thanh thành văn bản'),
+            const PopupMenuDivider(height: 8),
+            _mucMenuThem(1, 'Trò chuyện về văn bản này'),
+            _mucMenuThem(2, 'Tóm tắt toàn văn'),
+            _mucMenuThem(3, 'Mở rộng toàn văn'),
+            _mucMenuThem(4, 'Viết lại cho hay hơn'),
+            const PopupMenuDivider(height: 8),
+            // "Kiểm tra toàn văn" dời từ một nút riêng ngoài thanh công cụ
+            // vào ngay TRÊN mục cài đặt của nó — giữ màu xanh lá + icon dấu
+            // tích ở đây; mục cài đặt bên dưới không cần tô màu lặp lại nữa.
             PopupMenuItem<int>(
-              enabled: false,
-              padding: EdgeInsets.zero,
-              child: _NoiDungMenuCuon(
-                mucList: [
-                  // Ba mục mới đầu menu — "Thêm ảnh"/"Chụp ảnh (camera)" dời
-                  // từ menu "+ Thêm lựa chọn" sang đây (đổi tên mục ảnh),
-                  // cộng thêm mục hoàn toàn mới cho âm thanh (chưa gắn
-                  // logic).
-                  const _MucMenuCuon(6, 'Chuyển hình ảnh thành văn bản'),
-                  const _MucMenuCuon(7, 'Chụp ảnh (camera)'),
-                  const _MucMenuCuon(8, 'Chuyển file âm thanh thành văn bản'),
-                  null,
-                  const _MucMenuCuon(1, 'Trò chuyện về văn bản này'),
-                  const _MucMenuCuon(2, 'Tóm tắt toàn văn'),
-                  const _MucMenuCuon(3, 'Mở rộng toàn văn'),
-                  const _MucMenuCuon(4, 'Viết lại cho hay hơn'),
-                  null,
-                  // "Kiểm tra toàn văn" dời từ một nút riêng ngoài thanh
-                  // công cụ vào ngay TRÊN mục cài đặt của nó — giữ màu xanh
-                  // lá + icon dấu tích; mục cài đặt bên dưới không cần tô
-                  // màu lặp lại nữa.
-                  _MucMenuCuon(
-                    9,
+              value: 9,
+              height: 34,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.task_alt, size: 16, color: Colors.green.shade600),
+                  const SizedBox(width: 8),
+                  Text(
                     'Kiểm tra toàn văn',
-                    icon: Icon(Icons.task_alt, size: 16, color: Colors.green.shade600),
-                    mauChu: Colors.green.shade600,
+                    style: TextStyle(color: Colors.green.shade600),
                   ),
-                  const _MucMenuCuon(5, 'Cài đặt nút "Kiểm tra toàn văn"'),
                 ],
               ),
+            ),
+            PopupMenuItem<int>(
+              value: 5,
+              height: 34,
+              child: const Text('Cài đặt nút "Kiểm tra toàn văn"'),
             ),
           ],
         ),
