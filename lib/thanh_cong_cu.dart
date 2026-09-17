@@ -794,15 +794,15 @@ PopupMenuItem<int> _mucDongMenu(ScrollController controller) {
 /// `enabled: false`.
 ///
 /// Bọc trong `ConstrainedBox(maxHeight: ...)` + `SingleChildScrollView`
-/// (`shrinkWrap: true`, gắn [controller]) thay vì để trần: khung cuộn nội bộ
-/// SẴN CÓ của chính `PopupMenuButton` (một `SingleChildScrollView` khác, bọc
-/// toàn bộ danh sách mục) cho con của nó chiều cao KHÔNG GIỚI HẠN — lồng
-/// thẳng một `SingleChildScrollView` khác vào đó (chiều cuộn giống hệt) sẽ
-/// ném lỗi "unbounded height". Giới hạn chiều cao TỐI ĐA ở đây (một tỉ lệ
-/// màn hình, có trần) vừa tránh lỗi đó, vừa giữ đúng yêu cầu "không cuộn ép
-/// vào khung nhỏ nếu đủ chỗ": `shrinkWrap: true` khiến khung tự co theo đúng
-/// chiều cao nội dung khi nội dung NGẮN hơn trần, chỉ thật sự cuộn khi nội
-/// dung DÀI hơn.
+/// (gắn [controller]) thay vì để trần: khung cuộn nội bộ SẴN CÓ của chính
+/// `PopupMenuButton` (một `SingleChildScrollView` khác, bọc toàn bộ danh
+/// sách mục) cho con của nó chiều cao KHÔNG GIỚI HẠN — lồng thẳng một
+/// `SingleChildScrollView` khác vào đó (chiều cuộn giống hệt) sẽ ném lỗi
+/// "unbounded height". Giới hạn chiều cao TỐI ĐA ở đây (một tỉ lệ màn hình,
+/// có trần) vừa tránh lỗi đó, vừa giữ đúng yêu cầu "không cuộn ép vào khung
+/// nhỏ nếu đủ chỗ": `Column` bên trong dùng `mainAxisSize: MainAxisSize.min`
+/// nên khung tự co theo đúng chiều cao nội dung khi nội dung NGẮN hơn trần,
+/// chỉ thật sự cuộn khi nội dung DÀI hơn.
 PopupMenuItem<int> _mucCuonDanhSach(
   BuildContext context,
   ScrollController controller,
@@ -817,7 +817,6 @@ PopupMenuItem<int> _mucCuonDanhSach(
       constraints: BoxConstraints(maxHeight: gioiHanCao),
       child: SingleChildScrollView(
         controller: controller,
-        shrinkWrap: true,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
