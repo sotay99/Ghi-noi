@@ -408,6 +408,53 @@ class _VeChamCuoiVanBan extends CustomPainter {
   bool shouldRepaint(covariant _VeChamCuoiVanBan cu) => true;
 }
 
+/// (VIỆC 2) Con trỏ nháy TỰ VẼ, đè lên TRÊN CÙNG mọi lớp khác — kể cả
+/// `backgroundColor` của một `TextSpan` (màu nền định dạng thủ công). Caret
+/// GỐC của `TextField`/`EditableText` vẽ CÙNG lớp với chữ (dưới nền của
+/// span), nên khi đứng trên/cạnh ký tự có `mauNen`, caret gốc bị nền che kín
+/// hoàn toàn — không phải chuyện màu sắc trùng nhau (đã thử đổi màu, vẫn bị
+/// che), mà là thứ tự vẽ. Đây là painter RIÊNG, đặt Ở CUỐI danh sách con của
+/// `Stack` bọc `TextField` (xem `build`) nên luôn vẽ SAU CÙNG, không gì che
+/// được nữa — `showCursor: false` tắt hẳn caret gốc để tránh hai con trỏ
+/// chồng nhau.
+class _VeConTro extends CustomPainter {
+  _VeConTro({
+    required this.re,
+    required this.khungBox,
+    required this.viTri,
+    required this.mau,
+    required this.hienThi,
+  });
+  final RenderEditable re;
+  final RenderBox khungBox;
+  final int viTri;
+  final Color mau;
+
+  /// Pha nhấp nháy hiện tại — `false` thì `paint()` không vẽ gì cả (giả lập
+  /// nhịp tắt của caret chuẩn).
+  final bool hienThi;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (!hienThi) return;
+    if (!re.hasSize || !khungBox.hasSize) return;
+    Rect goc;
+    Offset diem;
+    try {
+      goc = re.getLocalRectForCaret(TextPosition(offset: viTri));
+      diem = re.localToGlobal(goc.topLeft, ancestor: khungBox);
+    } catch (_) {
+      return;
+    }
+    final vach = Rect.fromLTWH(diem.dx, diem.dy, 2.0, goc.height);
+    canvas.drawRect(vach, Paint()..color = mau);
+  }
+
+  @override
+  bool shouldRepaint(covariant _VeConTro cu) =>
+      cu.viTri != viTri || cu.hienThi != hienThi || cu.mau != mau;
+}
+
 // ------------------------------------------- mã hoá định dạng AI vào file
 
 /// Điểm bắt đầu khối định dạng AI (lỗi chính tả / đoạn không phù hợp / đoạn
@@ -1054,6 +1101,66 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     });
   }
 
+  /// (VIỆC 2) Pha nhấp nháy của con trỏ tự vẽ (`_VeConTro`) — `true` là đang
+  /// "hiện". Đổi bằng `Timer.periodic` (tái dùng đúng cách `_henMoDamChamCuoi`
+  /// đã làm trong file này, không thêm `AnimationController`/`vsync` mới cho
+  /// một việc đơn giản là đảo một bool theo nhịp cố định) — chỉ chạy trong
+  /// lúc `_oChu` đang giữ tiêu điểm, xem `_khiFocusConTroDoi`.
+  bool _conTroDangHien = true;
+  Timer? _henNhapNhayConTro;
+
+  void _khiFocusConTroDoi() {
+    if (_oChu.hasFocus) {
+      if (_henNhapNhayConTro != null) return;
+      // `setState` ở đây (không chỉ đặt biến suông) để buộc `build()` chạy
+      // lại ngay lúc vừa giành được tiêu điểm — overlay con trỏ chỉ tự vẽ lại
+      // theo `_boDieuKhien`/`_cuonVanBan` (xem `AnimatedBuilder` ở `build`),
+      // không tự biết focus vừa đổi, nên không gọi `setState` thì caret có
+      // thể không hiện ra cho tới lần đổi văn bản/cuộn kế tiếp.
+      if (mounted) {
+        setState(() => _conTroDangHien = true);
+      } else {
+        _conTroDangHien = true;
+      }
+      _henNhapNhayConTro = Timer.periodic(const Duration(milliseconds: 500), (_) {
+        if (!mounted) return;
+        setState(() => _conTroDangHien = !_conTroDangHien);
+      });
+    } else {
+      _henNhapNhayConTro?.cancel();
+      _henNhapNhayConTro = null;
+      if (mounted) setState(() => _conTroDangHien = false);
+    }
+  }
+
+  /// Con trỏ tự vẽ — chỉ hiện khi Ô CHỮ đang có tiêu điểm VÀ vùng chọn RỖNG
+  /// (con trỏ, không phải đang bôi chọn) — hệt hành vi caret chuẩn.
+  Widget _veConTro() {
+    if (!_oChu.hasFocus) return const SizedBox.shrink();
+    final chon = _boDieuKhien.selection;
+    if (!chon.isValid || !chon.isCollapsed) return const SizedBox.shrink();
+
+    final hopVanBan = _oVanBanKey.currentContext?.findRenderObject();
+    final khungBox = _khungVanBanKey.currentContext?.findRenderObject();
+    if (hopVanBan == null || khungBox is! RenderBox) {
+      return const SizedBox.shrink();
+    }
+    final re = _timRenderEditable(hopVanBan);
+    if (re == null) return const SizedBox.shrink();
+
+    return SizedBox.expand(
+      child: CustomPaint(
+        painter: _VeConTro(
+          re: re,
+          khungBox: khungBox,
+          viTri: chon.baseOffset,
+          mau: const Color(0xFFE91E63),
+          hienThi: _conTroDangHien,
+        ),
+      ),
+    );
+  }
+
   /// Mấy mức âm gần nhất, để vẽ sóng. Mới nhất nằm ở cuối.
   final List<double> _songAm = List<double>.filled(16, 0);
 
@@ -1511,6 +1618,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _ghiChuHienTai = widget.kho.timGhiChu(widget.ghiChuId)!;
     _tenController = TextEditingController(text: _ghiChuHienTai.ten);
     _oTen.addListener(_khiOTenMatFocus);
+    // (VIỆC 2) Bật/tắt nhấp nháy con trỏ tự vẽ theo đúng lúc `_oChu` được/mất
+    // tiêu điểm. KHÔNG gọi `_khiFocusConTroDoi()` ngay tại đây: nó gọi
+    // `setState` ở nhánh "mất tiêu điểm", mà State chưa build lần nào thì
+    // chưa được phép gọi `setState`. `autofocus: true` giành tiêu điểm cho
+    // `_oChu` NGAY SAU khung hình đầu tiên — khi đó `_oChu` tự phát sự kiện
+    // đổi focus, gọi listener này đúng lúc (đã an toàn, không còn trong
+    // initState nữa) để bắt đầu nháy.
+    _oChu.addListener(_khiFocusConTroDoi);
 
     WidgetsBinding.instance.addObserver(this);
     _boDieuKhien.addListener(_khiNguoiDungSua);
@@ -1576,6 +1691,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henRanhGioiGoTay?.cancel();
     _henTuTatMicroImLang?.cancel();
     _henMoDamChamCuoi?.cancel();
+    _henNhapNhayConTro?.cancel();
+    _oChu.removeListener(_khiFocusConTroDoi);
     _micro.cancel();
     _boDieuKhien.dispose();
     _oChu.dispose();
@@ -3578,6 +3695,26 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Color? _mauChuDangCho;
   Color? _mauNenDangCho;
 
+  /// (VIỆC 1 — chống gọi trùng) `(văn bản, vùng chọn)` mà
+  /// `_tinhTrangThaiDinhDangHienTai` vừa xử lý XONG gần nhất. `_ghiVaoO` tự
+  /// gán `_boDieuKhien.value` NGAY BÊN TRONG `_apDungChinhSuaNguoiDung`/
+  /// `_thayVungTamBangGiongNoi` — chính hai hàm đó lại đang chạy như là hệ
+  /// quả của một lượt `notifyListeners()` GỐC do bàn phím/IME phát ra (chúng
+  /// là listener của `_boDieuKhien`). Gán `.value` bên trong kích một lượt
+  /// `notifyListeners()` LỒNG chạy hết toàn bộ danh sách listener (kể cả
+  /// `_tinhTrangThaiDinhDangHienTai`) NGAY LẬP TỨC rồi mới trả quyền điều
+  /// khiển lại cho lượt GỐC — lượt gốc sau đó tiếp tục gọi NỐT các listener
+  /// còn lại của CHÍNH NÓ, tức là gọi lại `_tinhTrangThaiDinhDangHienTai` MỘT
+  /// LẦN NỮA cho đúng một (văn bản, con trỏ) đã xử lý xong ở lượt lồng. Lượt
+  /// lồng thấy đúng cờ `_vuaChenKyTuBangBoNhoDem == true` (đặt ngay trước khi
+  /// gọi `_ghiVaoO`) nên giữ đúng bộ nhớ đệm; lượt gốc chạy SAU đó thấy cờ đã
+  /// bị lượt lồng tiêu (`false`) nên hiểu NHẦM thành người dùng chủ động dời
+  /// con trỏ và HUỶ OAN bộ nhớ đệm — đúng lúc ký tự tiếp theo cần nó. Ghi nhớ
+  /// cặp giá trị vừa xử lý và bỏ qua ngay khi gặp lại y hệt là cách chặn gọn
+  /// nhất, không phải sửa lại toàn bộ kiến trúc cờ một lần.
+  String? _vanBanDaTinhDinhDang;
+  TextSelection? _luaChonDaTinhDinhDang;
+
   /// Điểm vào chính của mọi nút/phím tắt định dạng. [loai] là một trong:
   /// 'dam', 'nghieng', 'gachChan', 'gachNgang', 'treMu', 'treChan', 'mauChu',
   /// 'mauNen', 'xoaDinhDang'. [mau] chỉ dùng cho 'mauChu'/'mauNen'.
@@ -4123,6 +4260,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void _tinhTrangThaiDinhDangHienTai() {
     final chon = _boDieuKhien.selection;
     if (!chon.isValid) return;
+
+    // (VIỆC 1 — chống gọi trùng, xem giải thích tại khai báo hai biến) Lượt
+    // gọi thứ hai cho đúng CÙNG một (văn bản, vùng chọn) là hệ quả của việc
+    // `notifyListeners()` LỒNG bên trong lượt gốc — bỏ qua thẳng, đừng chạm
+    // tới cờ `_vuaChenKyTuBangBoNhoDem`/`_boNhoDemDangHoatDong` ở dưới, vì
+    // lượt đầu (lồng) đã xử lý đúng và đủ rồi.
+    final vanBanHienTai = _boDieuKhien.text;
+    if (vanBanHienTai == _vanBanDaTinhDinhDang && chon == _luaChonDaTinhDinhDang) {
+      return;
+    }
+    _vanBanDaTinhDinhDang = vanBanHienTai;
+    _luaChonDaTinhDinhDang = chon;
 
     // YÊU CẦU 2c (cờ một lần): mọi lần selection đổi mà KHÔNG phải hệ quả
     // trực tiếp của chính việc chèn ký tự (bộ nhớ đệm đang hoạt động) đều
@@ -5085,22 +5234,21 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           // tô kín tới tận mép phải dù không có chữ ở đó.
                           // `tight` khiến vùng tô chỉ ôm đúng phần có ký tự.
                           selectionWidthStyle: ui.BoxWidthStyle.tight,
-                          // Sửa lỗi con trỏ nháy (caret) bị "nuốt mất" khi
+                          // (VIỆC 2) Con trỏ nháy (caret) bị "nuốt mất" khi
                           // đứng trên/cạnh ký tự có `mauNen` (màu nền định
                           // dạng thủ công): `backgroundColor` của TextSpan
-                          // được engine vẽ CÙNG với chữ trong một lần vẽ
-                          // đoạn văn bản, còn caret mặc định của
-                          // TextField/EditableText vẽ TRƯỚC (dưới) đoạn văn
-                          // bản đó — nên màu nền che mất caret dù nó vẫn ở
-                          // đúng vị trí. TextField không có tham số nào vẽ
-                          // "viền quanh caret" hay đổi thứ tự vẽ (không lộ
-                          // `paintCursorAboveText` của EditableText ra ngoài),
-                          // nên cách an toàn nhất — không cần đoán API mới —
-                          // là đổi hẳn `cursorColor` sang một màu KHÔNG NẰM
-                          // trong bảng 8 màu nền cơ bản của định dạng thủ
-                          // công (`_NutMauDinhDang._bangMauCoBan`: đỏ, cam,
-                          // vàng, lục, lam, tím, đen, trắng) để caret luôn
-                          // đủ tương phản dù màu nền là gì trong số đó.
+                          // được engine vẽ CÙNG với chữ trong một lần vẽ đoạn
+                          // văn bản, còn caret GỐC của TextField/EditableText
+                          // vẽ CÙNG lớp đó (dưới nền của span kế tiếp khi
+                          // caret đứng NGAY TRƯỚC nó) — thử đổi hẳn màu caret
+                          // (từng làm) KHÔNG đủ, vì đây là chuyện THỨ TỰ VẼ,
+                          // không phải màu sắc: nền vẫn che kín caret dù màu
+                          // gì. TextField không có tham số nào đổi thứ tự vẽ
+                          // (không lộ `paintCursorAboveText` của EditableText
+                          // ra ngoài), nên tắt hẳn caret gốc và tự vẽ một
+                          // caret RIÊNG ở lớp TRÊN CÙNG của Stack (`_VeConTro`,
+                          // cuối danh sách con bên dưới) — xem chú thích ở đó.
+                          showCursor: false,
                           cursorColor: const Color(0xFFE91E63),
                           // D3: cập nhật trạng thái định dạng theo vị trí
                           // con trỏ/selection. TextField không có tham số
@@ -5129,6 +5277,24 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                               animation: Listenable.merge([_boDieuKhien, _cuonVanBan]),
                               builder: (context, _) => Stack(
                                 children: [_chamCuoiVanBan()],
+                              ),
+                            ),
+                          ),
+                        ),
+                        // (VIỆC 2) Con trỏ nháy tự vẽ — CUỐI CÙNG trong danh
+                        // sách con của Stack này nên vẽ SAU CÙNG, đè lên trên
+                        // mọi lớp khác kể cả `mauNen` của chữ. Nghe cả
+                        // `_boDieuKhien` (đổi vị trí/nội dung) lẫn `_cuonVanBan`
+                        // (cuộn) — đúng lý do đã giải thích ở các overlay khác
+                        // phía trên; nhịp nhấp nháy tự đổi qua `setState` của
+                        // State (Timer ở `_khiFocusConTroDoi`) nên không cần
+                        // thêm Listenable riêng cho việc đó.
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: AnimatedBuilder(
+                              animation: Listenable.merge([_boDieuKhien, _cuonVanBan]),
+                              builder: (context, _) => Stack(
+                                children: [_veConTro()],
                               ),
                             ),
                           ),
