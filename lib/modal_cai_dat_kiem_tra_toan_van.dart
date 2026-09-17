@@ -175,12 +175,14 @@ class _ThanCaiDatKiemTraToanVanState extends State<_ThanCaiDatKiemTraToanVan> {
               TextSpan(
                 style: const TextStyle(height: 1.5, color: Colors.black87),
                 children: [
-                  const TextSpan(text: 'Để sử dụng chức năng kiểm tra toàn văn bằng AI, vui lòng bấm nút '),
+                  const TextSpan(
+                      text: 'Để sử dụng chức năng kiểm tra toàn văn bằng AI, vui lòng bấm nút '
+                          '"Làm việc với AI" ở thanh công cụ rồi chọn mục '),
                   const WidgetSpan(
                     alignment: PlaceholderAlignment.middle,
                     child: _NutKiemTraToanVanMoPhong(),
                   ),
-                  const TextSpan(text: ' ở thanh công cụ.'),
+                  const TextSpan(text: '.'),
                 ],
               ),
             ),

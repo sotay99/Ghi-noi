@@ -197,6 +197,16 @@ class _VungDinhDangThuCong {
       color: mauChu,
       backgroundColor: mauNen,
       fontSize: (treMu || treChan) ? (style.fontSize ?? 17) * 0.7 : null,
+      // Cỡ chữ nhỏ hơn là phương án dự phòng chắc chắn (luôn hiện được);
+      // fontFeatures 'sups'/'subs' là tính năng OpenType chuẩn của font,
+      // nếu font đang dùng hỗ trợ thì chữ còn được ĐẨY LÊN/XUỐNG khỏi
+      // đường cơ sở, không chỉ nhỏ lại — nếu font không hỗ trợ thì
+      // thuộc tính này không có tác dụng phụ nào (an toàn, không lỗi).
+      fontFeatures: treMu
+          ? const [FontFeature.enable('sups')]
+          : treChan
+              ? const [FontFeature.enable('subs')]
+              : null,
     );
   }
 
@@ -443,6 +453,16 @@ class _BoDieuKhienChinhTa extends TextEditingController {
   /// `vung` ở `buildTextSpan` không cần lo tranh chấp thứ tự với các vùng AI.
   final List<_VungDinhDangThuCong> dinhDang = [];
 
+  /// Kết quả tìm kiếm hiện tại (mục 3) — chỉ để BIẾT vùng nào đang được
+  /// painter tìm kiếm (`_VeTimKiem`, vẽ ở lớp DƯỚI ô soạn thảo thật) tô
+  /// gradient đỏ→vàng, để tạm bỏ `backgroundColor` của định dạng thủ công
+  /// (`mauNen`) tại đúng những ký tự đó — `backgroundColor` là thuộc tính
+  /// của chính `TextSpan` (lớp chữ thật, luôn vẽ TRÊN mọi painter khác
+  /// trong `Stack`), nên không có cách "vẽ chồng lên sau" nào khác ngoài
+  /// việc không đặt nó ở những ký tự này trong lúc tìm kiếm.
+  List<int> viTriTimKiem = [];
+  int doDaiTimKiem = 0;
+
   void Function(LoiChinhTa loi, Offset viTriManHinh)? khiBamTuSai;
   void Function(_VungKhongPhuHop vung, Offset viTriManHinh)? khiBamDoanKhongPhuHop;
   void Function(_VungCanXoa vung, Offset viTriManHinh)? khiBamDoanCanXoa;
@@ -581,6 +601,16 @@ class _BoDieuKhienChinhTa extends TextEditingController {
         diem.add(d.batDau);
         diem.add(d.ketThuc);
       }
+      // Thêm biên các kết quả tìm kiếm vào mốc chia đoạn, để đoạn nào giao
+      // với một kết quả tìm kiếm được tách riêng ra (xem suy luận `laVungTimKiem` dưới).
+      if (doDaiTimKiem > 0) {
+        for (final vt in viTriTimKiem) {
+          final kt = vt + doDaiTimKiem;
+          if (vt < 0 || kt > vb.length) continue;
+          diem.add(vt);
+          diem.add(kt);
+        }
+      }
       final moc = diem.toList()..sort();
       for (var i = 0; i < moc.length - 1; i++) {
         final a = moc[i], b = moc[i + 1];
@@ -598,6 +628,17 @@ class _BoDieuKhienChinhTa extends TextEditingController {
             treChan = treChan || d.treChan;
             mauChu = d.mauChu ?? mauChu;
             mauNen = d.mauNen ?? mauNen;
+          }
+        }
+        // Đoạn [a,b) nằm trọn trong một kết quả tìm kiếm — bỏ nền thủ công để
+        // gradient của painter tìm kiếm (vẽ dưới) không bị che.
+        if (mauNen != null && doDaiTimKiem > 0) {
+          for (final vt in viTriTimKiem) {
+            final kt = vt + doDaiTimKiem;
+            if (a >= vt && b <= kt) {
+              mauNen = null;
+              break;
+            }
           }
         }
         final gop = _VungDinhDangThuCong(
@@ -771,6 +812,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _ketQuaTimKiem = [];
       _chiSoTimKiemHienTai = -1;
     });
+    _boDieuKhien.viTriTimKiem = [];
+    _boDieuKhien.doDaiTimKiem = 0;
+    _boDieuKhien.veLai();
     _oChu.requestFocus();
   }
 
@@ -798,6 +842,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         _cuonToiKetQuaHienTai();
       }
     });
+    _boDieuKhien.viTriTimKiem = ds;
+    _boDieuKhien.doDaiTimKiem = tuKhoa.length;
+    _boDieuKhien.veLai();
   }
 
   /// Văn bản đổi (gõ tay hay do nói) trong lúc thanh tìm kiếm đang mở thì
@@ -1194,11 +1241,20 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Lưu/Tìm kiếm, chỉ hiện khi ô soạn thảo có/từng có nội dung (luôn hiện,
   /// đơn giản hơn ẩn/hiện theo điều kiện).
   Widget _thanhDinhDangThuCong() {
+    // Mục 7: chiều cao mỗi nút giảm hết mức còn bấm trúng — bỏ padding mặc
+    // định 8px mọi phía của IconButton (VisualDensity.compact + constraints
+    // riêng), giữ đúng 36px mỗi chiều (vẫn ~ ngưỡng chạm tối thiểu chuẩn).
+    const kichThuocNut = BoxConstraints.tightFor(width: 36, height: 36);
+    const matDoNut = VisualDensity.compact;
+
     Widget nut(IconData icon, bool bat, String loai, String nhan) {
       return IconButton(
         iconSize: 20,
         tooltip: nhan,
         icon: Icon(icon),
+        visualDensity: matDoNut,
+        constraints: kichThuocNut,
+        padding: EdgeInsets.zero,
         style: IconButton.styleFrom(
           backgroundColor: bat ? const Color(0xFFE3F2FD) : null,
           foregroundColor: bat ? const Color(0xFF1565C0) : const Color(0xFF5F6368),
@@ -1212,6 +1268,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         iconSize: 20,
         tooltip: nhan,
         icon: Text(chu, style: const TextStyle(fontWeight: FontWeight.bold)),
+        visualDensity: matDoNut,
+        constraints: kichThuocNut,
+        padding: EdgeInsets.zero,
         style: IconButton.styleFrom(
           backgroundColor: bat ? const Color(0xFFE3F2FD) : null,
           foregroundColor: bat ? const Color(0xFF1565C0) : const Color(0xFF5F6368),
@@ -1220,9 +1279,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       );
     }
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
+    // Mục 12: `Wrap` thay cho `Row` trong `SingleChildScrollView` — màn
+    // hình hẹp không đủ chỗ ngang cho hết các nút thì tự động xuống dòng,
+    // không cuộn ngang (dễ bỏ sót nút nằm ngoài khung nhìn hơn xuống dòng).
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      child: Wrap(
+        spacing: 2,
+        runSpacing: 2,
         children: [
           nut(Icons.format_bold, _damDangCho, 'dam', 'Đậm (Ctrl+B)'),
           nut(Icons.format_italic, _nghiengDangCho, 'nghieng', 'Nghiêng (Ctrl+I)'),
@@ -1253,11 +1317,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               _apDungDinhDang('mauNen', mau: m);
             },
             choPhepTrongSuot: true,
+            laMauNen: true,
           ),
           IconButton(
             iconSize: 20,
             tooltip: 'Xoá định dạng văn bản (Ctrl+Q)',
             icon: const Icon(Icons.format_clear),
+            visualDensity: matDoNut,
+            constraints: kichThuocNut,
+            padding: EdgeInsets.zero,
             onPressed: () => _apDungDinhDang('xoaDinhDang'),
           ),
         ],
@@ -3007,6 +3075,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _luuDiemMoc();
 
     if (chon == 'dung') {
+      // Mục 6c: đoạn GỐC sắp bị xoá có đồng nhất định dạng thủ công không —
+      // nếu có, đoạn ĐỀ XUẤT (giữ lại) kế thừa đúng tổ hợp đó. Phải đọc TRƯỚC
+      // khi xoá đoạn gốc (đọc xong `_dinhDangDongNhatTrongVung` mới sửa
+      // `dinhDang`), vì `_dieuChinhLoiChinhTaSauKhiSua` ngay sau đây sẽ tự
+      // xoá/co các vùng định dạng đang giao với đoạn gốc.
+      final dinhDangKeThua = _dinhDangDongNhatTrongVung(v.batDauGoc, v.ketThucGoc);
       // Xoá đoạn GỐC, giữ đoạn ĐỀ XUẤT — cho đoạn đề xuất nhấp nháy xanh/đen.
       final doDaiGoc = v.ketThucGoc - v.batDauGoc;
       final moi = vb.replaceRange(v.batDauGoc, v.ketThucGoc, '');
@@ -3015,6 +3089,20 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       v.ketThucGoc = v.batDauGoc;
       v.batDauDeXuat -= doDaiGoc;
       v.ketThucDeXuat -= doDaiGoc;
+      if (dinhDangKeThua != null && v.batDauDeXuat < v.ketThucDeXuat) {
+        _boDieuKhien.dinhDang.add(_VungDinhDangThuCong(
+          batDau: v.batDauDeXuat,
+          ketThuc: v.ketThucDeXuat,
+          dam: dinhDangKeThua.dam,
+          nghieng: dinhDangKeThua.nghieng,
+          gachChan: dinhDangKeThua.gachChan,
+          gachNgang: dinhDangKeThua.gachNgang,
+          treMu: dinhDangKeThua.treMu,
+          treChan: dinhDangKeThua.treChan,
+          mauChu: dinhDangKeThua.mauChu,
+          mauNen: dinhDangKeThua.mauNen,
+        ));
+      }
       _ghiVaoO(moi, v.ketThucDeXuat);
       _henLuu();
       _batNhapNhayKhongPhuHop(v, 'xanh');
@@ -3100,6 +3188,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// 'dam', 'nghieng', 'gachChan', 'gachNgang', 'treMu', 'treChan', 'mauChu',
   /// 'mauNen', 'xoaDinhDang'. [mau] chỉ dùng cho 'mauChu'/'mauNen'.
   void _apDungDinhDang(String loai, {Color? mau}) {
+    // Mục 5: mỗi lần áp/bỏ định dạng là MỘT mốc lịch sử riêng, để Ctrl+Z
+    // hoàn tác đúng thao tác này (không đụng tới chữ, chỉ đụng `dinhDang`).
+    _luuDiemMocDinhDang();
     final chon = _boDieuKhien.selection;
     if (chon.isValid && !chon.isCollapsed) {
       final batDau = chon.start, ketThuc = chon.end;
@@ -3128,6 +3219,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         }
         _boDieuKhien.dinhDang.add(v);
       }
+      // Áp định dạng không đổi độ dài văn bản, nên vùng chọn cũ vẫn còn hợp
+      // lệ nguyên offset — bấm nút toolbar làm ô soạn thảo tạm mất focus
+      // (nút tự nhận focus khi bấm) và có thể khiến vùng chọn bị co lại;
+      // đặt lại đúng vùng cũ ở đây để nút toolbar giữ được vùng bôi đen
+      // giống hệt phím tắt (phím tắt không rời focus khỏi ô soạn thảo nên
+      // không gặp vấn đề này).
+      _boDieuKhien.selection = chon;
+      _oChu.requestFocus();
       _boDieuKhien.veLai();
       _henLuu();
       return;
@@ -3198,6 +3297,66 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _boDieuKhien.veLai();
   }
 
+  /// Mục 6c: [batDau, ketThuc) (đoạn GỐC sắp bị xoá khi chấp nhận thay thế)
+  /// có phải TOÀN BỘ ký tự cùng mang đúng MỘT tổ hợp định dạng thủ công
+  /// không (kể cả tổ hợp "không định dạng gì") — nếu đúng, trả về tổ hợp đó
+  /// để đoạn ĐỀ XUẤT thay vào kế thừa; nếu ký tự trong đoạn có định dạng
+  /// khác nhau (không đồng nhất), trả về `null` (đoạn mới không kế thừa gì).
+  _VungDinhDangThuCong? _dinhDangDongNhatTrongVung(int batDau, int ketThuc) {
+    if (batDau >= ketThuc) return null;
+    final diem = <int>{batDau, ketThuc};
+    for (final d in _boDieuKhien.dinhDang) {
+      if (d.batDau > batDau) diem.add(d.batDau.clamp(batDau, ketThuc));
+      if (d.ketThuc < ketThuc) diem.add(d.ketThuc.clamp(batDau, ketThuc));
+    }
+    final moc = diem.toList()..sort();
+    _VungDinhDangThuCong? truoc;
+    for (var i = 0; i < moc.length - 1; i++) {
+      final a = moc[i], b = moc[i + 1];
+      if (a >= b) continue;
+      var dam = false, nghieng = false, gachChan = false, gachNgang = false, treMu = false, treChan = false;
+      Color? mauChu;
+      Color? mauNen;
+      for (final d in _boDieuKhien.dinhDang) {
+        if (d.batDau <= a && d.ketThuc >= b) {
+          dam = dam || d.dam;
+          nghieng = nghieng || d.nghieng;
+          gachChan = gachChan || d.gachChan;
+          gachNgang = gachNgang || d.gachNgang;
+          treMu = treMu || d.treMu;
+          treChan = treChan || d.treChan;
+          mauChu = d.mauChu ?? mauChu;
+          mauNen = d.mauNen ?? mauNen;
+        }
+      }
+      final hienTai = _VungDinhDangThuCong(
+        batDau: a,
+        ketThuc: b,
+        dam: dam,
+        nghieng: nghieng,
+        gachChan: gachChan,
+        gachNgang: gachNgang,
+        treMu: treMu,
+        treChan: treChan,
+        mauChu: mauChu,
+        mauNen: mauNen,
+      );
+      if (truoc == null) {
+        truoc = hienTai;
+      } else if (truoc.dam != hienTai.dam ||
+          truoc.nghieng != hienTai.nghieng ||
+          truoc.gachChan != hienTai.gachChan ||
+          truoc.gachNgang != hienTai.gachNgang ||
+          truoc.treMu != hienTai.treMu ||
+          truoc.treChan != hienTai.treChan ||
+          truoc.mauChu != hienTai.mauChu ||
+          truoc.mauNen != hienTai.mauNen) {
+        return null; // Không đồng nhất.
+      }
+    }
+    return truoc;
+  }
+
   /// Xoá phần định dạng thủ công nằm TRONG [batDau, ketThuc) khỏi mọi vùng
   /// hiện có — vùng nào bị cắt đôi (định dạng trải dài qua cả hai biên) thì
   /// tách thành hai vùng con giữ nguyên phần còn lại NGOÀI khoảng bị xoá.
@@ -3266,7 +3425,39 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         for (final x in _boDieuKhien.canXoa)
           if (!x.dangNhapNhay) _MocVungCanXoa(batDau: x.batDau, ketThuc: x.ketThuc),
       ],
+      dinhDang: [
+        for (final d in _boDieuKhien.dinhDang)
+          _VungDinhDangThuCong(
+            batDau: d.batDau,
+            ketThuc: d.ketThuc,
+            dam: d.dam,
+            nghieng: d.nghieng,
+            gachChan: d.gachChan,
+            gachNgang: d.gachNgang,
+            treMu: d.treMu,
+            treChan: d.treChan,
+            mauChu: d.mauChu,
+            mauNen: d.mauNen,
+          ),
+      ],
     );
+  }
+
+  /// Y hệt [_luuDiemMoc] nhưng dành riêng cho một thao tác áp/bỏ ĐỊNH DẠNG
+  /// THỦ CÔNG (mục 5): gọi NGAY TRƯỚC khi sửa `_boDieuKhien.dinhDang`, để
+  /// Ctrl+Z hoàn tác đúng về trạng thái định dạng trước đó. Không thể dùng
+  /// chung [_luuDiemMoc] vì hàm đó bỏ qua mốc khi chữ chưa đổi — một thao
+  /// tác định dạng không đổi chữ (`vanBan` y nguyên) nên sẽ luôn bị bỏ qua
+  /// nếu đi qua đường dedupe đó; ở đây LUÔN chụp, không dedupe theo chữ.
+  void _luuDiemMocDinhDang() {
+    setState(() {
+      _lichSuLui.add(_chupTrangThai(
+        vanBan: _boDieuKhien.text,
+        viTriConTro: _viTriConTroHienTai(),
+      ));
+      if (_lichSuLui.length > _soLuongLichSuToiDa) _lichSuLui.removeAt(0);
+      _lichSuToi.clear();
+    });
   }
 
   /// Chụp lại trọn vẹn trạng thái NGAY TRƯỚC một đợt gõ/nói/hành động sắp
@@ -3350,6 +3541,20 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _boDieuKhien.canXoa
       ..clear()
       ..addAll(tt.canXoa.map((m) => _VungCanXoa(batDau: m.batDau, ketThuc: m.ketThuc)));
+    _boDieuKhien.dinhDang
+      ..clear()
+      ..addAll(tt.dinhDang.map((d) => _VungDinhDangThuCong(
+            batDau: d.batDau,
+            ketThuc: d.ketThuc,
+            dam: d.dam,
+            nghieng: d.nghieng,
+            gachChan: d.gachChan,
+            gachNgang: d.gachNgang,
+            treMu: d.treMu,
+            treChan: d.treChan,
+            mauChu: d.mauChu,
+            mauNen: d.mauNen,
+          )));
 
     // setState trần: buộc vẽ lại AppBar để nút Lùi/Tiến bật/tắt đúng theo độ
     // dài _lichSuLui/_lichSuToi vừa đổi (bản thân chúng không tự kích rebuild).
@@ -3626,9 +3831,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
+  /// Mục 11: ẩn/hiện thanh định dạng thủ công (B/I/U/S/...) — chỉ một biến
+  /// bool đơn giản, không cần lưu lại giữa các lần mở trang.
+  bool _anThanhDinhDang = false;
+
   // "Sao chép tất cả", "Sao chép rồi xoá tất cả" và "Xoá tất cả" đã dời vào
-  // menu "+ Thêm lựa chọn" của thanh công cụ dưới (xem `ThanhCongCu`), và nút
-  // "Chọn tất cả" đã bỏ hẳn — thanh trên giờ chỉ còn Lùi lại/Tiến tới/Lưu.
+  // menu "+ Thêm lựa chọn" của thanh công cụ dưới (xem `ThanhCongCu`); nút
+  // "Chọn tất cả" đã bỏ hẳn; nút "Tìm kiếm" (mục 8b) cũng đã dời vào menu đó
+  // (đổi tên "Tìm kiếm và thay thế") — thanh trên giờ còn Lùi lại/Tiến
+  // tới/Lưu, cộng thêm nút Ẩn/hiện thanh định dạng mới (mục 11) sát mép
+  // phải, ngay sau nút Lưu.
   List<Widget> _dsNutCongCu() => [
         IconButton(
           onPressed: _lichSuLui.isEmpty ? null : _lui,
@@ -3646,9 +3858,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           tooltip: 'Lưu',
         ),
         IconButton(
-          onPressed: _hienThanhTimKiem ? _dongTimKiem : _moTimKiem,
-          icon: const Icon(Icons.search),
-          tooltip: 'Tìm kiếm (Ctrl + F)',
+          onPressed: () => setState(() => _anThanhDinhDang = !_anThanhDinhDang),
+          // Emoji "chữ" — các nút khác trong hai thanh này đều dùng
+          // Material Icon (`Icon(IconData)`), nhưng không có icon Material
+          // nào diễn tả đúng "thanh định dạng chữ"; dùng `Text` với cùng cỡ
+          // icon (24) là cách nhất quán nhất còn lại (emoji render bình
+          // thường qua `Text`, không cần gói phụ thuộc thêm).
+          icon: const Text('🔤', style: TextStyle(fontSize: 20)),
+          tooltip: _anThanhDinhDang ? 'Hiện thanh định dạng' : 'Ẩn thanh định dạng',
         ),
       ];
 
@@ -3738,7 +3955,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               duration: const Duration(milliseconds: 150),
               child: _hienThanhTimKiem ? _thanhTimKiem() : const SizedBox(width: double.infinity),
             ),
-            _thanhDinhDangThuCong(),
+            // Mục 7: đường kẻ mỏng phân tách thanh Lùi/Tiến/Lưu (AppBar) với
+            // thanh định dạng thủ công ngay dưới nó.
+            if (!_anThanhDinhDang) const Divider(height: 1, thickness: 1),
+            if (!_anThanhDinhDang) _thanhDinhDangThuCong(),
+            // Mục 7: và một đường kẻ mỏng nữa ở mép dưới thanh định dạng,
+            // phân tách nó với vùng soạn thảo bên dưới.
+            if (!_anThanhDinhDang) const Divider(height: 1, thickness: 1),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -3956,6 +4179,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               khiBamChepRoiXoaTatCa: _chepRoiXoaTatCa,
               khiBamXoaTatCa: () => _xoaTatCa(),
               khiBamDanhSachPhimTat: _moDanhSachPhimTat,
+              khiBamTimKiem: () => _hienThanhTimKiem ? _dongTimKiem() : _moTimKiem(),
+              khiBamTroChuyen: () {},
+              khiBamTaiKhoan: () {},
             ),
             SizedBox(height: caoBanPhim),
           ],
@@ -3978,6 +4204,7 @@ class _NutMauDinhDang extends StatelessWidget {
     required this.khiBam,
     required this.khiChonMau,
     required this.choPhepTrongSuot,
+    this.laMauNen = false,
   });
 
   final String nhan;
@@ -3986,6 +4213,7 @@ class _NutMauDinhDang extends StatelessWidget {
   final VoidCallback khiBam;
   final ValueChanged<Color> khiChonMau;
   final bool choPhepTrongSuot;
+  final bool laMauNen;
 
   static const List<Color> _bangMauCoBan = [
     Colors.red,
@@ -4015,7 +4243,9 @@ class _NutMauDinhDang extends StatelessWidget {
             icon: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('A', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, height: 1)),
+                laMauNen
+                    ? const Icon(Icons.highlight, size: 16)
+                    : const Text('A', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, height: 1)),
                 Container(width: 16, height: 3, color: mauHienThi),
               ],
             ),
@@ -4107,6 +4337,7 @@ class _TrangThaiVanBan {
     required this.loi,
     required this.khongPhuHop,
     required this.canXoa,
+    required this.dinhDang,
   });
 
   final String vanBan;
@@ -4114,6 +4345,12 @@ class _TrangThaiVanBan {
   final List<LoiChinhTa> loi;
   final List<_MocVungKhongPhuHop> khongPhuHop;
   final List<_MocVungCanXoa> canXoa;
+
+  /// Định dạng thủ công (mục 5) — mỗi mốc lịch sử chụp luôn cả danh sách
+  /// này, giống hệt cách nó đã chụp `loi`/`khongPhuHop`/`canXoa`, để
+  /// Lùi/Tiến hoàn tác/làm lại được cả thao tác áp/bỏ định dạng, không chỉ
+  /// thao tác gõ chữ.
+  final List<_VungDinhDangThuCong> dinhDang;
 }
 
 /// Bản chụp "phẳng" của [_VungKhongPhuHop] — chỉ giữ vị trí, không giữ trạng

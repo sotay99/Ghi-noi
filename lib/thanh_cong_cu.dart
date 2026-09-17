@@ -28,6 +28,9 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamChepRoiXoaTatCa,
     required this.khiBamXoaTatCa,
     required this.khiBamDanhSachPhimTat,
+    required this.khiBamTimKiem,
+    required this.khiBamTroChuyen,
+    required this.khiBamTaiKhoan,
   });
 
   final bool bat;
@@ -66,6 +69,15 @@ class ThanhCongCu extends StatelessWidget {
 
   /// Gắn với mục "Danh sách phím tắt", ngay dưới "Kiểu gõ bàn phím".
   final VoidCallback khiBamDanhSachPhimTat;
+
+  /// Mục 8b: nút "Tìm kiếm" trước đây nằm ở thanh trên cùng (Lùi/Tiến/Lưu)
+  /// của trang soạn thảo — nay dời vào menu "+ Thêm lựa chọn" của thanh
+  /// này, dưới tên "Tìm kiếm và thay thế".
+  final VoidCallback khiBamTimKiem;
+
+  /// Mục 9: hai nút mới, chưa gắn logic.
+  final VoidCallback khiBamTroChuyen;
+  final VoidCallback khiBamTaiKhoan;
 
   /// Ngưỡng bề ngang chuẩn của Material để phân biệt điện thoại (hẹp) với
   /// máy tính bảng/màn hình gập mở ra (rộng) — đủ chỗ để các nút giãn ra
@@ -144,17 +156,15 @@ class ThanhCongCu extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.start,
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
+                          // Thứ tự mới (mục 10): Hướng dẫn, Thư mục, Làm
+                          // việc với AI, Trò chuyện, Thêm lựa chọn, Tài
+                          // khoản — "Cài đặt" và "Kiểm tra toàn văn" đã dời
+                          // vào trong hai menu (mục 8b/8c).
                           _NutCoChuThich(
                             hien: hienChuThich,
                             chu: 'Hướng dẫn sử dụng',
                             child: _nut(rong, Icons.help_outline_rounded,
                                 'Hướng dẫn', 'Hướng dẫn', khiBamHuongDan),
-                          ),
-                          _NutCoChuThich(
-                            hien: hienChuThich,
-                            chu: 'Cài đặt',
-                            child: _nut(rong, Icons.settings_outlined,
-                                'Cài đặt', 'Cài đặt', khiBamCaiDat),
                           ),
                           _NutCoChuThich(
                             hien: hienChuThich,
@@ -168,19 +178,14 @@ class ThanhCongCu extends StatelessWidget {
                             child: _NutAIMenu(
                               rong: rong,
                               khiBamCaiDatKiemTraToanVan: khiBamCaiDatKiemTraToanVan,
+                              khiBamKiemTraToanVan: khiBamKiemTraToanVan,
                             ),
                           ),
                           _NutCoChuThich(
                             hien: hienChuThich,
-                            chu: 'Kiểm tra toàn văn (AI)',
-                            child: _nut(
-                              rong,
-                              Icons.task_alt,
-                              'Kiểm tra toàn văn bằng AI',
-                              'Kiểm toàn văn',
-                              khiBamKiemTraToanVan,
-                              mau: Colors.green.shade600,
-                            ),
+                            chu: 'Trò chuyện với mọi người',
+                            child: _nut(rong, Icons.chat,
+                                'Trò chuyện', 'Trò chuyện', khiBamTroChuyen),
                           ),
                           _NutCoChuThich(
                             hien: hienChuThich,
@@ -192,7 +197,15 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamChepRoiXoaTatCa: khiBamChepRoiXoaTatCa,
                               khiBamXoaTatCa: khiBamXoaTatCa,
                               khiBamDanhSachPhimTat: khiBamDanhSachPhimTat,
+                              khiBamCaiDat: khiBamCaiDat,
+                              khiBamTimKiem: khiBamTimKiem,
                             ),
+                          ),
+                          _NutCoChuThich(
+                            hien: hienChuThich,
+                            chu: 'Tài khoản của bạn',
+                            child: _nut(rong, Icons.account_circle,
+                                'Tài khoản', 'Tài khoản', khiBamTaiKhoan),
                           ),
                           ],
                         ),
@@ -592,6 +605,8 @@ class _NutThemMenu extends StatelessWidget {
     required this.khiBamChepRoiXoaTatCa,
     required this.khiBamXoaTatCa,
     required this.khiBamDanhSachPhimTat,
+    required this.khiBamCaiDat,
+    required this.khiBamTimKiem,
   });
 
   final bool rong;
@@ -603,6 +618,13 @@ class _NutThemMenu extends StatelessWidget {
   final VoidCallback khiBamChepRoiXoaTatCa;
   final VoidCallback khiBamXoaTatCa;
   final VoidCallback khiBamDanhSachPhimTat;
+
+  /// Mục 8b: "Cài đặt" và "Tìm kiếm và thay thế" dời vào đây, đúng vị trí mà
+  /// "Thêm ảnh"/"Chụp ảnh (camera)" vừa rời đi (nay ở menu "Làm việc với
+  /// AI") — giữ nguyên logic cũ của cả hai, chỉ đổi chỗ đặt (và đổi tên hiển
+  /// thị của nút tìm kiếm thành "Tìm kiếm và thay thế").
+  final VoidCallback khiBamCaiDat;
+  final VoidCallback khiBamTimKiem;
 
   @override
   Widget build(BuildContext context) {
@@ -648,6 +670,12 @@ class _NutThemMenu extends StatelessWidget {
               case 22:
                 khiBamXoaTatCa();
                 break;
+              case 24:
+                khiBamCaiDat();
+                break;
+              case 25:
+                khiBamTimKiem();
+                break;
             }
           },
           itemBuilder: (ctx) => [
@@ -658,8 +686,12 @@ class _NutThemMenu extends StatelessWidget {
             _mucMenuThem(21, 'Sao chép rồi xoá tất cả'),
             _mucMenuThem(22, 'Xoá tất cả'),
             const PopupMenuDivider(height: 8),
-            _mucMenuThem(1, 'Thêm ảnh'),
-            _mucMenuThem(2, 'Chụp ảnh (camera)'),
+            // "Thêm ảnh"/"Chụp ảnh (camera)" đã dời sang menu "Làm việc với
+            // AI" (đổi tên "Chuyển hình ảnh thành văn bản") — "Cài đặt" và
+            // "Tìm kiếm và thay thế" (trước đây là hai nút riêng ngoài thanh
+            // công cụ) vào thay đúng vị trí này.
+            _mucMenuThem(24, 'Cài đặt'),
+            _mucMenuThem(25, 'Tìm kiếm và thay thế'),
             const PopupMenuDivider(height: 8),
             _mucMenuThem(3, 'Bật bộ điều hướng và phím nhanh'),
             _mucMenuThem(4, 'Kiểu gõ bàn phím'),
@@ -686,10 +718,18 @@ class _NutThemMenu extends StatelessWidget {
 /// đáy màn hình). Bốn mục đầu chưa gắn logic, chỉ mục cuối "Cài đặt nút
 /// "Kiểm tra toàn văn"" gọi callback thật.
 class _NutAIMenu extends StatelessWidget {
-  const _NutAIMenu({required this.rong, required this.khiBamCaiDatKiemTraToanVan});
+  const _NutAIMenu({
+    required this.rong,
+    required this.khiBamCaiDatKiemTraToanVan,
+    required this.khiBamKiemTraToanVan,
+  });
 
   final bool rong;
   final VoidCallback khiBamCaiDatKiemTraToanVan;
+
+  /// Mục 8c: "Kiểm tra toàn văn" dời từ một nút riêng ngoài thanh công cụ
+  /// vào đây, giữ nguyên logic thật.
+  final VoidCallback khiBamKiemTraToanVan;
 
   @override
   Widget build(BuildContext context) {
@@ -719,15 +759,26 @@ class _NutAIMenu extends StatelessWidget {
                 ),
           onSelected: (gia) {
             if (gia == 5) khiBamCaiDatKiemTraToanVan();
+            if (gia == 9) khiBamKiemTraToanVan();
           },
           itemBuilder: (ctx) => [
+            // Ba mục mới đầu menu — "Thêm ảnh"/"Chụp ảnh (camera)" dời từ
+            // menu "+ Thêm lựa chọn" sang đây (đổi tên mục ảnh), cộng thêm
+            // mục hoàn toàn mới cho âm thanh (chưa gắn logic).
+            _mucMenuThem(6, 'Chuyển hình ảnh thành văn bản'),
+            _mucMenuThem(7, 'Chụp ảnh (camera)'),
+            _mucMenuThem(8, 'Chuyển file âm thanh thành văn bản'),
+            const PopupMenuDivider(height: 8),
             _mucMenuThem(1, 'Trò chuyện về văn bản này'),
             _mucMenuThem(2, 'Tóm tắt toàn văn'),
             _mucMenuThem(3, 'Mở rộng toàn văn'),
             _mucMenuThem(4, 'Viết lại cho hay hơn'),
             const PopupMenuDivider(height: 8),
+            // "Kiểm tra toàn văn" dời từ một nút riêng ngoài thanh công cụ
+            // vào ngay TRÊN mục cài đặt của nó — giữ màu xanh lá + icon dấu
+            // tích ở đây; mục cài đặt bên dưới không cần tô màu lặp lại nữa.
             PopupMenuItem<int>(
-              value: 5,
+              value: 9,
               height: 34,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -735,11 +786,16 @@ class _NutAIMenu extends StatelessWidget {
                   Icon(Icons.task_alt, size: 16, color: Colors.green.shade600),
                   const SizedBox(width: 8),
                   Text(
-                    'Cài đặt nút "Kiểm tra toàn văn"',
+                    'Kiểm tra toàn văn',
                     style: TextStyle(color: Colors.green.shade600),
                   ),
                 ],
               ),
+            ),
+            PopupMenuItem<int>(
+              value: 5,
+              height: 34,
+              child: const Text('Cài đặt nút "Kiểm tra toàn văn"'),
             ),
           ],
         ),
