@@ -314,6 +314,12 @@ class _VeDanhDauAi extends CustomPainter {
       try {
         hops = re.getBoxesForSelection(
           TextSelection(baseOffset: v.batDau, extentOffset: v.ketThuc),
+          // LỖI 2: `tight` đã là mặc định của hàm này trong Flutter (chỉ
+          // ôm đúng chữ thật, không lan ra khoảng trống cuối dòng khi vùng
+          // trải qua nhiều dòng) — truyền tường minh ở đây để không phụ
+          // thuộc ngầm vào mặc định và phòng Flutter đổi mặc định sau này.
+          boxHeightStyle: BoxHeightStyle.tight,
+          boxWidthStyle: BoxWidthStyle.tight,
         );
       } catch (_) {
         continue;
@@ -651,6 +657,20 @@ class _BoDieuKhienChinhTa extends TextEditingController {
           diem.add(kt);
         }
       }
+      // LỖI 3: thêm biên của vùng CHỌN hiện tại (nếu có) làm mốc chia đoạn,
+      // để đoạn nào giao với vùng chọn được tách riêng ra — nhờ vậy có thể
+      // làm nhạt `mauNen` (backgroundColor định dạng thủ công) CHỈ ở phần
+      // giao với selection, không đụng phần còn lại. Cùng pattern với biên
+      // kết quả tìm kiếm ở trên, không viết cơ chế tách đoạn thứ hai.
+      final coVungChon = selection.isValid && !selection.isCollapsed;
+      if (coVungChon) {
+        final sBatDau = selection.start.clamp(0, vb.length);
+        final sKetThuc = selection.end.clamp(0, vb.length);
+        if (sBatDau < sKetThuc) {
+          diem.add(sBatDau);
+          diem.add(sKetThuc);
+        }
+      }
       final moc = diem.toList()..sort();
       for (var i = 0; i < moc.length - 1; i++) {
         final a = moc[i], b = moc[i + 1];
@@ -679,6 +699,26 @@ class _BoDieuKhienChinhTa extends TextEditingController {
               mauNen = null;
               break;
             }
+          }
+        }
+        // LỖI 3: đoạn [a,b) nằm trọn trong vùng đang được bôi CHỌN — làm
+        // NHẠT `mauNen` đi (giảm alpha cố định) để vùng tô CHỌN (do
+        // `RenderEditable` tự vẽ, nằm DƯỚI lớp chữ/nền của TextSpan) không
+        // bị màu nền thủ công che mất hoàn toàn, nhưng vẫn còn phảng phất
+        // sắc màu nền gốc — đúng ý "vùng chọn thắng nhưng vẫn thấy mờ mờ".
+        //
+        // Đây là phương án ĐƠN GIẢN (giảm alpha cố định) thay vì trộn chính
+        // xác với `selectionColor` của theme: không có nơi nào trong app đặt
+        // `selectionColor`/`TextSelectionThemeData` tường minh (nó tới từ
+        // theme mặc định, có thể đổi theo `ColorScheme`/nền sáng-tối), nên
+        // trộn màu chính xác dễ sai và không kiểm chứng được vì môi trường
+        // không compile/run Flutter được. Alpha cố định an toàn hơn, không
+        // phụ thuộc giá trị màu chọn thật của theme.
+        if (mauNen != null && coVungChon) {
+          final sBatDau = selection.start.clamp(0, vb.length);
+          final sKetThuc = selection.end.clamp(0, vb.length);
+          if (a >= sBatDau && b <= sKetThuc) {
+            mauNen = mauNen.withValues(alpha: 0.35);
           }
         }
         final gop = _VungDinhDangThuCong(
@@ -766,6 +806,9 @@ class _VeTimKiem extends CustomPainter {
       try {
         hops = re.getBoxesForSelection(
           TextSelection(baseOffset: batDau, extentOffset: ketThuc),
+          // Cùng lý do với `_VeDanhDauAi` — xem chú thích ở đó.
+          boxHeightStyle: BoxHeightStyle.tight,
+          boxWidthStyle: BoxWidthStyle.tight,
         );
       } catch (_) {
         continue;
@@ -5025,6 +5068,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           decoration: const InputDecoration(
                             border: InputBorder.none,
                           ),
+                          // Sửa LỖI 1 (vùng CHỌN lan ra hết phần trống cuối
+                          // dòng khi bôi chọn nhiều dòng): mặc định Flutter
+                          // dùng BoxWidthStyle.max cho vùng chọn NATIVE khi
+                          // selection trải qua nhiều dòng, khiến những dòng
+                          // ngắn (xuống dòng tự nhiên trước khi hết khung) bị
+                          // tô kín tới tận mép phải dù không có chữ ở đó.
+                          // `tight` khiến vùng tô chỉ ôm đúng phần có ký tự.
+                          selectionWidthStyle: BoxWidthStyle.tight,
                           // D3: cập nhật trạng thái định dạng theo vị trí
                           // con trỏ/selection. TextField không có tham số
                           // `onSelectionChanged` (đó là API của EditableText),
