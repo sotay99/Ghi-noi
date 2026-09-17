@@ -2203,12 +2203,26 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Mọi lần ghi do máy thực hiện đều đi qua đây, để ghi nhớ nội dung, vị trí
   /// con trỏ và thời điểm — ba thứ dùng để nhận ra trạng thái bộ gõ báo về.
   void _ghiVaoO(String chu, int viTri) {
-    _tuSua = true;
-    _boDieuKhien.value = TextEditingValue(
-      text: chu,
-      selection: TextSelection.collapsed(offset: viTri),
-    );
-    _tuSua = false;
+    // Nếu văn bản và vị trí con trỏ ĐÃ ĐÚNG NGUYÊN như bộ điều khiển đang giữ
+    // (trường hợp phổ biến nhất: gõ tay chèn một ký tự, không có hoán đổi
+    // dấu câu, không đụng vùng khoá) thì bỏ qua việc ghi lại `.value` —
+    // KHÔNG đẩy thêm một lượt `setEditingState` xuống bàn phím hệ điều hành.
+    // Gõ tay thật đã tự cập nhật đúng cả chữ lẫn con trỏ trong bộ điều khiển
+    // rồi (chính là nguồn của [chu]/[viTri] ở hầu hết lời gọi), nên việc ghi
+    // đè lại y hệt chỉ là một vòng lặp thừa Dart→gốc→Dart — gõ càng nhanh,
+    // vòng lặp thừa này càng dễ tranh chấp với bộ đệm gõ dồn của bàn phím
+    // (Gboard...), gây gộp/rớt phím. Bỏ vòng thừa này không đổi hành vi gì
+    // (chữ và con trỏ vốn đã đúng), chỉ bớt một lần ghi không cần thiết.
+    final dungRoi = _boDieuKhien.text == chu &&
+        _boDieuKhien.selection == TextSelection.collapsed(offset: viTri);
+    if (!dungRoi) {
+      _tuSua = true;
+      _boDieuKhien.value = TextEditingValue(
+        text: chu,
+        selection: TextSelection.collapsed(offset: viTri),
+      );
+      _tuSua = false;
+    }
     _chuGanNhat = chu;
     _viTriGanNhat = viTri;
     _lucGhi = DateTime.now();
@@ -2545,7 +2559,26 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       var ketThucMoi = d.ketThuc <= vitri
           ? d.ketThuc
           : (d.ketThuc >= ketThucXoa ? d.ketThuc + lech : vitri);
-      if (vanBanCu != null &&
+      // CHỈ xác minh lại bằng nội dung khi vùng [d.batDau, d.ketThuc) THẬT SỰ
+      // giao với khoảng [vitri, ketThucXoa) vừa bị so 2 đầu coi là "vùng
+      // không chắc" (tức có ít nhất một đầu bị KẸP về [vitri] ở trên) — nếu
+      // vùng nằm HẲN TRƯỚC (d.ketThuc <= vitri) hay HẲN SAU (d.batDau >=
+      // ketThucXoa) thì batDauMoi/ketThucMoi ở trên đã CHẮC CHẮN đúng theo vị
+      // trí rồi, không có gì mơ hồ để "xác minh" cả.
+      //
+      // BUG ĐÃ SỬA (mất định dạng khi gõ nhanh nhiều ký tự GIỐNG NHAU liên
+      // tiếp, ví dụ "aaaaa" hay dấu cách lặp lại): thiếu điều kiện giao nhau
+      // này, phép xác minh bằng nội dung so `vanBanCu.substring(d.batDau,
+      // d.ketThuc)` với `vanBanMoi.substring(d.batDau+lech, d.ketThuc+lech)`
+      // — với một dãy ký tự GIỐNG HỆT NHAU (chuỗi con toàn 'a' hay toàn dấu
+      // cách), phép so này LUÔN khớp bất kể dịch đi bao xa, nên nó ghi đè cả
+      // những vùng đã đúng theo vị trí (HẲN TRƯỚC chỗ sửa, không nên dịch
+      // chút nào) bằng toạ độ dịch +lech sai — vùng bị "kéo" ra khỏi đúng chỗ
+      // của nó, để lại một khoảng trống không còn vùng định dạng nào che phủ
+      // ngay tại đầu dãy ký tự vừa gõ.
+      if (d.ketThuc > vitri &&
+          d.batDau < ketThucXoa &&
+          vanBanCu != null &&
           vanBanMoi != null &&
           d.batDau >= 0 &&
           d.ketThuc <= vanBanCu.length &&
