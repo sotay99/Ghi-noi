@@ -1887,9 +1887,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         // rất thường xuyên vì app tự bật lại micro liên tục (kể cả lúc không
         // nghe thấy gì) — Android thỉnh thoảng từ chối một lượt bật lại quá
         // nhanh, tự hết ngay ở lượt kế tiếp, không phải sự cố đáng báo.
+        // 'error_busy' (micro đang bị ứng dụng khác chiếm) cũng thuộc loại
+        // này: xảy ra thoáng qua trong lúc ghi âm, không hề chặn việc nhận
+        // diện giọng nói/chèn chữ (app tự bật lại ngay ở lượt kế tiếp — xem
+        // `_henBatLai()` bên dưới, vẫn luôn được gọi dù không hiển thị lỗi),
+        // và tự hết khi ứng dụng kia nhả micro ra. Hiển thị nó chỉ gây rối
+        // mắt không cần thiết; các lỗi micro nghiêm trọng khác (mất quyền,
+        // không có micro, mất mạng...) vẫn hiển thị bình thường qua nhánh
+        // else bên dưới.
         final nhe = loi.errorMsg == 'error_no_match' ||
             loi.errorMsg == 'error_speech_timeout' ||
-            loi.errorMsg == 'error_client';
+            loi.errorMsg == 'error_client' ||
+            loi.errorMsg == 'error_busy';
         if (!nhe && mounted) {
           setState(() => _loi = _dichLoi(loi.errorMsg));
         }
@@ -5076,6 +5085,23 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           // tô kín tới tận mép phải dù không có chữ ở đó.
                           // `tight` khiến vùng tô chỉ ôm đúng phần có ký tự.
                           selectionWidthStyle: ui.BoxWidthStyle.tight,
+                          // Sửa lỗi con trỏ nháy (caret) bị "nuốt mất" khi
+                          // đứng trên/cạnh ký tự có `mauNen` (màu nền định
+                          // dạng thủ công): `backgroundColor` của TextSpan
+                          // được engine vẽ CÙNG với chữ trong một lần vẽ
+                          // đoạn văn bản, còn caret mặc định của
+                          // TextField/EditableText vẽ TRƯỚC (dưới) đoạn văn
+                          // bản đó — nên màu nền che mất caret dù nó vẫn ở
+                          // đúng vị trí. TextField không có tham số nào vẽ
+                          // "viền quanh caret" hay đổi thứ tự vẽ (không lộ
+                          // `paintCursorAboveText` của EditableText ra ngoài),
+                          // nên cách an toàn nhất — không cần đoán API mới —
+                          // là đổi hẳn `cursorColor` sang một màu KHÔNG NẰM
+                          // trong bảng 8 màu nền cơ bản của định dạng thủ
+                          // công (`_NutMauDinhDang._bangMauCoBan`: đỏ, cam,
+                          // vàng, lục, lam, tím, đen, trắng) để caret luôn
+                          // đủ tương phản dù màu nền là gì trong số đó.
+                          cursorColor: const Color(0xFFE91E63),
                           // D3: cập nhật trạng thái định dạng theo vị trí
                           // con trỏ/selection. TextField không có tham số
                           // `onSelectionChanged` (đó là API của EditableText),
