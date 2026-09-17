@@ -77,14 +77,21 @@ class _VungDauCauMoi {
 /// (lỗi chính tả, đoạn không phù hợp, đoạn cần xoá) thành một danh sách duy
 /// nhất trước khi dựng TextSpan.
 /// true nếu ký tự [kyTu] (đúng MỘT ký tự) hợp lệ cho "chữ trên" (treMu):
-/// CHỈ chữ cái La-tinh thường a-z (0x61-0x7A) hoặc số 0-9 (0x30-0x39).
+/// chữ cái La-tinh thường a-z (0x61-0x7A), số 0-9 (0x30-0x39), hoặc dấu cách
+/// (0x20 — dấu cách không có glyph superscript riêng nên không bị ảnh hưởng
+/// bởi giới hạn font, LUÔN được coi là hợp lệ để không ngắt vùng treMu một
+/// cách vô lý mỗi khi gõ khoảng trắng).
 /// `FontFeature.enable('sups')` chỉ được font hệ thống (Roboto Android) hỗ
 /// trợ tốt với đúng tập này — chữ HOA, tiếng Việt có dấu, ký tự đặc biệt đều
 /// KHÔNG có glyph superscript thay thế, nên treMu bị CHẶN HẲN với chúng
 /// (không còn phương án dự phòng "co nhỏ" như trước) — xem các điểm chặn ở
 /// `_baoLoiTreMu` và nơi gọi nó.
+///
+/// ĐÂY LÀ ĐỊNH NGHĨA DUY NHẤT — mọi điểm kiểm tra ký tự hợp lệ cho treMu
+/// trong toàn bộ tệp phải gọi hàm này, không tự viết lại điều kiện tương tự.
 bool _kyTuHopLeChoTreMu(String kyTu) {
   if (kyTu.isEmpty) return false;
+  if (kyTu == ' ') return true; // Dấu cách luôn hợp lệ.
   final donVi = kyTu.codeUnitAt(0);
   return (donVi >= 0x30 && donVi <= 0x39) || // 0-9
       (donVi >= 0x61 && donVi <= 0x7A); // a-z
@@ -2443,6 +2450,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final ketThucXoa = vitri + soXoa;
     final lech = soChen - soXoa;
 
+    // (VIỆC 4c) Override "chờ áp tại con trỏ" (D4) ghi nhớ ĐÚNG offset lúc
+    // đặt — gõ tiếp NGAY tại đó (không di chuyển con trỏ đi chỗ khác trước)
+    // phải làm offset này "trôi" theo cùng cách vùng 0-ký-tự bên dưới nới
+    // rộng, nếu không `_tinhTrangThaiDinhDangHienTai` sẽ thấy con trỏ mới
+    // "lệch chỗ" và tự huỷ override sau đúng MỘT ký tự.
+    if (_viTriOverrideDangCho != null && _viTriOverrideDangCho == vitri && soChen > 0) {
+      _viTriOverrideDangCho = vitri + soChen;
+    }
+
     _boDieuKhien.loi.removeWhere((l) => l.batDau < ketThucXoa && l.ketThuc > vitri);
     for (var i = 0; i < _boDieuKhien.loi.length; i++) {
       final l = _boDieuKhien.loi[i];
@@ -2493,9 +2509,22 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       var batDauMoi = d.batDau <= vitri
           ? d.batDau
           : (d.batDau >= ketThucXoa ? d.batDau + lech : vitri);
-      var ketThucMoi = d.ketThuc <= vitri
-          ? d.ketThuc
-          : (d.ketThuc >= ketThucXoa ? d.ketThuc + lech : vitri);
+      int ketThucMoi;
+      // (VIỆC 4c) Vùng "chờ áp tại con trỏ" (D4) là một mốc 0-ký-tự
+      // (batDau == ketThuc) đúng ngay tại điểm chèn — điều kiện `<= vitri`
+      // bên dưới coi trường hợp BẰNG là "đứng trước chỗ sửa" nên KHÔNG bao
+      // giờ chạm nhánh nới rộng, dù comment gốc mô tả nó sẽ nới. Xử lý riêng
+      // trường hợp này TRƯỚC: mốc 0-ký-tự đúng tại [vitri] có ký tự MỚI được
+      // chèn (soChen > 0) thì nới `ketThuc` theo đúng số ký tự vừa chèn, để
+      // ký tự gõ tiếp theo ngay tại đó vẫn mang override đang chờ, gõ liên
+      // tục bao nhiêu ký tự cũng "trôi" theo đúng vị trí con trỏ mới.
+      if (d.batDau == d.ketThuc && d.ketThuc == vitri && soChen > 0) {
+        ketThucMoi = d.ketThuc + soChen;
+      } else {
+        ketThucMoi = d.ketThuc <= vitri
+            ? d.ketThuc
+            : (d.ketThuc >= ketThucXoa ? d.ketThuc + lech : vitri);
+      }
       if (vanBanCu != null &&
           vanBanMoi != null &&
           d.batDau >= 0 &&
@@ -3297,10 +3326,24 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           mauChu: dinhDangKeThua.mauChu,
           mauNen: dinhDangKeThua.mauNen,
         ));
-        // (VIỆC 2, điểm vi) Đoạn ĐỀ XUẤT kế thừa treMu từ đoạn GỐC nhưng có
-        // thể mang ký tự khác đoạn gốc (AI đề xuất thay bằng chữ khác) — lọc
-        // lại y hệt lúc gõ tay, đừng để treMu dính vào ký tự không hợp lệ.
-        _gioiHanTreMuSauKhiChen(v.batDauDeXuat, v.ketThucDeXuat - v.batDauDeXuat, moi);
+        // (VIỆC 1) Đoạn ĐỀ XUẤT kế thừa treMu từ đoạn GỐC nhưng có thể mang
+        // ký tự khác đoạn gốc (AI đề xuất thay bằng chữ khác) — khác với gõ
+        // tay (nơi `_gioiHanTreMuSauKhiChen` tự TÁCH ký tự xấu ra khỏi vùng
+        // treMu), đây là hành vi HỆ THỐNG tự động, không phải người dùng chủ
+        // động bấm nút định dạng, nên CHO PHÉP lỗi hiển thị xảy ra (không
+        // tách/xoá treMu khỏi ký tự không hợp lệ) — chỉ PHÁT HIỆN và cảnh báo
+        // một lần bằng đúng dialog `_baoLoiTreMu()` (dùng chung cờ chống spam
+        // `_dangHienLoiTreMu`), không quét liên tục sau đó.
+        if (dinhDangKeThua.treMu) {
+          var coKyTuXauKeThua = false;
+          for (var i = v.batDauDeXuat; i < v.ketThucDeXuat; i++) {
+            if (!_kyTuHopLeChoTreMu(moi[i])) {
+              coKyTuXauKeThua = true;
+              break;
+            }
+          }
+          if (coKyTuXauKeThua) _baoLoiTreMu();
+        }
       }
       _ghiVaoO(moi, v.ketThucDeXuat);
       _henLuu();
@@ -3641,7 +3684,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // giống hệt phím tắt (phím tắt không rời focus khỏi ô soạn thảo nên
       // không gặp vấn đề này).
       _boDieuKhien.selection = chon;
-      _oChu.requestFocus();
+      // (VIỆC 3) `requestFocus()` gọi ngay trong `onPressed` có thể bị chính
+      // IconButton GHI ĐÈ ngay sau đó — Flutter tự cho nút nhận focus khi
+      // bấm (nút cũng là một focusable widget), và việc đó xảy ra SAU
+      // callback `onPressed` trong cùng frame, nên con trỏ nháy biến mất dù
+      // `selection` vẫn đúng offset. Hoãn `requestFocus()` sang
+      // `addPostFrameCallback` để nó là hành động CUỐI CÙNG trong frame,
+      // thắng focus của nút. Phím tắt (Shortcuts/Actions) không đi qua
+      // nhánh này vì TextField không hề rời focus khi bấm phím.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _oChu.requestFocus();
+      });
       _boDieuKhien.veLai();
       _henLuu();
       return;
@@ -3684,6 +3737,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // liệu ở vị trí mới.
     _viTriOverrideDangCho = _coDinhDangDangCho ? _viTriConTroHienTai() : null;
     _capNhatVungDangChoTaiConTro();
+    // (VIỆC 3) Nhánh con trỏ đứng yên (selection rỗng) cũng bị bấm nút
+    // toolbar cướp mất focus của ô soạn thảo — lấy lại focus y hệt nhánh có
+    // vùng chọn ở trên, cũng hoãn sang cuối frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _oChu.requestFocus();
+    });
   }
 
   /// Tạo/cập nhật một vùng 0-ký-tự ngay tại con trỏ mang đúng tổ hợp thuộc
@@ -3780,9 +3839,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       final vt = chon.start;
       if (_coDinhDangDangCho && _viTriOverrideDangCho == vt) return; // D4: giữ nguyên.
       _viTriOverrideDangCho = null;
-      batDau = vt - 1;
-      ketThuc = vt;
-      if (batDau < 0) {
+      // (VIỆC 4a/4b) Con trỏ đứng yên: ký tự SẮP chèn (và vì vậy trạng thái
+      // nút toolbar) không còn chỉ xét ký tự BÊN TRÁI như D3 cũ — mà là HỢP
+      // (OR) riêng từng loại định dạng giữa ký tự bên TRÁI và ký tự bên
+      // PHẢI con trỏ. Đầu/cuối văn bản (thiếu một bên) thì chỉ xét bên còn
+      // lại. Cả hai đường "tính định dạng cho ký tự mới" (D5, qua vùng chờ
+      // 0-ký-tự tự nới) và "sáng nút toolbar" (D3) cùng đọc từ các cờ
+      // `_xxxDangCho` được hàm này ghi ra, nên một lần sửa ở đây áp dụng
+      // đúng cho cả hai, không lệch nhau.
+      final coTrai = vt - 1 >= 0;
+      final coPhai = vt < _boDieuKhien.text.length;
+      if (!coTrai && !coPhai) {
         if (!_coDinhDangDangCho) return; // Đã tắt sẵn hết — khỏi rebuild vô ích.
         setState(() {
           _damDangCho = false;
@@ -3796,6 +3863,47 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         });
         return;
       }
+      bool hopCo(bool Function(_VungDinhDangThuCong) doc) {
+        final trai = coTrai && _coDongNhatTrongVung(vt - 1, vt, doc);
+        final phai = coPhai && _coDongNhatTrongVung(vt, vt + 1, doc);
+        return trai || phai;
+      }
+
+      Color? hopMau({required bool laMauChu}) {
+        final trai = coTrai ? _mauDongNhatTrongVung(vt - 1, vt, laMauChu: laMauChu) : null;
+        if (trai != null) return trai;
+        return coPhai ? _mauDongNhatTrongVung(vt, vt + 1, laMauChu: laMauChu) : null;
+      }
+
+      final dam = hopCo((d) => d.dam);
+      final nghieng = hopCo((d) => d.nghieng);
+      final gachChan = hopCo((d) => d.gachChan);
+      final gachNgang = hopCo((d) => d.gachNgang);
+      final treMu = hopCo((d) => d.treMu);
+      final treChan = hopCo((d) => d.treChan);
+      final mauChu = hopMau(laMauChu: true);
+      final mauNen = hopMau(laMauChu: false);
+      if (dam == _damDangCho &&
+          nghieng == _nghiengDangCho &&
+          gachChan == _gachChanDangCho &&
+          gachNgang == _gachNganDangCho &&
+          treMu == _treMuDangCho &&
+          treChan == _treChanDangCho &&
+          mauChu == _mauChuDangCho &&
+          mauNen == _mauNenDangCho) {
+        return; // Không đổi gì — khỏi setState vô ích.
+      }
+      setState(() {
+        _damDangCho = dam;
+        _nghiengDangCho = nghieng;
+        _gachChanDangCho = gachChan;
+        _gachNganDangCho = gachNgang;
+        _treMuDangCho = treMu;
+        _treChanDangCho = treChan;
+        _mauChuDangCho = mauChu;
+        _mauNenDangCho = mauNen;
+      });
+      return;
     }
     final dam = _coDongNhatTrongVung(batDau, ketThuc, (d) => d.dam);
     final nghieng = _coDongNhatTrongVung(batDau, ketThuc, (d) => d.nghieng);
