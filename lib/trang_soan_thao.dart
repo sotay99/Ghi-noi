@@ -5,6 +5,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -318,8 +319,8 @@ class _VeDanhDauAi extends CustomPainter {
           // ôm đúng chữ thật, không lan ra khoảng trống cuối dòng khi vùng
           // trải qua nhiều dòng) — truyền tường minh ở đây để không phụ
           // thuộc ngầm vào mặc định và phòng Flutter đổi mặc định sau này.
-          boxHeightStyle: BoxHeightStyle.tight,
-          boxWidthStyle: BoxWidthStyle.tight,
+          boxHeightStyle: ui.BoxHeightStyle.tight,
+          boxWidthStyle: ui.BoxWidthStyle.tight,
         );
       } catch (_) {
         continue;
@@ -807,8 +808,8 @@ class _VeTimKiem extends CustomPainter {
         hops = re.getBoxesForSelection(
           TextSelection(baseOffset: batDau, extentOffset: ketThuc),
           // Cùng lý do với `_VeDanhDauAi` — xem chú thích ở đó.
-          boxHeightStyle: BoxHeightStyle.tight,
-          boxWidthStyle: BoxWidthStyle.tight,
+          boxHeightStyle: ui.BoxHeightStyle.tight,
+          boxWidthStyle: ui.BoxWidthStyle.tight,
         );
       } catch (_) {
         continue;
@@ -5075,7 +5076,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           // ngắn (xuống dòng tự nhiên trước khi hết khung) bị
                           // tô kín tới tận mép phải dù không có chữ ở đó.
                           // `tight` khiến vùng tô chỉ ôm đúng phần có ký tự.
-                          selectionWidthStyle: BoxWidthStyle.tight,
+                          selectionWidthStyle: ui.BoxWidthStyle.tight,
                           // D3: cập nhật trạng thái định dạng theo vị trí
                           // con trỏ/selection. TextField không có tham số
                           // `onSelectionChanged` (đó là API của EditableText),
