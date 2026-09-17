@@ -313,14 +313,15 @@ class _VeDanhDauAi extends CustomPainter {
     for (final v in dsVung) {
       List<TextBox> hops;
       try {
+        // LỖI 2: `RenderEditable.getBoxesForSelection` KHÔNG nhận tham số
+        // `boxHeightStyle`/`boxWidthStyle` — hai style đó là THUỘC TÍNH của
+        // chính RenderEditable (`selectionHeightStyle`/`selectionWidthStyle`,
+        // do EditableText/TextField/SelectableText truyền vào lúc dựng), hàm
+        // này chỉ nhận đúng một tham số `TextSelection`. Style `tight` vốn đã
+        // là mặc định của RenderEditable nên không cần (và không thể) truyền
+        // lại ở đây.
         hops = re.getBoxesForSelection(
           TextSelection(baseOffset: v.batDau, extentOffset: v.ketThuc),
-          // LỖI 2: `tight` đã là mặc định của hàm này trong Flutter (chỉ
-          // ôm đúng chữ thật, không lan ra khoảng trống cuối dòng khi vùng
-          // trải qua nhiều dòng) — truyền tường minh ở đây để không phụ
-          // thuộc ngầm vào mặc định và phòng Flutter đổi mặc định sau này.
-          boxHeightStyle: ui.BoxHeightStyle.tight,
-          boxWidthStyle: ui.BoxWidthStyle.tight,
         );
       } catch (_) {
         continue;
@@ -805,11 +806,9 @@ class _VeTimKiem extends CustomPainter {
       final ketThuc = batDau + doDaiTuKhoa;
       List<TextBox> hops;
       try {
+        // Cùng lý do với `_VeDanhDauAi` — xem chú thích ở đó.
         hops = re.getBoxesForSelection(
           TextSelection(baseOffset: batDau, extentOffset: ketThuc),
-          // Cùng lý do với `_VeDanhDauAi` — xem chú thích ở đó.
-          boxHeightStyle: ui.BoxHeightStyle.tight,
-          boxWidthStyle: ui.BoxWidthStyle.tight,
         );
       } catch (_) {
         continue;
