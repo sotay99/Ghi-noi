@@ -266,10 +266,14 @@ class _VungDinhDangThuCong {
   }
 }
 
-/// (VIỆC 2) Bản ghi 8 giá trị định dạng — kiểu trả về DUY NHẤT của
-/// `_dinhDangHopTaiViTri`, dùng chung cho CẢ việc tô sáng nút toolbar LẪN
-/// việc quyết định định dạng của ký tự mới chèn. Không có hai nguồn tính
-/// riêng rẽ nào khác — đây chính là bài học từ các lỗi "bộ nhớ đệm" trước.
+/// (VIỆC 2) Bản ghi 8 giá trị định dạng — kiểu trả về của `_dinhDangHopTaiViTri`
+/// (dùng chung cho CẢ việc tô sáng nút toolbar LẪN "hợp 2 bên" mặc định của
+/// ký tự mới chèn), và CŨNG là kiểu của bộ nhớ đệm `_boNhoDem` (YÊU CẦU 2 —
+/// một biến state thuần tuý, không phải vùng `_VungDinhDangThuCong` gắn
+/// offset). Hai nguồn này KHÔNG BAO GIỜ trộn lẫn giữa chừng: nơi cần định
+/// dạng của ký tự mới chèn luôn chọn ĐÚNG MỘT trong hai bằng if/else tường
+/// minh (`_boNhoDemDangHoatDong ? _boNhoDem! : _dinhDangHopTaiViTri(...)`),
+/// không bao giờ hợp (OR) cả hai lại với nhau.
 typedef _HopDinhDang = ({
   bool dam,
   bool nghieng,
@@ -2091,15 +2095,24 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     // Hợp (OR) định dạng của ký tự NGAY TRƯỚC neo và ký tự NGAY SAU vùng tạm
     // cũ — tính TRƯỚC khi `_dieuChinhLoiChinhTaSauKhiSua` dời/nới các vùng
-    // `dinhDang`, vì hàm đó đọc theo toạ độ CŨ. Đây là NGUỒN DUY NHẤT quyết
-    // định định dạng của chữ vừa được giọng nói chèn — không có override nào
-    // khác chen vào (xem `_dinhDangHopTaiViTri`).
-    final hopMoi = _dinhDangHopTaiViTri(_neo, het, cu.length);
+    // `dinhDang`, vì hàm đó đọc theo toạ độ CŨ. Đây là nguồn MẶC ĐỊNH quyết
+    // định định dạng của chữ vừa được giọng nói chèn.
+    //
+    // YÊU CẦU 2b (đường GIỌNG NÓI — y hệt đường gõ tay ở
+    // `_apDungChinhSuaNguoiDung`): bộ nhớ đệm đang hoạt động thì thay hẳn
+    // "hợp 2 bên".
+    final hopMoi = _boNhoDemDangHoatDong
+        ? _chuanHoaXungDotTreMuTreChan(_boNhoDem!)
+        : _dinhDangHopTaiViTri(_neo, het, cu.length);
 
     _dieuChinhLoiChinhTaSauKhiSua(_neo, het - _neo, chenVao.length);
     _dieuChinhVungToanVanSauKhiSua(_neo, het - _neo, chenVao.length);
     if (chenVao.isNotEmpty) {
       _apDinhDangHopChoDoanMoiChen(_neo, _neo + chenVao.length, hopMoi);
+      // YÊU CẦU 2c (cờ một lần) — y hệt đường gõ tay: `_ghiVaoO` bên dưới sẽ
+      // tự dịch con trỏ theo chữ vừa chèn, không phải người dùng chủ động
+      // di chuyển.
+      if (_boNhoDemDangHoatDong) _vuaChenKyTuBangBoNhoDem = true;
     }
     // (VIỆC 2, điểm iii/v — đường GIỌNG NÓI) Y hệt đường gõ tay: chữ vừa
     // được giọng nói chèn có thể vừa bị vùng treMu "nuốt" vào — lọc ngay.
@@ -2443,11 +2456,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // Hợp (OR) định dạng của ký tự NGAY TRƯỚC [dau] và ký tự NGAY SAU đoạn bị
     // xoá (đầu cũ tại [dau + soLuongXoa]) — tính TRƯỚC khi
     // `_dieuChinhLoiChinhTaSauKhiSua` dời/nới các vùng `dinhDang`, vì hàm đó
-    // đọc theo toạ độ CŨ. Đây là NGUỒN DUY NHẤT quyết định định dạng của ký
-    // tự vừa gõ — không có "bộ nhớ đệm"/override nào khác chen vào (xem
-    // `_dinhDangHopTaiViTri`), và cùng một hàm này cũng quyết định nút nào
-    // sáng trên thanh công cụ (xem `_tinhTrangThaiDinhDangHienTai`).
-    final hopMoi = _dinhDangHopTaiViTri(dau, dau + soLuongXoa, cu.length);
+    // đọc theo toạ độ CŨ. Đây là nguồn MẶC ĐỊNH quyết định định dạng của ký
+    // tự vừa gõ, và cùng một hàm này cũng quyết định nút nào sáng trên
+    // thanh công cụ (xem `_tinhTrangThaiDinhDangHienTai`).
+    //
+    // YÊU CẦU 2b: NHƯNG nếu bộ nhớ đệm (YÊU CẦU 2) đang hoạt động, nó THAY
+    // THẾ HẲN "hợp 2 bên" — if/else đơn giản, không đụng gì tới offset/
+    // `_VungDinhDangThuCong` phía dưới. `_chuanHoaXungDotTreMuTreChan` là
+    // chốt chặn dự phòng cho YÊU CẦU 1 (xem khai báo hàm).
+    final hopMoi = _boNhoDemDangHoatDong
+        ? _chuanHoaXungDotTreMuTreChan(_boNhoDem!)
+        : _dinhDangHopTaiViTri(dau, dau + soLuongXoa, cu.length);
 
     _dieuChinhLoiChinhTaSauKhiSua(
       dau,
@@ -2459,6 +2478,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _dieuChinhVungToanVanSauKhiSua(dau, soLuongXoa, doDaiChenVao);
     if (doDaiChenVao > 0) {
       _apDinhDangHopChoDoanMoiChen(dau, dau + doDaiChenVao, hopMoi);
+      // YÊU CẦU 2c (cờ một lần): con trỏ SẮP tự dịch theo ký tự vừa chèn khi
+      // `_ghiVaoO` bên dưới cập nhật `selection` — đó KHÔNG phải người dùng
+      // chủ động di chuyển con trỏ, nên đừng để `_tinhTrangThaiDinhDangHienTai`
+      // (chạy trong cùng lượt, do là listener của `_boDieuKhien`) huỷ bộ nhớ
+      // đệm oan. Chỉ đặt cờ khi bộ nhớ đệm đang thật sự hoạt động — không có
+      // gì để giữ thì khỏi đặt cờ.
+      if (_boNhoDemDangHoatDong) _vuaChenKyTuBangBoNhoDem = true;
     }
     // (VIỆC 2, điểm iii/v) Ký tự vừa chèn (gõ tay hoặc giọng nói) có thể vừa
     // được gán treMu (chữ trên) qua `_apDinhDangHopChoDoanMoiChen` ở trên nếu
@@ -3466,6 +3492,37 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   bool _gachNganDangCho = false;
   bool _treMuDangCho = false;
   bool _treChanDangCho = false;
+
+  // ------------------------------------------- bộ nhớ đệm định dạng (YÊU CẦU 2)
+  //
+  // KIẾN TRÚC MỚI (khác hẳn lần trước, cố ý): đây là MỘT BIẾN STATE THUẦN
+  // TUÝ của Widget State, KHÔNG PHẢI một vùng `_VungDinhDangThuCong` 0-ký-tự
+  // gắn ở con trỏ — không có mục nào được thêm vào `_boDieuKhien.dinhDang`
+  // cho bộ nhớ đệm cả. Lỗi offset của kiến trúc cũ tới từ việc một "vùng"
+  // 0-ký-tự phải được các hàm xử lý offset (đặc biệt
+  // `_dieuChinhLoiChinhTaSauKhiSua`) dời/nới đúng theo mỗi phép sửa — kiến
+  // trúc mới KHÔNG có offset nào để dời cả, nên hoàn toàn tách biệt khỏi cơ
+  // chế đó: mỗi lần chèn ký tự, code chỉ ĐỌC giá trị hiện tại của
+  // `_boNhoDem` rồi gán thẳng, xong việc, không "theo dõi" gì thêm.
+  //
+  // Kích hoạt: bấm nút/phím tắt định dạng lúc vùng chọn RỖNG (xem
+  // `_bamNutDinhDangTaiConTro`). Huỷ: con trỏ bị NGƯỜI DÙNG di chuyển sang
+  // vị trí khác — phân biệt với việc con trỏ tự dịch do CHÍNH việc gõ bằng
+  // "cờ một lần" `_vuaChenKyTuBangBoNhoDem` (xem `_tinhTrangThaiDinhDangHienTai`
+  // và `_apDungChinhSuaNguoiDung`/`_thayVungTamBangGiongNoi`).
+  bool _boNhoDemDangHoatDong = false;
+  _HopDinhDang? _boNhoDem;
+
+  /// Cờ MỘT LẦN: đặt `true` ngay TRƯỚC khi `_apDungChinhSuaNguoiDung` hoặc
+  /// `_thayVungTamBangGiongNoi` ghi ký tự mới vào `_boDieuKhien` (trước khi
+  /// Flutter tự cập nhật `selection` và kích hoạt listener
+  /// `_tinhTrangThaiDinhDangHienTai`). Callback đó đọc cờ này: `true` nghĩa
+  /// là selection VỪA đổi là HỆ QUẢ của chính việc gõ (con trỏ tự dịch theo
+  /// ký tự mới) — không phải người dùng chủ động di chuyển con trỏ — nên
+  /// KHÔNG huỷ bộ nhớ đệm, chỉ đặt cờ về `false` để lần đổi selection TIẾP
+  /// THEO (nếu không đi kèm một lượt gõ mới) được hiểu đúng là do người dùng
+  /// bấm mũi tên/chạm màn hình và huỷ bộ nhớ đệm như bình thường.
+  bool _vuaChenKyTuBangBoNhoDem = false;
   Color? _mauChuDangCho;
   Color? _mauNenDangCho;
 
@@ -3664,12 +3721,19 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   void _apDungDinhDang(String loai, {Color? mau}) {
     final chon = _boDieuKhien.selection;
-    // Không có "bộ nhớ đệm"/override nào để đặt nữa (đã bỏ hẳn), và vùng
-    // chọn rỗng thì cũng không có vùng nào để áp — bấm nút/phím tắt lúc này
-    // ĐƠN GIẢN LÀ KHÔNG LÀM GÌ: không lưu mốc lịch sử, không đổi `dinhDang`,
-    // không đụng tới các cờ `_xxxDangCho` (chúng chỉ do
-    // `_tinhTrangThaiDinhDangHienTai` ghi, phản ánh "hợp 2 bên" tại con trỏ).
-    if (!chon.isValid || chon.isCollapsed) {
+    if (!chon.isValid) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _oChu.requestFocus();
+      });
+      return;
+    }
+    // YÊU CẦU 2a/3: vùng chọn RỖNG — KHÔNG còn "không làm gì" như trước nữa.
+    // Bấm nút/phím tắt lúc này kích hoạt (hoặc cập nhật) bộ nhớ đệm định
+    // dạng tại con trỏ, để lần gõ/nói tiếp theo mang đúng định dạng vừa
+    // bấm. Không đụng `_boDieuKhien.dinhDang`, không lưu mốc lịch sử (chưa
+    // có chữ nào đổi để mà lùi lại).
+    if (chon.isCollapsed) {
+      _bamNutDinhDangTaiConTro(loai, mau: mau);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _oChu.requestFocus();
       });
@@ -3744,6 +3808,122 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henLuu();
   }
 
+  /// YÊU CẦU 2a: bấm nút/phím tắt định dạng khi vùng chọn ĐANG RỖNG — tính
+  /// TOGGLE đúng [loai] vừa bấm trên NỀN là bộ nhớ đệm hiện tại nếu nó đang
+  /// hoạt động (để bấm B rồi bấm I liên tiếp mà chưa gõ gì cộng dồn được cả
+  /// hai), hoặc trên nền "hợp 2 bên" tại con trỏ nếu bộ nhớ đệm CHƯA hoạt
+  /// động — rồi CHỤP LẠI toàn bộ 8 thuộc tính vào `_boNhoDem`. Không lưu mốc
+  /// lịch sử, không đụng `_boDieuKhien.dinhDang` (xem chú thích khai báo
+  /// `_boNhoDemDangHoatDong`).
+  void _bamNutDinhDangTaiConTro(String loai, {Color? mau}) {
+    final vt = _boDieuKhien.selection.start;
+    final nen = _boNhoDemDangHoatDong
+        ? _boNhoDem!
+        : _dinhDangHopTaiViTri(vt, vt, _boDieuKhien.text.length);
+
+    var dam = nen.dam;
+    var nghieng = nen.nghieng;
+    var gachChan = nen.gachChan;
+    var gachNgang = nen.gachNgang;
+    var treMu = nen.treMu;
+    var treChan = nen.treChan;
+    var mauChu = nen.mauChu;
+    var mauNen = nen.mauNen;
+
+    switch (loai) {
+      case 'dam':
+        dam = !dam;
+        break;
+      case 'nghieng':
+        nghieng = !nghieng;
+        break;
+      case 'gachChan':
+        gachChan = !gachChan;
+        break;
+      case 'gachNgang':
+        gachNgang = !gachNgang;
+        break;
+      case 'treMu':
+        treMu = !treMu;
+        // D2: chữ trên/chữ dưới loại trừ nhau — hệt `_datCoDinhDangTrongVung`.
+        if (treMu) treChan = false;
+        break;
+      case 'treChan':
+        treChan = !treChan;
+        if (treChan) treMu = false;
+        break;
+      case 'mauChu':
+        {
+          final apDung = mau ?? widget.caiDat.mauChuGanNhat;
+          mauChu = (mauChu == apDung) ? null : apDung;
+        }
+        break;
+      case 'mauNen':
+        {
+          final apDung = mau ?? widget.caiDat.mauNenGanNhat;
+          mauNen = (mauNen == apDung) ? null : apDung;
+        }
+        break;
+      case 'xoaDinhDang':
+        dam = false;
+        nghieng = false;
+        gachChan = false;
+        gachNgang = false;
+        treMu = false;
+        treChan = false;
+        mauChu = null;
+        mauNen = null;
+        break;
+    }
+
+    final ketQua = _chuanHoaXungDotTreMuTreChan((
+      dam: dam,
+      nghieng: nghieng,
+      gachChan: gachChan,
+      gachNgang: gachNgang,
+      treMu: treMu,
+      treChan: treChan,
+      mauChu: mauChu,
+      mauNen: mauNen,
+    ));
+
+    setState(() {
+      _boNhoDem = ketQua;
+      _boNhoDemDangHoatDong = true;
+      _damDangCho = ketQua.dam;
+      _nghiengDangCho = ketQua.nghieng;
+      _gachChanDangCho = ketQua.gachChan;
+      _gachNganDangCho = ketQua.gachNgang;
+      _treMuDangCho = ketQua.treMu;
+      _treChanDangCho = ketQua.treChan;
+      _mauChuDangCho = ketQua.mauChu;
+      _mauNenDangCho = ketQua.mauNen;
+    });
+  }
+
+  /// Dự phòng (YÊU CẦU 2b): bộ nhớ đệm luôn toggle treMu/treChan loại trừ
+  /// nhau ngay tại `_bamNutDinhDangTaiConTro`, nên về lý thuyết không bao
+  /// giờ chứa cả hai `true` cùng lúc — NHƯNG nếu một lỗi logic nào đó (hiện
+  /// tại chưa biết) vẫn để lọt trạng thái đó, hàm này là chốt chặn cuối:
+  /// ưu tiên treMu (chữ trên), tắt treChan. Áp dụng cho MỌI [_HopDinhDang]
+  /// trước khi dùng để gán cho ký tự mới chèn, dù nguồn là "hợp 2 bên" (đã
+  /// tự loại trừ đúng ở `_dinhDangHopTaiViTri`) hay bộ nhớ đệm.
+  _HopDinhDang _chuanHoaXungDotTreMuTreChan(_HopDinhDang h) {
+    if (h.treMu && h.treChan) {
+      return (
+        dam: h.dam,
+        nghieng: h.nghieng,
+        gachChan: h.gachChan,
+        gachNgang: h.gachNgang,
+        treMu: true,
+        treChan: false,
+        mauChu: h.mauChu,
+        mauNen: h.mauNen,
+      );
+    }
+    return h;
+  }
+
   /// D3: [batDau, ketThuc) có phải MỌI đoạn con đều mang CÙNG một giá trị
   /// màu (mauChu nếu [laMauChu], ngược lại mauNen) — trả về màu đó nếu đồng
   /// nhất và không null ở đâu, `null` nếu không (kể cả khi không ai có màu).
@@ -3812,13 +3992,43 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return coPhai ? _mauDongNhatTrongVung(vtPhai, vtPhai + 1, laMauChu: laMauChu) : null;
     }
 
+    // YÊU CẦU 1 (sửa lỗi xung đột chữ trên/chữ dưới tại điểm chèn): treMu và
+    // treChan là HAI ĐỊNH DẠNG LOẠI TRỪ NHAU (một ký tự không thể vừa
+    // treMu vừa treChan — xem D2 ở `_datCoDinhDangTrongVung`). Nếu bên TRÁI
+    // đang mang treMu VÀ bên PHẢI đang mang treChan (hoặc ngược lại), OR mù
+    // quáng từng cờ riêng lẻ sẽ cho ra treMu=true VÀ treChan=true CÙNG LÚC —
+    // không phải chữ trên, cũng không phải chữ dưới, chỉ còn lại tác dụng
+    // phụ vô nghĩa (cỡ chữ bị thu nhỏ qua nhánh treChan trong khi
+    // FontFeature 'sups' của treMu cũng bật, chồng lên nhau).
+    //
+    // Sửa: CHỈ RIÊNG cho cặp treMu/treChan, khi phát hiện xung đột kiểu này
+    // thì bỏ hẳn quy tắc OR — LUÔN ưu tiên định dạng của bên PHẢI (ký tự
+    // chèn vào đứng ngay trước bên phải, "nối vào" đoạn bên phải một cách tự
+    // nhiên hơn là đoạn bên trái đã kết thúc). Các định dạng KHÁC (đậm,
+    // nghiêng, gạch chân, gạch ngang, màu chữ, màu nền) không hề đổi — vẫn
+    // OR (hợp 2 bên) bình thường như trước.
+    final traiTreMu = coTrai && _coDongNhatTrongVung(vtTrai - 1, vtTrai, (d) => d.treMu);
+    final traiTreChan = coTrai && _coDongNhatTrongVung(vtTrai - 1, vtTrai, (d) => d.treChan);
+    final phaiTreMu = coPhai && _coDongNhatTrongVung(vtPhai, vtPhai + 1, (d) => d.treMu);
+    final phaiTreChan = coPhai && _coDongNhatTrongVung(vtPhai, vtPhai + 1, (d) => d.treChan);
+    final xungDotTreMuTreChan = (traiTreMu && phaiTreChan) || (traiTreChan && phaiTreMu);
+    final bool treMuKetQua;
+    final bool treChanKetQua;
+    if (xungDotTreMuTreChan) {
+      treMuKetQua = phaiTreMu;
+      treChanKetQua = phaiTreChan;
+    } else {
+      treMuKetQua = traiTreMu || phaiTreMu;
+      treChanKetQua = traiTreChan || phaiTreChan;
+    }
+
     return (
       dam: hopCo((d) => d.dam),
       nghieng: hopCo((d) => d.nghieng),
       gachChan: hopCo((d) => d.gachChan),
       gachNgang: hopCo((d) => d.gachNgang),
-      treMu: hopCo((d) => d.treMu),
-      treChan: hopCo((d) => d.treChan),
+      treMu: treMuKetQua,
+      treChan: treChanKetQua,
       mauChu: hopMau(laMauChu: true),
       mauNen: hopMau(laMauChu: false),
     );
@@ -3861,6 +4071,22 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void _tinhTrangThaiDinhDangHienTai() {
     final chon = _boDieuKhien.selection;
     if (!chon.isValid) return;
+
+    // YÊU CẦU 2c (cờ một lần): mọi lần selection đổi mà KHÔNG phải hệ quả
+    // trực tiếp của chính việc chèn ký tự (bộ nhớ đệm đang hoạt động) đều
+    // coi là người dùng CHỦ ĐỘNG di chuyển con trỏ (mũi tên, chạm màn hình,
+    // click chuột...) → huỷ bộ nhớ đệm ngay. Đặt ở ĐẦU hàm, trước cả nhánh
+    // vùng chọn rỗng/không rỗng, vì cả hai trường hợp đều là "con trỏ không
+    // còn ở đúng chỗ bộ nhớ đệm được kích hoạt" theo đúng nghĩa của yêu cầu.
+    if (_boNhoDemDangHoatDong) {
+      if (_vuaChenKyTuBangBoNhoDem) {
+        _vuaChenKyTuBangBoNhoDem = false;
+      } else {
+        _boNhoDemDangHoatDong = false;
+        _boNhoDem = null;
+      }
+    }
+
     int batDau;
     int ketThuc;
     if (!chon.isCollapsed) {
