@@ -1599,6 +1599,24 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// luôn, không cần đợi đồng hồ thời gian nào cả.
   List<String> _partialTruocDo = [];
 
+  /// (RACE CONDITION KHI CHUYỂN PHIÊN — LỚP 2) Bản sao NGẮN HẠN của
+  /// `_tuDaChotTrongPhien` (tối đa 20 từ cuối), chụp lại NGAY TRƯỚC khi
+  /// `_tuDaChotTrongPhien` bị xoá rỗng lúc chuyển phiên (Android tự ngắt rồi
+  /// tự mở lại, bấm phím tắt cắt nhanh, gõ phím). Mục đích DUY NHẤT: phát
+  /// hiện một PARTIAL của phiên MỚI lặp lại (một phần hay toàn bộ) nội dung
+  /// đã chốt của phiên VỪA đóng — bộ nhớ đệm chốt-dần của phiên mới lúc đó
+  /// đang RỖNG nên tự nó không thể nhận ra chuyện này. KHÔNG BAO GIỜ dùng để
+  /// sửa/xoá chữ ĐÃ NẰM trong tài liệu — chỉ ảnh hưởng tới việc phiên mới sắp
+  /// chèn thêm gì. Xem `_luuBoDemRanhGioiPhien` và nhánh LỚP 2 trong
+  /// `_khiCoChu`.
+  List<String> _tuVuaChotGanRanhGioiPhien = [];
+
+  /// Hẹn giờ tự dọn `_tuVuaChotGanRanhGioiPhien` — sống rất ngắn (chỉ để bắt
+  /// đúng khoảnh khắc chuyển phiên), không giữ vô thời hạn. Cũng bị xoá sớm
+  /// hơn ngay khi phiên mới xử lý AN TOÀN xong PARTIAL đầu tiên của nó (xem
+  /// `_khiCoChu`), không cần đợi hết giờ.
+  Timer? _henHetHanRanhGioiPhien;
+
   // ------------------------------------------------ Việc 3: log gỡ lỗi giọng
   // nói — chỉ giữ trong bộ nhớ, tối đa 500 dòng gần nhất, xem màn hình đọc ở
   // `man_hinh_nhat_ky_giong_noi.dart` (mở từ menu "+ Thêm lựa chọn").
@@ -2214,6 +2232,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henRanhGioiGoTay?.cancel();
     _henTuTatMicroImLang?.cancel();
     _henMoDamChamCuoi?.cancel();
+    _henHetHanRanhGioiPhien?.cancel();
     _henNhapNhayConTro?.cancel();
     _oChu.removeListener(_khiFocusConTroDoi);
     _micro.cancel();
@@ -2584,7 +2603,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       setState(() => _dangNghe = dangChay);
     }
     if (!dangChay) {
-      _ghiLogGiongNoi('Phiên DỪNG (Android tự ngắt).');
+      // (RACE CONDITION KHI CHUYỂN PHIÊN — LỚP 1) Tăng session-ID NGAY TẠI
+      // ĐÂY, đồng bộ, không đợi `stop()`/`cancel()` xong hay hẹn giờ
+      // `_henBatLai` chạy — để mọi callback `onResult` của phiên vừa chết bị
+      // vứt NGAY LẬP TỨC, kể cả khi một sự kiện chuyển phiên KHÁC (bấm phím
+      // tắt cắt nhanh) đang xảy ra gần như cùng lúc.
+      _phienNgheHienTai++;
+      _ghiLogGiongNoi(
+        'Phiên DỪNG (Android tự ngắt) — phiên hiện tại thành #$_phienNgheHienTai.',
+      );
       _henBatLai();
     }
   }
@@ -2602,6 +2629,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   Future<void> _batMicro() async {
     if (!_sanSang) return;
+    // (RACE CONDITION KHI CHUYỂN PHIÊN — LỚP 2) Chụp lại đệm chống nhân đôi
+    // TRƯỚC khi `_chotCauDangDoc()` xoá rỗng `_tuDaChotTrongPhien` ngay dưới
+    // đây — đây là điểm MỘT phiên nghe MỚI thật sự sắp bắt đầu.
+    _luuBoDemRanhGioiPhien();
     _chotCauDangDoc();
     _luuDiemMoc(); // Mỗi lượt micro mới là một điểm có thể Lùi lại về.
     _boQuaCauNay = false;
@@ -2622,7 +2653,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       await _micro.listen(
         onResult: (ketQua) {
           if (idPhien != _phienNgheHienTai) return;
-          _khiCoChu(ketQua);
+          _khiCoChu(ketQua, idPhien);
         },
         localeId: _maNgonNgu,
         onSoundLevelChange: _khiDoiMucAm,
@@ -2641,7 +2672,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 
   Future<void> _tatMicro() async {
-    _ghiLogGiongNoi('Phiên DỪNG (tắt micro).');
+    // (LỚP 1) Tăng session-ID ngay, đồng bộ — phiên đang nghe coi như chết
+    // từ đây, không đợi cancel() xong.
+    _phienNgheHienTai++;
+    _ghiLogGiongNoi(
+      'Phiên DỪNG (tắt micro) — phiên hiện tại thành #$_phienNgheHienTai.',
+    );
     _muonNghe = false;
     _henTuTatMicroImLang?.cancel();
     _hen?.cancel();
@@ -2925,12 +2961,21 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// - `[]`    : `partialMoi` đúng NGUYÊN VĂN là N từ cuối đã chốt, không có
   ///             gì thêm — nhân đôi thuần tuý, phải bỏ qua hoàn toàn (D.4).
   /// - khác    : phần từ MỚI thực sự nằm SAU điểm nối (D.3).
-  List<String>? _timDiemNoi(List<String> partialMoi) {
-    final soDaChot = _tuDaChotTrongPhien.length;
+  ///
+  /// Nhận [daChot] làm THAM SỐ (thay vì luôn đọc thẳng `_tuDaChotTrongPhien`)
+  /// để một chỗ logic này dùng được cho CẢ hai việc: tìm điểm nối BÊN TRONG
+  /// một phiên (gọi qua `_timDiemNoi` bên dưới, truyền `_tuDaChotTrongPhien`)
+  /// VÀ tìm điểm nối QUA RANH GIỚI PHIÊN ở LỚP 2 của `_khiCoChu` (truyền
+  /// `_tuVuaChotGanRanhGioiPhien`) — tránh viết một bản sao thứ hai dễ lệch.
+  static List<String>? _timDiemNoiTrong(
+    List<String> daChot,
+    List<String> partialMoi,
+  ) {
+    final soDaChot = daChot.length;
     final maxN = soDaChot < 6 ? soDaChot : 6;
     for (var n = maxN; n >= 1; n--) {
       if (partialMoi.length < n) continue;
-      final duoiDaChot = _tuDaChotTrongPhien.sublist(soDaChot - n);
+      final duoiDaChot = daChot.sublist(soDaChot - n);
       var khop = true;
       for (var i = 0; i < n; i++) {
         if (!_tuKhopTho(partialMoi[i], duoiDaChot[i])) {
@@ -2946,7 +2991,34 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     return null;
   }
 
-  void _khiCoChu(dynamic ketQua) {
+  List<String>? _timDiemNoi(List<String> partialMoi) =>
+      _timDiemNoiTrong(_tuDaChotTrongPhien, partialMoi);
+
+  /// (RACE CONDITION KHI CHUYỂN PHIÊN — LỚP 2) Chụp lại tối đa 20 từ CUỐI
+  /// CÙNG của `_tuDaChotTrongPhien` NGAY TRƯỚC KHI nó bị xoá rỗng lúc chuyển
+  /// phiên, và cho bản chụp đó sống tối đa 4 giây. Gọi ở MỌI điểm thật sự bắt
+  /// đầu/kết thúc một phiên nghe (không gọi ở những chỗ `_tuDaChotTrongPhien`
+  /// chỉ đơn thuần được CHỐT xong trong lúc phiên vẫn tiếp tục).
+  void _luuBoDemRanhGioiPhien() {
+    if (_tuDaChotTrongPhien.isEmpty) return;
+    final n = _tuDaChotTrongPhien.length;
+    _tuVuaChotGanRanhGioiPhien =
+        List<String>.from(n <= 20 ? _tuDaChotTrongPhien : _tuDaChotTrongPhien.sublist(n - 20));
+    _henHetHanRanhGioiPhien?.cancel();
+    _henHetHanRanhGioiPhien = Timer(const Duration(seconds: 4), () {
+      if (_tuVuaChotGanRanhGioiPhien.isEmpty) return;
+      _ghiLogGiongNoi(
+        'LỚP 2: đệm chống nhân đôi qua ranh giới phiên hết hạn (4 giây), tự xoá.',
+      );
+      _tuVuaChotGanRanhGioiPhien = [];
+    });
+    _ghiLogGiongNoi(
+      "LỚP 2: lưu đệm chống nhân đôi qua ranh giới phiên: "
+      "'${_tuVuaChotGanRanhGioiPhien.join(' ')}'",
+    );
+  }
+
+  void _khiCoChu(dynamic ketQua, int idPhien) {
     final noi = (ketQua.recognizedWords as String? ?? '').trim();
     final xong = ketQua.finalResult as bool? ?? false;
     _ghiLogGiongNoi(xong ? "FINAL: '$noi'" : "PARTIAL: '$noi'");
@@ -2974,8 +3046,45 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _partialTruocDo = [];
     }
 
-    final tuMoi = _tachTu(noi);
+    var tuMoi = _tachTu(noi);
     if (tuMoi.isEmpty) return;
+
+    // (RACE CONDITION KHI CHUYỂN PHIÊN — LỚP 2) Đây là PARTIAL ĐẦU TIÊN của
+    // một đoạn nói mới (`_tuDaChotTrongPhien` đang rỗng) VÀ vẫn còn "đệm
+    // chống nhân đôi" của phiên vừa đóng — so partial này với đuôi đệm đó,
+    // dùng LẠI ĐÚNG thuật toán tìm-điểm-nối (`_timDiemNoiTrong`), coi đệm như
+    // một "đã chốt ảo". Chỉ ảnh hưởng nội dung SẮP chèn cho phiên mới, KHÔNG
+    // đụng gì tới chữ đã nằm sẵn trong tài liệu của phiên trước.
+    if (_tuDaChotTrongPhien.isEmpty && _tuVuaChotGanRanhGioiPhien.isNotEmpty) {
+      final ketQuaNoiRanhGioi = _timDiemNoiTrong(_tuVuaChotGanRanhGioiPhien, tuMoi);
+      if (ketQuaNoiRanhGioi == null) {
+        _ghiLogGiongNoi(
+          "LỚP 2: PARTIAL '$noi' không trùng đệm ranh giới phiên, coi là nội "
+          'dung thật, xoá đệm.',
+        );
+      } else if (ketQuaNoiRanhGioi.isEmpty) {
+        _ghiLogGiongNoi(
+          "LỚP 2: PARTIAL '$noi' trùng NGUYÊN VĂN đuôi đã chốt của phiên "
+          'trước — nhân đôi qua ranh giới phiên, bỏ qua hoàn toàn.',
+        );
+        _henHetHanRanhGioiPhien?.cancel();
+        _tuVuaChotGanRanhGioiPhien = [];
+        _partialTruocDo = tuMoi;
+        return;
+      } else {
+        _ghiLogGiongNoi(
+          "LỚP 2: cắt phần trùng đệm ranh giới phiên, chỉ giữ phần mới: "
+          "'${ketQuaNoiRanhGioi.join(' ')}'",
+        );
+        tuMoi = ketQuaNoiRanhGioi;
+      }
+      // Dù khớp hay không, một PARTIAL THẬT (không rỗng) đã được xử lý AN
+      // TOÀN qua đúng một lượt so khớp — đệm hết nhiệm vụ, dọn ngay, không
+      // đợi hết giờ.
+      _henHetHanRanhGioiPhien?.cancel();
+      _tuVuaChotGanRanhGioiPhien = [];
+      if (tuMoi.isEmpty) return;
+    }
 
     // BƯỚC C/D: xác định danh sách từ sẽ hiển thị (đã chốt + phần mới), theo
     // đúng thiết kế "chốt dần theo độ ổn định" + "tìm điểm nối" — KHÔNG còn
@@ -3040,6 +3149,19 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         widget.caiDat.tuDongChenKhoangCach &&
         !_laKhoangTrang(chen[chen.length - 1])) {
       chen = '$chen ';
+    }
+
+    // (RACE CONDITION KHI CHUYỂN PHIÊN — LỚP 1) Soát LẠI session-ID NGAY
+    // TRƯỚC khi thực sự GHI, không chỉ lúc callback bắt đầu chạy: từ lúc
+    // callback này khởi động tới đây có thể đã có một sự kiện CHUYỂN PHIÊN
+    // khác chen vào (Android tự ngắt trùng lúc người dùng bấm phím tắt...)
+    // và tăng `_phienNgheHienTai` lên rồi. Lệch thì huỷ ghi, không viết gì.
+    if (idPhien != _phienNgheHienTai) {
+      _ghiLogGiongNoi(
+        'LỚP 1: BỎ QUA — callback thuộc phiên cũ (#$idPhien), phiên hiện tại '
+        'đã là #$_phienNgheHienTai.',
+      );
+      return;
     }
 
     if (chen != _chuTam) {
@@ -3195,11 +3317,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Sau khi người dùng ngừng gõ đủ một giây thì micro tự bật lại như cũ.
   void _nguoiDungVuaGo() {
     _chuTam = ''; // Nhả đoạn đang nhảy ra: không gì đè lên nó được nữa.
+    // (LỚP 2) Chụp lại đệm chống nhân đôi TRƯỚC khi xoá rỗng bên dưới.
+    _luuBoDemRanhGioiPhien();
     _tuDaChotTrongPhien = [];
     _partialTruocDo = [];
 
     if (_muonNghe || _micro.isListening) {
-      _ghiLogGiongNoi('Phiên DỪNG (gõ phím).');
+      // (LỚP 1) Tăng session-ID ngay, đồng bộ — phiên đang nghe (nếu có) coi
+      // như chết từ đây, không đợi cancel() xong.
+      _phienNgheHienTai++;
+      _ghiLogGiongNoi(
+        'Phiên DỪNG (gõ phím) — phiên hiện tại thành #$_phienNgheHienTai.',
+      );
       _boQuaCauNay = true;
       _microNgungDeGo = true;
       _muonNghe = false; // Ngăn _henBatLai() lén bật lại.
@@ -3245,11 +3374,21 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void _dongBangDoanDangNhay({String lyDo = 'di chuyển con trỏ'}) {
     final dangVietDo = _chuTam.isNotEmpty;
     _chuTam = '';
+    // (LỚP 2) Chụp lại đệm chống nhân đôi TRƯỚC khi xoá rỗng bên dưới.
+    _luuBoDemRanhGioiPhien();
     _tuDaChotTrongPhien = [];
     _partialTruocDo = [];
     if (!dangVietDo) return;
     if (!_muonNghe || _dangCatCau || !_micro.isListening) return;
-    _ghiLogGiongNoi('Phiên DỪNG rồi MỞ LẠI ($lyDo).');
+    // (LỚP 1) Tăng session-ID NGAY tại thời điểm QUYẾT ĐỊNH cắt phiên, không
+    // đợi `stop()` hoàn tất — đây chính là điểm mấu chốt của ca "mất chữ":
+    // nếu Android CŨNG đang tự ngắt gần như cùng lúc, tăng sớm ở đây đảm bảo
+    // một trong hai sự kiện luôn thắng và id không bị hai nơi ghi đè lẫn
+    // nhau một cách mơ hồ.
+    _phienNgheHienTai++;
+    _ghiLogGiongNoi(
+      'Phiên DỪNG rồi MỞ LẠI ($lyDo) — phiên hiện tại thành #$_phienNgheHienTai.',
+    );
     _boQuaCauNay = true;
     _dangCatCau = true;
     _micro.stop().whenComplete(() {
