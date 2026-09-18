@@ -1,0 +1,58 @@
+name: Dựng bản thử micro Web
+
+# Chỉ chạy khi CHÍNH bản thử web (lib/main_web_test.dart) hoặc workflow này
+# đổi — tách biệt hoàn toàn khỏi build-apk.yml, không tự chạy lại mỗi khi
+# code Android khác thay đổi.
+on:
+  push:
+    paths:
+      - 'lib/main_web_test.dart'
+      - '.github/workflows/deploy-web-test.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  dung-va-trien-khai-web:
+    name: Dựng Flutter Web và đưa lên GitHub Pages
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Lấy mã nguồn
+        uses: actions/checkout@v4
+
+      # Đúng cách cài Flutter như build-apk.yml, để nhất quán phiên bản giữa
+      # hai workflow.
+      - name: Cài Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Xem phiên bản
+        run: flutter --version
+
+      - name: Bật hỗ trợ Flutter Web
+        run: flutter config --enable-web
+
+      - name: Tải thư viện
+        run: flutter pub get
+
+      - name: Soát mã (chỉ cảnh báo, không chặn build)
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+        continue-on-error: true
+
+      # Repo là sotay99/ghi-noi → GitHub Pages sẽ phục vụ tại
+      # /ghi-noi/, nên base-href phải khớp.
+      - name: Dựng bản Web (entry point riêng cho bản thử)
+        run: |
+          flutter build web \
+            --target=lib/main_web_test.dart \
+            --base-href /${{ github.event.repository.name }}/
+
+      - name: Đưa build/web lên nhánh gh-pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./build/web
