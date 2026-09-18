@@ -19,7 +19,6 @@ import 'kho_du_lieu.dart';
 import 'kiem_tra_chinh_ta.dart';
 import 'kiem_tra_toan_van.dart';
 import 'man_hinh_cai_dat.dart';
-import 'man_hinh_nhat_ky_giong_noi.dart';
 import 'man_hinh_thu_muc.dart';
 import 'modal_cai_dat_kiem_tra_toan_van.dart';
 import 'mo_hinh.dart';
@@ -852,16 +851,6 @@ class _YDinhDinhDang extends Intent {
   final String loai; // 'dam' | 'nghieng' | 'gachChan' | 'gachNgang' | 'treMu' | 'treChan' | 'mauChu' | 'mauNen' | 'xoaDinhDang'
 }
 
-/// (VIỆC 1) Ý định "cắt nhanh phiên ghi âm" — phím ĐƠN (Tab hoặc Win/Cmd,
-/// tuỳ Cài đặt), cùng cách khai báo với `_YDinhLuiLai`/`_YDinhToi` ở trên.
-/// Khai qua `Shortcuts`/`Actions` (không phải `HardwareKeyboard.addHandler`)
-/// để Flutter TỰ ĐỘNG chiếm lại phím Tab khỏi hành vi mặc định (di chuyển
-/// tiêu điểm giữa các widget) đúng cách, an toàn — xem giải thích đầy đủ ở
-/// nơi khai báo `Shortcuts` trong `build`.
-class _YDinhCatNhanhPhienGhiAm extends Intent {
-  const _YDinhCatNhanhPhienGhiAm();
-}
-
 /// Vẽ nền gradient đỏ→vàng cho mỗi kết quả tìm kiếm trong văn bản — cùng
 /// pattern đo toạ độ NGAY TRONG `paint()` như `_VeDanhDauAi`/`_VeChamCuoiVanBan`
 /// (xem giải thích đầy đủ ở `_VeDanhDauAi`), để không bao giờ lệch khung hình
@@ -1076,6 +1065,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// gọi `_capNhatKetQuaTimKiem()` khi đó do chính hàm bắt hiệu ứng đảm nhận.
   bool _treHoanCapNhatTimKiem = false;
 
+  /// (VIỆC 3) Chuẩn hoá một chuỗi để so khớp trong tìm kiếm/thay thế, theo
+  /// đúng hai cài đặt `CaiDat.timKiemPhanBietHoaThuong`/`timKiemPhanBietDauThanh`.
+  /// Áp dụng ĐỘC LẬP hai phép biến đổi (hạ chữ thường nếu không phân biệt
+  /// hoa/thường, bỏ dấu nếu không phân biệt dấu) — dùng CHUNG một hàm cho cả
+  /// từ khoá lẫn văn bản để đảm bảo hai bên luôn được chuẩn hoá y hệt nhau.
+  String _chuanHoaTimKiem(String s) {
+    var ketQua = s;
+    if (!widget.caiDat.timKiemPhanBietHoaThuong) ketQua = ketQua.toLowerCase();
+    if (!widget.caiDat.timKiemPhanBietDauThanh) ketQua = _boDauTiengViet(ketQua);
+    return ketQua;
+  }
+
   void _capNhatKetQuaTimKiem() {
     if (_dangCapNhatTimKiem) return;
     _dangCapNhatTimKiem = true;
@@ -1084,8 +1085,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       final vb = _boDieuKhien.text;
       final ds = <int>[];
       if (tuKhoa.isNotEmpty) {
-        final vbHa = vb.toLowerCase();
-        final tkHa = tuKhoa.toLowerCase();
+        final vbHa = _chuanHoaTimKiem(vb);
+        final tkHa = _chuanHoaTimKiem(tuKhoa);
         var vt = 0;
         while (true) {
           final i = vbHa.indexOf(tkHa, vt);
@@ -1185,6 +1186,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// hai luồng 4a (thay)/4b (xoá) tuỳ ô Thay thế có nội dung hay không.
   void _thayChoNay() {
     if (_chiSoTimKiemHienTai < 0 || _chiSoTimKiemHienTai >= _ketQuaTimKiem.length) return;
+    // (VIỆC 5) Một mốc Lùi lại cho đúng MỘT lần bấm "Thay chỗ này" — TÁI
+    // DÙNG cơ chế lịch sử đã có (`_luuDiemMoc`), chụp trạng thái TRƯỚC khi
+    // văn bản bị sửa bên dưới (trong `_thayMotKetQua`).
+    _luuDiemMoc();
     if (_oThayThe.text.isEmpty) {
       _batHieuUngXoaMotKetQua(_chiSoTimKiemHienTai);
     } else {
@@ -1199,6 +1204,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// `_dieuChinhVungToanVanSauKhiSua` trong toàn bộ tệp này) — chỉ khác là
   /// việc xử lý THẬT SỰ giờ có thể đến sau 1 giây hiệu ứng.
   void _thayTatCa() {
+    if (_ketQuaTimKiem.isEmpty) return;
+    // (VIỆC 5) MỘT mốc Lùi lại DUY NHẤT cho toàn bộ "Tất cả" (dù thay/xoá N
+    // kết quả cùng lúc) — chụp TRƯỚC khi bắt đầu xử lý, y hệt `_thayChoNay`.
+    // Việc thay/xoá thật sự trong `_batHieuUngThay...`/`_batHieuUngXoa...`
+    // bên dưới không gọi thêm `_luuDiemMoc` nào khác, nên Ctrl+Z một lần là
+    // hoàn tác đúng cả N kết quả.
+    _luuDiemMoc();
     if (_oThayThe.text.isEmpty) {
       _batHieuUngXoaTatCa();
     } else {
@@ -1425,25 +1437,115 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         ),
       );
 
-  void _moHuongDanThayThe() {
+  /// (VIỆC 3) Một dòng cài đặt dạng công tắc bật/tắt trong modal, cùng
+  /// pattern Row + Switch đã dùng ở các dòng cài đặt trong
+  /// `man_hinh_cai_dat.dart` (`_dong3TuDongChen`, `_dong4AI`, ...).
+  Widget _dongCongTacTimKiem(String nhan, bool bat, ValueChanged<bool> khiDoi) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              nhan,
+              style: TextStyle(
+                color: bat ? const Color(0xFF1A73E8) : const Color(0xFF5F6368),
+                fontSize: 13,
+              ),
+            ),
+          ),
+          Switch(value: bat, onChanged: khiDoi),
+        ],
+      ),
+    );
+  }
+
+  /// (VIỆC 3) Modal "Cài đặt tìm kiếm và hướng dẫn thay thế" — Phần 1 gồm 4
+  /// công tắc (2 cặp đối nghịch: hoa/thường, có dấu/không dấu) tác động thật
+  /// vào `_capNhatKetQuaTimKiem()`; Phần 2 giữ NGUYÊN 100% nội dung hướng
+  /// dẫn Thay thế cũ, chỉ dời xuống dưới Phần 1.
+  void _moCaiDatTimKiemVaHuongDanThayThe() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Hướng dẫn Thay thế'),
-        content: const Text(
-          '• "Thay chỗ này": chỉ thay đúng kết quả đang chọn (số thứ tự '
-          'đang hiện, ví dụ 3/5).\n\n'
-          '• "Tất cả": thay hết mọi kết quả cùng lúc, có hỏi xác nhận '
-          'trước khi làm.\n\n'
-          '• Để trống ô Thay thế rồi bấm một trong hai nút: kết quả tìm '
-          'kiếm đó bị XOÁ, không cần gõ gì để thay vào chỗ trống.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Đã hiểu'),
-          ),
-        ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateModal) {
+          final phanBietHoaThuong = widget.caiDat.timKiemPhanBietHoaThuong;
+          final phanBietDauThanh = widget.caiDat.timKiemPhanBietDauThanh;
+
+          Future<void> datHoaThuong(bool moiPhanBiet) async {
+            await widget.caiDat.datTimKiemPhanBietHoaThuong(moiPhanBiet);
+            setStateModal(() {});
+            _capNhatKetQuaTimKiem();
+          }
+
+          Future<void> datDauThanh(bool moiPhanBiet) async {
+            await widget.caiDat.datTimKiemPhanBietDauThanh(moiPhanBiet);
+            setStateModal(() {});
+            _capNhatKetQuaTimKiem();
+          }
+
+          return AlertDialog(
+            title: const Text('Cài đặt tìm kiếm và hướng dẫn thay thế'),
+            content: SizedBox(
+              width: 360,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Cài đặt chế độ tìm kiếm',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                    ),
+                    const SizedBox(height: 4),
+                    _dongCongTacTimKiem(
+                      'Khớp cả chữ Hoa và chữ thường',
+                      !phanBietHoaThuong,
+                      (bat) => datHoaThuong(!bat),
+                    ),
+                    _dongCongTacTimKiem(
+                      'Chữ Hoa và chữ thường luôn khác nhau',
+                      phanBietHoaThuong,
+                      (bat) => datHoaThuong(bat),
+                    ),
+                    const SizedBox(height: 6),
+                    _dongCongTacTimKiem(
+                      'Khớp cả chữ không dấu và chữ có dấu',
+                      !phanBietDauThanh,
+                      (bat) => datDauThanh(!bat),
+                    ),
+                    _dongCongTacTimKiem(
+                      'Chữ không dấu và chữ có dấu luôn khác nhau',
+                      phanBietDauThanh,
+                      (bat) => datDauThanh(bat),
+                    ),
+                    const Divider(height: 24),
+                    const Text(
+                      'Hướng dẫn thay thế',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '• "Thay chỗ này": chỉ thay đúng kết quả đang chọn (số '
+                      'thứ tự đang hiện, ví dụ 3/5).\n\n'
+                      '• "Tất cả": thay hết mọi kết quả cùng lúc, có hỏi xác '
+                      'nhận trước khi làm.\n\n'
+                      '• Để trống ô Thay thế rồi bấm một trong hai nút: kết '
+                      'quả tìm kiếm đó bị XOÁ, không cần gõ gì để thay vào '
+                      'chỗ trống.',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Đã hiểu'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1617,23 +1719,49 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// `_khiCoChu`), không cần đợi hết giờ.
   Timer? _henHetHanRanhGioiPhien;
 
-  // ------------------------------------------------ Việc 3: log gỡ lỗi giọng
-  // nói — chỉ giữ trong bộ nhớ, tối đa 500 dòng gần nhất, xem màn hình đọc ở
-  // `man_hinh_nhat_ky_giong_noi.dart` (mở từ menu "+ Thêm lựa chọn").
-  static const _soDongLogToiDa = 500;
-  final List<String> _logGiongNoi = [];
+  /// (VIỆC 3) Bảng ánh xạ MỖI ký tự tiếng Việt có dấu → đúng MỘT ký tự không
+  /// dấu tương ứng (giữ nguyên độ dài chuỗi sau khi thay, để chỉ số vị trí
+  /// tìm kiếm trong `_capNhatKetQuaTimKiem` không bị lệch so với văn bản
+  /// gốc). Liệt kê THỦ CÔNG, không dùng chuẩn hoá Unicode (NFD) của thư viện
+  /// ngoài — an toàn, không phụ thuộc API lạ.
+  static const Map<String, String> _bangBoDauTiengViet = {
+    'à': 'a', 'á': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
+    'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
+    'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a',
+    'À': 'A', 'Á': 'A', 'Ả': 'A', 'Ã': 'A', 'Ạ': 'A',
+    'Ă': 'A', 'Ằ': 'A', 'Ắ': 'A', 'Ẳ': 'A', 'Ẵ': 'A', 'Ặ': 'A',
+    'Â': 'A', 'Ầ': 'A', 'Ấ': 'A', 'Ẩ': 'A', 'Ẫ': 'A', 'Ậ': 'A',
+    'è': 'e', 'é': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
+    'ê': 'e', 'ề': 'e', 'ế': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e',
+    'È': 'E', 'É': 'E', 'Ẻ': 'E', 'Ẽ': 'E', 'Ẹ': 'E',
+    'Ê': 'E', 'Ề': 'E', 'Ế': 'E', 'Ể': 'E', 'Ễ': 'E', 'Ệ': 'E',
+    'ì': 'i', 'í': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
+    'Ì': 'I', 'Í': 'I', 'Ỉ': 'I', 'Ĩ': 'I', 'Ị': 'I',
+    'ò': 'o', 'ó': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
+    'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o',
+    'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o',
+    'Ò': 'O', 'Ó': 'O', 'Ỏ': 'O', 'Õ': 'O', 'Ọ': 'O',
+    'Ô': 'O', 'Ồ': 'O', 'Ố': 'O', 'Ổ': 'O', 'Ỗ': 'O', 'Ộ': 'O',
+    'Ơ': 'O', 'Ờ': 'O', 'Ớ': 'O', 'Ở': 'O', 'Ỡ': 'O', 'Ợ': 'O',
+    'ù': 'u', 'ú': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
+    'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u',
+    'Ù': 'U', 'Ú': 'U', 'Ủ': 'U', 'Ũ': 'U', 'Ụ': 'U',
+    'Ư': 'U', 'Ừ': 'U', 'Ứ': 'U', 'Ử': 'U', 'Ữ': 'U', 'Ự': 'U',
+    'ỳ': 'y', 'ý': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y',
+    'Ỳ': 'Y', 'Ý': 'Y', 'Ỷ': 'Y', 'Ỹ': 'Y', 'Ỵ': 'Y',
+    'đ': 'd', 'Đ': 'D',
+  };
 
-  /// Ghi một dòng vào log gỡ lỗi giọng nói, kèm giờ:phút:giây. Không
-  /// `setState` — màn hình log chỉ đọc danh sách này lúc người dùng chủ động
-  /// mở nó ra, không cần vẽ lại trang soạn thảo mỗi lần có dòng log mới.
-  void _ghiLogGiongNoi(String dong) {
-    String hai(int n) => n.toString().padLeft(2, '0');
-    final gio = DateTime.now();
-    final moc = '${hai(gio.hour)}:${hai(gio.minute)}:${hai(gio.second)}';
-    _logGiongNoi.add('[$moc] $dong');
-    if (_logGiongNoi.length > _soDongLogToiDa) {
-      _logGiongNoi.removeRange(0, _logGiongNoi.length - _soDongLogToiDa);
+  /// (VIỆC 3) Bỏ dấu thanh/dấu phụ tiếng Việt, giữ nguyên số ký tự (mỗi ký
+  /// tự trong chuỗi gốc ứng với đúng một ký tự trong kết quả) để không làm
+  /// lệch chỉ số vị trí dùng trong tìm kiếm.
+  static String _boDauTiengViet(String s) {
+    final buf = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      final kyTu = s[i];
+      buf.write(_bangBoDauTiengViet[kyTu] ?? kyTu);
     }
+    return buf.toString();
   }
 
   static bool _laKhoangTrang(String kyTu) =>
@@ -1975,9 +2103,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             child: const Text('Tất cả'),
           ),
           IconButton(
-            icon: const Icon(Icons.help_outline, size: 20),
-            tooltip: 'Hướng dẫn Thay thế',
-            onPressed: _moHuongDanThayThe,
+            icon: Icon(Icons.close, color: Colors.green.shade700),
+            tooltip: 'Xoá nội dung thay thế',
+            onPressed: () => _oThayThe.clear(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings, size: 20),
+            tooltip: 'Cài đặt tìm kiếm và hướng dẫn thay thế',
+            onPressed: _moCaiDatTimKiemVaHuongDanThayThe,
           ),
         ],
       ),
@@ -2207,7 +2340,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     HardwareKeyboard.instance.addHandler(_khiPhimTatMicro);
     HardwareKeyboard.instance.addHandler(_khiPhimTatLuiTien);
     HardwareKeyboard.instance.addHandler(_khiGoPhimBatKyTatChuThich);
-    HardwareKeyboard.instance.addHandler(_khiBamPhimWinCatNhanhPhienGhiAm);
   }
 
   /// Gõ BẤT KỲ phím nào trên bàn phím rời cũng tắt chú thích — không riêng gì
@@ -2223,7 +2355,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     HardwareKeyboard.instance.removeHandler(_khiPhimTatMicro);
     HardwareKeyboard.instance.removeHandler(_khiPhimTatLuiTien);
     HardwareKeyboard.instance.removeHandler(_khiGoPhimBatKyTatChuThich);
-    HardwareKeyboard.instance.removeHandler(_khiBamPhimWinCatNhanhPhienGhiAm);
     WidgetsBinding.instance.removeObserver(this);
     _hen?.cancel();
     _henLuuTru?.cancel();
@@ -2514,6 +2645,35 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
   }
 
+  /// (VIỆC 6b) Danh sách ghi chú trong CÙNG thư mục với ghi chú đang mở,
+  /// đúng THỨ TỰ hiển thị của `ManHinhThuMuc` — TÁI DÙNG đúng
+  /// `KhoDuLieu.noiDungThuMuc` (nguồn thứ tự DUY NHẤT, sắp theo tên không
+  /// phân biệt hoa/thường), không tự bịa thứ tự khác.
+  List<GhiChuFile> _dsGhiChuCungThuMuc() =>
+      widget.kho.noiDungThuMuc(_ghiChuHienTai.chaId).ghiChuCon;
+
+  /// (VIỆC 6b) "Tệp trước"/[buoc] = -1, "Tệp sau"/[buoc] = 1. Không có tệp
+  /// trước/sau (đang ở đầu/cuối danh sách) thì không làm gì — ưu tiên đơn
+  /// giản, tránh phức tạp hoá bằng thông báo riêng.
+  Future<void> _chuyenTepTrongThuMuc(int buoc) async {
+    final ds = _dsGhiChuCungThuMuc();
+    final viTriHienTai = ds.indexWhere((g) => g.id == _ghiChuHienTai.id);
+    if (viTriHienTai < 0) return;
+    final viTriMoi = viTriHienTai + buoc;
+    if (viTriMoi < 0 || viTriMoi >= ds.length) return;
+    final tepMoi = ds[viTriMoi];
+
+    // Lưu ghi chú đang mở TRƯỚC KHI chuyển — đúng luồng `_moManHinhThuMuc`
+    // đã dùng khi rời trang (tắt micro nếu đang nghe, rồi lưu).
+    if (_muonNghe) await _tatMicro();
+    if (!mounted) return;
+    await _luuVanBan();
+    if (!mounted) return;
+
+    _moGhiChu(tepMoi.id);
+    _baoDangOTrongTep(tepMoi.ten);
+  }
+
   void _moGhiChu(String id) {
     final g = widget.kho.timGhiChu(id);
     if (g == null) return;
@@ -2609,9 +2769,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // vứt NGAY LẬP TỨC, kể cả khi một sự kiện chuyển phiên KHÁC (bấm phím
       // tắt cắt nhanh) đang xảy ra gần như cùng lúc.
       _phienNgheHienTai++;
-      _ghiLogGiongNoi(
-        'Phiên DỪNG (Android tự ngắt) — phiên hiện tại thành #$_phienNgheHienTai.',
-      );
       _henBatLai();
     }
   }
@@ -2648,7 +2805,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // một câu vừa nói xong: phiên mới đã coi đoạn đó là chữ THẬT rồi, kết
     // quả trễ của phiên cũ lại chèn thêm một lần nữa.
     final idPhien = ++_phienNgheHienTai;
-    _ghiLogGiongNoi('Phiên MỞ MỚI (phiên #$idPhien).');
     try {
       await _micro.listen(
         onResult: (ketQua) {
@@ -2675,9 +2831,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // (LỚP 1) Tăng session-ID ngay, đồng bộ — phiên đang nghe coi như chết
     // từ đây, không đợi cancel() xong.
     _phienNgheHienTai++;
-    _ghiLogGiongNoi(
-      'Phiên DỪNG (tắt micro) — phiên hiện tại thành #$_phienNgheHienTai.',
-    );
     _muonNghe = false;
     _henTuTatMicroImLang?.cancel();
     _hen?.cancel();
@@ -2745,44 +2898,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
 
     _bamNutMicro();
-    return true;
-  }
-
-  /// (VIỆC 1) Phím tắt ĐƠN cắt nhanh phiên ghi âm (Tab hoặc Win/Cmd, tuỳ
-  /// `CaiDat.phimCatNhanhPhienGhiAm`) — chủ động cắt NGAY phiên nghe đang
-  /// chạy rồi mở phiên mới, dùng khi sắp nói sang một ý hoàn toàn khác.
-  ///
-  /// TÁI DÙNG ĐÚNG cơ chế đã có ở `_dongBangDoanDangNhay()` (chốt cứng vùng
-  /// tạm hiện tại + guard `_boQuaCauNay` + rỗng `_tuDaChotTrongPhien`/
-  /// `_partialTruocDo` + dừng rồi mở lại phiên nghe) — chỉ khác điểm KÍCH
-  /// HOẠT là phím tắt thay vì người dùng chạm màn hình dời con trỏ. KHÔNG
-  /// đụng gì tới thuật toán chốt-dần/tìm-điểm-nối.
-  ///
-  /// Micro không hoạt động thì phím này không có ý nghĩa gì — không làm gì.
-  void _khiBamPhimCatNhanhPhienGhiAm() {
-    if (!_muonNghe) return;
-    _dongBangDoanDangNhay(lyDo: 'bấm phím tắt cắt nhanh phiên ghi âm');
-  }
-
-  /// (VIỆC 1) Nhánh riêng cho lựa chọn 'win' — bắt phím Win/Cmd
-  /// (metaLeft/metaRight) bằng `HardwareKeyboard.addHandler` TOÀN CỤC, vì
-  /// `Shortcuts`/`SingleActivator` không nhận một phím biến đổi làm trigger
-  /// (xem chú thích tại nơi khai `Shortcuts` trong `build`). Chỉ tác dụng khi
-  /// ô soạn thảo đang giữ tiêu điểm — y hệt điều kiện của nhánh 'tab' ở trên,
-  /// giữ đúng hành vi "chỉ kích hoạt khi đang gõ trong ô soạn thảo".
-  bool _khiBamPhimWinCatNhanhPhienGhiAm(KeyEvent event) {
-    if (!mounted || event is! KeyDownEvent) return false;
-    if (widget.caiDat.phimCatNhanhPhienGhiAm != 'win') return false;
-    if (event.logicalKey != LogicalKeyboardKey.metaLeft &&
-        event.logicalKey != LogicalKeyboardKey.metaRight) {
-      return false;
-    }
-    if (!_oChu.hasFocus) return false;
-
-    final route = ModalRoute.of(context);
-    if (route != null && !route.isCurrent) return false;
-
-    _khiBamPhimCatNhanhPhienGhiAm();
     return true;
   }
 
@@ -3007,21 +3122,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henHetHanRanhGioiPhien?.cancel();
     _henHetHanRanhGioiPhien = Timer(const Duration(seconds: 4), () {
       if (_tuVuaChotGanRanhGioiPhien.isEmpty) return;
-      _ghiLogGiongNoi(
-        'LỚP 2: đệm chống nhân đôi qua ranh giới phiên hết hạn (4 giây), tự xoá.',
-      );
       _tuVuaChotGanRanhGioiPhien = [];
     });
-    _ghiLogGiongNoi(
-      "LỚP 2: lưu đệm chống nhân đôi qua ranh giới phiên: "
-      "'${_tuVuaChotGanRanhGioiPhien.join(' ')}'",
-    );
   }
 
   void _khiCoChu(dynamic ketQua, int idPhien) {
     final noi = (ketQua.recognizedWords as String? ?? '').trim();
     final xong = ketQua.finalResult as bool? ?? false;
-    _ghiLogGiongNoi(xong ? "FINAL: '$noi'" : "PARTIAL: '$noi'");
 
     // Người dùng vừa gõ phím giữa chừng: chữ đã hiện ra phải nằm im. Nuốt hết
     // phần còn lại của câu này, chờ câu mới.
@@ -3058,24 +3165,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (_tuDaChotTrongPhien.isEmpty && _tuVuaChotGanRanhGioiPhien.isNotEmpty) {
       final ketQuaNoiRanhGioi = _timDiemNoiTrong(_tuVuaChotGanRanhGioiPhien, tuMoi);
       if (ketQuaNoiRanhGioi == null) {
-        _ghiLogGiongNoi(
-          "LỚP 2: PARTIAL '$noi' không trùng đệm ranh giới phiên, coi là nội "
-          'dung thật, xoá đệm.',
-        );
+        // PARTIAL không trùng đệm ranh giới phiên, coi là nội dung thật.
       } else if (ketQuaNoiRanhGioi.isEmpty) {
-        _ghiLogGiongNoi(
-          "LỚP 2: PARTIAL '$noi' trùng NGUYÊN VĂN đuôi đã chốt của phiên "
-          'trước — nhân đôi qua ranh giới phiên, bỏ qua hoàn toàn.',
-        );
+        // PARTIAL trùng NGUYÊN VĂN đuôi đã chốt của phiên trước — nhân đôi
+        // qua ranh giới phiên, bỏ qua hoàn toàn.
         _henHetHanRanhGioiPhien?.cancel();
         _tuVuaChotGanRanhGioiPhien = [];
         _partialTruocDo = tuMoi;
         return;
       } else {
-        _ghiLogGiongNoi(
-          "LỚP 2: cắt phần trùng đệm ranh giới phiên, chỉ giữ phần mới: "
-          "'${ketQuaNoiRanhGioi.join(' ')}'",
-        );
+        // Cắt phần trùng đệm ranh giới phiên, chỉ giữ phần mới.
         tuMoi = ketQuaNoiRanhGioi;
       }
       // Dù khớp hay không, một PARTIAL THẬT (không rỗng) đã được xử lý AN
@@ -3096,9 +3195,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // lần cập nhật liên tiếp — dài hơn phần đã chốt thì chốt thêm.
       final tienToChung = _doDaiTienToChung(tuMoi, _partialTruocDo);
       if (tienToChung > _tuDaChotTrongPhien.length) {
-        final tuMoiChot = tuMoi.sublist(_tuDaChotTrongPhien.length, tienToChung);
         _tuDaChotTrongPhien = tuMoi.sublist(0, tienToChung);
-        _ghiLogGiongNoi("CHỐT: '${tuMoiChot.join(' ')}'");
       }
       hienThi = tuMoi;
     } else {
@@ -3109,17 +3206,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         // D.5: mơ hồ, không tìm được điểm nối nào — chấp nhận rủi ro nhỏ,
         // coi toàn bộ là nội dung MỚI, nối tiếp SAU phần đã chốt (không bao
         // giờ đè/xoá phần đã chốt).
-        _ghiLogGiongNoi("D.5: không tìm được điểm nối, coi '$noi' là câu MỚI.");
         hienThi = [..._tuDaChotTrongPhien, ...tuMoi];
       } else if (ketQuaNoi.isEmpty) {
         // D.4: nhân đôi thuần tuý — không có gì mới, bỏ qua hoàn toàn, không
         // ghi gì cả (chặn nhân đôi từ gốc).
-        _ghiLogGiongNoi('D.4: nhân đôi thuần tuý bị chặn, bỏ qua.');
         _partialTruocDo = tuMoi;
         return;
       } else {
         // D.3: phần thật sự mới nằm sau điểm nối.
-        _ghiLogGiongNoi("D.3: tìm được điểm nối, phần mới: '${ketQuaNoi.join(' ')}'");
         hienThi = [..._tuDaChotTrongPhien, ...ketQuaNoi];
       }
     }
@@ -3157,10 +3251,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // khác chen vào (Android tự ngắt trùng lúc người dùng bấm phím tắt...)
     // và tăng `_phienNgheHienTai` lên rồi. Lệch thì huỷ ghi, không viết gì.
     if (idPhien != _phienNgheHienTai) {
-      _ghiLogGiongNoi(
-        'LỚP 1: BỎ QUA — callback thuộc phiên cũ (#$idPhien), phiên hiện tại '
-        'đã là #$_phienNgheHienTai.',
-      );
       return;
     }
 
@@ -3239,7 +3329,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _neo = xoaBatDau;
     }
     _ghiVaoO(vbMoi, _neo);
-    _ghiLogGiongNoi("Dọn cụm từ lặp: xoá bản lặp thứ hai của '$cum'");
   }
 
   /// Mọi lần ghi do máy thực hiện đều đi qua đây, để ghi nhớ nội dung, vị trí
@@ -3326,9 +3415,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // (LỚP 1) Tăng session-ID ngay, đồng bộ — phiên đang nghe (nếu có) coi
       // như chết từ đây, không đợi cancel() xong.
       _phienNgheHienTai++;
-      _ghiLogGiongNoi(
-        'Phiên DỪNG (gõ phím) — phiên hiện tại thành #$_phienNgheHienTai.',
-      );
       _boQuaCauNay = true;
       _microNgungDeGo = true;
       _muonNghe = false; // Ngăn _henBatLai() lén bật lại.
@@ -3371,7 +3457,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   /// Người dùng chạm để dời con trỏ, chứ không gõ chữ. Nhẹ tay hơn: chỉ đóng
   /// băng đoạn đang nhảy và cắt câu đang dở, micro vẫn nghe tiếp.
-  void _dongBangDoanDangNhay({String lyDo = 'di chuyển con trỏ'}) {
+  void _dongBangDoanDangNhay() {
     final dangVietDo = _chuTam.isNotEmpty;
     _chuTam = '';
     // (LỚP 2) Chụp lại đệm chống nhân đôi TRƯỚC khi xoá rỗng bên dưới.
@@ -3386,9 +3472,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // một trong hai sự kiện luôn thắng và id không bị hai nơi ghi đè lẫn
     // nhau một cách mơ hồ.
     _phienNgheHienTai++;
-    _ghiLogGiongNoi(
-      'Phiên DỪNG rồi MỞ LẠI ($lyDo) — phiên hiện tại thành #$_phienNgheHienTai.',
-    );
     _boQuaCauNay = true;
     _dangCatCau = true;
     _micro.stop().whenComplete(() {
@@ -5572,20 +5655,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Modal "Danh sách phím tắt" — đọc TRỰC TIẾP từ `CaiDat.phimTatCoDinh`
   /// (nguồn động DUY NHẤT, xem B6), cộng thêm dòng riêng cho "Bật/tắt micro"
   /// (đọc `widget.caiDat.phimTatBoBienDoi`/`phimTatPhim`, cũng động).
-  /// (VIỆC 3) Mở màn hình đọc toàn bộ `_logGiongNoi` — truyền theo tham
-  /// chiếu nên "Xoá log" ở màn hình đó xoá thẳng list gốc ở đây.
-  void _moManHinhNhatKyGiongNoi() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ManHinhNhatKyGiongNoi(
-          log: _logGiongNoi,
-          khiXoaLog: () => _logGiongNoi.clear(),
-          hienThongBao: _bao,
-        ),
-      ),
-    );
-  }
-
   void _moDanhSachPhimTat() {
     String tim(String khoa) => CaiDat.phimTatCoDinh[khoa] ?? khoa;
 
@@ -5703,7 +5772,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   OverlayEntry? _baoDangHien;
 
-  void _bao(String loi) {
+  /// (VIỆC 6) [spans] khác null thì hiện bằng `RichText`/`TextSpan` (cho phép
+  /// một phần câu nổi bật hơn phần còn lại, ví dụ tên tệp) thay vì [loi]
+  /// dạng chuỗi trần — TÁI DÙNG đúng khung/màu nền/thời lượng tự ẩn 2 giây,
+  /// chỉ khác phần nội dung bên trong.
+  void _bao(String loi, {List<InlineSpan>? spans}) {
     if (!mounted) return;
     _baoDangHien?.remove();
     _baoDangHien = null;
@@ -5720,11 +5793,19 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               color: const Color(0xFF323232),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Text(
-              loi,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-            ),
+            child: spans == null
+                ? Text(
+                    loi,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                  )
+                : RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      children: spans,
+                    ),
+                  ),
           ),
         ),
       ),
@@ -5737,6 +5818,22 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         _baoDangHien = null;
       }
     });
+  }
+
+  /// (VIỆC 6c) Popup "Đang ở trong Tệp <tên tệp>" sau khi chuyển sang ghi
+  /// chú khác bằng nút "Tệp trước"/"Tệp sau" — phần tên tệp in đậm/nổi bật
+  /// hơn phần còn lại của câu.
+  void _baoDangOTrongTep(String ten) {
+    _bao(
+      'Đang ở trong Tệp $ten',
+      spans: [
+        const TextSpan(text: 'Đang ở trong Tệp '),
+        TextSpan(
+          text: ten,
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF8AB4F8)),
+        ),
+      ],
+    );
   }
 
   /// Chặn mở CHỒNG nhiều hộp thoại lỗi treMu khi người dùng gõ nhanh/giọng
@@ -5799,6 +5896,62 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// công cụ phải tách hai dòng, không thì đè lên nhau). 600dp là mốc
   /// Material Design vẫn dùng để phân biệt "compact" và "medium".
   static const _nguongManHinhHep = 600.0;
+
+  /// (VIỆC 6) Ba nút vuông góc 90° dính sát nhau, sát mép trái thanh chứa
+  /// tên tệp: "Mở thư mục" (tái dùng ĐÚNG `_moManHinhThuMuc`), "Tệp trước",
+  /// "Tệp sau". Mỗi ô là một `Container` viền `Border.all` không bo góc
+  /// (không set `borderRadius`) — viền giữa hai ô liền kề chấp nhận bị đôi,
+  /// đơn giản nhất mà không lỗi.
+  static const _canhNutDieuHuongTep = 34.0;
+
+  Widget _nutVuongDieuHuongTep(IconData icon, String nhan, VoidCallback? khiBam) {
+    return Tooltip(
+      message: nhan,
+      child: InkWell(
+        onTap: khiBam,
+        child: Container(
+          width: _canhNutDieuHuongTep,
+          height: _canhNutDieuHuongTep,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: const Color(0xFFDADCE0)),
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: khiBam == null ? const Color(0xFFBDC1C6) : const Color(0xFF5F6368),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _nutDieuHuongTep() {
+    final ds = _dsGhiChuCungThuMuc();
+    final viTriHienTai = ds.indexWhere((g) => g.id == _ghiChuHienTai.id);
+    final coTruoc = viTriHienTai > 0;
+    final coSau = viTriHienTai >= 0 && viTriHienTai < ds.length - 1;
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _nutVuongDieuHuongTep(Icons.folder, 'Mở thư mục', _moManHinhThuMuc),
+          _nutVuongDieuHuongTep(
+            Icons.arrow_back,
+            'Tệp trước',
+            coTruoc ? () => _chuyenTepTrongThuMuc(-1) : null,
+          ),
+          _nutVuongDieuHuongTep(
+            Icons.arrow_forward,
+            'Tệp sau',
+            coSau ? () => _chuyenTepTrongThuMuc(1) : null,
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _oTenField() {
     return TextField(
@@ -5889,6 +6042,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // ngược lại công cụ bị ép chật tới mức khó bấm trúng.
     final appBar = manHinhHep
         ? AppBar(
+            leading: _nutDieuHuongTep(),
+            leadingWidth: _canhNutDieuHuongTep * 3 + 4,
             title: _oTenField(),
             backgroundColor: Colors.white,
             surfaceTintColor: Colors.white,
@@ -5915,6 +6070,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             ),
           )
         : AppBar(
+            leading: _nutDieuHuongTep(),
+            leadingWidth: _canhNutDieuHuongTep * 3 + 4,
             title: _oTenField(),
             backgroundColor: Colors.white,
             surfaceTintColor: Colors.white,
@@ -6032,33 +6189,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                         const _YDinhDinhDang('xoaDinhDang'),
                     const SingleActivator(LogicalKeyboardKey.keyS, control: true):
                         const _YDinhDinhDang('luu'),
-                    // (VIỆC 1) Phím ĐƠN — không phải tổ hợp — nên khai riêng
-                    // ngoài các SingleActivator const ở trên (không có bộ
-                    // biến đổi nào cả). Khai qua `Shortcuts` (thay vì
-                    // `HardwareKeyboard.addHandler`) để Flutter tự động
-                    // CHIẾM lại phím Tab khỏi hành vi mặc định "di chuyển
-                    // tiêu điểm" — đúng như cách Ctrl+Z ở trên đã chiếm lại
-                    // phím tắt Lùi/Tiến của EditableText. Chỉ có tác dụng khi
-                    // tiêu điểm đang nằm TRONG ô soạn thảo (bên dưới
-                    // `Shortcuts` này) — `Shortcuts` gần tiêu điểm nhất luôn
-                    // thắng, y hệt giải thích ở trên.
-                    //
-                    // Phím Win/Cmd (metaLeft/metaRight) KHÔNG khai được ở đây:
-                    // `SingleActivator` cấm hẳn việc dùng một phím biến đổi
-                    // (Ctrl/Shift/Alt/Meta) làm chính TRIGGER của nó — hằng số
-                    // `const SingleActivator(LogicalKeyboardKey.metaLeft)` ném
-                    // lỗi ngay lúc BIÊN DỊCH (const_eval_throws_exception) vì
-                    // assertion trong `shortcuts.dart` chặn thẳng trường hợp
-                    // này. Trường hợp 'win' vì thế được bắt riêng bằng
-                    // `HardwareKeyboard.instance.addHandler` toàn cục — xem
-                    // `_khiBamPhimWinCatNhanhPhienGhiAm()` — nên map này để
-                    // trống, không khai gì cả.
-                    ...(widget.caiDat.phimCatNhanhPhienGhiAm == 'win'
-                        ? const <SingleActivator, Intent>{}
-                        : {
-                            const SingleActivator(LogicalKeyboardKey.tab):
-                                const _YDinhCatNhanhPhienGhiAm(),
-                          }),
                   },
                   child: Actions(
                     actions: {
@@ -6091,13 +6221,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           } else {
                             _apDungDinhDang(y.loai);
                           }
-                          return null;
-                        },
-                      ),
-                      _YDinhCatNhanhPhienGhiAm:
-                          CallbackAction<_YDinhCatNhanhPhienGhiAm>(
-                        onInvoke: (_) {
-                          _khiBamPhimCatNhanhPhienGhiAm();
                           return null;
                         },
                       ),
@@ -6304,7 +6427,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               khiBamTimKiem: () => _hienThanhTimKiem ? _dongTimKiem() : _moTimKiem(),
               khiBamTroChuyen: () {},
               khiBamTaiKhoan: () {},
-              khiBamNhatKyGiongNoi: _moManHinhNhatKyGiongNoi,
             ),
             SizedBox(height: caoBanPhim),
           ],
