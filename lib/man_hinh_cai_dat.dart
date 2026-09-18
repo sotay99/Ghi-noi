@@ -46,6 +46,9 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
   late bool _tuDongChen;
   late bool _kiemTraChinhTa;
   late bool _tuDongChenDauCau;
+  late bool _tuDongThemDauCham;
+  late bool _tuDongThutDauDong;
+  late bool _tuDongThemDuongKeChia;
   late String _phimTatBoBienDoi;
   late String _phimTatPhim;
   PermissionStatus? _trangThaiMicro;
@@ -61,6 +64,9 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     _tuDongChen = widget.caiDat.tuDongChenKhoangCach;
     _kiemTraChinhTa = widget.caiDat.kiemTraChinhTaBangAI;
     _tuDongChenDauCau = widget.caiDat.tuDongChenDauCauBangAI;
+    _tuDongThemDauCham = widget.caiDat.tuDongThemDauCham;
+    _tuDongThutDauDong = widget.caiDat.tuDongThutDauDong;
+    _tuDongThemDuongKeChia = widget.caiDat.tuDongThemDuongKeChia;
     _phimTatBoBienDoi = widget.caiDat.phimTatBoBienDoi;
     _phimTatPhim = widget.caiDat.phimTatPhim;
     _oTuTatMicro = TextEditingController(text: '${widget.caiDat.thoiGianTuTatMicroGiay}');
@@ -210,6 +216,12 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
           _dong4AI(),
           const Divider(height: 40),
           _dong4bChenDauCauAI(),
+          const Divider(height: 40),
+          _dong4cTuDongThemDauCham(),
+          const Divider(height: 40),
+          _dong4dTuDongThutDauDong(),
+          const Divider(height: 40),
+          _dong4eTuDongThemDuongKeChia(),
           const Divider(height: 40),
           _dong5PhimTat(),
           const Divider(height: 40),
@@ -400,6 +412,117 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
               'Tự động chèn dấu câu bằng AI',
               _giaiThichChenDauCauNgan,
               _giaiThichChenDauCau,
+            )),
+      ],
+    );
+  }
+
+  /// (VIỆC 5a) Ba dòng cài đặt mới cho hành vi khi xuống dòng (Enter) —
+  /// cùng pattern Column + Row + Switch + nút "Tìm hiểu thêm" với
+  /// `_dong3TuDongChen`/`_dong4AI` ở trên.
+  Widget _dong4cTuDongThemDauCham() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _tieuDeDong('Tự động thêm dấu chấm trước khi xuống dòng'),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                _tuDongThemDauCham ? 'Đang bật (Có)' : 'Đang tắt (Không)',
+                style: TextStyle(
+                  color: _tuDongThemDauCham
+                      ? const Color(0xFF1A73E8)
+                      : const Color(0xFF9AA0A6),
+                ),
+              ),
+            ),
+            Switch(
+              value: _tuDongThemDauCham,
+              onChanged: (bat) async {
+                setState(() => _tuDongThemDauCham = bat);
+                await widget.caiDat.datTuDongThemDauCham(bat);
+              },
+            ),
+          ],
+        ),
+        _nutTimHieuThem(() => _hienGiaiThich(
+              'Tự động thêm dấu chấm',
+              _giaiThichThemDauChamNgan,
+              _giaiThichThemDauCham,
+            )),
+      ],
+    );
+  }
+
+  Widget _dong4dTuDongThutDauDong() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _tieuDeDong('Tự động thụt đầu dòng khi xuống dòng'),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                _tuDongThutDauDong ? 'Đang bật (Có)' : 'Đang tắt (Không)',
+                style: TextStyle(
+                  color: _tuDongThutDauDong
+                      ? const Color(0xFF1A73E8)
+                      : const Color(0xFF9AA0A6),
+                ),
+              ),
+            ),
+            Switch(
+              value: _tuDongThutDauDong,
+              onChanged: (bat) async {
+                setState(() => _tuDongThutDauDong = bat);
+                await widget.caiDat.datTuDongThutDauDong(bat);
+              },
+            ),
+          ],
+        ),
+        _nutTimHieuThem(() => _hienGiaiThich(
+              'Tự động thụt đầu dòng',
+              _giaiThichThutDauDongNgan,
+              _giaiThichThutDauDong,
+            )),
+      ],
+    );
+  }
+
+  Widget _dong4eTuDongThemDuongKeChia() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _tieuDeDong('Tự động thêm đường kẻ chia văn bản khi xuống dòng 2 lần'),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                _tuDongThemDuongKeChia ? 'Đang bật (Có)' : 'Đang tắt (Không)',
+                style: TextStyle(
+                  color: _tuDongThemDuongKeChia
+                      ? const Color(0xFF1A73E8)
+                      : const Color(0xFF9AA0A6),
+                ),
+              ),
+            ),
+            Switch(
+              value: _tuDongThemDuongKeChia,
+              onChanged: (bat) async {
+                setState(() => _tuDongThemDuongKeChia = bat);
+                await widget.caiDat.datTuDongThemDuongKeChia(bat);
+              },
+            ),
+          ],
+        ),
+        _nutTimHieuThem(() => _hienGiaiThich(
+              'Đường kẻ chia văn bản',
+              _giaiThichDuongKeChiaNgan,
+              _giaiThichDuongKeChia,
             )),
       ],
     );
@@ -767,4 +890,35 @@ Khi tính năng này bật, cùng lúc với việc kiểm tra chính tả (nế
 Ngay sau khi AI chèn xong, đúng đoạn dấu câu đó **nhấp nháy nền xanh dương** trong 4 giây để bạn dễ nhận ra chỗ AI vừa sửa, rồi tự động biến mất — trở về chữ bình thường như mọi ký tự khác trong bài, không cần bấm gì thêm.
 
 Nếu cả hai tính năng "Kiểm tra chính tả bằng AI" và "Tự động chèn dấu câu bằng AI" đều bật, chúng gộp chung vào MỘT lần gọi AI duy nhất để đỡ tốn hạn mức. Tắt tính năng này đi thì AI chỉ còn sửa chính tả, không tự thêm dấu câu nào nữa.
+''';
+
+const _giaiThichThemDauChamNgan = '''
+Bấm **Enter** ở cuối câu: nếu ký tự ngay trước con trỏ là dấu cách, nó được thay bằng dấu chấm; nếu không, ứng dụng tự thêm một dấu chấm rồi mới xuống dòng.
+''';
+
+const _giaiThichThemDauCham = '''
+Khi bạn bấm Enter để xuống dòng, ứng dụng nhìn lại ký tự ngay trước con trỏ:
+
+- Nếu đó là một **dấu cách**, dấu cách đó được **thay** bằng dấu chấm.
+- Nếu KHÔNG phải dấu cách, ứng dụng **chèn thêm** một dấu chấm ngay trước khi xuống dòng.
+
+Nhờ vậy mỗi dòng (đoạn) trong bài luôn kết thúc bằng dấu chấm, không cần tự gõ tay. Tắt tính năng này thì Enter chỉ đơn thuần xuống dòng, không thêm bớt gì.
+''';
+
+const _giaiThichThutDauDongNgan = '''
+Sau khi xuống dòng, ứng dụng tự chèn **5 dấu cách** ở đầu dòng mới, con trỏ đứng ngay sau đó — giống thụt đầu dòng của một đoạn văn.
+''';
+
+const _giaiThichThutDauDong = '''
+Mỗi lần bấm Enter để xuống dòng, ngay khi con trỏ vừa sang dòng mới, ứng dụng tự chèn thêm 5 dấu cách vào đầu dòng đó — con trỏ đứng ngay sau 5 dấu cách này, sẵn sàng để bạn gõ hoặc nói tiếp. Đây là cách thụt đầu dòng quen thuộc của văn bản tiếng Việt. Tắt tính năng này thì dòng mới bắt đầu ngay từ cột đầu tiên, không có khoảng thụt nào.
+''';
+
+const _giaiThichDuongKeChiaNgan = '''
+Bấm Enter hai lần liên tiếp (tạo một dòng trống) sẽ vẽ một đường kẻ chia mờ ngay tại dòng trống đó, giúp nhìn ra ranh giới giữa các đoạn.
+''';
+
+const _giaiThichDuongKeChia = '''
+Khi bạn xuống dòng và để lại một dòng TRỐNG (hoặc chỉ toàn dấu cách) — thường là do bấm Enter hai lần liên tiếp — ứng dụng tự vẽ một đường kẻ chia mờ ngay tại dòng trống đó, giúp phân biệt rõ các đoạn văn khác nhau trong bài.
+
+Đường kẻ này chỉ là một nét vẽ hiển thị, KHÔNG phải ký tự thật chèn vào bài — nó tự bám đúng dòng trống dù màn hình xoay hay đổi kích thước. Nếu bạn gõ chữ vào đúng dòng trống đó (không còn trống nữa), đường kẻ tự biến mất; xoá hẳn dòng đó cũng vậy.
 ''';

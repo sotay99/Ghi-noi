@@ -292,9 +292,19 @@ class _NutMicroTron extends StatelessWidget {
           child: InkWell(
             customBorder: const CircleBorder(),
             onTap: khiBam,
-            child: SizedBox(
+            child: Container(
               width: 40,
               height: 40,
+              // (VIỆC 3) Viền xanh dương đậm bao quanh nền — CHỈ ở nhánh
+              // CHƯA hoạt động (sanSang && !bat, nền xanh lá nhạt). Nhánh
+              // đang nghe (nền đỏ) và nhánh chưa sẵn sàng (nền xám) không có
+              // viền này, giữ nguyên như cũ.
+              decoration: (sanSang && !bat)
+                  ? BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.blue.shade900, width: 2.5),
+                    )
+                  : null,
               // Phần C: đổi icon Material sang emoji 🎤 — giữ NGUYÊN mọi
               // logic/trạng thái (bật/tắt/màu nền), chỉ đổi phần hiển thị.
               // Cùng cách render emoji-làm-icon đã dùng cho nút Ẩn/hiện

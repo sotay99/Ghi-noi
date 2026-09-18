@@ -471,6 +471,60 @@ class _VeConTro extends CustomPainter {
       cu.viTri != viTri || cu.hienThi != hienThi || cu.mau != mau;
 }
 
+/// (VIỆC 5c) Vẽ đường kẻ chia văn bản tại mỗi dòng rỗng/toàn dấu cách đang
+/// ghi nhận trong `_cacViTriDuongKeChia` — ĐO TOẠ ĐỘ THẬT ngay trong
+/// `paint()` (dùng `RenderEditable.getLocalRectForCaret` cho đầu và cuối
+/// dòng), cùng lý do/pattern với `_VeDanhDauAi`/`_VeConTro`: toạ độ luôn
+/// đúng theo layout MỚI NHẤT, tự "bám đúng dòng" qua mọi lần xoay màn
+/// hình/đổi kích thước mà không cần lưu toạ độ cứng ở đâu cả.
+///
+/// ĐƠN GIẢN HOÁ so với đặc tả gốc ("chấm tròn nối nhau"): vẽ MỘT ĐƯỜNG
+/// THẲNG ngang qua bề rộng dòng — cùng màu tím mờ 35%, cùng độ dày với gạch
+/// giữa thân vàng đậm (`_damGachChanLoi`) để nhất quán về độ dày trực quan.
+/// Việc này tránh rủi ro tính sai khoảng cách/kích thước từng chấm khi
+/// không compile-test được, mà vẫn đạt đúng ý chính: có một đường kẻ chia
+/// rõ ràng, luôn bám đúng dòng.
+class _VeDuongKeChia extends CustomPainter {
+  _VeDuongKeChia({required this.re, required this.khungBox, required this.dsViTri});
+  final RenderEditable re;
+  final RenderBox khungBox;
+  final List<int> dsViTri;
+
+  static final _mau = Colors.purple.withValues(alpha: 0.35);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (!re.hasSize || !khungBox.hasSize) return;
+    // Chỉ có SỐ LƯỢNG NHỎ offset tại một thời điểm (thường vài dòng) —
+    // không quét toàn văn bản, an toàn về hiệu năng dù chạy mỗi khung hình.
+    for (final vt in dsViTri) {
+      Rect goc;
+      Offset diem;
+      try {
+        goc = re.getLocalRectForCaret(TextPosition(offset: vt));
+        diem = re.localToGlobal(goc.topLeft, ancestor: khungBox);
+      } catch (_) {
+        continue;
+      }
+      final y = diem.dy + goc.height / 2;
+      final trai = diem.dx;
+      final phai = khungBox.size.width - 4;
+      if (phai <= trai) continue;
+      canvas.drawLine(
+        Offset(trai, y),
+        Offset(phai, y),
+        Paint()
+          ..color = _mau
+          ..strokeWidth = _damGachChanLoi
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _VeDuongKeChia cu) => true;
+}
+
 // ------------------------------------------- mã hoá định dạng AI vào file
 
 /// Điểm bắt đầu khối định dạng AI (lỗi chính tả / đoạn không phù hợp / đoạn
@@ -1440,21 +1494,67 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// (VIỆC 3) Một dòng cài đặt dạng công tắc bật/tắt trong modal, cùng
   /// pattern Row + Switch đã dùng ở các dòng cài đặt trong
   /// `man_hinh_cai_dat.dart` (`_dong3TuDongChen`, `_dong4AI`, ...).
-  Widget _dongCongTacTimKiem(String nhan, bool bat, ValueChanged<bool> khiDoi) {
+  Widget _dongCongTacTimKiem(
+    String nhan,
+    bool bat,
+    ValueChanged<bool> khiDoi, {
+    VoidCallback? khiBamTimHieuThem,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Text(
-              nhan,
-              style: TextStyle(
-                color: bat ? const Color(0xFF1A73E8) : const Color(0xFF5F6368),
-                fontSize: 13,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  nhan,
+                  style: TextStyle(
+                    color: bat ? const Color(0xFF1A73E8) : const Color(0xFF5F6368),
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              Switch(value: bat, onChanged: khiDoi),
+            ],
+          ),
+          // (VIỆC 2) Nút "Tìm hiểu thêm" ngay dưới dòng công tắc — cùng
+          // pattern giải thích ngắn/dài dùng ở `man_hinh_cai_dat.dart`, chỉ
+          // đơn giản hơn (một đoạn văn ngắn, không tách "ngắn/chi tiết").
+          if (khiBamTimHieuThem != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: khiBamTimHieuThem,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, 28),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text('Tìm hiểu thêm', style: TextStyle(fontSize: 12)),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  /// (VIỆC 2) Modal giải thích ngắn gọn cho từng dòng công tắc của "Cài đặt
+  /// tìm kiếm" — cùng khung `AlertDialog` với `_hienGiaiThich` của
+  /// `man_hinh_cai_dat.dart`, nhưng chỉ MỘT đoạn (yêu cầu "súc tích"), không
+  /// tách ngắn/chi tiết.
+  void _hienGiaiThichTimKiem(String tieuDe, String noiDung) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tieuDe),
+        content: Text(noiDung, style: const TextStyle(fontSize: 14, height: 1.4)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Đóng'),
           ),
-          Switch(value: bat, onChanged: khiDoi),
         ],
       ),
     );
@@ -1502,22 +1602,42 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       'Khớp cả chữ Hoa và chữ thường',
                       !phanBietHoaThuong,
                       (bat) => datHoaThuong(!bat),
+                      khiBamTimHieuThem: () => _hienGiaiThichTimKiem(
+                        'Khớp cả chữ Hoa và chữ thường',
+                        'Tìm "h" sẽ ra cả "h" và "H" — không phân biệt chữ '
+                            'Hoa/thường khi so khớp.',
+                      ),
                     ),
                     _dongCongTacTimKiem(
                       'Chữ Hoa và chữ thường luôn khác nhau',
                       phanBietHoaThuong,
                       (bat) => datHoaThuong(bat),
+                      khiBamTimHieuThem: () => _hienGiaiThichTimKiem(
+                        'Chữ Hoa và chữ thường luôn khác nhau',
+                        'Tìm "h" chỉ ra đúng "h", không ra "H" — phân biệt '
+                            'chính xác chữ Hoa/thường.',
+                      ),
                     ),
                     const SizedBox(height: 6),
                     _dongCongTacTimKiem(
                       'Khớp cả chữ không dấu và chữ có dấu',
                       !phanBietDauThanh,
                       (bat) => datDauThanh(!bat),
+                      khiBamTimHieuThem: () => _hienGiaiThichTimKiem(
+                        'Khớp cả chữ không dấu và chữ có dấu',
+                        'Tìm "thang" sẽ ra cả "thắng", "thằng", "tháng"... — '
+                            'không phân biệt dấu thanh khi so khớp.',
+                      ),
                     ),
                     _dongCongTacTimKiem(
                       'Chữ không dấu và chữ có dấu luôn khác nhau',
                       phanBietDauThanh,
                       (bat) => datDauThanh(bat),
+                      khiBamTimHieuThem: () => _hienGiaiThichTimKiem(
+                        'Chữ không dấu và chữ có dấu luôn khác nhau',
+                        'Tìm đúng chính xác dấu đã gõ — gõ "thang" chỉ ra '
+                            '"thang", không ra các từ có dấu khác.',
+                      ),
                     ),
                     const Divider(height: 24),
                     const Text(
@@ -1657,14 +1777,71 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final re = _timRenderEditable(hopVanBan);
     if (re == null) return const SizedBox.shrink();
 
+    // (VIỆC 4) Con trỏ "chìm" vào nền đỏ khi đứng cạnh ký tự có mauNen gần
+    // đỏ — tính màu con trỏ Ở TẦNG STATE (không phải trong painter): tại đây
+    // đã có sẵn `_dinhDangHopTaiViTri`, hàm DUY NHẤT tra cứu "hợp 2 bên"
+    // (đã dùng cho việc tô sáng nút toolbar và định dạng ký tự mới chèn) —
+    // gọi lại ĐÚNG hàm đó với (vt, vt, doDai) là đúng cách tra mauNen tại vị
+    // trí con trỏ đang đứng (bên trái: ký tự ngay trước; bên phải: ký tự
+    // ngay tại đó), không viết logic tra cứu mới. An toàn hơn hẳn so với để
+    // painter tự tra cứu state phức tạp (painter chỉ nhận sẵn một Color).
+    final hop = _dinhDangHopTaiViTri(
+      chon.baseOffset,
+      chon.baseOffset,
+      _boDieuKhien.text.length,
+    );
+    final mauNenTaiConTro = hop.mauNen;
+    final mauConTro = (mauNenTaiConTro != null && _mauGanDo(mauNenTaiConTro))
+        ? Colors.blue.shade700
+        : const Color(0xFFE91E63);
+
     return SizedBox.expand(
       child: CustomPaint(
         painter: _VeConTro(
           re: re,
           khungBox: khungBox,
           viTri: chon.baseOffset,
-          mau: const Color(0xFFE91E63),
+          mau: mauConTro,
           hienThi: _conTroDangHien,
+        ),
+      ),
+    );
+  }
+
+  /// (VIỆC 4) Màu có "gần đỏ" hay không — so với ĐÚNG giá trị đỏ trong bảng
+  /// màu nền cơ bản `_NutMauDinhDang._bangMauCoBan` (`Colors.red`, tức
+  /// 0xFFF44336) và cả `Colors.red` thuần (0xFFFF0000, trường hợp người
+  /// dùng từng đặt qua đường khác) — so bằng khoảng cách từng kênh màu, đơn
+  /// giản, O(1), không vòng lặp.
+  static bool _mauGanDo(Color mau) {
+    bool ganMau(Color goc, {int nguong = 40}) {
+      final dr = (mau.r - goc.r).abs() * 255;
+      final dg = (mau.g - goc.g).abs() * 255;
+      final db = (mau.b - goc.b).abs() * 255;
+      return dr <= nguong && dg <= nguong && db <= nguong;
+    }
+
+    return ganMau(Colors.red) || ganMau(const Color(0xFFFF0000));
+  }
+
+  /// (VIỆC 5c) Overlay các đường kẻ chia văn bản — cùng cách dựng RenderBox
+  /// với `_veConTro()`/`_veDanhDauAi()` ở trên.
+  Widget _veDuongKeChia() {
+    if (_cacViTriDuongKeChia.isEmpty) return const SizedBox.shrink();
+    final hopVanBan = _oVanBanKey.currentContext?.findRenderObject();
+    final khungBox = _khungVanBanKey.currentContext?.findRenderObject();
+    if (hopVanBan == null || khungBox is! RenderBox) {
+      return const SizedBox.shrink();
+    }
+    final re = _timRenderEditable(hopVanBan);
+    if (re == null) return const SizedBox.shrink();
+
+    return SizedBox.expand(
+      child: CustomPaint(
+        painter: _VeDuongKeChia(
+          re: re,
+          khungBox: khungBox,
+          dsViTri: List<int>.of(_cacViTriDuongKeChia),
         ),
       ),
     );
@@ -3534,8 +3711,83 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _dongBangDoanDangNhay();
   }
 
+  /// (VIỆC 5c) Danh sách offset "đường kẻ chia văn bản" — mỗi phần tử là vị
+  /// trí BẮT ĐẦU của một dòng đang rỗng/toàn dấu cách, gắn với một đường kẻ
+  /// chia đang hiển thị tại đó. Đây LÀ MỘT VỊ TRÍ TRONG VĂN BẢN (như các
+  /// vùng AI/định dạng khác), được dời/xoá theo mỗi phép sửa ở
+  /// `_dieuChinhLoiChinhTaSauKhiSua` — KHÔNG phải ký tự thật, chỉ dùng để vẽ
+  /// overlay (`_VeDuongKeChia`).
+  final List<int> _cacViTriDuongKeChia = [];
+
+  /// (VIỆC 5b) Có đúng là "Enter đơn giản" hay không: [chuMoi] dài hơn [cu]
+  /// đúng 1 ký tự, ký tự thêm đó là `'\n'`, và không có gì khác bị xoá/đổi ở
+  /// đâu cả (mọi ký tự trước/sau vị trí chèn khớp y nguyên). Trả về vị trí
+  /// chèn, hoặc null nếu không khớp mẫu này (autocorrect, dán nhiều ký tự,
+  /// xoá kèm gõ... đều bị loại, để tính năng chỉ chạy đúng lúc người dùng
+  /// bấm Enter thật sự).
+  int? _viTriChenXuongDongDon(String cu, String chuMoi) {
+    if (chuMoi.length != cu.length + 1) return null;
+    var dau = 0;
+    while (dau < cu.length && cu[dau] == chuMoi[dau]) {
+      dau++;
+    }
+    if (dau >= chuMoi.length || chuMoi[dau] != '\n') return null;
+    if (cu.substring(dau) != chuMoi.substring(dau + 1)) return null;
+    return dau;
+  }
+
+  /// (VIỆC 5c) Thêm một offset đường kẻ chia mới, tránh trùng lặp.
+  void _themViTriDuongKeChia(int viTri) {
+    if (!_cacViTriDuongKeChia.contains(viTri)) {
+      _cacViTriDuongKeChia.add(viTri);
+    }
+  }
+
   void _apDungChinhSuaNguoiDung(String chuMoi) {
     final cu = _chuGanNhat;
+
+    // (VIỆC 5b/5c) Phát hiện "Enter đơn giản" (chèn ĐÚNG một ký tự '\n',
+    // không xoá gì khác) — TRƯỚC khi diff chính chạy, biến đổi [chuMoi]
+    // (nếu "Tự động thêm dấu chấm"/"Tự động thụt đầu dòng" đang bật) rồi để
+    // TOÀN BỘ diff/dời-offset bên dưới (đã có sẵn, không viết lại) tự lo
+    // phần còn lại — coi cả cụm (chấm + \n + thụt) là MỘT phép chèn duy
+    // nhất, y hệt cách các phép sửa khác trong hàm này vẫn làm.
+    int? viTriConTroXuongDongTuDong;
+    int? ungCuVienDuongKeChia;
+    final dauXuongDongDon = _viTriChenXuongDongDon(cu, chuMoi);
+    if (dauXuongDongDon != null) {
+      final themCham = widget.caiDat.tuDongThemDauCham;
+      final thut = widget.caiDat.tuDongThutDauDong ? '     ' : '';
+      var moiDau = dauXuongDongDon;
+      String chenVao;
+      if (themCham) {
+        if (dauXuongDongDon > 0 && cu[dauXuongDongDon - 1] == ' ') {
+          moiDau = dauXuongDongDon - 1;
+        }
+        chenVao = '.\n$thut';
+      } else {
+        chenVao = '\n$thut';
+      }
+      if (themCham || thut.isNotEmpty) {
+        chuMoi = cu.substring(0, moiDau) + chenVao + cu.substring(dauXuongDongDon);
+        viTriConTroXuongDongTuDong = moiDau + chenVao.length;
+      }
+
+      // (VIỆC 5c) Dòng NGAY TRÊN vị trí con trỏ mới — tính trên văn bản
+      // CUỐI CÙNG (đã áp cả dấu chấm, nếu có) — rỗng/toàn dấu cách thì ghi
+      // nhận một đường kẻ chia mới (thêm vào danh sách SAU KHI offset của
+      // các đường kẻ cũ đã được dời, xem bên dưới, để khỏi bị dời chồng lần
+      // hai).
+      if (widget.caiDat.tuDongThemDuongKeChia) {
+        final viTriNewline = moiDau + (themCham ? 1 : 0);
+        final dongTrenBatDau = viTriNewline <= 0
+            ? 0
+            : chuMoi.lastIndexOf('\n', viTriNewline - 1) + 1;
+        if (chuMoi.substring(dongTrenBatDau, viTriNewline).trim().isEmpty) {
+          ungCuVienDuongKeChia = dongTrenBatDau;
+        }
+      }
+    }
 
     // So khác biệt: phần đầu giống nhau dài bao nhiêu, phần đuôi giống nhau
     // dài bao nhiêu. Khoảng giữa còn lại chính là chỗ vừa bị đổi.
@@ -3610,6 +3862,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       vanBanCu: cu,
       vanBanMoi: chuMoi,
     );
+    // (VIỆC 5c) Ghi nhận đường kẻ chia MỚI (nếu Enter vừa rồi tạo ra) SAU
+    // KHI các offset CŨ trong `_cacViTriDuongKeChia` đã được dời ở trên —
+    // offset mới này vốn đã tính sẵn theo toạ độ văn bản CUỐI CÙNG (chuMoi),
+    // dời thêm lần nữa sẽ sai.
+    if (ungCuVienDuongKeChia != null) _themViTriDuongKeChia(ungCuVienDuongKeChia);
     _dieuChinhVungToanVanSauKhiSua(dau, soLuongXoa, doDaiChenVao);
     if (doDaiChenVao > 0) {
       _apDinhDangHopChoDoanMoiChen(dau, dau + doDaiChenVao, hopMoi);
@@ -3641,7 +3898,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
 
     final chon = _boDieuKhien.selection;
-    final viTriConTro = chon.isValid ? chon.end : chuMoiCuoi.length;
+    final viTriConTro = viTriConTroXuongDongTuDong ??
+        (chon.isValid ? chon.end : chuMoiCuoi.length);
 
     _neo = viTriConTro;
     _nguoiDungVuaGo();
@@ -3761,6 +4019,36 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         d.ketThuc = ketThucMoi;
       }
     }
+    // (VIỆC 5c) Dời/xoá offset đường kẻ chia — CÙNG PHÉP DỜI ĐƠN GIẢN đã
+    // dùng cho `_boDieuKhien.loi` ở trên: offset rơi HẲN VÀO vùng vừa bị
+    // xoá/đổi thì coi như dòng đó không còn giữ nguyên nữa, bỏ khỏi danh
+    // sách; offset nằm SAU vùng đó thì dịch theo [lech]; offset nằm TRƯỚC
+    // giữ nguyên.
+    _cacViTriDuongKeChia.removeWhere((v) => v >= vitri && v < ketThucXoa);
+    for (var i = 0; i < _cacViTriDuongKeChia.length; i++) {
+      if (_cacViTriDuongKeChia[i] >= ketThucXoa) {
+        _cacViTriDuongKeChia[i] += lech;
+      }
+    }
+    // Kiểm tra lại các offset GẦN vị trí vừa sửa (không quét toàn danh
+    // sách/toàn văn bản) — dòng đó không còn rỗng/toàn dấu cách nữa (người
+    // dùng vừa gõ chữ vào) thì bỏ khỏi danh sách. Chỉ chạy khi có đủ văn bản
+    // mới để tra cứu (không phải mọi lượt gọi `_dieuChinhLoiChinhTaSauKhiSua`
+    // đều truyền `vanBanMoi`).
+    if (vanBanMoi != null && _cacViTriDuongKeChia.isNotEmpty) {
+      const phamViKiemTra = 200;
+      final moc = vitri + lech;
+      _cacViTriDuongKeChia.removeWhere((v) {
+        if ((v - vitri).abs() > phamViKiemTra && (v - moc).abs() > phamViKiemTra) {
+          return false;
+        }
+        if (v < 0 || v > vanBanMoi.length) return true;
+        final ketThucDong = vanBanMoi.indexOf('\n', v);
+        final dong = vanBanMoi.substring(v, ketThucDong == -1 ? vanBanMoi.length : ketThucDong);
+        return dong.trim().isNotEmpty;
+      });
+    }
+
     // scheduleMicrotask, KHÔNG gọi notifyListeners() ngay tại đây: hàm này
     // chạy ngay bên trong _khiNguoiDungSua — chính nó là một listener của
     // _boDieuKhien. Gọi notifyListeners() đồng bộ ở đây sẽ gọi lại ngay lập
@@ -6263,6 +6551,19 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                               animation: Listenable.merge([_boDieuKhien, _cuonVanBan]),
                               builder: (context, _) => Stack(
                                 children: [_veDanhDauAi()],
+                              ),
+                            ),
+                          ),
+                        ),
+                        // (VIỆC 5c) Đường kẻ chia văn bản — cùng lớp "dưới
+                        // chữ" như gạch chân AI, cùng lý do phải nghe cả
+                        // `_cuonVanBan`.
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: AnimatedBuilder(
+                              animation: Listenable.merge([_boDieuKhien, _cuonVanBan]),
+                              builder: (context, _) => Stack(
+                                children: [_veDuongKeChia()],
                               ),
                             ),
                           ),

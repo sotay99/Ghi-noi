@@ -102,6 +102,16 @@ class CaiDat {
   static const _khoaTimKiemPhanBietDauThanh =
       'ghi_noi_tim_kiem_phan_biet_dau_thanh';
 
+  /// (VIỆC 5) Ba cài đặt cho hành vi khi xuống dòng (Enter) — mặc định cả
+  /// ba đều BẬT.
+  bool tuDongThemDauCham = true;
+  bool tuDongThutDauDong = true;
+  bool tuDongThemDuongKeChia = true;
+
+  static const _khoaTuDongThemDauCham = 'ghi_noi_tu_dong_them_dau_cham';
+  static const _khoaTuDongThutDauDong = 'ghi_noi_tu_dong_thut_dau_dong';
+  static const _khoaTuDongThemDuongKeChia = 'ghi_noi_tu_dong_them_duong_ke_chia';
+
   Future<void> tai() async {
     final kho = await SharedPreferences.getInstance();
     thoiGianBatLaiGiay = kho.getDouble(_khoaThoiGianBatLai) ?? 1.0;
@@ -122,6 +132,27 @@ class CaiDat {
         kho.getBool(_khoaTimKiemPhanBietHoaThuong) ?? false;
     timKiemPhanBietDauThanh =
         kho.getBool(_khoaTimKiemPhanBietDauThanh) ?? true;
+    tuDongThemDauCham = kho.getBool(_khoaTuDongThemDauCham) ?? true;
+    tuDongThutDauDong = kho.getBool(_khoaTuDongThutDauDong) ?? true;
+    tuDongThemDuongKeChia = kho.getBool(_khoaTuDongThemDuongKeChia) ?? true;
+  }
+
+  Future<void> datTuDongThemDauCham(bool bat) async {
+    tuDongThemDauCham = bat;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setBool(_khoaTuDongThemDauCham, bat);
+  }
+
+  Future<void> datTuDongThutDauDong(bool bat) async {
+    tuDongThutDauDong = bat;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setBool(_khoaTuDongThutDauDong, bat);
+  }
+
+  Future<void> datTuDongThemDuongKeChia(bool bat) async {
+    tuDongThemDuongKeChia = bat;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setBool(_khoaTuDongThemDuongKeChia, bat);
   }
 
   Future<void> datTimKiemPhanBietHoaThuong(bool bat) async {
@@ -212,7 +243,7 @@ class CaiDat {
   static const Map<String, String> phimTatCoDinh = {
     'Ctrl+Z': 'Lùi lại',
     'Ctrl+Shift+Z': 'Tiến tới',
-    'Ctrl+F': 'Tìm kiếm',
+    'Ctrl+F': 'Tìm kiếm và Thay thế',
     'Ctrl+A': 'Chọn tất cả',
     'Ctrl+S': 'Lưu',
     'Ctrl+X': 'Cắt',
