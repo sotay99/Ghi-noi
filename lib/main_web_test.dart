@@ -38,7 +38,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v6';
+const _phienBanThuNghiem = 'v7';
 
 // (Chỉ import đúng MỘT file `speech_to_text/speech_to_text.dart` — y hệt
 // cách `trang_soan_thao.dart` đang dùng đã chứng minh hoạt động — thay vì
@@ -277,6 +277,18 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       });
       _batNghe();
     }
+  }
+
+  Future<void> _saoChepVanBan() async {
+    final noiDung = _vanBan.isEmpty ? '(chưa có chữ nào)' : _vanBan;
+    await Clipboard.setData(ClipboardData(text: noiDung));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Đã sao chép kết quả vào bộ nhớ tạm'),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _saoChepNhatKy() async {
@@ -560,6 +572,17 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                 ],
               ),
               const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Text('Kết quả',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: _saoChepVanBan,
+                    child: const Text('Sao chép tất cả'),
+                  ),
+                ],
+              ),
               Expanded(
                 flex: 3,
                 child: Container(
@@ -570,7 +593,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: SingleChildScrollView(
-                    child: Text(
+                    child: SelectableText(
                       _vanBan.isEmpty ? '(chưa có chữ nào)' : _vanBan,
                       style: const TextStyle(fontSize: 18, height: 1.5),
                     ),
