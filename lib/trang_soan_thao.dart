@@ -1830,7 +1830,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // (SỬA LỖI đường kẻ chia "bóng ma" — LỚP BẢO VỆ THỨ HAI) Văn bản rỗng
     // hoặc chỉ toàn khoảng trắng thì TUYỆT ĐỐI không vẽ đường kẻ nào, dù
     // `_cacViTriDuongKeChia` có lỡ sót offset chưa dọn sạch ở đâu đó.
-    if (_cacViTriDuongKeChia.isEmpty || _boDieuKhien.text.trim().isEmpty) {
+    // (VIỆC 3) LỚP BẢO VỆ ĐƠN GIẢN NHẤT: tính năng đang TẮT thì KHÔNG vẽ gì
+    // cả, dù `_cacViTriDuongKeChia` có chứa gì (kể cả offset còn sót lại từ
+    // trước khi tắt) — đảm bảo tắt cài đặt là ẩn NGAY LẬP TỨC ở mọi ghi chú.
+    if (!widget.caiDat.tuDongThemDuongKeChia ||
+        _cacViTriDuongKeChia.isEmpty ||
+        _boDieuKhien.text.trim().isEmpty) {
       return const SizedBox.shrink();
     }
     final hopVanBan = _oVanBanKey.currentContext?.findRenderObject();
@@ -2786,6 +2791,19 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             _boDieuKhien.veLai();
           },
           khiKiemTraLaiMicro: _khoiTaoMicro,
+          // (VIỆC 3) Người dùng vừa đổi cài đặt đường kẻ chia ngay trong màn
+          // Cài đặt — cập nhật NGAY cho ghi chú đang mở, không cần đợi mở lại
+          // ghi chú: BẬT thì quét lại toàn văn bản, TẮT thì xoá sạch danh
+          // sách (painter cũng đã tự chặn vẽ khi tắt, đây chỉ là dọn dẹp cho
+          // gọn). `setState` để buộc vẽ lại overlay ngay lập tức.
+          khiDoiTuDongThemDuongKeChia: () {
+            setState(() {
+              _cacViTriDuongKeChia.clear();
+              if (widget.caiDat.tuDongThemDuongKeChia) {
+                _quetVaXayDungDuongKeChia();
+              }
+            });
+          },
         ),
       ),
     );
@@ -2882,6 +2900,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // thì offset cũ (ví dụ 0) vẫn "hợp lệ" trên văn bản mới (kể cả văn bản
     // rỗng) và painter cứ thế vẽ nhầm ngay từ dòng đầu tiên.
     _cacViTriDuongKeChia.clear();
+    // (VIỆC 3) Quét lại TOÀN BỘ văn bản của ghi chú vừa mở để dựng lại các
+    // đường kẻ chia đã có TRƯỚC ĐÓ (không dựa vào bộ nhớ tạm vừa bị xoá ở
+    // trên) — chỉ quét khi tính năng đang BẬT, để tránh làm việc thừa (và để
+    // painter luôn có một lớp bảo vệ kép: dù lỡ quét, cũng KHÔNG vẽ khi cài
+    // đặt đang tắt — xem `_veDuongKeChia`).
+    if (widget.caiDat.tuDongThemDuongKeChia) {
+      _quetVaXayDungDuongKeChia();
+    }
     _viTriChoVietHoa = null;
 
     widget.kho.datGhiChuDangMo(id);
@@ -3746,8 +3772,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   static final RegExp _laChuCai = RegExp(r'[a-zA-ZÀ-ỹ]');
 
   /// (VIỆC 4) Các dấu câu coi là mốc kết thúc câu, để từ tiếp theo được viết
-  /// hoa chữ đầu.
-  static const Set<String> _kyTuKetCauChoVietHoa = {'.', ',', ':', '!', '?'};
+  /// hoa chữ đầu. KHÔNG có dấu phẩy (,) — dấu phẩy chỉ ngăn cách trong câu,
+  /// không kết thúc câu, nên không kích hoạt viết hoa.
+  static const Set<String> _kyTuKetCauChoVietHoa = {'.', ':', '!', '?'};
 
   /// (VIỆC 4) Tổng quát hoá của `_viTriChenXuongDongDon`: [chuMoi] có đúng
   /// là [cu] vừa được chèn thêm MỘT ký tự đơn giản ở đâu đó (bất kỳ ký tự
@@ -3821,17 +3848,59 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
   }
 
+  /// (VIỆC 3) Quét TOÀN BỘ nội dung hiện tại của `_boDieuKhien` để dựng lại
+  /// `_cacViTriDuongKeChia` từ đầu — dùng khi MỞ một ghi chú (kể cả quay lại
+  /// một ghi chú đã mở trước đó), vì danh sách này chỉ là bộ nhớ TẠM (RAM),
+  /// được xây dần theo từng lần bấm Enter, nên bị mất khi chuyển sang ghi chú
+  /// khác rồi quay lại.
+  ///
+  /// Tách văn bản theo `\n` thành từng dòng, DUYỆT MỌI dòng NGOẠI TRỪ dòng
+  /// ĐẦU TIÊN và dòng CUỐI CÙNG (ràng buộc cứng: hai dòng này không bao giờ
+  /// có đường kẻ chia dù rỗng/toàn dấu cách) — dòng nào rỗng hoặc chỉ toàn
+  /// dấu cách thì offset BẮT ĐẦU của dòng đó được thêm vào danh sách.
+  ///
+  /// KHÔNG tự xoá `_cacViTriDuongKeChia` trước khi quét — người gọi (bên
+  /// `_moGhiChu`) đã tự lo việc đó, để giữ đúng thứ tự "xoá cũ trước, quét
+  /// mới sau" như đã có.
+  void _quetVaXayDungDuongKeChia() {
+    final vanBan = _boDieuKhien.text;
+    if (vanBan.isEmpty) return;
+    final cacDong = vanBan.split('\n');
+    if (cacDong.length <= 2) return; // Chỉ có dòng đầu và/hoặc dòng cuối.
+    var offset = cacDong[0].length + 1; // Bỏ qua dòng đầu tiên.
+    for (var i = 1; i < cacDong.length - 1; i++) {
+      final dong = cacDong[i];
+      if (dong.trim().isEmpty) {
+        _themViTriDuongKeChia(offset);
+      }
+      offset += dong.length + 1;
+    }
+  }
+
   void _apDungChinhSuaNguoiDung(String chuMoi) {
     final cu = _chuGanNhat;
+
+    // (VIỆC 1) Vị trí con trỏ CUỐI CÙNG override — dùng chung cho MỌI phép
+    // biến đổi [chuMoi] xảy ra TRƯỚC khi diff chính chạy bên dưới (chèn 5 dấu
+    // cách ở LỖI 2 ngay dưới đây, hoặc chèn "\n" + chấm câu + thụt đầu dòng ở
+    // VIỆC 5b/5c xa hơn) — vì Flutter's `TextEditingValue.selection` (đọc ở
+    // cuối hàm) được tính trên [chuMoi] GỐC (TRƯỚC biến đổi), không hề biết gì
+    // về các ký tự vừa được chèn thêm, nên phải tự tính tay và ghi đè vào đây.
+    int? viTriConTroXuongDongTuDong;
 
     // (LỖI 2) Gõ ký tự ĐẦU TIÊN của một văn bản đang HOÀN TOÀN RỖNG, khi tự
     // động thụt đầu dòng đang bật: chèn 5 dấu cách vào TRƯỚC ký tự đó — cùng
     // kỹ thuật "biến đổi [chuMoi] trước khi diff chính chạy" như VIỆC 5b bên
     // dưới đã làm cho trường hợp Enter. `cu.isEmpty` đảm bảo chỉ áp dụng
     // đúng MỘT LẦN, ngay lần gõ đầu tiên (những lần gõ sau, `cu` không còn
-    // rỗng nữa).
+    // rỗng nữa). Con trỏ phải nằm SAU TOÀN BỘ (5 dấu cách + ký tự vừa gõ),
+    // tức cuối [chuMoi] đã biến đổi — [chuMoi] gốc trước biến đổi luôn chỉ
+    // đúng MỘT ký tự khi `cu` rỗng (bàn phím chỉ gửi từng ký tự một), nên
+    // "5 + độ dài chuMoi gốc" ở đây chính là `chuMoi.length` SAU khi đã thêm
+    // 5 dấu cách.
     if (widget.caiDat.tuDongThutDauDong && cu.isEmpty && chuMoi.isNotEmpty) {
       chuMoi = '     $chuMoi';
+      viTriConTroXuongDongTuDong = chuMoi.length;
     }
 
     // (VIỆC 4) Viết hoa đầu câu — CHẠY TRƯỚC MỌI thứ khác trong hàm này
@@ -3866,19 +3935,32 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // TOÀN BỘ diff/dời-offset bên dưới (đã có sẵn, không viết lại) tự lo
     // phần còn lại — coi cả cụm (chấm + \n + thụt) là MỘT phép chèn duy
     // nhất, y hệt cách các phép sửa khác trong hàm này vẫn làm.
-    int? viTriConTroXuongDongTuDong;
     int? ungCuVienDuongKeChia;
     final dauXuongDongDon = _viTriChenXuongDongDon(cuChoEnter, chuMoi);
     if (dauXuongDongDon != null) {
+      // (VIỆC 2) Đã có sẵn dấu chấm ngay trước con trỏ rồi (kể cả có một dấu
+      // cách xen giữa) — không thêm/thay chấm nữa, tránh thừa 2 dấu chấm liền
+      // nhau. Kiểm tra đúng HAI hình dạng: "...chấm|" (chấm ngay sát) và
+      // "...chấm cách|" (chấm rồi một dấu cách rồi mới tới con trỏ).
+      final ktNgayTruoc =
+          dauXuongDongDon > 0 ? cuChoEnter[dauXuongDongDon - 1] : null;
+      final daCoChamRoi = ktNgayTruoc == '.' ||
+          (ktNgayTruoc == ' ' &&
+              dauXuongDongDon >= 2 &&
+              cuChoEnter[dauXuongDongDon - 2] == '.');
+
       // (VIỆC 3) Hai dấu cách liên tiếp NGAY TRƯỚC con trỏ là dấu hiệu đây
       // là một dòng trống do "Tự động thụt đầu dòng" tự tạo (5 dấu cách),
       // không phải văn bản thật — bỏ qua HOÀN TOÀN logic thêm dấu chấm, chỉ
       // xuống dòng bình thường, để không phá mất dòng trống mà "đường kẻ
-      // chia văn bản" cần nhận diện.
-      final haiCachLienTiep = dauXuongDongDon >= 2 &&
+      // chia văn bản" cần nhận diện. Chỉ kiểm tra khi CHƯA rơi vào trường hợp
+      // "đã có chấm rồi" ở trên (hai điều kiện độc lập, không xung đột).
+      final haiCachLienTiep = !daCoChamRoi &&
+          dauXuongDongDon >= 2 &&
           cuChoEnter[dauXuongDongDon - 1] == ' ' &&
           cuChoEnter[dauXuongDongDon - 2] == ' ';
-      final themCham = widget.caiDat.tuDongThemDauCham && !haiCachLienTiep;
+      final themCham =
+          widget.caiDat.tuDongThemDauCham && !daCoChamRoi && !haiCachLienTiep;
       final thut = widget.caiDat.tuDongThutDauDong ? '     ' : '';
       var moiDau = dauXuongDongDon;
       String chenVao;
@@ -4021,6 +4103,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         cu[dau - 1] == ' ' &&
         _kyTuDacBiet.contains(chuMoi[dau])) {
       chuMoiCuoi = chuMoi.substring(0, dau - 1) + chuMoi[dau] + ' ' + chuMoi.substring(dau + 1);
+      // (VIỆC 5) Ký tự đặc biệt vừa "nhảy" ra TRƯỚC dấu cách (không còn nằm
+      // ở vị trí con trỏ [dau] nữa, mà ở [dau - 1]) — về ngữ nghĩa đây CHÍNH
+      // XÁC là tình huống "dấu câu + dấu cách", nên phải kiểm tra đánh dấu
+      // viết hoa lại TRÊN [chuMoiCuoi] (văn bản SAU khi nhảy), không phải
+      // trên [chuMoi] gốc (lần gọi `_kiemTraDanhDauVietHoa` ở khối VIỆC 4 bên
+      // trên đã chạy trên [chuMoi] TRƯỚC khi nhảy nên kiểm tra sai chỗ, không
+      // bắt được tình huống này). Vị trí cần đánh dấu là `dau + 1`: trong
+      // [chuMoiCuoi], ký tự đặc biệt nằm ở `dau - 1`, dấu cách nằm ở `dau`,
+      // nên từ kế tiếp sẽ bắt đầu ngay tại `dau + 1`.
+      if (widget.caiDat.tuDongVietHoaDauCau) {
+        _kiemTraDanhDauVietHoa(chuMoiCuoi, dau + 1);
+      }
     }
 
     final chon = _boDieuKhien.selection;

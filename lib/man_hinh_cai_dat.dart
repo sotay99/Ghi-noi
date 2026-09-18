@@ -25,6 +25,7 @@ class ManHinhCaiDat extends StatefulWidget {
     required this.caiDat,
     required this.khiTatKiemTraChinhTa,
     required this.khiKiemTraLaiMicro,
+    this.khiDoiTuDongThemDuongKeChia,
   });
 
   final CaiDat caiDat;
@@ -32,6 +33,12 @@ class ManHinhCaiDat extends StatefulWidget {
   /// Gọi ngay khi người dùng tắt "kiểm tra chính tả bằng AI" — trang soạn
   /// thảo dùng đây để xoá hết gạch đỏ chân đang hiển thị.
   final VoidCallback khiTatKiemTraChinhTa;
+
+  /// (VIỆC 3) Gọi ngay khi người dùng BẬT/TẮT "tự động thêm đường kẻ chia
+  /// văn bản" — trang soạn thảo dùng đây để quét lại (khi bật) hoặc buộc vẽ
+  /// lại ngay (khi tắt) cho ghi chú ĐANG MỞ, không cần đợi mở/chuyển ghi chú
+  /// khác mới thấy hiệu ứng. Không bắt buộc.
+  final VoidCallback? khiDoiTuDongThemDuongKeChia;
 
   /// Gọi lại speech_to_text.initialize() để trang soạn thảo cập nhật xem
   /// micro có dùng được không, sau khi người dùng vừa xin quyền.
@@ -519,6 +526,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
               onChanged: (bat) async {
                 setState(() => _tuDongThemDuongKeChia = bat);
                 await widget.caiDat.datTuDongThemDuongKeChia(bat);
+                widget.khiDoiTuDongThemDuongKeChia?.call();
               },
             ),
           ],
