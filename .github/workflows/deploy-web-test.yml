@@ -43,6 +43,20 @@ jobs:
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
         continue-on-error: true
 
+      # Thư mục web/ không nằm trong git (y hệt lý do android/ không nằm
+      # trong git ở build-apk.yml) — "This project is not configured for
+      # the web." nếu thiếu bước này. Sinh nó bằng đúng phiên bản Flutter
+      # vừa cài, sang một thư mục tạm rồi chỉ chép phần web/ vào, tránh
+      # đụng tới bất kỳ file nào khác của repo.
+      - name: Sinh phần Web
+        run: |
+          set -e
+          flutter create --platforms=web \
+            --project-name=flowrite \
+            --org=com.flowrite \
+            /tmp/khung-web
+          cp -r /tmp/khung-web/web ./web
+
       # Repo là sotay99/ghi-noi → GitHub Pages sẽ phục vụ tại
       # /ghi-noi/, nên base-href phải khớp.
       - name: Dựng bản Web (entry point riêng cho bản thử)
