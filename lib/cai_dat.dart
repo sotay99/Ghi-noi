@@ -112,6 +112,12 @@ class CaiDat {
   static const _khoaTuDongThutDauDong = 'ghi_noi_tu_dong_thut_dau_dong';
   static const _khoaTuDongThemDuongKeChia = 'ghi_noi_tu_dong_them_duong_ke_chia';
 
+  /// Có tự viết hoa chữ cái đầu của một từ ngay sau dấu câu kết thúc câu
+  /// (. , : ! ?) hay không. Mặc định BẬT.
+  bool tuDongVietHoaDauCau = true;
+
+  static const _khoaTuDongVietHoaDauCau = 'ghi_noi_tu_dong_viet_hoa_dau_cau';
+
   Future<void> tai() async {
     final kho = await SharedPreferences.getInstance();
     thoiGianBatLaiGiay = kho.getDouble(_khoaThoiGianBatLai) ?? 1.0;
@@ -135,6 +141,7 @@ class CaiDat {
     tuDongThemDauCham = kho.getBool(_khoaTuDongThemDauCham) ?? true;
     tuDongThutDauDong = kho.getBool(_khoaTuDongThutDauDong) ?? true;
     tuDongThemDuongKeChia = kho.getBool(_khoaTuDongThemDuongKeChia) ?? true;
+    tuDongVietHoaDauCau = kho.getBool(_khoaTuDongVietHoaDauCau) ?? true;
   }
 
   Future<void> datTuDongThemDauCham(bool bat) async {
@@ -153,6 +160,12 @@ class CaiDat {
     tuDongThemDuongKeChia = bat;
     final kho = await SharedPreferences.getInstance();
     await kho.setBool(_khoaTuDongThemDuongKeChia, bat);
+  }
+
+  Future<void> datTuDongVietHoaDauCau(bool bat) async {
+    tuDongVietHoaDauCau = bat;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setBool(_khoaTuDongVietHoaDauCau, bat);
   }
 
   Future<void> datTimKiemPhanBietHoaThuong(bool bat) async {

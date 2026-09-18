@@ -1827,7 +1827,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// (VIỆC 5c) Overlay các đường kẻ chia văn bản — cùng cách dựng RenderBox
   /// với `_veConTro()`/`_veDanhDauAi()` ở trên.
   Widget _veDuongKeChia() {
-    if (_cacViTriDuongKeChia.isEmpty) return const SizedBox.shrink();
+    // (SỬA LỖI đường kẻ chia "bóng ma" — LỚP BẢO VỆ THỨ HAI) Văn bản rỗng
+    // hoặc chỉ toàn khoảng trắng thì TUYỆT ĐỐI không vẽ đường kẻ nào, dù
+    // `_cacViTriDuongKeChia` có lỡ sót offset chưa dọn sạch ở đâu đó.
+    if (_cacViTriDuongKeChia.isEmpty || _boDieuKhien.text.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
     final hopVanBan = _oVanBanKey.currentContext?.findRenderObject();
     final khungBox = _khungVanBanKey.currentContext?.findRenderObject();
     if (hopVanBan == null || khungBox is! RenderBox) {
@@ -2872,6 +2877,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henChinhTa?.cancel();
     _boDieuKhien.loi.clear();
     _viTriDaKiemTraChinhTa = g.noiDung.length;
+    // (SỬA LỖI đường kẻ chia "bóng ma") Ghi chú KHÁC có thể mang toạ độ
+    // đường kẻ chia hoàn toàn không liên quan tới ghi chú vừa mở — không xoá
+    // thì offset cũ (ví dụ 0) vẫn "hợp lệ" trên văn bản mới (kể cả văn bản
+    // rỗng) và painter cứ thế vẽ nhầm ngay từ dòng đầu tiên.
+    _cacViTriDuongKeChia.clear();
+    _viTriChoVietHoa = null;
 
     widget.kho.datGhiChuDangMo(id);
   }
@@ -3707,6 +3718,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _datNeoTaiConTro();
       return;
     }
+    // (VIỆC 4) Người dùng chủ động dời con trỏ đi nơi khác — bỏ dở từ đang
+    // chờ viết hoa, tránh áp dụng viết hoa sai chỗ nếu họ quay lại gõ ở một
+    // vị trí khác.
+    _viTriChoVietHoa = null;
     _neo = chon.end;
     _dongBangDoanDangNhay();
   }
@@ -3718,6 +3733,69 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// `_dieuChinhLoiChinhTaSauKhiSua` — KHÔNG phải ký tự thật, chỉ dùng để vẽ
   /// overlay (`_VeDuongKeChia`).
   final List<int> _cacViTriDuongKeChia = [];
+
+  /// (VIỆC 4) Vị trí BẮT ĐẦU của từ đang chờ viết hoa chữ cái đầu tiên, hoặc
+  /// `null` nếu không có từ nào đang chờ. Chỉ áp dụng MỘT LẦN cho mỗi từ —
+  /// xoá ngay sau khi xử lý (viết hoa hay bỏ qua), và huỷ khi người dùng chủ
+  /// động di chuyển con trỏ đi nơi khác (xem `_khiNguoiDungSua`, nhánh (b)),
+  /// hoặc khi mở ghi chú khác/xoá tất cả (đánh dấu của ghi chú cũ không còn
+  /// nghĩa gì với ghi chú mới).
+  int? _viTriChoVietHoa;
+
+  /// (VIỆC 4) Một chữ cái, kể cả chữ cái tiếng Việt có dấu.
+  static final RegExp _laChuCai = RegExp(r'[a-zA-ZÀ-ỹ]');
+
+  /// (VIỆC 4) Các dấu câu coi là mốc kết thúc câu, để từ tiếp theo được viết
+  /// hoa chữ đầu.
+  static const Set<String> _kyTuKetCauChoVietHoa = {'.', ',', ':', '!', '?'};
+
+  /// (VIỆC 4) Tổng quát hoá của `_viTriChenXuongDongDon`: [chuMoi] có đúng
+  /// là [cu] vừa được chèn thêm MỘT ký tự đơn giản ở đâu đó (bất kỳ ký tự
+  /// nào, không riêng `'\n'`) hay không — trả về vị trí chèn nếu khớp, hoặc
+  /// null nếu không (xoá kèm gõ, dán nhiều ký tự, autocorrect đổi cả cụm...).
+  int? _viTriChenMotKyTuDon(String cu, String chuMoi) {
+    if (chuMoi.length != cu.length + 1) return null;
+    var dau = 0;
+    while (dau < cu.length && cu[dau] == chuMoi[dau]) {
+      dau++;
+    }
+    if (cu.substring(dau) != chuMoi.substring(dau + 1)) return null;
+    return dau;
+  }
+
+  /// (VIỆC 4) Ngay TRƯỚC KHI chèn một ký tự mới tại [viTriChen] vào
+  /// [vanBan] (văn bản đã có ký tự đó): nếu ký tự ngay trước [viTriChen] là
+  /// dấu cách, và ký tự ngay trước dãy dấu cách đó là một trong các ký tự kết
+  /// câu — đánh dấu [viTriChen] là điểm bắt đầu của một từ mới cần viết hoa
+  /// chữ đầu (sau khi từ đó gõ xong).
+  void _kiemTraDanhDauVietHoa(String vanBan, int viTriChen) {
+    if (viTriChen <= 0 || viTriChen > vanBan.length) return;
+    if (vanBan[viTriChen - 1] != ' ') return;
+    var i = viTriChen - 1;
+    while (i > 0 && vanBan[i - 1] == ' ') {
+      i--;
+    }
+    if (i == 0) return; // Không có gì trước dãy dấu cách này.
+    if (_kyTuKetCauChoVietHoa.contains(vanBan[i - 1])) {
+      _viTriChoVietHoa = viTriChen;
+    }
+  }
+
+  /// (VIỆC 4) Nếu đang có một từ chờ viết hoa (`_viTriChoVietHoa`) VÀ ký tự
+  /// vừa gõ [ktChen] là dấu cách hoặc xuống dòng (dấu hiệu từ đó đã gõ
+  /// xong) — trả về (vị trí, ký tự đã viết hoa) cần thay vào [vanBan], hoặc
+  /// `null` nếu không có gì phải làm. LUÔN xoá đánh dấu sau khi gọi (chỉ áp
+  /// dụng một lần cho mỗi từ), bất kể có viết hoa được hay không.
+  (int, String)? _ketQuaVietHoaChoTuVuaGoXong(String vanBan, String ktChen) {
+    final vt = _viTriChoVietHoa;
+    _viTriChoVietHoa = null;
+    if (vt == null) return null;
+    if (ktChen != ' ' && ktChen != '\n') return null;
+    if (vt < 0 || vt >= vanBan.length) return null;
+    final kt = vanBan[vt];
+    if (!_laChuCai.hasMatch(kt)) return null;
+    return (vt, kt.toUpperCase());
+  }
 
   /// (VIỆC 5b) Có đúng là "Enter đơn giản" hay không: [chuMoi] dài hơn [cu]
   /// đúng 1 ký tự, ký tự thêm đó là `'\n'`, và không có gì khác bị xoá/đổi ở
@@ -3746,6 +3824,42 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void _apDungChinhSuaNguoiDung(String chuMoi) {
     final cu = _chuGanNhat;
 
+    // (LỖI 2) Gõ ký tự ĐẦU TIÊN của một văn bản đang HOÀN TOÀN RỖNG, khi tự
+    // động thụt đầu dòng đang bật: chèn 5 dấu cách vào TRƯỚC ký tự đó — cùng
+    // kỹ thuật "biến đổi [chuMoi] trước khi diff chính chạy" như VIỆC 5b bên
+    // dưới đã làm cho trường hợp Enter. `cu.isEmpty` đảm bảo chỉ áp dụng
+    // đúng MỘT LẦN, ngay lần gõ đầu tiên (những lần gõ sau, `cu` không còn
+    // rỗng nữa).
+    if (widget.caiDat.tuDongThutDauDong && cu.isEmpty && chuMoi.isNotEmpty) {
+      chuMoi = '     $chuMoi';
+    }
+
+    // (VIỆC 4) Viết hoa đầu câu — CHẠY TRƯỚC MỌI thứ khác trong hàm này
+    // (đúng thứ tự ưu tiên: viết hoa từ vừa gõ xong trước, rồi mới tới logic
+    // Enter/chấm câu/thụt đầu dòng bên dưới). Chỉ áp dụng khi đây đúng là
+    // MỘT lần chèn đúng một ký tự đơn giản (gõ tay bình thường) — không đụng
+    // tới các trường hợp phức tạp hơn (dán nhiều ký tự, autocorrect đổi cả
+    // cụm, hay trường hợp LỖI 2 vừa chèn 5 dấu cách ở trên).
+    //
+    // `cuChoEnter`: bản `cu` đã áp CÙNG phép viết hoa (nếu có) — dùng RIÊNG
+    // cho phát hiện "Enter đơn giản" ngay bên dưới, để phép so khác biệt đó
+    // (giả định chỉ có ĐÚNG một khác biệt là ký tự vừa chèn) không bị lệch
+    // vì thêm một khác biệt viết hoa nằm ở một vị trí khác.
+    var cuChoEnter = cu;
+    if (widget.caiDat.tuDongVietHoaDauCau) {
+      final viTriChenDon = _viTriChenMotKyTuDon(cu, chuMoi);
+      if (viTriChenDon != null) {
+        final ktChen = chuMoi[viTriChenDon];
+        final ketQua = _ketQuaVietHoaChoTuVuaGoXong(chuMoi, ktChen);
+        if (ketQua != null) {
+          final (vt, ktHoa) = ketQua;
+          chuMoi = chuMoi.substring(0, vt) + ktHoa + chuMoi.substring(vt + 1);
+          cuChoEnter = cu.substring(0, vt) + ktHoa + cu.substring(vt + 1);
+        }
+        _kiemTraDanhDauVietHoa(chuMoi, viTriChenDon);
+      }
+    }
+
     // (VIỆC 5b/5c) Phát hiện "Enter đơn giản" (chèn ĐÚNG một ký tự '\n',
     // không xoá gì khác) — TRƯỚC khi diff chính chạy, biến đổi [chuMoi]
     // (nếu "Tự động thêm dấu chấm"/"Tự động thụt đầu dòng" đang bật) rồi để
@@ -3754,14 +3868,22 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // nhất, y hệt cách các phép sửa khác trong hàm này vẫn làm.
     int? viTriConTroXuongDongTuDong;
     int? ungCuVienDuongKeChia;
-    final dauXuongDongDon = _viTriChenXuongDongDon(cu, chuMoi);
+    final dauXuongDongDon = _viTriChenXuongDongDon(cuChoEnter, chuMoi);
     if (dauXuongDongDon != null) {
-      final themCham = widget.caiDat.tuDongThemDauCham;
+      // (VIỆC 3) Hai dấu cách liên tiếp NGAY TRƯỚC con trỏ là dấu hiệu đây
+      // là một dòng trống do "Tự động thụt đầu dòng" tự tạo (5 dấu cách),
+      // không phải văn bản thật — bỏ qua HOÀN TOÀN logic thêm dấu chấm, chỉ
+      // xuống dòng bình thường, để không phá mất dòng trống mà "đường kẻ
+      // chia văn bản" cần nhận diện.
+      final haiCachLienTiep = dauXuongDongDon >= 2 &&
+          cuChoEnter[dauXuongDongDon - 1] == ' ' &&
+          cuChoEnter[dauXuongDongDon - 2] == ' ';
+      final themCham = widget.caiDat.tuDongThemDauCham && !haiCachLienTiep;
       final thut = widget.caiDat.tuDongThutDauDong ? '     ' : '';
       var moiDau = dauXuongDongDon;
       String chenVao;
       if (themCham) {
-        if (dauXuongDongDon > 0 && cu[dauXuongDongDon - 1] == ' ') {
+        if (dauXuongDongDon > 0 && cuChoEnter[dauXuongDongDon - 1] == ' ') {
           moiDau = dauXuongDongDon - 1;
         }
         chenVao = '.\n$thut';
@@ -3769,7 +3891,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         chenVao = '\n$thut';
       }
       if (themCham || thut.isNotEmpty) {
-        chuMoi = cu.substring(0, moiDau) + chenVao + cu.substring(dauXuongDongDon);
+        chuMoi = cuChoEnter.substring(0, moiDau) + chenVao + cuChoEnter.substring(dauXuongDongDon);
         viTriConTroXuongDongTuDong = moiDau + chenVao.length;
       }
 
@@ -3778,7 +3900,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // nhận một đường kẻ chia mới (thêm vào danh sách SAU KHI offset của
       // các đường kẻ cũ đã được dời, xem bên dưới, để khỏi bị dời chồng lần
       // hai).
-      if (widget.caiDat.tuDongThemDuongKeChia) {
+      // (SỬA LỖI đường kẻ chia "bóng ma") `cu.isNotEmpty`: nếu văn bản GỐC
+      // (trước khi gõ Enter này) đang HOÀN TOÀN RỖNG thì KHÔNG CÓ dòng nào ở
+      // trên cả — không được coi "không có gì" là một dòng trống hợp lệ để
+      // tạo đường kẻ chia ngay tại dòng đầu tiên của trang.
+      if (widget.caiDat.tuDongThemDuongKeChia && cu.isNotEmpty) {
         final viTriNewline = moiDau + (themCham ? 1 : 0);
         final dongTrenBatDau = viTriNewline <= 0
             ? 0
@@ -5920,6 +6046,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     _boDieuKhien.canXoa.clear();
     _viTriDaKiemTraChinhTa = 0;
+    // (SỬA LỖI đường kẻ chia "bóng ma") Văn bản vừa về rỗng hoàn toàn — mọi
+    // đường kẻ chia cũ không còn ý nghĩa gì, xoá sạch để khỏi vẽ nhầm ở dòng
+    // đầu tiên của trang trống.
+    _cacViTriDuongKeChia.clear();
+    _viTriChoVietHoa = null;
     _boQuaCauNay = _micro.isListening;
     await _luuVanBan();
     if (baoKetQua && mounted) _bao('Đã xoá tất cả');

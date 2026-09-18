@@ -49,6 +49,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
   late bool _tuDongThemDauCham;
   late bool _tuDongThutDauDong;
   late bool _tuDongThemDuongKeChia;
+  late bool _tuDongVietHoaDauCau;
   late String _phimTatBoBienDoi;
   late String _phimTatPhim;
   PermissionStatus? _trangThaiMicro;
@@ -67,6 +68,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     _tuDongThemDauCham = widget.caiDat.tuDongThemDauCham;
     _tuDongThutDauDong = widget.caiDat.tuDongThutDauDong;
     _tuDongThemDuongKeChia = widget.caiDat.tuDongThemDuongKeChia;
+    _tuDongVietHoaDauCau = widget.caiDat.tuDongVietHoaDauCau;
     _phimTatBoBienDoi = widget.caiDat.phimTatBoBienDoi;
     _phimTatPhim = widget.caiDat.phimTatPhim;
     _oTuTatMicro = TextEditingController(text: '${widget.caiDat.thoiGianTuTatMicroGiay}');
@@ -222,6 +224,8 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
           _dong4dTuDongThutDauDong(),
           const Divider(height: 40),
           _dong4eTuDongThemDuongKeChia(),
+          const Divider(height: 40),
+          _dong4fTuDongVietHoaDauCau(),
           const Divider(height: 40),
           _dong5PhimTat(),
           const Divider(height: 40),
@@ -523,6 +527,44 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
               'Đường kẻ chia văn bản',
               _giaiThichDuongKeChiaNgan,
               _giaiThichDuongKeChia,
+            )),
+      ],
+    );
+  }
+
+  /// (VIỆC 4a) Cùng pattern Column + Row + Switch + nút "Tìm hiểu thêm" với
+  /// ba dòng cài đặt xuống dòng ở trên.
+  Widget _dong4fTuDongVietHoaDauCau() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _tieuDeDong('Tự động viết Hoa ở đầu câu'),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                _tuDongVietHoaDauCau ? 'Đang bật (Có)' : 'Đang tắt (Không)',
+                style: TextStyle(
+                  color: _tuDongVietHoaDauCau
+                      ? const Color(0xFF1A73E8)
+                      : const Color(0xFF9AA0A6),
+                ),
+              ),
+            ),
+            Switch(
+              value: _tuDongVietHoaDauCau,
+              onChanged: (bat) async {
+                setState(() => _tuDongVietHoaDauCau = bat);
+                await widget.caiDat.datTuDongVietHoaDauCau(bat);
+              },
+            ),
+          ],
+        ),
+        _nutTimHieuThem(() => _hienGiaiThich(
+              'Tự động viết Hoa ở đầu câu',
+              _giaiThichVietHoaDauCauNgan,
+              _giaiThichVietHoaDauCau,
             )),
       ],
     );
@@ -921,4 +963,14 @@ const _giaiThichDuongKeChia = '''
 Khi bạn xuống dòng và để lại một dòng TRỐNG (hoặc chỉ toàn dấu cách) — thường là do bấm Enter hai lần liên tiếp — ứng dụng tự vẽ một đường kẻ chia mờ ngay tại dòng trống đó, giúp phân biệt rõ các đoạn văn khác nhau trong bài.
 
 Đường kẻ này chỉ là một nét vẽ hiển thị, KHÔNG phải ký tự thật chèn vào bài — nó tự bám đúng dòng trống dù màn hình xoay hay đổi kích thước. Nếu bạn gõ chữ vào đúng dòng trống đó (không còn trống nữa), đường kẻ tự biến mất; xoá hẳn dòng đó cũng vậy.
+''';
+
+const _giaiThichVietHoaDauCauNgan = '''
+Gõ xong một câu (kết thúc bằng . , : ! hoặc ?) rồi sang câu mới, chữ cái đầu của từ đầu tiên tự được viết Hoa.
+''';
+
+const _giaiThichVietHoaDauCau = '''
+Sau khi bạn gõ một trong các dấu . , : ! ? rồi một dấu cách, ứng dụng ghi nhớ: từ tiếp theo cần viết Hoa chữ đầu. Khi bạn gõ xong từ đó (tới khi gặp dấu cách hoặc xuống dòng tiếp theo), ứng dụng mới viết Hoa chữ cái đầu tiên của từ — không đổi gì khác trong từ đó.
+
+Nếu ký tự đầu từ không phải chữ cái (ví dụ số), ứng dụng bỏ qua, không viết Hoa được thì thôi. Việc này áp dụng cho cả gõ tay và giọng nói. Tắt tính năng này thì chữ giữ nguyên như bạn gõ/nói, không tự viết Hoa gì cả.
 ''';
