@@ -2189,6 +2189,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     HardwareKeyboard.instance.addHandler(_khiPhimTatMicro);
     HardwareKeyboard.instance.addHandler(_khiPhimTatLuiTien);
     HardwareKeyboard.instance.addHandler(_khiGoPhimBatKyTatChuThich);
+    HardwareKeyboard.instance.addHandler(_khiBamPhimWinCatNhanhPhienGhiAm);
   }
 
   /// Gõ BẤT KỲ phím nào trên bàn phím rời cũng tắt chú thích — không riêng gì
@@ -2204,6 +2205,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     HardwareKeyboard.instance.removeHandler(_khiPhimTatMicro);
     HardwareKeyboard.instance.removeHandler(_khiPhimTatLuiTien);
     HardwareKeyboard.instance.removeHandler(_khiGoPhimBatKyTatChuThich);
+    HardwareKeyboard.instance.removeHandler(_khiBamPhimWinCatNhanhPhienGhiAm);
     WidgetsBinding.instance.removeObserver(this);
     _hen?.cancel();
     _henLuuTru?.cancel();
@@ -2724,6 +2726,28 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void _khiBamPhimCatNhanhPhienGhiAm() {
     if (!_muonNghe) return;
     _dongBangDoanDangNhay(lyDo: 'bấm phím tắt cắt nhanh phiên ghi âm');
+  }
+
+  /// (VIỆC 1) Nhánh riêng cho lựa chọn 'win' — bắt phím Win/Cmd
+  /// (metaLeft/metaRight) bằng `HardwareKeyboard.addHandler` TOÀN CỤC, vì
+  /// `Shortcuts`/`SingleActivator` không nhận một phím biến đổi làm trigger
+  /// (xem chú thích tại nơi khai `Shortcuts` trong `build`). Chỉ tác dụng khi
+  /// ô soạn thảo đang giữ tiêu điểm — y hệt điều kiện của nhánh 'tab' ở trên,
+  /// giữ đúng hành vi "chỉ kích hoạt khi đang gõ trong ô soạn thảo".
+  bool _khiBamPhimWinCatNhanhPhienGhiAm(KeyEvent event) {
+    if (!mounted || event is! KeyDownEvent) return false;
+    if (widget.caiDat.phimCatNhanhPhienGhiAm != 'win') return false;
+    if (event.logicalKey != LogicalKeyboardKey.metaLeft &&
+        event.logicalKey != LogicalKeyboardKey.metaRight) {
+      return false;
+    }
+    if (!_oChu.hasFocus) return false;
+
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return false;
+
+    _khiBamPhimCatNhanhPhienGhiAm();
+    return true;
   }
 
   /// Ctrl + Z (Lùi lại) và Ctrl + Shift + Z (Tiến tới) — cố định, không cho
@@ -5879,13 +5903,19 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     // tiêu điểm đang nằm TRONG ô soạn thảo (bên dưới
                     // `Shortcuts` này) — `Shortcuts` gần tiêu điểm nhất luôn
                     // thắng, y hệt giải thích ở trên.
+                    //
+                    // Phím Win/Cmd (metaLeft/metaRight) KHÔNG khai được ở đây:
+                    // `SingleActivator` cấm hẳn việc dùng một phím biến đổi
+                    // (Ctrl/Shift/Alt/Meta) làm chính TRIGGER của nó — hằng số
+                    // `const SingleActivator(LogicalKeyboardKey.metaLeft)` ném
+                    // lỗi ngay lúc BIÊN DỊCH (const_eval_throws_exception) vì
+                    // assertion trong `shortcuts.dart` chặn thẳng trường hợp
+                    // này. Trường hợp 'win' vì thế được bắt riêng bằng
+                    // `HardwareKeyboard.instance.addHandler` toàn cục — xem
+                    // `_khiBamPhimWinCatNhanhPhienGhiAm()` — nên map này để
+                    // trống, không khai gì cả.
                     ...(widget.caiDat.phimCatNhanhPhienGhiAm == 'win'
-                        ? {
-                            const SingleActivator(LogicalKeyboardKey.metaLeft):
-                                const _YDinhCatNhanhPhienGhiAm(),
-                            const SingleActivator(LogicalKeyboardKey.metaRight):
-                                const _YDinhCatNhanhPhienGhiAm(),
-                          }
+                        ? const <SingleActivator, Intent>{}
                         : {
                             const SingleActivator(LogicalKeyboardKey.tab):
                                 const _YDinhCatNhanhPhienGhiAm(),
