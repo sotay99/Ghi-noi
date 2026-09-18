@@ -38,7 +38,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v7';
+const _phienBanThuNghiem = 'v8';
 
 // (Chỉ import đúng MỘT file `speech_to_text/speech_to_text.dart` — y hệt
 // cách `trang_soan_thao.dart` đang dùng đã chứng minh hoạt động — thay vì
@@ -376,17 +376,23 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     return true;
   }
 
-  /// Thuật toán "tìm điểm nối": thử N = 6..1 từ CUỐI của [daChot], xem
-  /// [partialMoi] có bắt đầu đúng bằng N từ đó không (so khớp nới lỏng).
-  /// `null` = không tìm được, coi là nội dung mới hoàn toàn.
-  /// `[]`   = trùng nguyên văn N từ cuối, không có gì thêm (nhân đôi).
-  /// khác   = phần mới thật sự nằm sau điểm nối.
+  /// Thuật toán "tìm điểm nối": thử N từ CUỐI của [daChot] (từ dài nhất có
+  /// thể xuống 1), xem [partialMoi] có bắt đầu đúng bằng N từ đó không (so
+  /// khớp nới lỏng). `null` = không tìm được, coi là nội dung mới hoàn
+  /// toàn. `[]` = trùng nguyên văn N từ cuối, không có gì thêm (nhân đôi).
+  /// khác = phần mới thật sự nằm sau điểm nối.
+  ///
+  /// KHÔNG giới hạn N ở 6 như bản gốc bên app chính (nơi cụm lặp trên
+  /// Android luôn ngắn) — trên nhánh điện thoại của bản test này, cụm lặp
+  /// do Chrome tự lặp lại có thể dài hơn 6 từ rất nhiều (xem log thực tế:
+  /// "bị lặp lại từ của tôi Bởi vậy cho nên..." lặp nguyên cụm mỗi lần),
+  /// giới hạn 6 làm bỏ lỡ điểm nối và gây nối nhầm nguyên cụm dài vào cuối.
   static List<String>? _timDiemNoiTrong(
     List<String> daChot,
     List<String> partialMoi,
   ) {
     final soDaChot = daChot.length;
-    final maxN = soDaChot < 6 ? soDaChot : 6;
+    final maxN = soDaChot < partialMoi.length ? soDaChot : partialMoi.length;
     for (var n = maxN; n >= 1; n--) {
       if (partialMoi.length < n) continue;
       final duoiDaChot = daChot.sublist(soDaChot - n);
