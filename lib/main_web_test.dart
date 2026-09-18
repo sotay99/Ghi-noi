@@ -284,6 +284,22 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
 
   // ------------------------------------------------------ thuật toán lõi
 
+  // Chrome Android trả `recognizedWords` bị dính liền các ĐOẠN với nhau,
+  // không có dấu cách ở ranh giới đoạn (vd "CóCó tôi") — mỗi đoạn luôn bắt
+  // đầu bằng chữ hoa. Chèn lại dấu cách còn thiếu TRƯỚC khi tách từ, để
+  // thuật toán tìm-điểm-nối bên dưới (vốn đã chạy đúng trên PC) nhận được
+  // dữ liệu tách từ đúng ranh giới. Chỉ dùng cho nhánh điện thoại — PC
+  // không có lỗi này nên không đụng tới.
+  static const _chuThuongViet =
+      'a-zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ';
+  static const _chuHoaViet =
+      'A-ZÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ';
+  static final RegExp _reRanhGioiDoanDinh =
+      RegExp('(?<=[$_chuThuongViet])(?=[$_chuHoaViet])');
+
+  static String _vaKhoangCachThieu(String s) =>
+      s.replaceAllMapped(_reRanhGioiDoanDinh, (_) => ' ');
+
   /// Tách chuỗi thành danh sách từ theo khoảng trắng — y hệt `_tachTu`.
   static List<String> _tachTu(String s) {
     final t = s.trim();
@@ -364,7 +380,12 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     _ghiLog('${xong ? "FINAL" : "partial"}: "$noi"');
 
     if (noi.isEmpty) return;
-    final tuMoi = _tachTu(noi);
+    // Chỉ vá dữ liệu cho nhánh điện thoại — PC dùng nguyên văn.
+    final noiDaVa = _laDiDong ? _vaKhoangCachThieu(noi) : noi;
+    if (noiDaVa != noi) {
+      _ghiLog('  → vá dấu cách thiếu: "$noiDaVa"');
+    }
+    final tuMoi = _tachTu(noiDaVa);
     if (tuMoi.isEmpty) return;
 
     List<String> hienThi;
