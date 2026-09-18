@@ -2379,7 +2379,43 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _soLanTuChoiLienTuc = 0;
       _luuVanBan();
       _lenLichKiemTraChinhTa();
+      _batLaiPhienSauKhiChot();
     }
+  }
+
+  /// Sau khi một câu đã CHỐT xong (`finalResult: true`), chủ động ngắt rồi mở
+  /// lại phiên nghe ngay — không chờ hệ điều hành tự ngắt vì im lặng.
+  /// `_henBatLai()` vốn chỉ được gọi khi TRẠNG THÁI micro đổi sang "không
+  /// nghe" (`_khiDoiTrangThai`); nói liên tục nhiều câu không tạo ra lần đổi
+  /// trạng thái nào giữa các câu, nên một phiên có thể sống xuyên suốt rất
+  /// nhiều câu. Để một phiên sống quá lâu như vậy, bộ nhận dạng trên một số
+  /// máy/phiên bản Android có xu hướng "nhớ" ngữ cảnh âm thanh từ ĐẦU phiên
+  /// và thỉnh thoảng trả về một kết quả (partial hoặc final) gồm CẢ câu vừa
+  /// chốt — nhìn như micro quay lại sửa hoặc nhân đôi chữ đã hiện ra màn
+  /// hình. Chốt xong một câu là mở một phiên HOÀN TOÀN MỚI, sạch ngữ cảnh.
+  ///
+  /// Dùng lại đúng con đường `stop()` → `_henBatLai()` đã chạy ổn định ở
+  /// `_dongBangDoanDangNhay()` (thay vì tự viết một đường khác): `_hen`,
+  /// `idPhien`, `_dangNghe`... đều được thu dọn/đặt lại y hệt như khi hệ điều
+  /// hành tự ngắt, không có đường tắt nào có thể lệch cờ.
+  ///
+  /// `_boQuaCauNay = true` chặn một kết quả TRỄ của phiên SẮP đóng lọt vào
+  /// (bộ nhận dạng đôi khi vẫn trả thêm một kết quả sau khi đã gọi `stop()`)
+  /// — y hệt lý do `_tatMicro()`/`_dongBangDoanDangNhay()` đều làm vậy trước
+  /// khi ngắt. Cờ tự gỡ ở nhánh `_boQuaCauNay` của `_khiCoChu` khi phiên MỚI
+  /// gửi về kết quả chốt đầu tiên của nó.
+  ///
+  /// `_dangCatCau` chặn gọi chồng: nếu người dùng vừa chạm để dời con trỏ
+  /// (`_dongBangDoanDangNhay`) đúng lúc câu này chốt xong, chỉ một lượt
+  /// dừng/mở lại chạy, không phải hai lượt tranh nhau.
+  void _batLaiPhienSauKhiChot() {
+    if (!_muonNghe || _dangCatCau || !_micro.isListening) return;
+    _boQuaCauNay = true;
+    _dangCatCau = true;
+    _micro.stop().whenComplete(() {
+      _dangCatCau = false;
+      _henBatLai();
+    });
   }
 
   /// Mọi lần ghi do máy thực hiện đều đi qua đây, để ghi nhớ nội dung, vị trí
