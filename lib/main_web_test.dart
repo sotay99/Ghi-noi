@@ -31,6 +31,7 @@ import 'dart:async';
 import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 // (Chỉ import đúng MỘT file `speech_to_text/speech_to_text.dart` — y hệt
@@ -260,6 +261,18 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       });
       _batNghe();
     }
+  }
+
+  Future<void> _saoChepNhatKy() async {
+    final noiDung = _nhatKy.isEmpty ? '(chưa có nhật ký)' : _nhatKy.join('\n');
+    await Clipboard.setData(ClipboardData(text: noiDung));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Đã sao chép nhật ký vào bộ nhớ tạm'),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   void _doiCheDoThietBi() {
@@ -495,6 +508,10 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                   const Text('Nhật ký',
                       style: TextStyle(fontWeight: FontWeight.bold)),
                   const Spacer(),
+                  TextButton(
+                    onPressed: _saoChepNhatKy,
+                    child: const Text('Sao chép tất cả'),
+                  ),
                   TextButton(
                     onPressed: () => setState(() => _nhatKy.clear()),
                     child: const Text('Xoá nhật ký'),
