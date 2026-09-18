@@ -13,8 +13,22 @@
 // ở đó để biết đầy đủ lý do thiết kế. Ở đây bỏ bớt các phần không cần cho mục
 // đích test: không có "bộ đệm chống nhân đôi qua ranh giới phiên" (LỚP 2),
 // không đụng chỉnh tả/bộ nhớ đệm định dạng/gõ-phím-thắng-micro.
+//
+// THÊM MỚI (vòng test di động):
+// - Nhận diện thiết bị (điện thoại/PC) qua User-Agent, có nút chuyển tay để
+//   ép chế độ khi nhận diện sai — hai chế độ dùng CÙNG MỘT khối logic, chỉ
+//   khác một cờ `_laDiDong` để tránh việc sửa cho di động làm hỏng PC.
+// - Khung "Nhật ký" hiển thị NGAY trên trang (không cần USB debug) để người
+//   dùng chụp màn hình gửi lại khi rà lỗi trên điện thoại.
+// - Vá lỗi nhân bản chữ đã thấy trên Chrome Android: khi không tìm được
+//   điểm nối VÀ đoạn partial mới dài bằng/hơn toàn bộ phần đã chốt — dấu
+//   hiệu bộ nhận dạng đang gửi lại TOÀN BỘ câu từ đầu chứ không phải phần
+//   mới — thì coi partial mới là toàn bộ nội dung phiên, không nối thêm
+//   (nối thêm trong trường hợp này là nguyên nhân gây chữ nhân bản chồng
+//   chất trong ảnh chụp người dùng gửi).
 
 import 'dart:async';
+import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -47,6 +61,16 @@ class UngDungThuMicroWeb extends StatelessWidget {
   }
 }
 
+/// Đoán thiết bị bằng User-Agent — chỉ dùng làm giá trị GỢI Ý ban đầu, người
+/// dùng luôn bấm được nút chuyển tay nếu đoán sai (ví dụ PC thu nhỏ cửa sổ).
+bool _doanLaDiDong() {
+  final ua = html.window.navigator.userAgent.toLowerCase();
+  return ua.contains('android') ||
+      ua.contains('iphone') ||
+      ua.contains('ipad') ||
+      ua.contains('mobile');
+}
+
 class TrangThuMicro extends StatefulWidget {
   const TrangThuMicro({super.key});
 
@@ -62,12 +86,22 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   bool _dangNghe = false;
   String _loi = '';
 
+  // Chế độ thiết bị: đoán ban đầu qua User-Agent, người dùng đổi được bằng
+  // nút chuyển tay. Cả hai chế độ dùng chung một khối xử lý bên dưới, chỉ
+  // khác đúng MỘT cờ `_laDiDong` — sửa cho di động sẽ không đụng nhánh PC.
+  late bool _laDiDong;
+
   // ---- đếm để nhìn bằng mắt lúc debug ----
   int _soLanPartial = 0;
   int _soLanFinal = 0;
 
   // ---- văn bản đang hiển thị ----
   String _vanBan = '';
+
+  // ---- nhật ký hiển thị ngay trên trang, để test trên điện thoại không
+  // cần USB debug — mỗi dòng có giờ:phút:giây để dễ đối chiếu. ----
+  final List<String> _nhatKy = [];
+  final _cuonNhatKy = ScrollController();
 
   // ---- trạng thái thuật toán "chốt dần theo độ ổn định" + "tìm điểm nối",
   // bản đơn giản hoá cho một PHIÊN duy nhất (không cần đệm ranh giới phiên
@@ -85,7 +119,30 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   @override
   void initState() {
     super.initState();
+    _laDiDong = _doanLaDiDong();
+    _ghiLog('Đoán thiết bị: ${_laDiDong ? "điện thoại" : "PC"} '
+        '(User-Agent: ${html.window.navigator.userAgent})');
     _khoiTao();
+  }
+
+  void _ghiLog(String dong) {
+    final gio = DateTime.now();
+    String hai(int n) => n.toString().padLeft(2, '0');
+    final gioChuoi = '${hai(gio.hour)}:${hai(gio.minute)}:${hai(gio.second)}';
+    if (!mounted) {
+      _nhatKy.add('[$gioChuoi] $dong');
+      return;
+    }
+    setState(() {
+      _nhatKy.add('[$gioChuoi] $dong');
+      if (_nhatKy.length > 300) _nhatKy.removeAt(0);
+    });
+    // Cuộn xuống dòng mới nhất sau khi khung vẽ lại.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_cuonNhatKy.hasClients) {
+        _cuonNhatKy.jumpTo(_cuonNhatKy.position.maxScrollExtent);
+      }
+    });
   }
 
   Future<void> _khoiTao() async {
@@ -103,6 +160,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
             'trang này.';
       }
     });
+    _ghiLog('Khởi tạo micro: ${duoc ? "được" : "THẤT BẠI"}');
   }
 
   void _khiCoLoi(dynamic loi) {
@@ -114,6 +172,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
         maLoi == 'error_speech_timeout' ||
         maLoi == 'error_client' ||
         maLoi == 'error_busy';
+    _ghiLog('onError: $maLoi ${nhe ? "(nhẹ, tự bật lại)" : "(HIỂN THỊ ĐỎ)"}');
     if (!nhe && mounted) {
       setState(() => _loi = 'Lỗi: $maLoi');
     }
@@ -121,6 +180,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   }
 
   void _khiDoiTrangThai(String trangThai) {
+    _ghiLog('onStatus: $trangThai');
     final dangChay = trangThai == SpeechToText.listeningStatus;
     if (mounted && _dangNghe != dangChay) {
       setState(() => _dangNghe = dangChay);
@@ -141,7 +201,11 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   void _henNgheLai() {
     if (!_muonNghe) return;
     _henBatLai?.cancel();
-    _henBatLai = Timer(const Duration(milliseconds: 300), () {
+    // Điện thoại (Chrome Android) có xu hướng tự ngắt phiên dày hơn PC — bật
+    // lại nhanh hơn một chút để đỡ hụt tiếng nói giữa hai phiên.
+    final treDoiChoDo =
+        Duration(milliseconds: _laDiDong ? 150 : 300);
+    _henBatLai = Timer(treDoiChoDo, () {
       if (_muonNghe && !_micro.isListening) _batNghe();
     });
   }
@@ -149,10 +213,15 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   Future<void> _batNghe() async {
     if (!_sanSang) return;
     final idPhien = ++_phienHienTai;
+    _ghiLog('Bắt đầu phiên nghe #$idPhien (${_laDiDong ? "điện thoại" : "PC"})');
     try {
       await _micro.listen(
         onResult: (ketQua) {
-          if (idPhien != _phienHienTai) return;
+          if (idPhien != _phienHienTai) {
+            _ghiLog('Bỏ callback trễ của phiên cũ #$idPhien '
+                '(phiên hiện tại là #$_phienHienTai)');
+            return;
+          }
           _khiCoKetQua(ketQua);
         },
         listenOptions: SpeechListenOptions(
@@ -166,7 +235,8 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
         listenFor: const Duration(minutes: 10),
         pauseFor: const Duration(seconds: 8),
       );
-    } catch (_) {
+    } catch (loi) {
+      _ghiLog('listen() ném lỗi: $loi');
       _henNgheLai();
     }
   }
@@ -177,6 +247,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     _henBatLai?.cancel();
     await _micro.cancel();
     if (mounted) setState(() => _dangNghe = false);
+    _ghiLog('Người dùng tắt micro.');
   }
 
   void _bamNutMicro() {
@@ -189,6 +260,13 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       });
       _batNghe();
     }
+  }
+
+  void _doiCheDoThietBi() {
+    setState(() {
+      _laDiDong = !_laDiDong;
+    });
+    _ghiLog('Chuyển tay sang chế độ: ${_laDiDong ? "điện thoại" : "PC"}');
   }
 
   // ------------------------------------------------------ thuật toán lõi
@@ -270,6 +348,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
         _soLanPartial++;
       }
     });
+    _ghiLog('${xong ? "FINAL" : "partial"}: "$noi"');
 
     if (noi.isEmpty) return;
     final tuMoi = _tachTu(noi);
@@ -287,14 +366,29 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       // Bộ nhận dạng có vẻ "viết lại" phần đã chốt — tìm điểm nối.
       final ketQuaNoi = _timDiemNoiTrong(_tuDaChot, tuMoi);
       if (ketQuaNoi == null) {
-        // Không tìm được điểm nối — coi là nội dung mới, nối SAU phần đã
-        // chốt (không bao giờ đè/xoá phần đã chốt).
-        hienThi = [..._tuDaChot, ...tuMoi];
+        if (tuMoi.length >= _tuDaChot.length) {
+          // Partial mới dài bằng/hơn toàn bộ phần đã chốt nhưng không nối
+          // được ở đâu cả — dấu hiệu bộ nhận dạng đang gửi lại TOÀN BỘ câu
+          // từ đầu phiên (hay gặp trên Chrome Android) chứ không phải một
+          // câu mới thật sự. Coi tuMoi là toàn bộ nội dung, KHÔNG nối thêm
+          // — nối thêm ở đây là nguyên nhân gây chữ nhân bản chồng chất.
+          _ghiLog('  → không tìm được điểm nối, partial dài hơn phần đã '
+              'chốt: THAY THẾ toàn bộ (tránh nhân bản)');
+          hienThi = tuMoi;
+        } else {
+          // Partial mới ngắn hơn hẳn phần đã chốt — nhiều khả năng là một
+          // câu mới thật sự bắt đầu sau khi phiên cũ đã chốt xong.
+          _ghiLog('  → không tìm được điểm nối, partial ngắn: NỐI sau '
+              'phần đã chốt');
+          hienThi = [..._tuDaChot, ...tuMoi];
+        }
       } else if (ketQuaNoi.isEmpty) {
         // Nhân đôi thuần tuý — bỏ qua hoàn toàn.
+        _ghiLog('  → nhân đôi thuần tuý, bỏ qua');
         _partialTruocDo = tuMoi;
         return;
       } else {
+        _ghiLog('  → tìm được điểm nối, thêm ${ketQuaNoi.length} từ mới');
         hienThi = [..._tuDaChot, ...ketQuaNoi];
       }
     }
@@ -319,6 +413,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   void dispose() {
     _henBatLai?.cancel();
     _micro.cancel();
+    _cuonNhatKy.dispose();
     super.dispose();
   }
 
@@ -329,6 +424,19 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Flowrite — thử micro trên Web'),
+        actions: [
+          TextButton.icon(
+            onPressed: _doiCheDoThietBi,
+            icon: Icon(
+              _laDiDong ? Icons.smartphone : Icons.laptop_mac,
+              color: Colors.white,
+            ),
+            label: Text(
+              _laDiDong ? 'Điện thoại' : 'PC',
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Padding(
@@ -365,6 +473,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
               ),
               const SizedBox(height: 12),
               Expanded(
+                flex: 3,
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
@@ -376,6 +485,45 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                     child: Text(
                       _vanBan.isEmpty ? '(chưa có chữ nào)' : _vanBan,
                       style: const TextStyle(fontSize: 18, height: 1.5),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Text('Nhật ký',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => setState(() => _nhatKy.clear()),
+                    child: const Text('Xoá nhật ký'),
+                  ),
+                ],
+              ),
+              Expanded(
+                flex: 2,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black87,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Scrollbar(
+                    controller: _cuonNhatKy,
+                    child: SingleChildScrollView(
+                      controller: _cuonNhatKy,
+                      child: SelectableText(
+                        _nhatKy.isEmpty
+                            ? '(chưa có nhật ký)'
+                            : _nhatKy.join('\n'),
+                        style: const TextStyle(
+                          color: Colors.greenAccent,
+                          fontFamily: 'monospace',
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -410,6 +558,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                       _soLanPartial = 0;
                       _soLanFinal = 0;
                     });
+                    _ghiLog('Xoá để thử lại.');
                   },
                   child: const Text('Xoá để thử lại'),
                 ),
