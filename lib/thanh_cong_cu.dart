@@ -275,9 +275,11 @@ class _NutMicroTron extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // (VIỆC 5) Nền khi CHƯA hoạt động đổi từ xanh đậm (mau.primary) sang
+    // xanh lá nhạt — GIỮ NGUYÊN nhánh đỏ khi đang nghe, không đụng tới.
     final nen = !sanSang
         ? Colors.grey.shade400
-        : (bat ? Colors.red.shade600 : mau.primary);
+        : (bat ? Colors.red.shade600 : Colors.green.shade100);
 
     return Semantics(
       button: true,

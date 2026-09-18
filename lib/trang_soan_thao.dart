@@ -74,6 +74,22 @@ class _VungDauCauMoi {
   Timer? henNhapNhay;
 }
 
+/// (VIỆC 4) Một vùng đang chạy hiệu ứng nhấp nháy nền gradient đỏ→vàng ĐÚNG
+/// 1 GIÂY cho "Thay chỗ này"/"Tất cả" trong thanh Thay thế — TÁI DÙNG hệt
+/// pattern `Timer.periodic` đã có ở `_VungCanXoa`/`_VungDauCauMoi` phía trên,
+/// chỉ đổi thời lượng và màu/vị trí vẽ (xem `_VeHieuUngThayThe`). `laXoa`
+/// phân biệt hai luồng (VIỆC 4a/4b): `false` = đang thay (chữ MỚI đã hiện
+/// ngay, [batDau, ketThuc) là vùng chữ mới); `true` = đang xoá (chữ CŨ còn
+/// nguyên trong lúc chờ, [batDau, ketThuc) là vùng chữ cũ sắp mất).
+class _VungHieuUngThayThe {
+  _VungHieuUngThayThe({required this.batDau, required this.ketThuc, required this.laXoa});
+  int batDau;
+  int ketThuc;
+  final bool laXoa;
+  bool sangMau = true;
+  Timer? henNhapNhay;
+}
+
 /// Một khoảng chữ cần vẽ với kiểu riêng — bước trung gian để gộp cả ba nguồn
 /// (lỗi chính tả, đoạn không phù hợp, đoạn cần xoá) thành một danh sách duy
 /// nhất trước khi dựng TextSpan.
@@ -542,6 +558,11 @@ class _BoDieuKhienChinhTa extends TextEditingController {
   /// vì hết hiệu ứng thì chữ đã ở trong [text] rồi, không cần theo dõi nữa.
   final List<_VungDauCauMoi> dauCauMoi = [];
 
+  /// (VIỆC 4) Vùng đang chạy hiệu ứng nhấp nháy 1 giây của "Thay chỗ này"/
+  /// "Tất cả" — cùng kiểu "hiệu ứng tạm thời" như `dauCauMoi` ở trên, không
+  /// phải nguồn sự thật lâu dài.
+  final List<_VungHieuUngThayThe> hieuUngThayThe = [];
+
   /// Định dạng thủ công (đậm/nghiêng/gạch chân/…) — CŨNG là nguồn duy nhất
   /// của sự thật, giống ba danh sách trên. Không bao giờ chồng lên vùng AI
   /// (xem B7 trong `_TrangSoanThaoState._giaoVoiVungAi`), nên khi ghép vào
@@ -577,6 +598,9 @@ class _BoDieuKhienChinhTa extends TextEditingController {
     }
     for (final d in dauCauMoi) {
       d.henNhapNhay?.cancel();
+    }
+    for (final v in hieuUngThayThe) {
+      v.henNhapNhay?.cancel();
     }
     super.dispose();
   }
@@ -898,6 +922,58 @@ class _VeTimKiem extends CustomPainter {
   bool shouldRepaint(covariant _VeTimKiem cu) => true;
 }
 
+/// (VIỆC 4) Vẽ nền gradient đỏ→vàng NHẤP NHÁY (ẩn/hiện theo `sangMau`) cho
+/// mỗi vùng trong `_BoDieuKhienChinhTa.hieuUngThayThe` — cùng cách đo toạ độ
+/// NGAY TRONG `paint()` như `_VeTimKiem` ở trên, chỉ khác là bỏ qua hẳn việc
+/// vẽ khi `sangMau == false` để tạo hiệu ứng nhấp nháy.
+class _VeHieuUngThayThe extends CustomPainter {
+  _VeHieuUngThayThe({required this.re, required this.khungBox, required this.vungs});
+  final RenderEditable re;
+  final RenderBox khungBox;
+  final List<_VungHieuUngThayThe> vungs;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (!re.hasSize || !khungBox.hasSize) return;
+    for (final v in vungs) {
+      if (!v.sangMau) continue; // Nửa chu kỳ "tắt" của nhấp nháy — bỏ qua.
+      if (v.batDau < 0 || v.ketThuc <= v.batDau) continue;
+      List<TextBox> hops;
+      try {
+        hops = re.getBoxesForSelection(
+          TextSelection(baseOffset: v.batDau, extentOffset: v.ketThuc),
+        );
+      } catch (_) {
+        continue;
+      }
+      for (final tb in hops) {
+        Rect h;
+        try {
+          h = Rect.fromPoints(
+            re.localToGlobal(Offset(tb.left, tb.top), ancestor: khungBox),
+            re.localToGlobal(Offset(tb.right, tb.bottom), ancestor: khungBox),
+          );
+        } catch (_) {
+          continue;
+        }
+        canvas.drawRect(
+          h,
+          Paint()
+            ..style = PaintingStyle.fill
+            ..shader = const LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+              colors: [Color(0xFFD32F2F), Color(0xFFFFEB3B)],
+            ).createShader(h),
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _VeHieuUngThayThe cu) => true;
+}
+
 class TrangSoanThao extends StatefulWidget {
   const TrangSoanThao({
     super.key,
@@ -982,6 +1058,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// lại thành hàng giây nghẽn cứng luồng UI trước khi ngăn xếp tràn.
   bool _dangCapNhatTimKiem = false;
 
+  /// (VIỆC 4) Trong lúc hiệu ứng nhấp nháy 1 giây của "Thay chỗ này"/"Tất
+  /// cả" đang chạy, CHẶN việc `_capNhatTimKiemNeuDangMo` tự tính lại danh
+  /// sách kết quả ngay khi văn bản vừa đổi (trường hợp THAY, VIỆC 4a) — kết
+  /// quả chỉ thật sự bị loại khỏi danh sách SAU KHI hiệu ứng kết thúc, việc
+  /// gọi `_capNhatKetQuaTimKiem()` khi đó do chính hàm bắt hiệu ứng đảm nhận.
+  bool _treHoanCapNhatTimKiem = false;
+
   void _capNhatKetQuaTimKiem() {
     if (_dangCapNhatTimKiem) return;
     _dangCapNhatTimKiem = true;
@@ -1024,6 +1107,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// tự kích hoạt thông qua `_boDieuKhien.veLai()` ở cuối
   /// `_capNhatKetQuaTimKiem()`.
   void _capNhatTimKiemNeuDangMo() {
+    if (_treHoanCapNhatTimKiem) return;
     if (_hienThanhTimKiem) _capNhatKetQuaTimKiem();
   }
 
@@ -1086,20 +1170,154 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 
   /// "Thay chỗ này" — chỉ thay đúng kết quả đang chọn (số thứ tự hiện tại).
+  /// (VIỆC 4) Không xử lý ngay lập tức nữa — điều phối sang đúng một trong
+  /// hai luồng 4a (thay)/4b (xoá) tuỳ ô Thay thế có nội dung hay không.
   void _thayChoNay() {
     if (_chiSoTimKiemHienTai < 0 || _chiSoTimKiemHienTai >= _ketQuaTimKiem.length) return;
-    _thayMotKetQua(_chiSoTimKiemHienTai);
-    _luuVanBan();
-    _capNhatKetQuaTimKiem();
+    if (_oThayThe.text.isEmpty) {
+      _batHieuUngXoaMotKetQua(_chiSoTimKiemHienTai);
+    } else {
+      _batHieuUngThayMotKetQua(_chiSoTimKiemHienTai);
+    }
   }
 
-  /// "Thay tất cả" — thay/xoá TỪ CUỐI VỀ ĐẦU để toạ độ các kết quả đứng
-  /// trước không bị lệch khi độ dài văn bản đổi (đúng nguyên tắc dịch offset
-  /// đã dùng ở `_dieuChinhLoiChinhTaSauKhiSua`/`_dieuChinhVungToanVanSauKhiSua`
-  /// trong toàn bộ tệp này).
+  /// "Thay tất cả" — (VIỆC 4) cũng điều phối sang 4a/4b, KHÔNG còn xử lý
+  /// ngay lập tức. Vẫn giữ nguyên tắc TỪ CUỐI VỀ ĐẦU để toạ độ các kết quả
+  /// đứng trước không bị lệch khi độ dài văn bản đổi (đúng nguyên tắc dịch
+  /// offset đã dùng ở `_dieuChinhLoiChinhTaSauKhiSua`/
+  /// `_dieuChinhVungToanVanSauKhiSua` trong toàn bộ tệp này) — chỉ khác là
+  /// việc xử lý THẬT SỰ giờ có thể đến sau 1 giây hiệu ứng.
   void _thayTatCa() {
-    for (var i = _ketQuaTimKiem.length - 1; i >= 0; i--) {
+    if (_oThayThe.text.isEmpty) {
+      _batHieuUngXoaTatCa();
+    } else {
+      _batHieuUngThayTatCa();
+    }
+  }
+
+  /// (VIỆC 4) Bắt đầu — và tự dọn khi xong — hiệu ứng nhấp nháy nền gradient
+  /// đỏ→vàng ĐÚNG 1 GIÂY tại [v], rồi gọi [xongHieuUng]. TÁI DÙNG hệt pattern
+  /// `Timer.periodic` đã dùng ở `_batNhapNhayCanXoa`/`_batNhapNhayDauCauMoi`
+  /// phía dưới, chỉ đổi thời lượng: 8 nhịp × 125ms = đúng 1000ms.
+  void _batHieuUngThayThe(_VungHieuUngThayThe v, VoidCallback xongHieuUng) {
+    _boDieuKhien.hieuUngThayThe.add(v);
+    v.sangMau = true;
+    var dem = 0;
+    v.henNhapNhay = Timer.periodic(const Duration(milliseconds: 125), (t) {
+      dem++;
+      v.sangMau = !v.sangMau;
+      if (dem >= 8) {
+        t.cancel();
+        _boDieuKhien.hieuUngThayThe.remove(v);
+        xongHieuUng();
+        return;
+      }
+      if (mounted) _boDieuKhien.veLai();
+    });
+    _boDieuKhien.veLai();
+  }
+
+  /// (VIỆC 4a) MỘT kết quả, khi ô Thay thế CÓ nội dung: thay chữ NGAY, rồi
+  /// nhấp nháy nền gradient trên đoạn chữ MỚI 1 giây — chỉ SAU đó mới coi
+  /// đây không còn là "kết quả tìm kiếm" nữa (tính lại danh sách, số lượng
+  /// giảm, thanh tìm kiếm tự nhảy kết quả kế, đúng logic cũ).
+  void _batHieuUngThayMotKetQua(int chiSo) {
+    if (chiSo < 0 || chiSo >= _ketQuaTimKiem.length) return;
+    final chenVao = _oThayThe.text;
+    final batDauCu = _ketQuaTimKiem[chiSo];
+    _treHoanCapNhatTimKiem = true;
+    _thayMotKetQua(chiSo);
+    _luuVanBan();
+    final v = _VungHieuUngThayThe(
+      batDau: batDauCu,
+      ketThuc: batDauCu + chenVao.length,
+      laXoa: false,
+    );
+    _batHieuUngThayThe(v, () {
+      _treHoanCapNhatTimKiem = false;
+      if (mounted) _capNhatKetQuaTimKiem();
+    });
+  }
+
+  /// (VIỆC 4a) "Tất cả" khi ô Thay thế CÓ nội dung: thay hết NGAY (từ cuối
+  /// văn bản về đầu, y hệt `_thayTatCa` cũ), mỗi kết quả nhấp nháy nền
+  /// gradient TRÊN CHỮ MỚI riêng 1 giây, TẤT CẢ ĐỒNG THỜI — vì mỗi kết quả
+  /// độc lập về mặt hiển thị, chỉ tính lại danh sách kết quả tìm kiếm ĐÚNG
+  /// MỘT LẦN, sau khi hiệu ứng cuối cùng cũng kết thúc (đợi đủ [soLuong] lần
+  /// hoàn tất bằng bộ đếm [conLai]).
+  void _batHieuUngThayTatCa() {
+    final chenVao = _oThayThe.text;
+    final soLuong = _ketQuaTimKiem.length;
+    if (soLuong == 0) return;
+    _treHoanCapNhatTimKiem = true;
+    var conLai = soLuong;
+    for (var i = soLuong - 1; i >= 0; i--) {
+      final batDauCu = _ketQuaTimKiem[i];
       _thayMotKetQua(i);
+      final v = _VungHieuUngThayThe(
+        batDau: batDauCu,
+        ketThuc: batDauCu + chenVao.length,
+        laXoa: false,
+      );
+      _batHieuUngThayThe(v, () {
+        conLai--;
+        if (conLai <= 0) {
+          _treHoanCapNhatTimKiem = false;
+          if (mounted) _capNhatKetQuaTimKiem();
+        }
+      });
+    }
+    _luuVanBan();
+  }
+
+  /// (VIỆC 4b) MỘT kết quả, khi ô Thay thế RỖNG: chữ CŨ giữ nguyên, CHƯA xoá
+  /// gì cả — chỉ nhấp nháy nền gradient trên đoạn chữ CŨ 1 giây. Xoá THẬT SỰ
+  /// chỉ xảy ra SAU 1 giây, cùng lúc với việc nền biến mất.
+  void _batHieuUngXoaMotKetQua(int chiSo) {
+    if (chiSo < 0 || chiSo >= _ketQuaTimKiem.length) return;
+    final batDau = _ketQuaTimKiem[chiSo];
+    final doDai = _oTimKiem.text.length;
+    final v = _VungHieuUngThayThe(batDau: batDau, ketThuc: batDau + doDai, laXoa: true);
+    _batHieuUngThayThe(v, () => _thucHienXoaSauHieuUng([v]));
+  }
+
+  /// (VIỆC 4b) "Tất cả" khi ô Thay thế RỖNG: TẤT CẢ chữ cũ giữ nguyên, mỗi
+  /// kết quả nhấp nháy nền gradient trên đoạn chữ CŨ của nó, ĐỒNG THỜI, trong
+  /// 1 giây — văn bản không đổi trong lúc chờ nên toạ độ mọi kết quả vẫn
+  /// đúng nguyên. Xoá thật sự TẤT CẢ (từ cuối về đầu) chỉ diễn ra sau khi
+  /// hiệu ứng cuối cùng cũng kết thúc.
+  void _batHieuUngXoaTatCa() {
+    final soLuong = _ketQuaTimKiem.length;
+    if (soLuong == 0) return;
+    final doDai = _oTimKiem.text.length;
+    final vungs = [
+      for (final batDau in _ketQuaTimKiem)
+        _VungHieuUngThayThe(batDau: batDau, ketThuc: batDau + doDai, laXoa: true),
+    ];
+    var conLai = vungs.length;
+    for (final v in vungs) {
+      _batHieuUngThayThe(v, () {
+        conLai--;
+        if (conLai <= 0) _thucHienXoaSauHieuUng(vungs);
+      });
+    }
+  }
+
+  /// (VIỆC 4b) Xoá THẬT SỰ mọi vùng đã nhấp nháy xong — từ cuối văn bản về
+  /// đầu (đúng nguyên tắc dịch offset dùng trong toàn bộ tệp này). Trong lúc
+  /// chờ 1 giây, người dùng có thể đã gõ/tìm khác làm văn bản đổi — kiểm tra
+  /// lại từng vị trí còn hợp lệ trước khi xoá, bỏ qua an toàn nếu không còn
+  /// đúng nữa thay vì lỗi/lệch offset.
+  void _thucHienXoaSauHieuUng(List<_VungHieuUngThayThe> vungs) {
+    final ds = List<_VungHieuUngThayThe>.of(vungs)
+      ..sort((a, b) => b.batDau.compareTo(a.batDau));
+    for (final v in ds) {
+      final cu = _boDieuKhien.text;
+      if (v.batDau < 0 || v.ketThuc > cu.length || v.batDau >= v.ketThuc) continue;
+      final moi = cu.replaceRange(v.batDau, v.ketThuc, '');
+      _dieuChinhLoiChinhTaSauKhiSua(v.batDau, v.ketThuc - v.batDau, 0);
+      _dieuChinhVungToanVanSauKhiSua(v.batDau, v.ketThuc - v.batDau, 0);
+      _ghiVaoO(moi, v.batDau);
     }
     _luuVanBan();
     _capNhatKetQuaTimKiem();
@@ -1129,7 +1347,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 const TextSpan(text: ' thành '),
                 _oanTuHopThoai(thayThe),
               ],
-              TextSpan(text: ' ở $soLuong kết quả tìm kiếm không?'),
+              const TextSpan(text: ' ở '),
+              _oanTuHopThoaiXanh('$soLuong'),
+              const TextSpan(text: ' kết quả tìm kiếm không?'),
             ],
           ),
         ),
@@ -1147,6 +1367,31 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
     if (dongY == true) _thayTatCa();
   }
+
+  /// (VIỆC 2) Số lượng kết quả N trong hộp thoại xác nhận — đóng khung viền
+  /// y hệt `_oanTuHopThoai` bên dưới (đồng bộ phong cách), nhưng dùng màu
+  /// XANH DƯƠNG để phân biệt với khung đỏ của X/Y (từ khoá tìm/thay) — và
+  /// tách hẳn với xanh LÁ đã dùng cho nút "Kiểm tra toàn văn", tránh nhầm ý
+  /// nghĩa màu sắc trong app.
+  WidgetSpan _oanTuHopThoaiXanh(String chu) => WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.blue.shade300),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            chu,
+            style: TextStyle(
+              color: Colors.blue.shade700,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+        ),
+      );
 
   /// Một đoạn chữ được đóng khung viền để nổi bật trong hộp thoại xác nhận.
   WidgetSpan _oanTuHopThoai(String chu) => WidgetSpan(
@@ -1177,7 +1422,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         content: const Text(
           '• "Thay chỗ này": chỉ thay đúng kết quả đang chọn (số thứ tự '
           'đang hiện, ví dụ 3/5).\n\n'
-          '• "Thay tất cả": thay hết mọi kết quả cùng lúc, có hỏi xác nhận '
+          '• "Tất cả": thay hết mọi kết quả cùng lúc, có hỏi xác nhận '
           'trước khi làm.\n\n'
           '• Để trống ô Thay thế rồi bấm một trong hai nút: kết quả tìm '
           'kiếm đó bị XOÁ, không cần gõ gì để thay vào chỗ trống.',
@@ -1542,6 +1787,30 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
+  /// (VIỆC 4) Nền gradient đỏ→vàng NHẤP NHÁY 1 giây của "Thay chỗ này"/
+  /// "Tất cả" — cùng cách đo toạ độ và cùng lớp "dưới chữ" như `_veTimKiem()`
+  /// ở trên, nhưng đọc từ `_boDieuKhien.hieuUngThayThe` (danh sách hiệu ứng
+  /// tạm thời) thay vì `_ketQuaTimKiem`.
+  Widget _veHieuUngThayThe() {
+    if (_boDieuKhien.hieuUngThayThe.isEmpty) return const SizedBox.shrink();
+
+    final hopVanBan = _oVanBanKey.currentContext?.findRenderObject();
+    final khungBox = _khungVanBanKey.currentContext?.findRenderObject();
+    if (hopVanBan == null || khungBox is! RenderBox) return const SizedBox.shrink();
+    final re = _timRenderEditable(hopVanBan);
+    if (re == null) return const SizedBox.shrink();
+
+    return SizedBox.expand(
+      child: CustomPaint(
+        painter: _VeHieuUngThayThe(
+          re: re,
+          khungBox: khungBox,
+          vungs: _boDieuKhien.hieuUngThayThe,
+        ),
+      ),
+    );
+  }
+
   /// Ctrl+F LUÔN THẮNG để đóng thanh tìm kiếm, kể cả khi con trỏ đang nhấp
   /// nháy TRONG ô Tìm kiếm/ô Thay thế — `EditableText` của chính ô đó có thể
   /// "nuốt" tổ hợp phím trước khi nó lan lên `Shortcuts` ở tầng cha. Bọc
@@ -1600,7 +1869,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             onPressed: _ketQuaTimKiem.isEmpty ? null : () => _dieuHuongTimKiem(1),
           ),
           IconButton(
-            icon: const Icon(Icons.close),
+            icon: Icon(Icons.close, color: Colors.green.shade700),
             tooltip: 'Xoá nội dung tìm',
             onPressed: () => _oTimKiem.clear(),
           ),
@@ -1649,7 +1918,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           ),
           TextButton(
             onPressed: _ketQuaTimKiem.isEmpty ? null : _xacNhanThayTatCa,
-            child: const Text('Thay tất cả'),
+            child: const Text('Tất cả'),
           ),
           IconButton(
             icon: const Icon(Icons.help_outline, size: 20),
@@ -5524,6 +5793,20 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                               animation: Listenable.merge([_boDieuKhien, _cuonVanBan, _oTimKiem]),
                               builder: (context, _) => Stack(
                                 children: [_veTimKiem()],
+                              ),
+                            ),
+                          ),
+                        ),
+                        // (VIỆC 4) Nền gradient đỏ→vàng NHẤP NHÁY 1 giây của
+                        // "Thay chỗ này"/"Tất cả" — chỉ cần lắng nghe
+                        // `_boDieuKhien` (mỗi nhịp nhấp nháy tự gọi `veLai()`)
+                        // và `_cuonVanBan` (cuộn cũng phải vẽ lại ngay).
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: AnimatedBuilder(
+                              animation: Listenable.merge([_boDieuKhien, _cuonVanBan]),
+                              builder: (context, _) => Stack(
+                                children: [_veHieuUngThayThe()],
                               ),
                             ),
                           ),
