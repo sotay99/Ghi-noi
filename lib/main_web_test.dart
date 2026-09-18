@@ -38,7 +38,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v5';
+const _phienBanThuNghiem = 'v6';
 
 // (Chỉ import đúng MỘT file `speech_to_text/speech_to_text.dart` — y hệt
 // cách `trang_soan_thao.dart` đang dùng đã chứng minh hoạt động — thay vì
@@ -116,6 +116,14 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   // ngắt — chỉ cần QUAN SÁT được thuật toán chạy ổn hay không). ----
   List<String> _tuDaChot = [];
   List<String> _partialTruocDo = [];
+
+  // Riêng cho nhánh điện thoại: chuỗi thô (sau khi đã cắt-đoạn-cuối-sạch)
+  // của lần callback TRƯỚC trong CÙNG phiên hiện tại — dùng để lấy đúng
+  // phần MỚI thêm vào bằng cách so sánh chuỗi (không phụ thuộc việc đoạn
+  // lặp lại có viết hoa hay không, vì cách cắt theo chữ hoa không bắt được
+  // mọi trường hợp lặp — xem log thực tế: có lúc lặp lại giữa câu, không
+  // hoa chữ nào). Reset về rỗng mỗi khi phiên nghe mới bắt đầu.
+  String _rawTruocDoTrongPhien = '';
 
   // Đánh số phiên nghe, y hệt `idPhien`/`_phienNgheHienTai` bên app chính —
   // để loại bỏ callback trễ của một phiên đã đóng (LỚP 1).
@@ -221,6 +229,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   Future<void> _batNghe() async {
     if (!_sanSang) return;
     final idPhien = ++_phienHienTai;
+    _rawTruocDoTrongPhien = '';
     _ghiLog('Bắt đầu phiên nghe #$idPhien (${_laDiDong ? "điện thoại" : "PC"})');
     try {
       await _micro.listen(
@@ -398,67 +407,94 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     _ghiLog('${xong ? "FINAL" : "partial"}: "$noi"');
 
     if (noi.isEmpty) return;
-    // Chỉ vá dữ liệu cho nhánh điện thoại — PC dùng nguyên văn.
-    final noiDaVa = _laDiDong ? _catDoanCuoiCung(noi) : noi;
-    if (noiDaVa != noi) {
-      _ghiLog('  → cắt còn đoạn cuối sạch: "$noiDaVa"');
+
+    if (_laDiDong) {
+      _xuLyKetQuaDienThoai(noi);
+    } else {
+      _xuLyKetQuaPc(noi, xong);
     }
-    final tuMoi = _tachTu(noiDaVa);
+  }
+
+  /// Nhánh PC: dùng nguyên thuật toán "chốt dần theo độ ổn định" gốc — coi
+  /// [noi] là TOÀN BỘ hypothesis đang tăng dần của bộ nhận dạng (đúng như
+  /// Web Speech API trên PC hoạt động).
+  void _xuLyKetQuaPc(String noi, bool xong) {
+    final tuMoi = _tachTu(noi);
     if (tuMoi.isEmpty) return;
 
     List<String> hienThi;
     if (_batDauBangPhanDaChot(tuMoi, _tuDaChot)) {
-      // Đường bình thường: bộ nhận dạng vẫn cộng dồn đúng từ đầu phiên.
       final tienToChung = _doDaiTienToChung(tuMoi, _partialTruocDo);
       if (tienToChung > _tuDaChot.length) {
         _tuDaChot = tuMoi.sublist(0, tienToChung);
       }
       hienThi = tuMoi;
     } else {
-      // Bộ nhận dạng có vẻ "viết lại" phần đã chốt — tìm điểm nối.
       final ketQuaNoi = _timDiemNoiTrong(_tuDaChot, tuMoi);
       if (ketQuaNoi == null) {
-        if (tuMoi.length >= _tuDaChot.length) {
-          // Partial mới dài bằng/hơn toàn bộ phần đã chốt nhưng không nối
-          // được ở đâu cả — dấu hiệu bộ nhận dạng đang gửi lại TOÀN BỘ câu
-          // từ đầu phiên (hay gặp trên Chrome Android) chứ không phải một
-          // câu mới thật sự. Coi tuMoi là toàn bộ nội dung, KHÔNG nối thêm
-          // — nối thêm ở đây là nguyên nhân gây chữ nhân bản chồng chất.
-          _ghiLog('  → không tìm được điểm nối, partial dài hơn phần đã '
-              'chốt: THAY THẾ toàn bộ (tránh nhân bản)');
-          hienThi = tuMoi;
-        } else {
-          // Partial mới ngắn hơn hẳn phần đã chốt — nhiều khả năng là một
-          // câu mới thật sự bắt đầu sau khi phiên cũ đã chốt xong.
-          _ghiLog('  → không tìm được điểm nối, partial ngắn: NỐI sau '
-              'phần đã chốt');
-          hienThi = [..._tuDaChot, ...tuMoi];
-        }
+        hienThi = [..._tuDaChot, ...tuMoi];
       } else if (ketQuaNoi.isEmpty) {
-        // Nhân đôi thuần tuý — bỏ qua hoàn toàn.
-        _ghiLog('  → nhân đôi thuần tuý, bỏ qua');
         _partialTruocDo = tuMoi;
         return;
       } else {
-        _ghiLog('  → tìm được điểm nối, thêm ${ketQuaNoi.length} từ mới');
         hienThi = [..._tuDaChot, ...ketQuaNoi];
       }
     }
 
     _partialTruocDo = tuMoi;
-
-    setState(() {
-      _vanBan = hienThi.join(' ');
-    });
+    setState(() => _vanBan = hienThi.join(' '));
 
     if (xong) {
-      // Kết quả FINAL: toàn bộ nội dung hiện có coi là chốt cứng, chờ đoạn
-      // nói tiếp theo (phiên có thể vẫn tiếp tục, không chủ động dừng ở
-      // đây — y hệt app chính, `_henNgheLai`/trình duyệt lo việc chuyển
-      // phiên).
       _tuDaChot = _tachTu(_vanBan);
       _partialTruocDo = [];
     }
+  }
+
+  /// Nhánh điện thoại: Chrome Android không gửi hypothesis tăng dần sạch —
+  /// nó lặp lại lịch sử của CHÍNH PHIÊN NÀY làm tiền tố mỗi lần có kết quả
+  /// mới, có lúc viết hoa đầu đoạn lặp (bắt được bằng `_catDoanCuoiCung`),
+  /// có lúc KHÔNG (lặp giữa câu, toàn chữ thường — xem log thực tế: "rất"
+  /// → "rấtrất là" → "rấtrất làrất là"...). Cách chắc ăn với CẢ HAI kiểu
+  /// lặp: so sánh chuỗi thô của lần này với lần TRƯỚC trong cùng phiên —
+  /// phần thêm vào luôn nằm ở cuối, vì bộ nhận dạng chỉ có APPEND, không
+  /// bao giờ xoá. Lấy đúng phần đuôi mới đó rồi đưa vào tìm-điểm-nối để
+  /// gộp vào nội dung đã chốt.
+  void _xuLyKetQuaDienThoai(String noiGoc) {
+    final noiDaCat = _catDoanCuoiCung(noiGoc);
+    if (noiDaCat != noiGoc) {
+      _ghiLog('  → cắt còn đoạn cuối sạch: "$noiDaCat"');
+    }
+
+    String phanMoi;
+    if (_rawTruocDoTrongPhien.isNotEmpty &&
+        noiDaCat.startsWith(_rawTruocDoTrongPhien)) {
+      phanMoi = noiDaCat.substring(_rawTruocDoTrongPhien.length);
+    } else {
+      phanMoi = noiDaCat;
+    }
+    _rawTruocDoTrongPhien = noiDaCat;
+
+    final tuMoi = _tachTu(phanMoi);
+    if (tuMoi.isEmpty) return;
+    _ghiLog('  → phần đuôi mới so với lần trước: "${tuMoi.join(' ')}"');
+
+    final ketQuaNoi = _timDiemNoiTrong(_tuDaChot, tuMoi);
+    List<String> hienThi;
+    if (ketQuaNoi == null) {
+      _ghiLog('  → không tìm được điểm nối, nối thẳng đuôi mới vào cuối');
+      hienThi = [..._tuDaChot, ...tuMoi];
+    } else if (ketQuaNoi.isEmpty) {
+      _ghiLog('  → đuôi mới trùng hoàn toàn với phần đã chốt, bỏ qua');
+      return;
+    } else {
+      _ghiLog('  → tìm được điểm nối, thêm ${ketQuaNoi.length} từ mới');
+      hienThi = [..._tuDaChot, ...ketQuaNoi];
+    }
+
+    // Nhánh điện thoại không có FINAL đáng tin cậy — chốt cứng ngay mỗi
+    // lần có nội dung mới, để không bao giờ mất chữ đã hiện ra.
+    _tuDaChot = hienThi;
+    setState(() => _vanBan = hienThi.join(' '));
   }
 
   @override
