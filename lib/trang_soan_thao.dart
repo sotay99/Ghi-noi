@@ -1568,19 +1568,25 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   int _neo = 0;
   String _chuTam = '';
 
-  /// Đúng nguyên văn `recognizedWords` (chưa chèn dấu cách nào của ta) của
-  /// lần cập nhật gần nhất đã CHẤP NHẬN cho đoạn đang đọc dở — dùng để chặn
-  /// bộ nhận dạng quay lại rút ngắn/sửa chữ đã hiện lên màn hình (xem
-  /// `_khiCoChu`). Luôn coi là rỗng bất cứ khi nào `_chuTam` rỗng (đoạn mới).
-  String _noiGocDaKhoa = '';
+  /// Các TỪ đã được CHỐT CỨNG trong phiên nghe hiện tại (tách theo khoảng
+  /// trắng, giữ nguyên dấu câu dính liền từ) — tính từ `_neo`. Đây là phần
+  /// "văn bản thật" của đoạn đang đọc dở: một khi đã vào danh sách này,
+  /// giọng nói không được phép tự sửa lại nữa (nguyên tắc 3). Phần CÒN LẠI
+  /// của kết quả nhận dạng (sau các từ này) vẫn là "vùng tạm", có thể bị ghi
+  /// đè bởi cập nhật kế tiếp.
+  ///
+  /// Reset về rỗng mỗi khi một phiên/đoạn MỚI bắt đầu — xem `_chotCauDangDoc`
+  /// (chốt xong một đoạn dở là mở đường cho đoạn kế) và mọi chỗ gán lại
+  /// `_chuTam = ''` để "nhả" hẳn đoạn đang nhảy (gõ phím, dời con trỏ, mở ghi
+  /// chú khác, Lùi/Tiến, xoá tất cả...).
+  List<String> _tuDaChotTrongPhien = [];
 
-  /// Số lần liên tiếp một kết quả tạm bị TỪ CHỐI (xem `_khiCoChu`) vì không
-  /// nối dài đúng phần đã khoá. Chỉ chặn tối đa MỘT lần liên tiếp — bộ nhận
-  /// dạng thỉnh thoảng "nghĩ lại" một lần rồi thôi thì chặn được cái đó,
-  /// nhưng nếu nó cứ liên tục trả về khác hẳn (ví dụ autoPunctuation viết
-  /// lại nguyên câu khi có thêm ngữ cảnh), chặn mãi sẽ làm sóng âm vẫn chạy
-  /// mà không ra chữ nào cả — bắt buộc phải nhượng bộ sau lần từ chối đầu.
-  int _soLanTuChoiLienTuc = 0;
+  /// Đúng danh sách TỪ của kết quả PARTIAL gần nhất (dù được chấp nhận hay
+  /// không) — dùng để so ĐỘ DÀI TIỀN TỐ CHUNG với partial mới, làm cơ sở
+  /// "chốt dần theo độ ổn định" (xem `_khiCoChu`): hai lần cập nhật liên tiếp
+  /// cùng chung một tiền tố thì tiền tố đó coi như đã ổn định, chốt cứng
+  /// luôn, không cần đợi đồng hồ thời gian nào cả.
+  List<String> _partialTruocDo = [];
 
   static bool _laKhoangTrang(String kyTu) =>
       kyTu == ' ' || kyTu == '\n' || kyTu == '\t';
@@ -2078,27 +2084,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Timer? _henGoXong;
   String? _maNgonNgu;
 
-  /// Canh khoảng NGẬP NGỪNG giữa chừng một câu đang nói dở (dừng nói một lúc
-  /// nhưng micro CHƯA bị Android tự ngắt vì `pauseFor` — tức 8 giây — chưa
-  /// hết hạn). Bộ nhận dạng trên nhiều máy/phiên bản Android, khi phiên nghe
-  /// sống qua một khoảng lặng như vậy rồi có tiếng nói tiếp, có thể trả về
-  /// một PARTIAL RESULT MỚI chỉ chứa phần MỚI vừa nói (không cộng dồn từ đầu
-  /// phiên nữa) — `_khiCoChu` khi đó tưởng đây là "hồi tố" một lần
-  /// (`_soLanTuChoiLienTuc`), từ chối đúng MỘT lần rồi buộc phải nhượng bộ ở
-  /// lần kế, chấp nhận nội dung ngắn hơn và GHI ĐÈ mất phần đã nói trước.
-  ///
-  /// Cách chặn triệt để: không đợi bộ nhận dạng "quên", mà chủ động CHỐT
-  /// đoạn đang có thành chữ cứng và MỞ PHIÊN NGHE MỚI ngay khi im lặng kéo
-  /// dài quá ngưỡng này (ngắn hơn hẳn `pauseFor` 8 giây, để luôn kịp ra tay
-  /// trước) — biến mọi khoảng ngập ngừng thành một ranh giới câu rõ ràng,
-  /// dùng lại đúng con đường `_batLaiPhienSauKhiChot()` đã ổn định.
-  ///
-  /// Reset ở CUỐI `_thayVungTamBangGiongNoi()` — tức là MỖI LẦN có chữ mới
-  /// thật sự ghi ra màn hình (không phải mỗi lần có callback) — nên trong
-  /// lúc đang nói liên tục, đồng hồ này liên tục được dời lại, không bao giờ
-  /// kịp bấm chuông; chỉ khi thật sự im lặng quá lâu nó mới đếm hết.
-  Timer? _henCatCauKhiNgapNgung;
-  static const _thoiGianNgapNgungToiDa = Duration(milliseconds: 2000);
 
   /// Vị trí trong bài mà AI đã kiểm tra chính tả tới đó rồi. Mỗi lần kiểm
   /// tra chỉ gửi phần văn bản TỪ đây trở đi, không gửi lại phần đã kiểm tra.
@@ -2198,7 +2183,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henTuTatMicroImLang?.cancel();
     _henMoDamChamCuoi?.cancel();
     _henNhapNhayConTro?.cancel();
-    _henCatCauKhiNgapNgung?.cancel();
     _oChu.removeListener(_khiFocusConTroDoi);
     _micro.cancel();
     _boDieuKhien.dispose();
@@ -2495,7 +2479,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     _neo = g.noiDung.length;
     _chuTam = '';
-    _henCatCauKhiNgapNgung?.cancel();
+    _tuDaChotTrongPhien = [];
+    _partialTruocDo = [];
     _henChinhTa?.cancel();
     _boDieuKhien.loi.clear();
     _viTriDaKiemTraChinhTa = g.noiDung.length;
@@ -2743,13 +2728,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _neo = chon.isValid ? chon.end : _boDieuKhien.text.length;
       _chuTam = '';
     }
-    _noiGocDaKhoa = '';
+    _tuDaChotTrongPhien = [];
+    _partialTruocDo = [];
   }
 
-  /// Coi phần chữ tạm hiện tại là đã xong, và dời neo ra sau nó.
+  /// Coi phần chữ tạm hiện tại là đã xong, và dời neo ra sau nó — đồng thời
+  /// mở đường cho một đoạn nói MỚI (rỗng bộ đệm chốt-dần của phiên).
   void _chotCauDangDoc() {
     _neo += _chuTam.length;
     _chuTam = '';
+    _tuDaChotTrongPhien = [];
+    _partialTruocDo = [];
   }
 
   /// Đoạn chữ tạm có còn nguyên vẹn ở đúng chỗ cũ không?
@@ -2802,24 +2791,84 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _chuTam = chenVao;
     _chuGanNhat = moi; // Để lần _khiNguoiDungSua tiếp theo không hiểu nhầm.
     _batDauMoDamChamCuoi();
-    _datLaiHenCatCauKhiNgapNgung();
   }
 
-  /// Dời lại đồng hồ canh ngập ngừng — gọi mỗi khi có chữ MỚI thật sự ghi ra
-  /// (xem giải thích ở khai báo `_henCatCauKhiNgapNgung`).
-  void _datLaiHenCatCauKhiNgapNgung() {
-    _henCatCauKhiNgapNgung?.cancel();
-    if (_chuTam.isEmpty) return;
-    _henCatCauKhiNgapNgung = Timer(_thoiGianNgapNgungToiDa, _khiNgapNgungQuaLau);
+  /// Tách một chuỗi thành danh sách từ theo khoảng trắng, bỏ khoảng trắng
+  /// thừa hai đầu — dùng cho toàn bộ cơ chế chốt-dần/tìm-điểm-nối bên dưới.
+  static List<String> _tachTu(String s) {
+    final t = s.trim();
+    if (t.isEmpty) return const [];
+    return t.split(RegExp(r'\s+'));
   }
 
-  /// Im lặng giữa chừng câu đang nói dở đã quá lâu — chốt đoạn hiện có thành
-  /// chữ cứng và mở một phiên nghe hoàn toàn mới, y hệt lúc một câu chốt
-  /// xong tự nhiên (`finalResult: true`). Nhờ vậy phiên MỚI không còn mang
-  /// theo ngữ cảnh của phần đã chốt, nên không thể ghi đè mất nó nữa.
-  void _khiNgapNgungQuaLau() {
-    if (_chuTam.isEmpty) return; // Đã chốt/nhả ở chỗ khác trong lúc chờ.
-    _chotCauVaMoPhienMoi();
+  /// Chuẩn hoá MỘT từ để so khớp NỚI LỎNG: chữ thường, bỏ dấu câu cơ bản
+  /// dính ở cuối từ. Dùng riêng cho bước "tìm điểm nối" (mục D) — không dùng
+  /// cho bước so tiền tố ổn định (mục C), vốn cần khớp CHÍNH XÁC.
+  static String _chuanHoaSoKhopTho(String tu) =>
+      tu.toLowerCase().replaceAll(RegExp(r'[.,!?;:]+$'), '');
+
+  static bool _tuKhopTho(String a, String b) =>
+      _chuanHoaSoKhopTho(a) == _chuanHoaSoKhopTho(b);
+
+  /// Độ dài tiền tố chung (khớp CHÍNH XÁC từng từ) giữa hai danh sách từ —
+  /// dùng để phát hiện phần nào của partial mới đã "ổn định" qua hai lần cập
+  /// nhật liên tiếp (mục C).
+  static int _doDaiTienToChung(List<String> a, List<String> b) {
+    final n = a.length < b.length ? a.length : b.length;
+    var i = 0;
+    while (i < n && a[i] == b[i]) {
+      i++;
+    }
+    return i;
+  }
+
+  /// [partialMoi] có bắt đầu bằng ĐÚNG (nới lỏng) toàn bộ [_tuDaChotTrongPhien]
+  /// hay không — đây là điều kiện để coi partial mới là "cộng dồn bình
+  /// thường" từ đầu phiên như mọi khi (mục C), thay vì một lượt bộ nhận dạng
+  /// "quên" ngữ cảnh và chỉ trả phần mới (mục D).
+  static bool _batDauBangPhanDaChot(
+    List<String> partialMoi,
+    List<String> daChot,
+  ) {
+    if (partialMoi.length < daChot.length) return false;
+    for (var i = 0; i < daChot.length; i++) {
+      if (!_tuKhopTho(partialMoi[i], daChot[i])) return false;
+    }
+    return true;
+  }
+
+  /// Thuật toán "tìm điểm nối" (mục D): thử N = 6..1 từ CUỐI CÙNG của
+  /// [_tuDaChotTrongPhien], xem [partialMoi] có BẮT ĐẦU đúng bằng N từ đó hay
+  /// không (so khớp nới lỏng). Thử N LỚN NHẤT trước (thay vì tăng dần từ 1)
+  /// để ưu tiên điểm nối CHẮC CHẮN nhất — một từ đơn lẻ trùng ngẫu nhiên (ví
+  /// dụ "và", "là") dễ khớp giả ở N=1, nhưng khó khớp giả hơn nhiều khi phải
+  /// khớp liền một mạch 4-6 từ.
+  ///
+  /// Trả về:
+  /// - `null`  : không tìm được điểm nối nào — coi `partialMoi` là nội dung
+  ///             MỚI hoàn toàn, không liên quan phần đã chốt (D.5).
+  /// - `[]`    : `partialMoi` đúng NGUYÊN VĂN là N từ cuối đã chốt, không có
+  ///             gì thêm — nhân đôi thuần tuý, phải bỏ qua hoàn toàn (D.4).
+  /// - khác    : phần từ MỚI thực sự nằm SAU điểm nối (D.3).
+  List<String>? _timDiemNoi(List<String> partialMoi) {
+    final soDaChot = _tuDaChotTrongPhien.length;
+    final maxN = soDaChot < 6 ? soDaChot : 6;
+    for (var n = maxN; n >= 1; n--) {
+      if (partialMoi.length < n) continue;
+      final duoiDaChot = _tuDaChotTrongPhien.sublist(soDaChot - n);
+      var khop = true;
+      for (var i = 0; i < n; i++) {
+        if (!_tuKhopTho(partialMoi[i], duoiDaChot[i])) {
+          khop = false;
+          break;
+        }
+      }
+      if (khop) {
+        if (partialMoi.length == n) return const [];
+        return partialMoi.sublist(n);
+      }
+    }
+    return null;
   }
 
   void _khiCoChu(dynamic ketQua) {
@@ -2837,121 +2886,103 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final cu = _boDieuKhien.text;
 
     // Không tin vào mốc suông. Đoạn tạm không còn nguyên thì bắt đầu lại từ
-    // chỗ con trỏ, coi như đây là câu mới.
+    // chỗ con trỏ, coi như đây là câu mới — rỗng luôn bộ đệm chốt-dần, vì nó
+    // gắn với đúng đoạn văn bản vừa mất hiệu lực này.
     if (!_vungTamConNguyen(cu)) {
       final chon = _boDieuKhien.selection;
       _neo = chon.isValid ? chon.end : cu.length;
       if (_neo > cu.length) _neo = cu.length;
       if (_neo < 0) _neo = 0;
       _chuTam = '';
+      _tuDaChotTrongPhien = [];
+      _partialTruocDo = [];
     }
 
-    // Chặn hồi tố: bộ nhận dạng thỉnh thoảng "nghĩ lại" và trả về một bản
-    // NGẮN HƠN hoặc KHÁC HẲN cho cùng một đoạn đang đọc dở — nhìn như thể
-    // micro tự quay lại sửa/xoá chữ đã hiện lên màn hình. Chữ đã hiện ra rồi
-    // thì phải CHẾT CỨNG: chỉ chấp nhận cập nhật khi `noi` nối dài thêm đúng
-    // từ phần đã khoá (`_noiGocDaKhoa`); coi như đoạn mới (`_chuTam` rỗng)
-    // thì không có gì để khoá, chấp nhận bất cứ nội dung nào.
-    //
-    // Chỉ chặn tối đa MỘT lần liên tiếp (`_soLanTuChoiLienTuc`): nếu bộ nhận
-    // dạng cứ liên tục trả về khác hẳn phần đã khoá (ví dụ autoPunctuation
-    // viết lại nguyên câu khi có thêm ngữ cảnh), chặn mãi sẽ làm sóng âm vẫn
-    // chạy mà không ra chữ nào cả — phải nhượng bộ sau lần từ chối đầu.
-    final coBanDaKhoa = _chuTam.isEmpty ? '' : _noiGocDaKhoa;
-    final chapNhan = noi.startsWith(coBanDaKhoa) || _soLanTuChoiLienTuc >= 1;
-    if (chapNhan) {
-      _soLanTuChoiLienTuc = 0;
-      _noiGocDaKhoa = noi;
+    final tuMoi = _tachTu(noi);
+    if (tuMoi.isEmpty) return;
 
-      var chen = noi;
-      // Nếu ngay trước neo đã có chữ mà chưa có dấu cách, thêm một dấu cách
-      // cho câu mới không dính vào câu cũ.
-      if (_neo > 0) {
-        final truoc = cu[_neo - 1];
-        if (!_laKhoangTrang(truoc)) chen = ' $chen';
+    // BƯỚC C/D: xác định danh sách từ sẽ hiển thị (đã chốt + phần mới), theo
+    // đúng thiết kế "chốt dần theo độ ổn định" + "tìm điểm nối" — KHÔNG còn
+    // đồng hồ thời gian nào can thiệp.
+    List<String> hienThi;
+    if (_batDauBangPhanDaChot(tuMoi, _tuDaChotTrongPhien)) {
+      // Đường bình thường: bộ nhận dạng vẫn cộng dồn đúng từ đầu phiên như
+      // mọi khi. So với partial TRƯỚC ĐÓ để tìm tiền tố đã ổn định qua hai
+      // lần cập nhật liên tiếp — dài hơn phần đã chốt thì chốt thêm.
+      final tienToChung = _doDaiTienToChung(tuMoi, _partialTruocDo);
+      if (tienToChung > _tuDaChotTrongPhien.length) {
+        _tuDaChotTrongPhien = tuMoi.sublist(0, tienToChung);
       }
-
-      // Luôn giữ NGAY SAU CON TRỎ là một khoảng trắng trong suốt lúc câu còn
-      // đang đọc dở — không đợi tới lúc câu chốt xong mới chèn.
-      //
-      // Đây là cách DUY NHẤT thực sự chặn được lỗi bộ gõ tiếng Việt gộp ngược
-      // ('Thành' + phím 's' → 'Thánh'): ứng dụng chỉ biết được người dùng vừa
-      // gõ phím gì SAU KHI bàn phím đã xử lý xong. Nếu người dùng gõ phím tạo
-      // dấu (Telex: s, f, r, x, j...) NGAY TRONG LÚC câu còn dở — tức là chưa
-      // kịp chốt để chèn dấu cách — bộ gõ vẫn nhìn thấy nguyên âm trần ngay
-      // trước con trỏ và gộp ngược y hệt. Chèn dấu cách theo TỪNG lần nghe rõ
-      // thêm (không đợi chốt) thì tại BẤT KỲ thời điểm nào người dùng gõ phím
-      // xen vào, trước con trỏ luôn sẵn một dấu cách, không phải nguyên âm.
-      if (widget.caiDat.tuDongChenKhoangCach && !_laKhoangTrang(chen[chen.length - 1])) {
-        chen = '$chen ';
-      }
-
-      if (chen != _chuTam) {
-        // _chuTam rỗng nghĩa là đây là mẩu đầu tiên của một đoạn nói MỚI
-        // (đoạn trước, nếu có, đã chốt xong và xoá _chuTam ở _chotCauDangDoc)
-        // — đúng ranh giới cần lưu một điểm mốc Lùi lại riêng, để một bài dài
-        // nói nhiều lần vẫn lùi được từng đoạn một, không gộp chung cả bài
-        // thành một bước.
-        if (_chuTam.isEmpty) {
-          _luuDiemMoc(vanBan: cu, viTriConTro: _neo);
-        }
-        _thayVungTamBangGiongNoi(chen);
-      }
+      hienThi = tuMoi;
     } else {
-      _soLanTuChoiLienTuc++;
+      // Bộ nhận dạng có vẻ đang "viết lại" phần đã chốt (ví dụ quên ngữ cảnh
+      // sau một khoảng ngập ngừng) — tìm điểm nối với đuôi đã chốt.
+      final ketQuaNoi = _timDiemNoi(tuMoi);
+      if (ketQuaNoi == null) {
+        // D.5: mơ hồ, không tìm được điểm nối nào — chấp nhận rủi ro nhỏ,
+        // coi toàn bộ là nội dung MỚI, nối tiếp SAU phần đã chốt (không bao
+        // giờ đè/xoá phần đã chốt).
+        hienThi = [..._tuDaChotTrongPhien, ...tuMoi];
+      } else if (ketQuaNoi.isEmpty) {
+        // D.4: nhân đôi thuần tuý — không có gì mới, bỏ qua hoàn toàn, không
+        // ghi gì cả (chặn nhân đôi từ gốc).
+        _partialTruocDo = tuMoi;
+        return;
+      } else {
+        // D.3: phần thật sự mới nằm sau điểm nối.
+        hienThi = [..._tuDaChotTrongPhien, ...ketQuaNoi];
+      }
     }
 
+    _partialTruocDo = tuMoi;
+
+    var chen = hienThi.join(' ');
+    // Nếu ngay trước neo đã có chữ mà chưa có dấu cách, thêm một dấu cách
+    // cho câu mới không dính vào câu cũ.
+    if (_neo > 0) {
+      final truoc = cu[_neo - 1];
+      if (!_laKhoangTrang(truoc)) chen = ' $chen';
+    }
+
+    // Luôn giữ NGAY SAU CON TRỎ là một khoảng trắng trong suốt lúc câu còn
+    // đang đọc dở — không đợi tới lúc câu chốt xong mới chèn.
+    //
+    // Đây là cách DUY NHẤT thực sự chặn được lỗi bộ gõ tiếng Việt gộp ngược
+    // ('Thành' + phím 's' → 'Thánh'): ứng dụng chỉ biết được người dùng vừa
+    // gõ phím gì SAU KHI bàn phím đã xử lý xong. Nếu người dùng gõ phím tạo
+    // dấu (Telex: s, f, r, x, j...) NGAY TRONG LÚC câu còn dở — tức là chưa
+    // kịp chốt để chèn dấu cách — bộ gõ vẫn nhìn thấy nguyên âm trần ngay
+    // trước con trỏ và gộp ngược y hệt. Chèn dấu cách theo TỪNG lần nghe rõ
+    // thêm (không đợi chốt) thì tại BẤT KỲ thời điểm nào người dùng gõ phím
+    // xen vào, trước con trỏ luôn sẵn một dấu cách, không phải nguyên âm.
+    if (chen.isNotEmpty &&
+        widget.caiDat.tuDongChenKhoangCach &&
+        !_laKhoangTrang(chen[chen.length - 1])) {
+      chen = '$chen ';
+    }
+
+    if (chen != _chuTam) {
+      // _chuTam rỗng nghĩa là đây là mẩu đầu tiên của một đoạn nói MỚI (đoạn
+      // trước, nếu có, đã chốt xong và xoá _chuTam ở _chotCauDangDoc) — đúng
+      // ranh giới cần lưu một điểm mốc Lùi lại riêng, để một bài dài nói
+      // nhiều lần vẫn lùi được từng đoạn một, không gộp chung cả bài thành
+      // một bước.
+      if (_chuTam.isEmpty) {
+        _luuDiemMoc(vanBan: cu, viTriConTro: _neo);
+      }
+      _thayVungTamBangGiongNoi(chen);
+    }
+
+    // BƯỚC E: một kết quả FINAL coi TOÀN BỘ nội dung hiện có là chốt cứng
+    // luôn, không còn "vùng tạm" nào nữa cho tới khi có âm thanh mới. KHÔNG
+    // chủ động dừng/mở lại phiên nghe ở đây nữa — phiên nghe được giữ liên
+    // tục, chỉ kết thúc bởi Android tự ngắt (`_henBatLai`), người dùng gõ
+    // phím, hoặc người dùng dời con trỏ (`_dongBangDoanDangNhay`).
     if (xong) {
-      _chotCauVaMoPhienMoi();
+      _chotCauDangDoc();
+      _luuVanBan();
+      _lenLichKiemTraChinhTa();
     }
-  }
-
-  /// Chốt đoạn `_chuTam` hiện có thành chữ cứng rồi mở một phiên nghe MỚI.
-  /// Dùng chung cho cả hai nguồn: câu tự chốt (`finalResult: true`) VÀ
-  /// khoảng ngập ngừng quá lâu giữa chừng (`_khiNgapNgungQuaLau`).
-  void _chotCauVaMoPhienMoi() {
-    _henCatCauKhiNgapNgung?.cancel();
-    _chotCauDangDoc();
-    _noiGocDaKhoa = '';
-    _soLanTuChoiLienTuc = 0;
-    _luuVanBan();
-    _lenLichKiemTraChinhTa();
-    _batLaiPhienSauKhiChot();
-  }
-
-  /// Sau khi một câu đã CHỐT xong (`finalResult: true`), chủ động ngắt rồi mở
-  /// lại phiên nghe ngay — không chờ hệ điều hành tự ngắt vì im lặng.
-  /// `_henBatLai()` vốn chỉ được gọi khi TRẠNG THÁI micro đổi sang "không
-  /// nghe" (`_khiDoiTrangThai`); nói liên tục nhiều câu không tạo ra lần đổi
-  /// trạng thái nào giữa các câu, nên một phiên có thể sống xuyên suốt rất
-  /// nhiều câu. Để một phiên sống quá lâu như vậy, bộ nhận dạng trên một số
-  /// máy/phiên bản Android có xu hướng "nhớ" ngữ cảnh âm thanh từ ĐẦU phiên
-  /// và thỉnh thoảng trả về một kết quả (partial hoặc final) gồm CẢ câu vừa
-  /// chốt — nhìn như micro quay lại sửa hoặc nhân đôi chữ đã hiện ra màn
-  /// hình. Chốt xong một câu là mở một phiên HOÀN TOÀN MỚI, sạch ngữ cảnh.
-  ///
-  /// Dùng lại đúng con đường `stop()` → `_henBatLai()` đã chạy ổn định ở
-  /// `_dongBangDoanDangNhay()` (thay vì tự viết một đường khác): `_hen`,
-  /// `idPhien`, `_dangNghe`... đều được thu dọn/đặt lại y hệt như khi hệ điều
-  /// hành tự ngắt, không có đường tắt nào có thể lệch cờ.
-  ///
-  /// `_boQuaCauNay = true` chặn một kết quả TRỄ của phiên SẮP đóng lọt vào
-  /// (bộ nhận dạng đôi khi vẫn trả thêm một kết quả sau khi đã gọi `stop()`)
-  /// — y hệt lý do `_tatMicro()`/`_dongBangDoanDangNhay()` đều làm vậy trước
-  /// khi ngắt. Cờ tự gỡ ở nhánh `_boQuaCauNay` của `_khiCoChu` khi phiên MỚI
-  /// gửi về kết quả chốt đầu tiên của nó.
-  ///
-  /// `_dangCatCau` chặn gọi chồng: nếu người dùng vừa chạm để dời con trỏ
-  /// (`_dongBangDoanDangNhay`) đúng lúc câu này chốt xong, chỉ một lượt
-  /// dừng/mở lại chạy, không phải hai lượt tranh nhau.
-  void _batLaiPhienSauKhiChot() {
-    if (!_muonNghe || _dangCatCau || !_micro.isListening) return;
-    _boQuaCauNay = true;
-    _dangCatCau = true;
-    _micro.stop().whenComplete(() {
-      _dangCatCau = false;
-      _henBatLai();
-    });
   }
 
   /// Mọi lần ghi do máy thực hiện đều đi qua đây, để ghi nhớ nội dung, vị trí
@@ -3029,7 +3060,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Sau khi người dùng ngừng gõ đủ một giây thì micro tự bật lại như cũ.
   void _nguoiDungVuaGo() {
     _chuTam = ''; // Nhả đoạn đang nhảy ra: không gì đè lên nó được nữa.
-    _henCatCauKhiNgapNgung?.cancel();
+    _tuDaChotTrongPhien = [];
+    _partialTruocDo = [];
 
     if (_muonNghe || _micro.isListening) {
       _boQuaCauNay = true;
@@ -3077,7 +3109,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void _dongBangDoanDangNhay() {
     final dangVietDo = _chuTam.isNotEmpty;
     _chuTam = '';
-    _henCatCauKhiNgapNgung?.cancel();
+    _tuDaChotTrongPhien = [];
+    _partialTruocDo = [];
     if (!dangVietDo) return;
     if (!_muonNghe || _dangCatCau || !_micro.isListening) return;
     _boQuaCauNay = true;
@@ -5142,6 +5175,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // lúc vừa khôi phục xong.
     if (_muonNghe) _tatMicro();
     _chuTam = '';
+    _tuDaChotTrongPhien = [];
+    _partialTruocDo = [];
     _neo = tt.viTriConTro.clamp(0, tt.vanBan.length);
 
     // Huỷ mọi hẹn giờ nhấp nháy đang chạy trước khi thay hẳn ba danh sách.
@@ -5225,6 +5260,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _ghiVaoO('', 0);
     _neo = 0;
     _chuTam = '';
+    _tuDaChotTrongPhien = [];
+    _partialTruocDo = [];
     _henChinhTa?.cancel();
     _boDieuKhien.loi.clear();
     for (final k in _boDieuKhien.khongPhuHop) {
