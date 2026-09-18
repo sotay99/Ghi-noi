@@ -929,19 +929,41 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   List<int> _ketQuaTimKiem = [];
   int _chiSoTimKiemHienTai = -1;
 
+  /// Ô "Thay thế" — chỉ hiện khi có ít nhất một kết quả tìm kiếm.
+  final _oThayThe = TextEditingController();
+  final _focusThayThe = FocusNode();
+
+  /// Bộ nhớ đệm RIÊNG cho từng ô, sống trong bộ nhớ (không lưu đĩa) — tự mất
+  /// khi đóng app, điền lại mỗi lần MỞ thanh tìm kiếm. Cập nhật NGAY mỗi lần
+  /// người dùng gõ, không đợi đóng thanh mới lưu.
+  String _boNhoTimKiemGanNhat = '';
+  String _boNhoThayTheGanNhat = '';
+
+  void _khiOTimKiemDoi() => _boNhoTimKiemGanNhat = _oTimKiem.text;
+  void _khiOThayTheDoi() => _boNhoThayTheGanNhat = _oThayThe.text;
+
   void _moTimKiem() {
+    _oTimKiem.text = _boNhoTimKiemGanNhat;
+    _oThayThe.text = _boNhoThayTheGanNhat;
     setState(() => _hienThanhTimKiem = true);
     _capNhatKetQuaTimKiem();
     WidgetsBinding.instance.addPostFrameCallback((_) => _focusTimKiem.requestFocus());
   }
 
   void _dongTimKiem() {
+    // Chụp lại nội dung TRƯỚC khi clear() — clear() cũng bắn listener, sẽ ghi
+    // đè bộ nhớ đệm thành chuỗi rỗng nếu không chụp trước.
+    final tuKhoaVuaTim = _oTimKiem.text;
+    final thayTheVuaTim = _oThayThe.text;
     setState(() {
       _hienThanhTimKiem = false;
       _oTimKiem.clear();
+      _oThayThe.clear();
       _ketQuaTimKiem = [];
       _chiSoTimKiemHienTai = -1;
     });
+    _boNhoTimKiemGanNhat = tuKhoaVuaTim;
+    _boNhoThayTheGanNhat = thayTheVuaTim;
     _boDieuKhien.viTriTimKiem = [];
     _boDieuKhien.doDaiTimKiem = 0;
     _boDieuKhien.veLai();
@@ -1039,6 +1061,135 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           .clamp(0.0, _cuonVanBan.position.maxScrollExtent);
       _cuonVanBan.animateTo(dich, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
     });
+  }
+
+  // ------------------------------------------------------ thay thế (search)
+
+  /// Thay MỘT kết quả (tại [chiSo] trong `_ketQuaTimKiem`) bằng nội dung ô
+  /// Thay thế — ô rỗng nghĩa là XOÁ kết quả đó. Không tự tính lại danh sách
+  /// kết quả (gọi `_capNhatKetQuaTimKiem()` sau khi xong, việc đó tự lo).
+  void _thayMotKetQua(int chiSo) {
+    if (chiSo < 0 || chiSo >= _ketQuaTimKiem.length) return;
+    final batDau = _ketQuaTimKiem[chiSo];
+    final doDai = _oTimKiem.text.length;
+    final ketThuc = batDau + doDai;
+    final cu = _boDieuKhien.text;
+    if (ketThuc > cu.length) return;
+    final chenVao = _oThayThe.text;
+    final moi = cu.replaceRange(batDau, ketThuc, chenVao);
+    _dieuChinhLoiChinhTaSauKhiSua(batDau, doDai, chenVao.length);
+    _dieuChinhVungToanVanSauKhiSua(batDau, doDai, chenVao.length);
+    // `_ghiVaoO` — con đường DUY NHẤT ghi văn bản do máy thực hiện (đặt
+    // `_tuSua` trước khi ghi, để `_khiNguoiDungSua` không hiểu nhầm đây là
+    // người dùng tự gõ) — dùng lại y hệt `_thayVungTamBangGiongNoi`.
+    _ghiVaoO(moi, batDau + chenVao.length);
+  }
+
+  /// "Thay chỗ này" — chỉ thay đúng kết quả đang chọn (số thứ tự hiện tại).
+  void _thayChoNay() {
+    if (_chiSoTimKiemHienTai < 0 || _chiSoTimKiemHienTai >= _ketQuaTimKiem.length) return;
+    _thayMotKetQua(_chiSoTimKiemHienTai);
+    _luuVanBan();
+    _capNhatKetQuaTimKiem();
+  }
+
+  /// "Thay tất cả" — thay/xoá TỪ CUỐI VỀ ĐẦU để toạ độ các kết quả đứng
+  /// trước không bị lệch khi độ dài văn bản đổi (đúng nguyên tắc dịch offset
+  /// đã dùng ở `_dieuChinhLoiChinhTaSauKhiSua`/`_dieuChinhVungToanVanSauKhiSua`
+  /// trong toàn bộ tệp này).
+  void _thayTatCa() {
+    for (var i = _ketQuaTimKiem.length - 1; i >= 0; i--) {
+      _thayMotKetQua(i);
+    }
+    _luuVanBan();
+    _capNhatKetQuaTimKiem();
+  }
+
+  Future<void> _xacNhanThayTatCa() async {
+    final tuKhoa = _oTimKiem.text;
+    final thayThe = _oThayThe.text;
+    final soLuong = _ketQuaTimKiem.length;
+    if (soLuong == 0) return;
+    final laXoa = thayThe.isEmpty;
+    final dongY = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xác nhận thay thế'),
+        content: RichText(
+          text: TextSpan(
+            style: const TextStyle(color: Colors.black87, fontSize: 15),
+            children: [
+              TextSpan(
+                text: laXoa
+                    ? 'Bạn có chắc chắn xoá các ký tự '
+                    : 'Bạn có chắc chắn thay đổi các ký tự ',
+              ),
+              _oanTuHopThoai(tuKhoa),
+              if (!laXoa) ...[
+                const TextSpan(text: ' thành '),
+                _oanTuHopThoai(thayThe),
+              ],
+              TextSpan(text: ' ở $soLuong kết quả tìm kiếm không?'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Huỷ'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Chấp nhận'),
+          ),
+        ],
+      ),
+    );
+    if (dongY == true) _thayTatCa();
+  }
+
+  /// Một đoạn chữ được đóng khung viền để nổi bật trong hộp thoại xác nhận.
+  WidgetSpan _oanTuHopThoai(String chu) => WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.red.shade300),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            '"$chu"',
+            style: TextStyle(
+              color: Colors.red.shade700,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+        ),
+      );
+
+  void _moHuongDanThayThe() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hướng dẫn Thay thế'),
+        content: const Text(
+          '• "Thay chỗ này": chỉ thay đúng kết quả đang chọn (số thứ tự '
+          'đang hiện, ví dụ 3/5).\n\n'
+          '• "Thay tất cả": thay hết mọi kết quả cùng lúc, có hỏi xác nhận '
+          'trước khi làm.\n\n'
+          '• Để trống ô Thay thế rồi bấm một trong hai nút: kết quả tìm '
+          'kiếm đó bị XOÁ, không cần gõ gì để thay vào chỗ trống.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Đã hiểu'),
+          ),
+        ],
+      ),
+    );
   }
 
   late GhiChuFile _ghiChuHienTai;
@@ -1391,6 +1542,21 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
+  /// Ctrl+F LUÔN THẮNG để đóng thanh tìm kiếm, kể cả khi con trỏ đang nhấp
+  /// nháy TRONG ô Tìm kiếm/ô Thay thế — `EditableText` của chính ô đó có thể
+  /// "nuốt" tổ hợp phím trước khi nó lan lên `Shortcuts` ở tầng cha. Bọc
+  /// riêng một `Focus.onKeyEvent` quanh MỖI ô để tự bắt Ctrl+F và đóng thẳng,
+  /// không trông chờ `Shortcuts` ở tầng trên nhận được sự kiện.
+  KeyEventResult _khiPhimTrongOTimKiem(FocusNode node, KeyEvent su) {
+    if (su is! KeyDownEvent) return KeyEventResult.ignored;
+    if (su.logicalKey == LogicalKeyboardKey.keyF &&
+        HardwareKeyboard.instance.isControlPressed) {
+      _dongTimKiem();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
   /// Thanh tìm kiếm nổi lên trên cùng khung soạn thảo — ô nhập, số kết quả,
   /// mũi tên lên/xuống, nút xoá và nút "Tắt" (đóng hẳn).
   Widget _thanhTimKiem() {
@@ -1402,15 +1568,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       child: Row(
         children: [
           Expanded(
-            child: TextField(
-              controller: _oTimKiem,
-              focusNode: _focusTimKiem,
-              decoration: const InputDecoration(
-                isDense: true,
-                hintText: 'Tìm trong văn bản...',
-                border: OutlineInputBorder(),
+            child: Focus(
+              onKeyEvent: _khiPhimTrongOTimKiem,
+              child: TextField(
+                controller: _oTimKiem,
+                focusNode: _focusTimKiem,
+                decoration: const InputDecoration(
+                  isDense: true,
+                  hintText: 'Tìm trong văn bản...',
+                  border: OutlineInputBorder(),
+                ),
+                onSubmitted: (_) => _dieuHuongTimKiem(1),
               ),
-              onSubmitted: (_) => _dieuHuongTimKiem(1),
             ),
           ),
           const SizedBox(width: 8),
@@ -1442,6 +1611,50 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             ),
             onPressed: _dongTimKiem,
             child: const Text('Tắt'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Thanh "Thay thế" — nằm NGAY DƯỚI thanh tìm kiếm, chỉ hiện khi có ít
+  /// nhất một kết quả tìm kiếm (`_ketQuaTimKiem.isNotEmpty`), tự ẩn ngay khi
+  /// về 0 (B6).
+  Widget _thanhThayThe() {
+    return Container(
+      key: const ValueKey('thanhThayThe'),
+      width: double.infinity,
+      color: const Color(0xFFFAFAFA),
+      padding: const EdgeInsets.fromLTRB(12, 6, 8, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Focus(
+              onKeyEvent: _khiPhimTrongOTimKiem,
+              child: TextField(
+                controller: _oThayThe,
+                focusNode: _focusThayThe,
+                decoration: const InputDecoration(
+                  isDense: true,
+                  hintText: 'Thay thế những ký tự trên bằng ký tự gì?',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: _ketQuaTimKiem.isEmpty ? null : _thayChoNay,
+            child: const Text('Thay chỗ này'),
+          ),
+          TextButton(
+            onPressed: _ketQuaTimKiem.isEmpty ? null : _xacNhanThayTatCa,
+            child: const Text('Thay tất cả'),
+          ),
+          IconButton(
+            icon: const Icon(Icons.help_outline, size: 20),
+            tooltip: 'Hướng dẫn Thay thế',
+            onPressed: _moHuongDanThayThe,
           ),
         ],
       ),
@@ -1596,6 +1809,28 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Timer? _henGoXong;
   String? _maNgonNgu;
 
+  /// Canh khoảng NGẬP NGỪNG giữa chừng một câu đang nói dở (dừng nói một lúc
+  /// nhưng micro CHƯA bị Android tự ngắt vì `pauseFor` — tức 8 giây — chưa
+  /// hết hạn). Bộ nhận dạng trên nhiều máy/phiên bản Android, khi phiên nghe
+  /// sống qua một khoảng lặng như vậy rồi có tiếng nói tiếp, có thể trả về
+  /// một PARTIAL RESULT MỚI chỉ chứa phần MỚI vừa nói (không cộng dồn từ đầu
+  /// phiên nữa) — `_khiCoChu` khi đó tưởng đây là "hồi tố" một lần
+  /// (`_soLanTuChoiLienTuc`), từ chối đúng MỘT lần rồi buộc phải nhượng bộ ở
+  /// lần kế, chấp nhận nội dung ngắn hơn và GHI ĐÈ mất phần đã nói trước.
+  ///
+  /// Cách chặn triệt để: không đợi bộ nhận dạng "quên", mà chủ động CHỐT
+  /// đoạn đang có thành chữ cứng và MỞ PHIÊN NGHE MỚI ngay khi im lặng kéo
+  /// dài quá ngưỡng này (ngắn hơn hẳn `pauseFor` 8 giây, để luôn kịp ra tay
+  /// trước) — biến mọi khoảng ngập ngừng thành một ranh giới câu rõ ràng,
+  /// dùng lại đúng con đường `_batLaiPhienSauKhiChot()` đã ổn định.
+  ///
+  /// Reset ở CUỐI `_thayVungTamBangGiongNoi()` — tức là MỖI LẦN có chữ mới
+  /// thật sự ghi ra màn hình (không phải mỗi lần có callback) — nên trong
+  /// lúc đang nói liên tục, đồng hồ này liên tục được dời lại, không bao giờ
+  /// kịp bấm chuông; chỉ khi thật sự im lặng quá lâu nó mới đếm hết.
+  Timer? _henCatCauKhiNgapNgung;
+  static const _thoiGianNgapNgungToiDa = Duration(milliseconds: 2000);
+
   /// Vị trí trong bài mà AI đã kiểm tra chính tả tới đó rồi. Mỗi lần kiểm
   /// tra chỉ gửi phần văn bản TỪ đây trở đi, không gửi lại phần đã kiểm tra.
   int _viTriDaKiemTraChinhTa = 0;
@@ -1641,6 +1876,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _boDieuKhien.khiBamDoanKhongPhuHop = _khiBamDoanKhongPhuHop;
     _boDieuKhien.khiBamDoanCanXoa = _khiBamDoanCanXoa;
     _oTimKiem.addListener(_capNhatKetQuaTimKiem);
+    _oTimKiem.addListener(_khiOTimKiemDoi);
+    _oThayThe.addListener(_khiOThayTheDoi);
 
     // Nội dung lưu trữ có thể mang thêm một khối định dạng AI mã hoá ở cuối
     // (xem `_macDinhDangAi`/`_apDungDinhDangAi`) — tách nó ra TRƯỚC khi đưa
@@ -1692,6 +1929,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henTuTatMicroImLang?.cancel();
     _henMoDamChamCuoi?.cancel();
     _henNhapNhayConTro?.cancel();
+    _henCatCauKhiNgapNgung?.cancel();
     _oChu.removeListener(_khiFocusConTroDoi);
     _micro.cancel();
     _boDieuKhien.dispose();
@@ -1701,6 +1939,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _oTen.dispose();
     _oTimKiem.dispose();
     _focusTimKiem.dispose();
+    _oThayThe.dispose();
+    _focusThayThe.dispose();
     super.dispose();
   }
 
@@ -1986,6 +2226,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     _neo = g.noiDung.length;
     _chuTam = '';
+    _henCatCauKhiNgapNgung?.cancel();
     _henChinhTa?.cancel();
     _boDieuKhien.loi.clear();
     _viTriDaKiemTraChinhTa = g.noiDung.length;
@@ -2292,6 +2533,24 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _chuTam = chenVao;
     _chuGanNhat = moi; // Để lần _khiNguoiDungSua tiếp theo không hiểu nhầm.
     _batDauMoDamChamCuoi();
+    _datLaiHenCatCauKhiNgapNgung();
+  }
+
+  /// Dời lại đồng hồ canh ngập ngừng — gọi mỗi khi có chữ MỚI thật sự ghi ra
+  /// (xem giải thích ở khai báo `_henCatCauKhiNgapNgung`).
+  void _datLaiHenCatCauKhiNgapNgung() {
+    _henCatCauKhiNgapNgung?.cancel();
+    if (_chuTam.isEmpty) return;
+    _henCatCauKhiNgapNgung = Timer(_thoiGianNgapNgungToiDa, _khiNgapNgungQuaLau);
+  }
+
+  /// Im lặng giữa chừng câu đang nói dở đã quá lâu — chốt đoạn hiện có thành
+  /// chữ cứng và mở một phiên nghe hoàn toàn mới, y hệt lúc một câu chốt
+  /// xong tự nhiên (`finalResult: true`). Nhờ vậy phiên MỚI không còn mang
+  /// theo ngữ cảnh của phần đã chốt, nên không thể ghi đè mất nó nữa.
+  void _khiNgapNgungQuaLau() {
+    if (_chuTam.isEmpty) return; // Đã chốt/nhả ở chỗ khác trong lúc chờ.
+    _chotCauVaMoPhienMoi();
   }
 
   void _khiCoChu(dynamic ketQua) {
@@ -2374,13 +2633,21 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
 
     if (xong) {
-      _chotCauDangDoc();
-      _noiGocDaKhoa = '';
-      _soLanTuChoiLienTuc = 0;
-      _luuVanBan();
-      _lenLichKiemTraChinhTa();
-      _batLaiPhienSauKhiChot();
+      _chotCauVaMoPhienMoi();
     }
+  }
+
+  /// Chốt đoạn `_chuTam` hiện có thành chữ cứng rồi mở một phiên nghe MỚI.
+  /// Dùng chung cho cả hai nguồn: câu tự chốt (`finalResult: true`) VÀ
+  /// khoảng ngập ngừng quá lâu giữa chừng (`_khiNgapNgungQuaLau`).
+  void _chotCauVaMoPhienMoi() {
+    _henCatCauKhiNgapNgung?.cancel();
+    _chotCauDangDoc();
+    _noiGocDaKhoa = '';
+    _soLanTuChoiLienTuc = 0;
+    _luuVanBan();
+    _lenLichKiemTraChinhTa();
+    _batLaiPhienSauKhiChot();
   }
 
   /// Sau khi một câu đã CHỐT xong (`finalResult: true`), chủ động ngắt rồi mở
@@ -2493,6 +2760,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Sau khi người dùng ngừng gõ đủ một giây thì micro tự bật lại như cũ.
   void _nguoiDungVuaGo() {
     _chuTam = ''; // Nhả đoạn đang nhảy ra: không gì đè lên nó được nữa.
+    _henCatCauKhiNgapNgung?.cancel();
 
     if (_muonNghe || _micro.isListening) {
       _boQuaCauNay = true;
@@ -2540,6 +2808,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void _dongBangDoanDangNhay() {
     final dangVietDo = _chuTam.isNotEmpty;
     _chuTam = '';
+    _henCatCauKhiNgapNgung?.cancel();
     if (!dangVietDo) return;
     if (!_muonNghe || _dangCatCau || !_micro.isListening) return;
     _boQuaCauNay = true;
@@ -5059,7 +5328,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      appBar: appBar,
+      // B1: thanh tìm kiếm mở thì nhường hẳn vị trí trên cùng — ẩn AppBar
+      // (tên tệp, Lùi/Tiến/Lưu/Ẩn-hiện-định-dạng). Đóng lại thì AppBar trở
+      // về y nguyên như cũ.
+      appBar: _hienThanhTimKiem ? null : appBar,
       // translucent: chỉ NGHE sự kiện chạm để tắt chú thích, không chặn nó
       // đi tiếp xuống nút/ô bên dưới — một cú bấm vừa tắt chú thích vừa làm
       // đúng việc của nút đó (mở cài đặt, bật micro...).
@@ -5099,17 +5371,26 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               duration: const Duration(milliseconds: 150),
               child: _hienThanhTimKiem ? _thanhTimKiem() : const SizedBox(width: double.infinity),
             ),
+            // B2/B6: thanh "Thay thế" ngay dưới thanh tìm kiếm, chỉ khi có
+            // ít nhất một kết quả — tự ẩn/hiện theo `_ketQuaTimKiem`.
+            AnimatedSize(
+              duration: const Duration(milliseconds: 150),
+              child: _hienThanhTimKiem && _ketQuaTimKiem.isNotEmpty
+                  ? _thanhThayThe()
+                  : const SizedBox(width: double.infinity),
+            ),
             // Mục 7: đường kẻ mỏng phân tách thanh Lùi/Tiến/Lưu (AppBar) với
             // thanh định dạng thủ công ngay dưới nó. Mờ hơn nữa (0.12 thay
             // vì màu `Colors.grey` mặc định gần như đen-xám) — chỉ đủ để mắt
             // nhận ra có ranh giới, không tạo thêm một "đường kẻ đậm" nhìn
             // rối mắt giữa hai thanh vốn đã sát nhau.
-            if (!_anThanhDinhDang)
+            // B1: thanh định dạng thủ công cũng nhường chỗ khi tìm kiếm mở.
+            if (!_anThanhDinhDang && !_hienThanhTimKiem)
               Divider(height: 1, thickness: 1, color: Colors.grey.withValues(alpha: 0.12)),
-            if (!_anThanhDinhDang) _thanhDinhDangThuCong(),
+            if (!_anThanhDinhDang && !_hienThanhTimKiem) _thanhDinhDangThuCong(),
             // Mục 7: và một đường kẻ mỏng nữa ở mép dưới thanh định dạng,
             // phân tách nó với vùng soạn thảo bên dưới.
-            if (!_anThanhDinhDang)
+            if (!_anThanhDinhDang && !_hienThanhTimKiem)
               Divider(height: 1, thickness: 1, color: Colors.grey.withValues(alpha: 0.12)),
             Expanded(
               child: Padding(

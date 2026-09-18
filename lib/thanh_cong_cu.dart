@@ -293,10 +293,13 @@ class _NutMicroTron extends StatelessWidget {
             child: SizedBox(
               width: 40,
               height: 40,
-              child: Icon(
-                bat ? Icons.mic : Icons.mic_none,
-                color: Colors.white,
-                size: 22,
+              // Phần C: đổi icon Material sang emoji 🎤 — giữ NGUYÊN mọi
+              // logic/trạng thái (bật/tắt/màu nền), chỉ đổi phần hiển thị.
+              // Cùng cách render emoji-làm-icon đã dùng cho nút Ẩn/hiện
+              // thanh định dạng ('🔤', xem `_dsNutCongCu` trong
+              // trang_soan_thao.dart).
+              child: const Center(
+                child: Text('🎤', style: TextStyle(fontSize: 20)),
               ),
             ),
           ),
