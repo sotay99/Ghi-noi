@@ -48,6 +48,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
   late bool _tuDongChenDauCau;
   late String _phimTatBoBienDoi;
   late String _phimTatPhim;
+  late String _phimCatNhanh;
   PermissionStatus? _trangThaiMicro;
   bool _dangXuLyMicro = false;
 
@@ -63,6 +64,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     _tuDongChenDauCau = widget.caiDat.tuDongChenDauCauBangAI;
     _phimTatBoBienDoi = widget.caiDat.phimTatBoBienDoi;
     _phimTatPhim = widget.caiDat.phimTatPhim;
+    _phimCatNhanh = widget.caiDat.phimCatNhanhPhienGhiAm;
     _oTuTatMicro = TextEditingController(text: '${widget.caiDat.thoiGianTuTatMicroGiay}');
     _focusTuTatMicro.addListener(_khiMatTieuDiemTuTatMicro);
     _kiemTraQuyenMicro();
@@ -212,6 +214,8 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
           _dong4bChenDauCauAI(),
           const Divider(height: 40),
           _dong5PhimTat(),
+          const Divider(height: 40),
+          _dong5bPhimCatNhanh(),
           const Divider(height: 40),
           _dong6Micro(),
         ],
@@ -607,6 +611,70 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     );
   }
 
+  Widget _oChonPhimCatNhanh(String nhan, String moTaGia, bool dangChon) {
+    return Expanded(
+      child: InkWell(
+        onTap: () async {
+          if (dangChon) return;
+          setState(() => _phimCatNhanh = moTaGia);
+          await widget.caiDat.datPhimCatNhanhPhienGhiAm(moTaGia);
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: dangChon ? const Color(0xFFE8F0FE) : Colors.transparent,
+            border: Border.all(
+              color: dangChon ? const Color(0xFF1A73E8) : const Color(0xFFDADCE0),
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            nhan,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: dangChon ? const Color(0xFF1A73E8) : const Color(0xFF5F6368),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _dong5bPhimCatNhanh() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _tieuDeDong('Phím tắt cắt nhanh phiên ghi âm'),
+        const SizedBox(height: 6),
+        const Text(
+          'Bấm phím này TRƯỚC khi nói sang một ý hoàn toàn khác, để micro '
+          'không nhầm với câu vừa nói.',
+          style: TextStyle(fontSize: 12, color: Color(0xFF9AA0A6)),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            _oChonPhimCatNhanh('Tab', 'tab', _phimCatNhanh == 'tab'),
+            const SizedBox(width: 10),
+            _oChonPhimCatNhanh(
+              'Win (trên máy Mac là phím Cmd ⌘)',
+              'win',
+              _phimCatNhanh == 'win',
+            ),
+          ],
+        ),
+        _nutTimHieuThem(() => _hienGiaiThich(
+              'Phím tắt cắt nhanh phiên ghi âm',
+              _giaiThichCatNhanhNgan,
+              _giaiThichCatNhanh,
+            )),
+      ],
+    );
+  }
+
   Widget _dong6Micro() {
     final tt = _trangThaiMicro;
     IconData icon;
@@ -759,6 +827,20 @@ Tắt tính năng này đi thì mọi gạch đỏ đang hiện biến mất nga
 
 const _giaiThichChenDauCauNgan = '''
 Bật lên, AI tự chèn thêm dấu câu còn thiếu (dấu chấm, phẩy, hỏi, than...) vào những chỗ hợp lý trong bài. Đoạn dấu câu vừa chèn nhấp nháy **nền xanh dương** trong 4 giây rồi trở về chữ bình thường.
+''';
+
+const _giaiThichCatNhanhNgan = '''
+Bấm phím **Tab** (hoặc **Win**/**Cmd ⌘** trên Mac, tuỳ bạn chọn) sẽ **cắt ngay** phiên ghi âm đang chạy và **mở phiên mới**. Dùng khi bạn chuẩn bị nói sang một **ý hoàn toàn khác** — bấm phím này TRƯỚC khi nói để micro không nhầm với câu vừa xong.
+''';
+
+const _giaiThichCatNhanh = '''
+Phím **Tab** nằm gần phím Q, ngay phía trên phím Caps Lock, ở bên trái hàng số 1 trên bàn phím.
+
+Phím **Win** (icon hình cửa sổ) nằm ở góc dưới trái bàn phím, giữa phím Ctrl và phím Alt. Trên máy Mac, vị trí tương ứng là phím **Cmd** (⌘) — ứng dụng bắt luôn phím này khi bạn chọn "Win".
+
+Bấm đúng phím đã chọn ở đây, ứng dụng lập tức **cắt phiên ghi âm đang chạy** và **mở một phiên mới** ngay sau đó — không cần chờ gì cả.
+
+Vì sao cần tính năng này: khi bạn đang nói dở một câu rồi ngập ngừng khá lâu (ví dụ 3-4 giây) mới nói tiếp, đôi khi bộ nhận dạng giọng nói "quên" mất câu cũ và viết lại/nhân đôi một phần câu đó. Nếu bạn biết trước mình sắp nói sang một **ý hoàn toàn khác**, không liên quan gì tới câu vừa nói, hãy bấm phím này TRƯỚC KHI nói — phiên ghi âm cũ được chốt cứng lại và đóng hẳn, phiên mới mở ra sạch sẽ, không còn gì để nhầm lẫn hay ghi đè nữa.
 ''';
 
 const _giaiThichChenDauCau = '''

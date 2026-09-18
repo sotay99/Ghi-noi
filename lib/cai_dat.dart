@@ -11,6 +11,8 @@ class CaiDat {
   static const _khoaKiemTraChinhTaAI = 'ghi_noi_kiem_tra_chinh_ta_ai';
   static const _khoaPhimTatBoBienDoi = 'ghi_noi_phim_tat_bo_bien_doi';
   static const _khoaPhimTatPhim = 'ghi_noi_phim_tat_phim';
+  static const _khoaPhimCatNhanhPhienGhiAm =
+      'ghi_noi_phim_cat_nhanh_phien_ghi_am';
   static const _khoaThoiGianTuTatMicro = 'ghi_noi_thoi_gian_tu_tat_micro_giay';
   static const _khoaTuDongChenDauCau = 'ghi_noi_tu_dong_chen_dau_cau_ai';
   static const _khoaMucDoDaiDeXuat = 'ghi_noi_muc_do_dai_de_xuat';
@@ -79,6 +81,13 @@ class CaiDat {
   String phimTatBoBienDoi = 'Ctrl';
   String phimTatPhim = 'G';
 
+  /// Phím tắt ĐƠN (không phải tổ hợp) để chủ động cắt NGAY một phiên ghi âm
+  /// đang chạy và mở phiên mới — dùng khi sắp nói sang một ý hoàn toàn khác,
+  /// để micro không nhầm/ghi đè/nhân đôi câu cũ. Giá trị LOGIC, không phụ
+  /// thuộc hệ điều hành: `'tab'` hoặc `'win'` (trên Mac bắt luôn phím Cmd ⌘ —
+  /// xem chỗ dùng ở `trang_soan_thao.dart`). Mặc định `'tab'`.
+  String phimCatNhanhPhienGhiAm = 'tab';
+
   /// Màu chữ/màu nền gần nhất người dùng dùng ở công cụ định dạng thủ công —
   /// nút màu chữ/màu nền trên thanh công cụ và phím tắt Ctrl+Shift+C /
   /// Ctrl+Shift+H đều dùng lại đúng màu này. Mặc định đỏ (chữ) / vàng (nền)
@@ -93,6 +102,8 @@ class CaiDat {
     kiemTraChinhTaBangAI = kho.getBool(_khoaKiemTraChinhTaAI) ?? true;
     phimTatBoBienDoi = kho.getString(_khoaPhimTatBoBienDoi) ?? 'Ctrl';
     phimTatPhim = kho.getString(_khoaPhimTatPhim) ?? 'G';
+    phimCatNhanhPhienGhiAm =
+        kho.getString(_khoaPhimCatNhanhPhienGhiAm) ?? 'tab';
     thoiGianTuTatMicroGiay =
         (kho.getInt(_khoaThoiGianTuTatMicro) ?? 45).clamp(gioiHanDuoiTuTatMicro, gioiHanTrenTuTatMicro);
     tuDongChenDauCauBangAI = kho.getBool(_khoaTuDongChenDauCau) ?? true;
@@ -140,6 +151,12 @@ class CaiDat {
     final kho = await SharedPreferences.getInstance();
     await kho.setString(_khoaPhimTatBoBienDoi, boBienDoi);
     await kho.setString(_khoaPhimTatPhim, phim);
+  }
+
+  Future<void> datPhimCatNhanhPhienGhiAm(String gia) async {
+    phimCatNhanhPhienGhiAm = gia;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setString(_khoaPhimCatNhanhPhienGhiAm, gia);
   }
 
   Future<void> datThoiGianTuTatMicro(int giay) async {

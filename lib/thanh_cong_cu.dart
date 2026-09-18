@@ -33,6 +33,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamTimKiem,
     required this.khiBamTroChuyen,
     required this.khiBamTaiKhoan,
+    required this.khiBamNhatKyGiongNoi,
   });
 
   final bool bat;
@@ -80,6 +81,10 @@ class ThanhCongCu extends StatelessWidget {
   /// Mục 9: hai nút mới, chưa gắn logic.
   final VoidCallback khiBamTroChuyen;
   final VoidCallback khiBamTaiKhoan;
+
+  /// (VIỆC 3) Mở màn hình "Nhật ký gỡ lỗi giọng nói", mục cuối của menu
+  /// "+ Thêm lựa chọn".
+  final VoidCallback khiBamNhatKyGiongNoi;
 
   /// Ngưỡng bề ngang chuẩn của Material để phân biệt điện thoại (hẹp) với
   /// máy tính bảng/màn hình gập mở ra (rộng) — đủ chỗ để các nút giãn ra
@@ -201,6 +206,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamDanhSachPhimTat: khiBamDanhSachPhimTat,
                               khiBamCaiDat: khiBamCaiDat,
                               khiBamTimKiem: khiBamTimKiem,
+                              khiBamNhatKyGiongNoi: khiBamNhatKyGiongNoi,
                             ),
                           ),
                           _NutCoChuThich(
@@ -846,6 +852,7 @@ class _NutThemMenu extends StatelessWidget {
     required this.khiBamDanhSachPhimTat,
     required this.khiBamCaiDat,
     required this.khiBamTimKiem,
+    required this.khiBamNhatKyGiongNoi,
   });
 
   final bool rong;
@@ -864,6 +871,10 @@ class _NutThemMenu extends StatelessWidget {
   /// thị của nút tìm kiếm thành "Tìm kiếm và thay thế").
   final VoidCallback khiBamCaiDat;
   final VoidCallback khiBamTimKiem;
+
+  /// (VIỆC 3) Mục cuối cùng của danh sách — mở màn hình "Nhật ký gỡ lỗi
+  /// giọng nói".
+  final VoidCallback khiBamNhatKyGiongNoi;
 
   @override
   Widget build(BuildContext context) {
@@ -915,6 +926,9 @@ class _NutThemMenu extends StatelessWidget {
               case 25:
                 khiBamTimKiem();
                 break;
+              case 26:
+                khiBamNhatKyGiongNoi();
+                break;
             }
           },
           // (VIỆC 3) Một `ScrollController` MỚI mỗi lần menu mở — `itemBuilder`
@@ -957,6 +971,10 @@ class _NutThemMenu extends StatelessWidget {
                 _mucMenuThem(10, 'Bảo mật và quyền riêng tư'),
                 _dividerMenu(),
                 _mucMenuThem(11, 'Đăng nhập tài khoản'),
+                _dividerMenu(),
+                // (VIỆC 3) Cố ý đặt Ở CUỐI danh sách — không ảnh hưởng thứ tự
+                // các mục quan trọng khác đã có ở trên.
+                _mucMenuThem(26, 'Nhật ký gỡ lỗi giọng nói'),
               ]),
             ];
           },
