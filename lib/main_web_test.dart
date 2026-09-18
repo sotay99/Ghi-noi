@@ -34,6 +34,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+// Số phiên bản bản thử — TĂNG THỦ CÔNG mỗi lần đẩy bản mới lên Firebase
+// Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
+// hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
+// Flutter Web dù đã bấm tải lại thường).
+const _phienBanThuNghiem = 'v5';
+
 // (Chỉ import đúng MỘT file `speech_to_text/speech_to_text.dart` — y hệt
 // cách `trang_soan_thao.dart` đang dùng đã chứng minh hoạt động — thay vì
 // đoán thêm đường import phụ (`speech_recognition_result.dart`,
@@ -121,6 +127,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   void initState() {
     super.initState();
     _laDiDong = _doanLaDiDong();
+    _ghiLog('Phiên bản bản thử: $_phienBanThuNghiem');
     _ghiLog('Đoán thiết bị: ${_laDiDong ? "điện thoại" : "PC"} '
         '(User-Agent: ${html.window.navigator.userAgent})');
     _khoiTao();
@@ -284,21 +291,32 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
 
   // ------------------------------------------------------ thuật toán lõi
 
-  // Chrome Android trả `recognizedWords` bị dính liền các ĐOẠN với nhau,
-  // không có dấu cách ở ranh giới đoạn (vd "CóCó tôi") — mỗi đoạn luôn bắt
-  // đầu bằng chữ hoa. Chèn lại dấu cách còn thiếu TRƯỚC khi tách từ, để
-  // thuật toán tìm-điểm-nối bên dưới (vốn đã chạy đúng trên PC) nhận được
-  // dữ liệu tách từ đúng ranh giới. Chỉ dùng cho nhánh điện thoại — PC
-  // không có lỗi này nên không đụng tới.
+  // Chrome Android trả `recognizedWords` bị lặp lại TOÀN BỘ lịch sử của
+  // phiên như tiền tố mỗi lần có kết quả mới (vd lần 3 gửi
+  // "XinXin chàoXin chàoXin chào" thay vì chỉ "Xin chào") — mỗi lần lặp lại
+  // luôn bắt đầu bằng chữ hoa. Quan sát log thực tế cho thấy: ĐOẠN CUỐI
+  // CÙNG (tính từ lần chuyển chữ-thường-sang-chữ-hoa gần cuối chuỗi nhất)
+  // luôn là bản ghi ĐẦY ĐỦ, SẠCH của toàn phiên tới thời điểm đó — không
+  // lặp lại gì cả. Vì vậy chỉ cần cắt lấy đúng đoạn cuối này, bỏ hết phần
+  // lặp lại dư thừa phía trước, là có được dữ liệu y hệt một partial bình
+  // thường (giống PC) để đưa vào thuật toán tìm-điểm-nối bên dưới. Chỉ
+  // dùng cho nhánh điện thoại — PC không có lỗi này nên không đụng tới.
   static const _chuThuongViet =
       'a-zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ';
   static const _chuHoaViet =
       'A-ZÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ';
   static final RegExp _reRanhGioiDoanDinh =
-      RegExp('(?<=[$_chuThuongViet])(?=[$_chuHoaViet])');
+      RegExp('[$_chuThuongViet][$_chuHoaViet]');
 
-  static String _vaKhoangCachThieu(String s) =>
-      s.replaceAllMapped(_reRanhGioiDoanDinh, (_) => ' ');
+  /// Cắt lấy đoạn cuối cùng (từ lần chuyển chữ-thường→chữ-hoa gần cuối
+  /// chuỗi nhất tới hết chuỗi) — đây là bản ghi sạch, không lặp.
+  static String _catDoanCuoiCung(String s) {
+    var viTri = 0;
+    for (final m in _reRanhGioiDoanDinh.allMatches(s)) {
+      viTri = m.start + 1;
+    }
+    return s.substring(viTri);
+  }
 
   /// Tách chuỗi thành danh sách từ theo khoảng trắng — y hệt `_tachTu`.
   static List<String> _tachTu(String s) {
@@ -381,9 +399,9 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
 
     if (noi.isEmpty) return;
     // Chỉ vá dữ liệu cho nhánh điện thoại — PC dùng nguyên văn.
-    final noiDaVa = _laDiDong ? _vaKhoangCachThieu(noi) : noi;
+    final noiDaVa = _laDiDong ? _catDoanCuoiCung(noi) : noi;
     if (noiDaVa != noi) {
-      _ghiLog('  → vá dấu cách thiếu: "$noiDaVa"');
+      _ghiLog('  → cắt còn đoạn cuối sạch: "$noiDaVa"');
     }
     final tuMoi = _tachTu(noiDaVa);
     if (tuMoi.isEmpty) return;
@@ -457,7 +475,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Flowrite — thử micro trên Web'),
+        title: const Text('Flowrite — thử micro trên Web ($_phienBanThuNghiem)'),
         actions: [
           TextButton.icon(
             onPressed: _doiCheDoThietBi,
