@@ -12,7 +12,8 @@
 // LỚP 1 (re-check `idPhien`) trong `lib/trang_soan_thao.dart` — xem chú thích
 // ở đó để biết đầy đủ lý do thiết kế. Ở đây bỏ bớt các phần không cần cho mục
 // đích test: không có "bộ đệm chống nhân đôi qua ranh giới phiên" (LỚP 2),
-// không đụng chỉnh tả/bộ nhớ đệm định dạng/gõ-phím-thắng-micro.
+// không đụng chỉnh tả/bộ nhớ đệm định dạng. CÓ gõ-phím-thắng-micro (xem
+// `_khiNguoiDungGoPhim`) để test vừa nói vừa gõ tay.
 //
 // THÊM MỚI (vòng test di động):
 // - Nhận diện thiết bị (điện thoại/PC) qua User-Agent, có nút chuyển tay để
@@ -38,7 +39,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v8';
+const _phienBanThuNghiem = 'v9';
 
 // (Chỉ import đúng MỘT file `speech_to_text/speech_to_text.dart` — y hệt
 // cách `trang_soan_thao.dart` đang dùng đã chứng minh hoạt động — thay vì
@@ -102,8 +103,20 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   int _soLanPartial = 0;
   int _soLanFinal = 0;
 
-  // ---- văn bản đang hiển thị ----
+  // ---- văn bản đang hiển thị — giờ CHO PHÉP gõ tay trực tiếp vào khung
+  // kết quả, với nguyên tắc gõ-phím-thắng-micro (y hệt tinh thần
+  // `_nguoiDungVuaGo()` bên app chính): gõ một phím là micro tắt NGAY, tự
+  // bật lại sau 1 giây không gõ tiếp. ----
   String _vanBan = '';
+  final _boDieuKhienVanBan = TextEditingController();
+
+  // Cờ chặn: khi TRUE nghĩa là đoạn `_boDieuKhienVanBan.text` đang được
+  // chính code (do micro) ghi vào, không phải người dùng gõ — để
+  // `_khiNguoiDungGoPhim` (gắn vào `onChanged`) không hiểu nhầm là người
+  // dùng gõ rồi tắt oan micro.
+  bool _dangGhiTuMicro = false;
+
+  Timer? _henMoLaiMicroSauKhiGo;
 
   // ---- nhật ký hiển thị ngay trên trang, để test trên điện thoại không
   // cần USB debug — mỗi dòng có giờ:phút:giây để dễ đối chiếu. ----
@@ -277,6 +290,51 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       });
       _batNghe();
     }
+  }
+
+  /// Gắn vào `onChanged` của khung kết quả — NGUYÊN TẮC gõ-phím-thắng-micro,
+  /// y hệt tinh thần `_nguoiDungVuaGo()` bên app chính: gõ một phím là micro
+  /// tắt NGAY LẬP TỨC (không đợi micro nói xong đoạn dở dang), và tự bật lại
+  /// sau 1 giây không gõ tiếp — không cần bấm nút bật lại bằng tay.
+  ///
+  /// Chỉ coi là "người dùng gõ" khi thay đổi này KHÔNG phải do chính code tự
+  /// ghi vào (`_dangGhiTuMicro`) — nếu không sẽ tắt oan micro mỗi khi chính
+  /// micro cập nhật chữ.
+  void _khiNguoiDungGoPhim(String vanBanMoi) {
+    if (_dangGhiTuMicro) return;
+    _vanBan = vanBanMoi;
+    // Coi toàn bộ chữ hiện có (kể cả phần vừa gõ tay) là đã "chốt cứng", để
+    // khi micro bật lại nó nối tiếp sau đúng chỗ người dùng vừa gõ, không
+    // đè lên hay xoá mất.
+    _tuDaChot = _tachTu(vanBanMoi);
+    _partialTruocDo = [];
+    _rawTruocDoTrongPhien = '';
+    _ghiLog('Người dùng gõ tay — tắt micro ngay, tự bật lại sau 1 giây '
+        'nếu không gõ tiếp.');
+    _ngatMicroNgayViGoPhim();
+  }
+
+  Future<void> _ngatMicroNgayViGoPhim() async {
+    _henMoLaiMicroSauKhiGo?.cancel();
+    _henBatLai?.cancel();
+    _phienHienTai++; // Huỷ callback của phiên đang chạy dở (LỚP 1).
+    await _micro.cancel();
+    if (mounted && _dangNghe) setState(() => _dangNghe = false);
+    _henMoLaiMicroSauKhiGo = Timer(const Duration(seconds: 1), () {
+      if (_muonNghe && !_micro.isListening) _batNghe();
+    });
+  }
+
+  /// Ghi văn bản do MICRO tạo ra vào cả `_vanBan` lẫn khung gõ, mà không để
+  /// `_khiNguoiDungGoPhim` hiểu nhầm là người dùng gõ (dùng cờ chặn).
+  void _ghiVanBanTuMicro(String vanBanMoi) {
+    _dangGhiTuMicro = true;
+    _vanBan = vanBanMoi;
+    _boDieuKhienVanBan.value = TextEditingValue(
+      text: vanBanMoi,
+      selection: TextSelection.collapsed(offset: vanBanMoi.length),
+    );
+    _dangGhiTuMicro = false;
   }
 
   Future<void> _saoChepVanBan() async {
@@ -460,7 +518,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     }
 
     _partialTruocDo = tuMoi;
-    setState(() => _vanBan = hienThi.join(' '));
+    setState(() => _ghiVanBanTuMicro(hienThi.join(' ')));
 
     if (xong) {
       _tuDaChot = _tachTu(_vanBan);
@@ -512,14 +570,16 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     // Nhánh điện thoại không có FINAL đáng tin cậy — chốt cứng ngay mỗi
     // lần có nội dung mới, để không bao giờ mất chữ đã hiện ra.
     _tuDaChot = hienThi;
-    setState(() => _vanBan = hienThi.join(' '));
+    setState(() => _ghiVanBanTuMicro(hienThi.join(' ')));
   }
 
   @override
   void dispose() {
     _henBatLai?.cancel();
+    _henMoLaiMicroSauKhiGo?.cancel();
     _micro.cancel();
     _cuonNhatKy.dispose();
+    _boDieuKhienVanBan.dispose();
     super.dispose();
   }
 
@@ -580,7 +640,8 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  const Text('Kết quả',
+                  const Text('Kết quả (gõ tay được — gõ phím sẽ tắt micro '
+                      'ngay, tự bật lại sau 1 giây)',
                       style: TextStyle(fontWeight: FontWeight.bold)),
                   const Spacer(),
                   TextButton(
@@ -598,11 +659,17 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                     border: Border.all(color: Colors.grey.shade400),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: SingleChildScrollView(
-                    child: SelectableText(
-                      _vanBan.isEmpty ? '(chưa có chữ nào)' : _vanBan,
-                      style: const TextStyle(fontSize: 18, height: 1.5),
+                  child: TextField(
+                    controller: _boDieuKhienVanBan,
+                    onChanged: _khiNguoiDungGoPhim,
+                    maxLines: null,
+                    expands: true,
+                    textAlignVertical: TextAlignVertical.top,
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      hintText: '(chưa có chữ nào — nói hoặc gõ vào đây)',
                     ),
+                    style: const TextStyle(fontSize: 18, height: 1.5),
                   ),
                 ),
               ),
@@ -673,9 +740,10 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                 child: TextButton(
                   onPressed: () {
                     setState(() {
-                      _vanBan = '';
+                      _ghiVanBanTuMicro('');
                       _tuDaChot = [];
                       _partialTruocDo = [];
+                      _rawTruocDoTrongPhien = '';
                       _soLanPartial = 0;
                       _soLanFinal = 0;
                     });
