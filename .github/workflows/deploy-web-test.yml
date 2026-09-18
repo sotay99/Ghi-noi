@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   dung-va-trien-khai-web:
-    name: Dựng Flutter Web và đưa lên GitHub Pages
+    name: Dựng Flutter Web và đưa lên Firebase Hosting
     runs-on: ubuntu-latest
 
     steps:
@@ -57,16 +57,44 @@ jobs:
             /tmp/khung-web
           cp -r /tmp/khung-web/web ./web
 
-      # Repo là sotay99/ghi-noi → GitHub Pages sẽ phục vụ tại
-      # /ghi-noi/, nên base-href phải khớp.
+      # Firebase Hosting phục vụ ở domain gốc (flowrite219.web.app),
+      # không có tiền tố đường dẫn con như GitHub Pages, nên base-href
+      # phải là gốc "/".
       - name: Dựng bản Web (entry point riêng cho bản thử)
         run: |
           flutter build web \
             --target=lib/main_web_test.dart \
-            --base-href /${{ github.event.repository.name }}/
+            --base-href /
 
-      - name: Đưa build/web lên nhánh gh-pages
-        uses: peaceiris/actions-gh-pages@v3
+      # Repo riêng tư nên GitHub Pages miễn phí không dùng được (chỉ hỗ
+      # trợ repo công khai) — chuyển sang Firebase Hosting. Hai file cấu
+      # hình này không commit vào repo, chỉ sinh động lúc CI chạy, y hệt
+      # cách web/ ở trên cũng không nằm trong git.
+      - name: Tạo cấu hình Firebase Hosting
+        run: |
+          cat > firebase.json << 'EOF'
+          {
+            "hosting": {
+              "public": "build/web",
+              "ignore": ["firebase.json", "**/.*"],
+              "rewrites": [
+                { "source": "**", "destination": "/index.html" }
+              ]
+            }
+          }
+          EOF
+          cat > .firebaserc << 'EOF'
+          {
+            "projects": {
+              "default": "flowrite219"
+            }
+          }
+          EOF
+
+      - name: Đưa build/web lên Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./build/web
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
+          channelId: live
+          projectId: flowrite219
