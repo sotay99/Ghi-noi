@@ -84,6 +84,20 @@
 //   token giờ tự chốt cứng trạng thái (`_vanBanDaChot`, `_tuDaChot`...)
 //   NGAY TẠI CHỖ bằng `_ghiVanBanChoTheVaChotCung`, không còn trông chờ
 //   một `onChanged` không tồn tại nữa.
+// - (v23) Chữ do MICRO NHẬN DẠNG (nút micro chính, KHÁC cơ chế thẻ ghi âm ở
+//   trên) giờ chèn ĐÚNG TẠI VỊ TRÍ CON TRỎ thay vì luôn luôn chèn ở CUỐI
+//   văn bản — tham khảo đúng hành vi app Android (`_neo`/`_datNeoTaiConTro`
+//   trong `trang_soan_thao.dart`). Thêm `_neoChenMic` (vị trí chèn hiện
+//   hành) và `_chenTuVaoViTri` (chèn giữa chuỗi thay vì nối cuối). Neo chỉ
+//   được dời tới đúng vị trí con trỏ khi MỘT PHIÊN NGHE MỚI bắt đầu
+//   (`_batNghe` — bấm nút, tự bật lại sau khi gõ tay xong, hay trình duyệt
+//   tự khởi động lại phiên) — KHÔNG dời giữa chừng một phiên đang nói liên
+//   tục, đúng hành vi Android: đang nói liên tục mà kéo con trỏ đi chỗ
+//   khác thì chữ vẫn tiếp tục ra ở vị trí cũ cho tới khi có phiên nghe mới.
+//   `_tuDaChot` đổi ý nghĩa thành "phần đã chốt NGAY TRƯỚC neo" (không còn
+//   là "toàn bộ văn bản") — tính lại mỗi khi neo đổi, để thuật toán dò
+//   trùng lặp/điểm nối không so khớp nhầm với chữ không liên quan nằm ở
+//   chỗ khác trong văn bản.
 //   CHƯA LÀM (còn nợ, sẽ làm khi có xác nhận thêm): tự kết thúc thẻ khi con
 //   trỏ DI CHUYỂN mà không gõ tay; chế độ tự động gửi ngầm các thẻ đã xong
 //   trong lúc ghi thẻ mới; gộp nhiều thẻ vào một lần gọi Gemini để có ngữ
@@ -109,7 +123,7 @@ import 'ai_cau_hinh.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v22';
+const _phienBanThuNghiem = 'v23';
 
 // `diaChiMayChuAI`/`matKhauMayChuAI` đến từ ai_cau_hinh.dart (import ở
 // trên) — máy chủ đó đã có sẵn action 'ghi_am' (xem cloud-function/
@@ -386,6 +400,18 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   // để loại bỏ callback trễ của một phiên đã đóng (LỚP 1).
   int _phienHienTai = 0;
 
+  // Vị trí ký tự — trong `_vanBanDaChot` — nơi chữ do micro nhận dạng được
+  // CHÈN VÀO, y hệt tinh thần `_neo` bên app chính (`trang_soan_thao.dart`):
+  // KHÔNG phải luôn luôn ở cuối văn bản. Chỉ được đặt lại (dời theo con trỏ
+  // hiện tại) mỗi khi một PHIÊN NGHE MỚI bắt đầu (`_batNghe`) — bấm nút bật
+  // micro, tự bật lại sau khi gõ tay xong, hay trình duyệt tự khởi động lại
+  // phiên sau khoảng lặng — KHÔNG dời giữa chừng một phiên đang nói liên
+  // tục dù con trỏ có bị người dùng kéo đi chỗ khác (đúng hành vi app
+  // Android: đang nói liên tục thì chữ vẫn tiếp tục ra ở chỗ cũ, phải đợi
+  // phiên nghe mới — tức là phải dừng nói/mic tự ngắt rồi bắt đầu lại —
+  // chữ mới đi theo con trỏ mới).
+  int _neoChenMic = 0;
+
   Timer? _henBatLai;
 
   // ---- Ghi âm thô + nghe lại — TÁCH BIỆT HOÀN TOÀN khỏi Web Speech API ở
@@ -564,9 +590,33 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
 
   Future<void> _batNghe() async {
     if (!_sanSang) return;
+
+    // Dời neo chèn chữ tới ĐÚNG vị trí con trỏ hiện tại — NHƯNG chỉ khi nó
+    // thật sự đổi so với neo cũ, để không phá vỡ cơ chế nối-liền-mạch giữa
+    // các phiên nghe kế tiếp nhau khi con trỏ KHÔNG hề bị người dùng động
+    // tới (chữ do chính micro ghi luôn tự dịch con trỏ theo neo, nên neo
+    // không đổi giữa hai phiên liên tiếp nếu người dùng không tự tay di
+    // chuyển con trỏ ở giữa). Khi neo đổi, `_tuDaChot` (đại diện cho phần
+    // "đã chốt" NGAY TRƯỚC neo, dùng để dò trùng lặp với hypothesis phiên
+    // mới) phải tính lại theo đúng vị trí neo MỚI, không thì thuật toán dò
+    // điểm nối sẽ so khớp nhầm với đoạn văn bản không liên quan nằm trước
+    // vị trí neo cũ.
+    final vanBanHienTai = _boDieuKhienVanBan.text;
+    var neoMoi = _boDieuKhienVanBan.selection.baseOffset;
+    if (neoMoi < 0 || neoMoi > vanBanHienTai.length) neoMoi = vanBanHienTai.length;
+    if (neoMoi != _neoChenMic) {
+      _ghiLog('Vị trí chèn chữ mic đổi từ $_neoChenMic sang $neoMoi (con '
+          'trỏ đã được di chuyển) — tính lại phần "đã chốt" ngay trước vị '
+          'trí mới.');
+      _neoChenMic = neoMoi;
+      _tuDaChot = _tachTu(vanBanHienTai.substring(0, _neoChenMic));
+      _partialTruocDo = [];
+    }
+
     final idPhien = ++_phienHienTai;
     _rawTruocDoTrongPhien = '';
-    _ghiLog('Bắt đầu phiên nghe #$idPhien (${_tenThietBi(_thietBi)})');
+    _ghiLog('Bắt đầu phiên nghe #$idPhien (${_tenThietBi(_thietBi)}), neo '
+        'chèn chữ tại vị trí $_neoChenMic.');
     try {
       await _micro.listen(
         onResult: (ketQua) {
@@ -1064,14 +1114,53 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
 
   /// Ghi văn bản do MICRO tạo ra vào cả `_vanBan` lẫn khung gõ, mà không để
   /// `_khiNguoiDungGoPhim` hiểu nhầm là người dùng gõ (dùng cờ chặn).
-  void _ghiVanBanTuMicro(String vanBanMoi) {
+  ///
+  /// [viTriConTro] mặc định là CUỐI văn bản (giữ hành vi cũ cho các chỗ gọi
+  /// không liên quan tới neo — ví dụ "Xoá để thử lại", chốt thẻ ghi âm) —
+  /// nhưng khi ghi chữ do micro NHẬN DẠNG được (xem `_xuLyKetQuaPc` và các
+  /// nhánh chị em), luôn truyền rõ vị trí ngay sau đoạn vừa chèn tại neo
+  /// (`_neoChenMic`), để con trỏ luôn theo đúng chỗ chữ vừa xuất hiện thay
+  /// vì luôn nhảy về cuối toàn bộ văn bản.
+  void _ghiVanBanTuMicro(String vanBanMoi, {int? viTriConTro}) {
     _dangGhiTuMicro = true;
     _vanBan = vanBanMoi;
     _boDieuKhienVanBan.value = TextEditingValue(
       text: vanBanMoi,
-      selection: TextSelection.collapsed(offset: vanBanMoi.length),
+      selection:
+          TextSelection.collapsed(offset: viTriConTro ?? vanBanMoi.length),
     );
     _dangGhiTuMicro = false;
+  }
+
+  /// Chèn [tuMoi] vào GIỮA [hienTai] tại vị trí [viTri] (thay vì luôn nối
+  /// vào cuối văn bản) — thêm dấu cách phân tách ở ĐẦU (nếu ký tự
+  /// ngay trước [viTri] không phải khoảng trắng/xuống dòng) và ở CUỐI (nếu
+  /// còn phần đuôi văn bản ngay sau [viTri] và ký tự đó không phải khoảng
+  /// trắng/xuống dòng — tức đang chèn vào GIỮA một đoạn chữ có sẵn). Trả về
+  /// (văn bản mới, vị trí NGAY SAU đoạn vừa chèn — dùng làm neo/con trỏ
+  /// tiếp theo).
+  static (String, int) _chenTuVaoViTri(
+    String hienTai,
+    int viTri,
+    List<String> tuMoi,
+  ) {
+    // Kẹp lại đề phòng neo bị lệch so với văn bản hiện tại (ví dụ văn bản
+    // vừa bị rút ngắn ở nơi khác mà chưa kịp đồng bộ neo) — tránh
+    // RangeError thay vì cứ tin tưởng tuyệt đối vào giá trị neo truyền vào.
+    if (viTri < 0) viTri = 0;
+    if (viTri > hienTai.length) viTri = hienTai.length;
+    if (tuMoi.isEmpty) return (hienTai, viTri);
+    var phanMoi = tuMoi.join(' ');
+    if (viTri > 0) {
+      final kt = hienTai[viTri - 1];
+      if (kt != '\n' && kt != ' ') phanMoi = ' $phanMoi';
+    }
+    if (viTri < hienTai.length) {
+      final kt = hienTai[viTri];
+      if (kt != '\n' && kt != ' ') phanMoi = '$phanMoi ';
+    }
+    final vanBanMoi = hienTai.replaceRange(viTri, viTri, phanMoi);
+    return (vanBanMoi, viTri + phanMoi.length);
   }
 
   Future<void> _saoChepVanBan() async {
@@ -1184,20 +1273,6 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       viTri = m.start + 1;
     }
     return s.substring(viTri);
-  }
-
-  /// Nối [tuMoi] vào SAU [hienTai] theo đúng nguyên tắc "chỉ nối thêm,
-  /// không dựng lại" — giữ NGUYÊN VĂN [hienTai] (kể cả dấu xuống dòng gõ
-  /// tay), chỉ thêm dấu cách phân tách nếu [hienTai] chưa tự kết thúc bằng
-  /// khoảng trắng/xuống dòng sẵn.
-  static String _noiTiep(String hienTai, List<String> tuMoi) {
-    if (tuMoi.isEmpty) return hienTai;
-    final phanMoi = tuMoi.join(' ');
-    if (hienTai.isEmpty) return phanMoi;
-    if (hienTai.endsWith('\n') || hienTai.endsWith(' ')) {
-      return '$hienTai$phanMoi';
-    }
-    return '$hienTai $phanMoi';
   }
 
   /// Tách chuỗi thành danh sách từ theo khoảng trắng — y hệt `_tachTu`.
@@ -1315,9 +1390,14 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       if (tienToChung > _tuDaChot.length) {
         // Chỉ đúng phần MỚI được coi là ổn định (tienToChung tăng thêm) mới
         // thật sự chốt cứng vào `_vanBanDaChot` — phần còn lại của tuMoi
-        // (dưới đây) vẫn chỉ là xem trước, chưa ghi đè lên bản chốt.
+        // (dưới đây) vẫn chỉ là xem trước, chưa ghi đè lên bản chốt. Chèn
+        // ĐÚNG TẠI NEO (`_neoChenMic`), không phải luôn ở cuối văn bản, rồi
+        // dời neo theo — xem chú thích ở khai báo `_neoChenMic`.
         final tuMoiChotThem = tuMoi.sublist(_tuDaChot.length, tienToChung);
-        _vanBanDaChot = _noiTiep(_vanBanDaChot, tuMoiChotThem);
+        final (vbMoi, neoMoi) =
+            _chenTuVaoViTri(_vanBanDaChot, _neoChenMic, tuMoiChotThem);
+        _vanBanDaChot = vbMoi;
+        _neoChenMic = neoMoi;
         _tuDaChot = tuMoi.sublist(0, tienToChung);
       }
       phanMoiCanNoi = tuMoi.sublist(_tuDaChot.length);
@@ -1334,14 +1414,21 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     }
 
     _partialTruocDo = tuMoi;
-    final vanBanHienThi = _noiTiep(_vanBanDaChot, phanMoiCanNoi);
-    setState(() => _ghiVanBanTuMicro(vanBanHienThi));
+    final (vanBanHienThi, viTriSauChen) =
+        _chenTuVaoViTri(_vanBanDaChot, _neoChenMic, phanMoiCanNoi);
+    setState(
+        () => _ghiVanBanTuMicro(vanBanHienThi, viTriConTro: viTriSauChen));
 
     if (xong) {
       // Kết quả FINAL: toàn bộ nội dung hiện có (kể cả phần xem trước) coi
-      // là chốt cứng, giữ nguyên văn.
+      // là chốt cứng, giữ nguyên văn. `_tuDaChot` dùng thẳng `tuMoi` (toàn
+      // bộ từ của phiên nói này, đã có sẵn) thay vì tách từ lại
+      // `vanBanHienThi` — vì `vanBanHienThi` giờ là NGUYÊN VĂN BẢN (chèn
+      // giữa chừng), tách từ lại nó sẽ lẫn cả những đoạn chữ khác không
+      // liên quan nằm trước/sau vị trí chèn.
       _vanBanDaChot = vanBanHienThi;
-      _tuDaChot = _tachTu(vanBanHienThi);
+      _neoChenMic = viTriSauChen;
+      _tuDaChot = tuMoi;
       _partialTruocDo = [];
     }
   }
@@ -1371,7 +1458,10 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       final tienToChung = _doDaiTienToChung(tuMoi, _partialTruocDo);
       if (tienToChung > _tuDaChot.length) {
         final tuMoiChotThem = tuMoi.sublist(_tuDaChot.length, tienToChung);
-        _vanBanDaChot = _noiTiep(_vanBanDaChot, tuMoiChotThem);
+        final (vbMoi, neoMoi) =
+            _chenTuVaoViTri(_vanBanDaChot, _neoChenMic, tuMoiChotThem);
+        _vanBanDaChot = vbMoi;
+        _neoChenMic = neoMoi;
         _tuDaChot = tuMoi.sublist(0, tienToChung);
       }
       phanMoiCanNoi = tuMoi.sublist(_tuDaChot.length);
@@ -1388,12 +1478,15 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     }
 
     _partialTruocDo = tuMoi;
-    final vanBanHienThi = _noiTiep(_vanBanDaChot, phanMoiCanNoi);
-    setState(() => _ghiVanBanTuMicro(vanBanHienThi));
+    final (vanBanHienThi, viTriSauChen) =
+        _chenTuVaoViTri(_vanBanDaChot, _neoChenMic, phanMoiCanNoi);
+    setState(
+        () => _ghiVanBanTuMicro(vanBanHienThi, viTriConTro: viTriSauChen));
 
     if (xong) {
       _vanBanDaChot = vanBanHienThi;
-      _tuDaChot = _tachTu(vanBanHienThi);
+      _neoChenMic = viTriSauChen;
+      _tuDaChot = tuMoi;
       _partialTruocDo = [];
     }
   }
@@ -1440,12 +1533,18 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     }
 
     // Nhánh điện thoại không có FINAL đáng tin cậy — chốt cứng ngay mỗi lần
-    // có nội dung mới, để không bao giờ mất chữ đã hiện ra. CHỈ NỐI THÊM
-    // vào `_vanBanDaChot` (giữ nguyên văn, kể cả xuống dòng gõ tay), không
-    // bao giờ dựng lại bằng join(' ') từ danh sách từ.
-    _vanBanDaChot = _noiTiep(_vanBanDaChot, tuThemVao);
-    _tuDaChot = _tachTu(_vanBanDaChot);
-    setState(() => _ghiVanBanTuMicro(_vanBanDaChot));
+    // có nội dung mới, để không bao giờ mất chữ đã hiện ra. CHỈ NỐI THÊM,
+    // không bao giờ dựng lại bằng join(' ') từ danh sách từ — nhưng chèn
+    // ĐÚNG TẠI NEO (`_neoChenMic`), không phải luôn ở cuối văn bản.
+    final (vbMoi, neoMoi) =
+        _chenTuVaoViTri(_vanBanDaChot, _neoChenMic, tuThemVao);
+    _vanBanDaChot = vbMoi;
+    _neoChenMic = neoMoi;
+    // `_tuDaChot` đại diện cho phần "đã chốt" NGAY TRƯỚC neo — tính lại từ
+    // đúng đoạn đó (không phải toàn bộ văn bản, kẻo lẫn chữ không liên quan
+    // nằm sau vị trí chèn) để lần dò điểm nối tiếp theo so khớp đúng chỗ.
+    _tuDaChot = _tachTu(_vanBanDaChot.substring(0, _neoChenMic));
+    setState(() => _ghiVanBanTuMicro(_vanBanDaChot, viTriConTro: _neoChenMic));
   }
 
   @override
@@ -1621,6 +1720,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                           setState(() {
                             _ghiVanBanTuMicro('');
                             _vanBanDaChot = '';
+                            _neoChenMic = 0;
                             _tuDaChot = [];
                             _partialTruocDo = [];
                             _rawTruocDoTrongPhien = '';
