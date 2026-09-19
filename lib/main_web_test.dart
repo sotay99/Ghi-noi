@@ -41,7 +41,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v14';
+const _phienBanThuNghiem = 'v15';
 
 // (Chỉ import đúng MỘT file `speech_to_text/speech_to_text.dart` — y hệt
 // cách `trang_soan_thao.dart` đang dùng đã chứng minh hoạt động — thay vì
@@ -404,7 +404,31 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       final luong = await thietBiMedia.getUserMedia({'audio': true});
       _luongGhiAm = luong;
       _cacDoanGhiAm = [];
-      final boGhi = html.MediaRecorder(luong);
+      // Safari/WebKit KHÔNG hỗ trợ 'audio/webm' (mặc định của Chrome) — nếu
+      // ép ghi/gói bằng webm trên Safari, trình duyệt vẫn "ghi" được (không
+      // báo lỗi) nhưng dữ liệu thực chất ở định dạng khác, khiến thẻ
+      // <audio> không giải mã nổi và IM LẶNG không báo lỗi gì — rất có thể
+      // đây là lý do ghi âm không ra tiếng trên iPhone. Dò định dạng trình
+      // duyệt THỰC SỰ hỗ trợ trước khi ghi.
+      const cacDinhDangUuTien = [
+        'audio/mp4',
+        'audio/webm',
+        'audio/ogg',
+        'audio/wav',
+      ];
+      String? dinhDangDung;
+      for (final dd in cacDinhDangUuTien) {
+        if (html.MediaRecorder.isTypeSupported(dd)) {
+          dinhDangDung = dd;
+          break;
+        }
+      }
+      _ghiLog('Định dạng ghi âm trình duyệt hỗ trợ: '
+          '${dinhDangDung ?? "(không cái nào trong danh sách — dùng mặc "
+              "định của trình duyệt)"}');
+      final boGhi = dinhDangDung == null
+          ? html.MediaRecorder(luong)
+          : html.MediaRecorder(luong, {'mimeType': dinhDangDung});
       _boGhiAm = boGhi;
       boGhi.addEventListener('dataavailable', (suKien) {
         final doan = (suKien as html.BlobEvent).data;
@@ -412,6 +436,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       });
       boGhi.addEventListener('stop', (_) => _hoanTatGhiAm());
       boGhi.start();
+      _ghiLog('MediaRecorder.mimeType thực tế: "${boGhi.mimeType}"');
       setState(() {
         _dangGhiAm = true;
         _loi = '';
@@ -424,7 +449,14 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   }
 
   void _hoanTatGhiAm() {
-    final blob = html.Blob(_cacDoanGhiAm, 'audio/webm');
+    // Dùng ĐÚNG mimeType mà bộ ghi thật sự đã dùng (đọc lại từ chính đối
+    // tượng MediaRecorder) — không đoán/ép cứng, vì mỗi trình duyệt trả về
+    // một định dạng khác nhau (xem log lúc bắt đầu ghi).
+    final loaiThuc = _boGhiAm?.mimeType;
+    final blob = html.Blob(
+      _cacDoanGhiAm,
+      (loaiThuc == null || loaiThuc.isEmpty) ? 'audio/mp4' : loaiThuc,
+    );
     final url = html.Url.createObjectUrlFromBlob(blob);
     if (_urlAmThanhDaGhi != null) {
       html.Url.revokeObjectUrl(_urlAmThanhDaGhi!);
@@ -1051,7 +1083,9 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                         message: 'Bật/tắt micro (Ctrl+G)',
                         child: InkWell(
                           customBorder: const CircleBorder(),
-                          onTap: _sanSang ? _bamNutMicro : null,
+                          onTap: (_sanSang && !_dangGhiAm)
+                              ? _bamNutMicro
+                              : null,
                           child: Container(
                             width: 44,
                             height: 44,
