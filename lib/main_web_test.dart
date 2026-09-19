@@ -41,7 +41,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v11';
+const _phienBanThuNghiem = 'v12';
 
 // (Chỉ import đúng MỘT file `speech_to_text/speech_to_text.dart` — y hệt
 // cách `trang_soan_thao.dart` đang dùng đã chứng minh hoạt động — thay vì
@@ -177,6 +177,18 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
 
   Timer? _henBatLai;
 
+  // Đếm số lần lỗi liên tiếp KHÔNG kèm bất kỳ chữ nào (không có partial nào
+  // trước khi lỗi) — dấu hiệu bộ nhận dạng bị chặn ngay từ đầu chứ không
+  // phải lỗi tạm thời giữa chừng. Thấy thật trên iPhone (Safari/WebKit):
+  // liên tục "onError: aborted" ngay sau "onStatus: listening", lặp hàng
+  // chục lần một giây — nhiều khả năng do WebKit trên iOS đòi hỏi mỗi lần
+  // bắt đầu nhận dạng phải xuất phát trực tiếp từ một cử chỉ bấm tay của
+  // người dùng (không cho tự động bật lại bằng Timer như Android/PC vẫn
+  // làm được). Dừng vòng lặp lại càng sớm càng tốt để khỏi xả pin/CPU vô
+  // ích và báo rõ cho người dùng biết thay vì im lặng treo.
+  int _soLanLoiLienTiepKhongChu = 0;
+  static const _nguongDungTuBatLai = 4;
+
   @override
   void initState() {
     super.initState();
@@ -237,6 +249,28 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     _ghiLog('onError: $maLoi ${nhe ? "(nhẹ, tự bật lại)" : "(HIỂN THỊ ĐỎ)"}');
     if (!nhe && mounted) {
       setState(() => _loi = 'Lỗi: $maLoi');
+    }
+
+    _soLanLoiLienTiepKhongChu++;
+    if (_soLanLoiLienTiepKhongChu >= _nguongDungTuBatLai) {
+      // Đã thử tự bật lại nhiều lần liên tiếp mà lần nào cũng lỗi ngay lập
+      // tức, không có lấy một chữ nào — dừng hẳn vòng lặp, không đoán mò
+      // thêm nữa, để người dùng biết mà tự bấm lại bằng tay.
+      _ghiLog('Lỗi liên tiếp $_soLanLoiLienTiepKhongChu lần không kèm chữ '
+          'nào — dừng tự bật lại micro. Có thể ${_tenThietBi(_thietBi)} '
+          'không cho tự động bật micro mà cần người dùng tự bấm nút mỗi '
+          'lần.');
+      _henBatLai?.cancel();
+      _muonNghe = false;
+      if (mounted) {
+        setState(() {
+          _dangNghe = false;
+          _loi = 'Micro liên tục bị lỗi "$maLoi" ngay khi vừa bật, không '
+              'nói được câu nào. Có thể trình duyệt này không cho tự động '
+              'bật lại micro — hãy bấm nút micro lại bằng tay sau mỗi câu.';
+        });
+      }
+      return;
     }
     _henNgheLai();
   }
@@ -318,6 +352,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     if (_muonNghe) {
       _tatNghe();
     } else {
+      _soLanLoiLienTiepKhongChu = 0; // người dùng tự bấm — cho thử lại từ đầu.
       setState(() {
         _muonNghe = true;
         _loi = '';
@@ -585,6 +620,8 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     _ghiLog('${xong ? "FINAL" : "partial"}: "$noi"');
 
     if (noi.isEmpty) return;
+    // Có chữ thật — bộ đếm lỗi-liên-tiếp-không-chữ hết ý nghĩa, xoá về 0.
+    _soLanLoiLienTiepKhongChu = 0;
 
     switch (_thietBi) {
       case ThietBi.android:
@@ -771,195 +808,220 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       },
       child: Focus(
         autofocus: true,
+        // Không dùng AppBar nữa — tên trang giờ nằm trong thân trang (xem
+        // bên dưới), theo đúng thứ tự người dùng yêu cầu: khung nhập lên
+        // đầu, kế đến thanh micro/nhật ký, rồi mới tới tên trang và cuối
+        // cùng là bộ chọn thiết bị.
         child: Scaffold(
-      appBar: AppBar(
-        title: const Text('Flowrite — thử micro trên Web ($_phienBanThuNghiem)'),
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Nút chuyển thiết bị — cố tình KHÔNG đặt trong AppBar nữa
-              // (chữ trắng từng bị chìm mất trên nền AppBar gần trắng của
-              // Material 3). Đặt hẳn trong thân trang, có khung nền riêng
-              // để luôn nổi bật bất kể theme màu gì.
-              Container(
-                padding: const EdgeInsets.all(8),
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      'Thiết bị đang chọn:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 6),
-                    SegmentedButton<ThietBi>(
-                      segments: const [
-                        ButtonSegment(
-                          value: ThietBi.android,
-                          icon: Icon(Icons.android),
-                          label: Text('Android'),
-                        ),
-                        ButtonSegment(
-                          value: ThietBi.pc,
-                          icon: Icon(Icons.laptop_mac),
-                          label: Text('PC/Mac'),
-                        ),
-                        ButtonSegment(
-                          value: ThietBi.iphone,
-                          icon: Icon(Icons.phone_iphone),
-                          label: Text('iPhone'),
-                        ),
-                      ],
-                      selected: {_thietBi},
-                      onSelectionChanged: (chon) =>
-                          _doiCheDoThietBi(chon.first),
-                      style: SegmentedButton.styleFrom(
-                        selectedBackgroundColor: Colors.blue.shade700,
-                        selectedForegroundColor: Colors.white,
+          body: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Các thông báo quan trọng (đang xin quyền / lỗi) vẫn cố
+                  // tình đặt trên cùng — chỉ hiện khi thật sự cần, không
+                  // choán chỗ lúc bình thường.
+                  if (!_sanSang)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        'Đang khởi tạo micro… nếu trình duyệt hỏi quyền, '
+                        'hãy chọn Cho phép.',
+                        style: TextStyle(color: Colors.orange),
                       ),
                     ),
-                  ],
-                ),
-              ),
-              if (!_sanSang)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    'Đang khởi tạo micro… nếu trình duyệt hỏi quyền, hãy '
-                    'chọn Cho phép.',
-                    style: TextStyle(color: Colors.orange),
-                  ),
-                ),
-              if (_loi.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(_loi, style: const TextStyle(color: Colors.red)),
-                ),
-              Row(
-                children: [
-                  Icon(
-                    _dangNghe ? Icons.circle : Icons.circle_outlined,
-                    size: 12,
-                    color: _dangNghe ? Colors.red : Colors.grey,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(_dangNghe ? 'Đang nghe' : 'Không nghe'),
-                  const Spacer(),
-                  Text('PARTIAL: $_soLanPartial   FINAL: $_soLanFinal'),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  const Text('Kết quả (gõ tay được — gõ phím sẽ tắt micro '
-                      'ngay, tự bật lại sau 1 giây)',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: _saoChepVanBan,
-                    child: const Text('Sao chép tất cả'),
-                  ),
-                ],
-              ),
-              Expanded(
-                // Không giới hạn flex — nhật ký đã chuyển vào modal riêng
-                // (nút nhỏ cạnh micro), nên khung nhập được dùng gần hết
-                // chỗ trống, dễ thao tác trên màn hình hẹp của điện thoại.
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade400),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: TextField(
-                    controller: _boDieuKhienVanBan,
-                    onChanged: _khiNguoiDungGoPhim,
-                    maxLines: null,
-                    expands: true,
-                    textAlignVertical: TextAlignVertical.top,
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      hintText: '(chưa có chữ nào — nói hoặc gõ vào đây)',
+                  if (_loi.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        _loi,
+                        style: const TextStyle(color: Colors.red),
+                      ),
                     ),
-                    style: const TextStyle(fontSize: 18, height: 1.5),
+
+                  // Khung nhập liệu — lên đầu tiên.
+                  Row(
+                    children: [
+                      const Text(
+                        'Kết quả (gõ tay được — gõ phím sẽ tắt micro ngay, '
+                        'tự bật lại sau 1 giây)',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: _saoChepVanBan,
+                        child: const Text('Sao chép tất cả'),
+                      ),
+                    ],
                   ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  TextButton(
-                    onPressed: () {
-                      setState(() {
-                        _ghiVanBanTuMicro('');
-                        _vanBanDaChot = '';
-                        _tuDaChot = [];
-                        _partialTruocDo = [];
-                        _rawTruocDoTrongPhien = '';
-                        _soLanPartial = 0;
-                        _soLanFinal = 0;
-                      });
-                      _ghiLog('Xoá để thử lại.');
-                    },
-                    child: const Text('Xoá để thử lại'),
-                  ),
-                  const SizedBox(width: 16),
-                  // Nút nhật ký — nhỏ, mở modal riêng thay vì chiếm chỗ
-                  // ngay trên trang như trước.
-                  Tooltip(
-                    message: 'Xem nhật ký',
-                    child: IconButton(
-                      onPressed: _moModalNhatKy,
-                      icon: const Icon(Icons.receipt_long),
+                  Expanded(
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: TextField(
+                        controller: _boDieuKhienVanBan,
+                        onChanged: _khiNguoiDungGoPhim,
+                        maxLines: null,
+                        expands: true,
+                        textAlignVertical: TextAlignVertical.top,
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          hintText: '(chưa có chữ nào — nói hoặc gõ vào đây)',
+                        ),
+                        style: const TextStyle(fontSize: 18, height: 1.5),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  // Nút micro — thu nhỏ lại giống kiểu nút trong app APK,
-                  // có phím tắt Ctrl+G (xem `CallbackShortcuts` bao ngoài).
-                  Tooltip(
-                    message: 'Bật/tắt micro (Ctrl+G)',
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: _sanSang ? _bamNutMicro : null,
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _muonNghe
-                              ? Colors.red
-                              : Colors.lightGreen.shade200,
-                          border: Border.all(
-                            color: Colors.blue.shade900,
-                            width: 2,
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        _dangNghe ? Icons.circle : Icons.circle_outlined,
+                        size: 12,
+                        color: _dangNghe ? Colors.red : Colors.grey,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(_dangNghe ? 'Đang nghe' : 'Không nghe'),
+                      const Spacer(),
+                      Text('PARTIAL: $_soLanPartial   FINAL: $_soLanFinal'),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Thanh ngang chứa nút Xoá / Nhật ký / Micro.
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _ghiVanBanTuMicro('');
+                            _vanBanDaChot = '';
+                            _tuDaChot = [];
+                            _partialTruocDo = [];
+                            _rawTruocDoTrongPhien = '';
+                            _soLanPartial = 0;
+                            _soLanFinal = 0;
+                          });
+                          _ghiLog('Xoá để thử lại.');
+                        },
+                        child: const Text('Xoá để thử lại'),
+                      ),
+                      const SizedBox(width: 16),
+                      // Nút nhật ký — nhỏ, mở modal riêng thay vì chiếm chỗ
+                      // ngay trên trang như trước.
+                      Tooltip(
+                        message: 'Xem nhật ký',
+                        child: IconButton(
+                          onPressed: _moModalNhatKy,
+                          icon: const Icon(Icons.receipt_long),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Nút micro — thu nhỏ lại giống kiểu nút trong app
+                      // APK, có phím tắt Ctrl+G (xem `CallbackShortcuts`
+                      // bao ngoài).
+                      Tooltip(
+                        message: 'Bật/tắt micro (Ctrl+G)',
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: _sanSang ? _bamNutMicro : null,
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _muonNghe
+                                  ? Colors.red
+                                  : Colors.lightGreen.shade200,
+                              border: Border.all(
+                                color: Colors.blue.shade900,
+                                width: 2,
+                              ),
+                            ),
+                            alignment: Alignment.center,
+                            child: Icon(
+                              _muonNghe ? Icons.mic : Icons.mic_none,
+                              color: _muonNghe
+                                  ? Colors.white
+                                  : Colors.blue.shade900,
+                              size: 22,
+                            ),
                           ),
                         ),
-                        alignment: Alignment.center,
-                        child: Icon(
-                          _muonNghe ? Icons.mic : Icons.mic_none,
-                          color: _muonNghe ? Colors.white : Colors.blue.shade900,
-                          size: 22,
-                        ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Tên trang.
+                  Center(
+                    child: Text(
+                      'Flowrite — thử micro trên Web ($_phienBanThuNghiem)',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Thiết bị đang chọn — cố tình KHÔNG đặt trong AppBar
+                  // (chữ trắng từng bị chìm mất trên nền AppBar gần trắng
+                  // của Material 3). Khung nền riêng để luôn nổi bật.
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text(
+                          'Thiết bị đang chọn:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 6),
+                        SegmentedButton<ThietBi>(
+                          segments: const [
+                            ButtonSegment(
+                              value: ThietBi.android,
+                              icon: Icon(Icons.android),
+                              label: Text('Android'),
+                            ),
+                            ButtonSegment(
+                              value: ThietBi.pc,
+                              icon: Icon(Icons.laptop_mac),
+                              label: Text('PC/Mac'),
+                            ),
+                            ButtonSegment(
+                              value: ThietBi.iphone,
+                              icon: Icon(Icons.phone_iphone),
+                              label: Text('iPhone'),
+                            ),
+                          ],
+                          selected: {_thietBi},
+                          onSelectionChanged: (chon) =>
+                              _doiCheDoThietBi(chon.first),
+                          style: SegmentedButton.styleFrom(
+                            selectedBackgroundColor: Colors.blue.shade700,
+                            selectedForegroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
         ),
       ),
     );
