@@ -41,30 +41,33 @@
 // - (v18) Thẻ hiện NGAY lúc bắt đầu ghi (token tĩnh "đang ghi âm", đồng hồ
 //   đếm giờ hiển thị ở hàng tiêu đề "Kết quả", KHÔNG nhét vào trong nội
 //   dung văn bản để tránh xung đột với gõ tay), đổi thành "Thẻ ghi âm số N"
-//   khi dừng. Gõ tay trong lúc đang ghi thẻ sẽ HUỶ NGAY bản ghi dở đó (gõ
-//   tay luôn thắng micro, kể cả đang ghi âm — `_huyGhiAmDangDoDoGoTay`).
-//   Trên iPhone, nút micro CHÍNH (nút xanh lá) giờ gọi thẳng cơ chế ghi-âm
-//   -rồi-gửi-Gemini thay vì thử Web Speech API (vốn không chạy được trên
-//   iOS). Bàn phím ảo hiện lên thì ẩn hết các hàng bên dưới khung nhập, để
-//   khung nhập giãn hết cỡ phần còn lại phía trên bàn phím.
-// - (v19) Vá 4 lỗi người dùng báo sau khi thử v18:
-//   1. Gõ tay huỷ một thẻ đang ghi dở KHÔNG còn để lại token "đang ghi âm"
-//      làm rác nữa — nguyên nhân cũ: `MediaRecorder.stop()` vẫn bắn sự
-//      kiện 'stop' sau đó nên `_hoanTatGhiAm` vẫn chạy như bình thường và
-//      chèn thẻ mới sai chỗ; nay có cờ `_dangHuyGhiAmDoGoTay` để phân biệt,
-//      và dọn sạch token bằng `_xoaTokenDangGhiKhoiVanBan`.
-//   2. "Tạo văn bản" tự dọn nốt token "đang ghi âm" còn sót (lưới an toàn).
-//   3. Thêm log chẩn đoán cho ca "gõ dấu ngoặc lúc đang ghi mà không tắt"
-//      (nghi ngờ là hệ quả của lỗi #1, chưa có bằng chứng chắc chắn khác).
-//   4. Thẻ giờ KHÔNG thể sửa/xoá từng ký tự bên trong — `_ChanSuaGiuaThe`
-//      (một `TextInputFormatter`) phóng to mọi chỉnh sửa chồng lấn một
-//      phần vùng thẻ thành xoá TRỌN thẻ, và đẩy con trỏ ra khỏi giữa thẻ
-//      khi chỉ di chuyển (không gõ). Thẻ cũng được tô màu: "Ghi âm N" màu
-//      xanh lá, token "đang ghi âm" màu đỏ (`_BoDieuKhienVanBanCoThe`,
-//      override `buildTextSpan`).
-//   Ngoài ra: bỏ hai nút "Nghe lại"/"Tải xuống" (không cần nữa, cơ chế ghi
-//   âm đã kiểm chứng ổn định); trên iPhone ẩn nút "Ghi âm" riêng vì nút
-//   micro chính đã làm đúng việc đó rồi (tránh hai nút trùng chức năng).
+//   khi dừng. Trên iPhone, nút micro CHÍNH (nút xanh lá) giờ gọi thẳng cơ
+//   chế ghi-âm-rồi-gửi-Gemini thay vì thử Web Speech API (vốn không chạy
+//   được trên iOS). Bàn phím ảo hiện lên thì ẩn hết các hàng bên dưới khung
+//   nhập, để khung nhập giãn hết cỡ phần còn lại phía trên bàn phím.
+// - (v19) Thẻ giờ KHÔNG thể sửa/xoá từng ký tự bên trong — `_ChanSuaGiuaThe`
+//   (một `TextInputFormatter`) phóng to mọi chỉnh sửa chồng lấn một phần
+//   vùng thẻ thành xoá TRỌN thẻ, và đẩy con trỏ ra khỏi giữa thẻ khi chỉ di
+//   chuyển (không gõ). Thẻ cũng được tô màu: "Ghi âm N" xanh lá, token
+//   "đang ghi âm" đỏ (`_BoDieuKhienVanBanCoThe`, override `buildTextSpan`).
+//   Bỏ hai nút "Nghe lại"/"Tải xuống"; trên iPhone ẩn nút "Ghi âm" riêng vì
+//   nút micro chính đã làm đúng việc đó rồi.
+// - (v20) Sửa TẬN GỐC lỗi "gõ tay lúc đang ghi làm token rác/thứ tự sai":
+//   thiết kế cũ (v18/v19) COI gõ tay là HUỶ bản ghi, nhưng `MediaRecorder.
+//   stop()` luôn bắn sự kiện 'stop' bất đồng bộ SAU ĐÓ — trong khoảng chờ
+//   đó (có thể trải qua nhiều phím gõ tiếp theo) token "đang ghi âm" vẫn
+//   còn nằm lù lù trong văn bản như chữ thật, gây đúng các lỗi đã gặp.
+//   Nay đổi hẳn cách hiểu: gõ tay trong lúc ghi KHÔNG huỷ mà CHỐT NGAY
+//   (đồng bộ, không đợi 'stop') thẻ đang ghi thành "〔🎙️ Ghi âm N〕" tại
+//   đúng vị trí cũ, rồi BẮT ĐẦU MỘT THẺ MỚI ngay sau ký tự vừa gõ, dùng lại
+//   đúng luồng mic đã xin quyền — ghi âm tiếp tục liền mạch, tách thành hai
+//   thẻ, không mất tiếng, không còn token rác. Số thẻ được DÀNH SẴN ngay
+//   lúc bắt đầu ghi (`_soTheDangGhiHienTai`), không đợi tới lúc có blob âm
+//   thanh — sự kiện 'stop' giờ CHỈ lưu blob vào đúng số thẻ đã dành sẵn,
+//   không động gì tới văn bản nữa. `_chenTheGhiAmVaoVanBan` cũng được sửa
+//   để GIỮ NGUYÊN vị trí tương đối của con trỏ so với phần chữ nằm sau
+//   token (ví dụ dấu phẩy vừa gõ), thay vì luôn đẩy con trỏ về ngay sau
+//   token — tránh lỗi con trỏ nhảy lùi đã gặp.
 //   CHƯA LÀM (còn nợ, sẽ làm khi có xác nhận thêm): tự kết thúc thẻ khi con
 //   trỏ DI CHUYỂN mà không gõ tay; chế độ tự động gửi ngầm các thẻ đã xong
 //   trong lúc ghi thẻ mới; gộp nhiều thẻ vào một lần gọi Gemini để có ngữ
@@ -90,7 +93,7 @@ import 'ai_cau_hinh.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v19';
+const _phienBanThuNghiem = 'v20';
 
 // `diaChiMayChuAI`/`matKhauMayChuAI` đến từ ai_cau_hinh.dart (import ở
 // trên) — máy chủ đó đã có sẵn action 'ghi_am' (xem cloud-function/
@@ -378,13 +381,9 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   // sau này nếu ổn thì gửi file ghi được cho một AI khác (vd Gemini) nghe
   // và chuyển thành chữ — đường vòng khi trình duyệt tự nhận dạng không ăn
   // thua trên iOS.
-  html.MediaStream? _luongGhiAm;
-  html.MediaRecorder? _boGhiAm;
-  List<html.Blob> _cacDoanGhiAm = [];
+  html.MediaStream? _luongGhiAm; // tái sử dụng qua NHIỀU thẻ liên tiếp.
+  html.MediaRecorder? _boGhiAm; // recorder của thẻ ĐANG ghi hiện tại.
   bool _dangGhiAm = false;
-  String? _urlAmThanhDaGhi;
-  html.AudioElement? _phatLaiAmThanh;
-  bool _dangPhatLai = false;
 
   // ---- Ghi âm NHIỀU LẦN, chèn thành "thẻ" giữa các đoạn gõ tay (dành riêng
   // cho iPhone, nơi Web Speech API không hoạt động). Mỗi lần dừng ghi âm,
@@ -409,21 +408,19 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   Timer? _bomDongHoGhiAm;
   Duration _thoiLuongDangGhi = Duration.zero;
   int? _viTriTokenDangGhi; // vị trí ký tự bắt đầu của token đang ghi dở.
+
+  // Số thẻ đã DÀNH SẴN cho lần ghi đang chạy — gán NGAY lúc bắt đầu ghi
+  // (không đợi tới lúc dữ liệu âm thanh sẵn sàng ở sự kiện 'stop', vốn bất
+  // đồng bộ), để việc CHỐT thẻ (do bấm dừng tay, hoặc do gõ phím giữa
+  // chừng) có thể đổi ngay token hiển thị trong văn bản mà không phải chờ.
+  int? _soTheDangGhiHienTai;
   static const String _tenTokenDangGhi = '〔🎙️ … đang ghi âm …〕';
 
   // Bỏ qua ĐÚNG MỘT lần kiểm tra "gõ tay trong lúc đang ghi" trong
   // `_khiNguoiDungGoPhim` — dùng khi chính code (không phải người dùng) vừa
   // chèn/thay token bằng cách gán `.value` (việc đó tự khiến `onChanged`
-  // bắn ra), để không hiểu nhầm chính hành động chèn token là "người dùng
-  // gõ tay huỷ bản ghi".
+  // bắn ra), để không hiểu nhầm chính hành động đó là "người dùng gõ tay".
   bool _boQuaKiemTraGoTrongLucGhiMotLan = false;
-
-  // Đặt TRUE bởi `_huyGhiAmDangDoDoGoTay` khi gõ tay huỷ một lần ghi dở —
-  // `MediaRecorder.stop()` vẫn luôn bắn sự kiện 'stop' SAU ĐÓ (bất đồng bộ),
-  // nên `_hoanTatGhiAm` vẫn sẽ được gọi như một lần ghi bình thường nếu
-  // không có cờ này để phân biệt. Khi cờ này bật, `_hoanTatGhiAm` KHÔNG tạo
-  // thẻ mới — chỉ dọn sạch token "đang ghi âm" còn sót trong văn bản.
-  bool _dangHuyGhiAmDoGoTay = false;
 
   // Đếm số lần lỗi liên tiếp KHÔNG kèm bất kỳ chữ nào (không có partial nào
   // trước khi lỗi) — dấu hiệu bộ nhận dạng bị chặn ngay từ đầu chứ không
@@ -617,11 +614,11 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     }
   }
 
-  // ------------------------------------------------ ghi âm thô + nghe lại
+  // ------------------------------------------------ ghi âm thô theo thẻ
 
   Future<void> _bamNutGhiAm() async {
     if (_dangGhiAm) {
-      _boGhiAm?.stop();
+      _dungHanGhiAm();
       return;
     }
     // Tắt hẳn vòng Web Speech API trước khi ghi âm thô — hai bên cùng
@@ -640,53 +637,12 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       return;
     }
     try {
-      final luong = await thietBiMedia.getUserMedia({'audio': true});
-      _luongGhiAm = luong;
-      _cacDoanGhiAm = [];
-      // Safari/WebKit KHÔNG hỗ trợ 'audio/webm' (mặc định của Chrome) — nếu
-      // ép ghi/gói bằng webm trên Safari, trình duyệt vẫn "ghi" được (không
-      // báo lỗi) nhưng dữ liệu thực chất ở định dạng khác, khiến thẻ
-      // <audio> không giải mã nổi và IM LẶNG không báo lỗi gì — rất có thể
-      // đây là lý do ghi âm không ra tiếng trên iPhone. Dò định dạng trình
-      // duyệt THỰC SỰ hỗ trợ trước khi ghi.
-      const cacDinhDangUuTien = [
-        'audio/mp4',
-        'audio/webm',
-        'audio/ogg',
-        'audio/wav',
-      ];
-      String? dinhDangDung;
-      for (final dd in cacDinhDangUuTien) {
-        if (html.MediaRecorder.isTypeSupported(dd)) {
-          dinhDangDung = dd;
-          break;
-        }
-      }
-      _ghiLog('Định dạng ghi âm trình duyệt hỗ trợ: '
-          '${dinhDangDung ?? "(không cái nào trong danh sách — dùng mặc "
-              "định của trình duyệt)"}');
-      final boGhi = dinhDangDung == null
-          ? html.MediaRecorder(luong)
-          : html.MediaRecorder(luong, {'mimeType': dinhDangDung});
-      _boGhiAm = boGhi;
-      boGhi.addEventListener('dataavailable', (suKien) {
-        final doan = (suKien as html.BlobEvent).data;
-        if (doan != null && doan.size > 0) _cacDoanGhiAm.add(doan);
-      });
-      boGhi.addEventListener('stop', (_) => _hoanTatGhiAm());
-      boGhi.start();
-      _ghiLog('MediaRecorder.mimeType thực tế: "${boGhi.mimeType}"');
+      _luongGhiAm = await thietBiMedia.getUserMedia({'audio': true});
       setState(() {
         _dangGhiAm = true;
         _loi = '';
-        _thoiLuongDangGhi = Duration.zero;
       });
-      _chenTokenDangGhiVaoVanBan();
-      _bomDongHoGhiAm?.cancel();
-      _bomDongHoGhiAm = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (!mounted) return;
-        setState(() => _thoiLuongDangGhi += const Duration(seconds: 1));
-      });
+      _batDauMotThe();
       _ghiLog('Bắt đầu ghi âm thử (không qua Web Speech API).');
     } catch (e) {
       _ghiLog('Lỗi khi xin quyền/ghi âm: $e');
@@ -694,133 +650,137 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     }
   }
 
-  /// Chèn token tĩnh "đang ghi âm" NGAY khi bắt đầu ghi (không đợi tới lúc
-  /// dừng) — để người dùng thấy ngay trong văn bản có một thẻ đang hình
-  /// thành. Ghi lại vị trí ký tự để lúc dừng ghi thay ĐÚNG token này bằng
-  /// "Thẻ ghi âm số N", không chèn thêm token mới.
+  /// Bắt đầu MỘT PHIÊN `MediaRecorder` mới trên `_luongGhiAm` đã xin quyền
+  /// sẵn — dùng cả lúc bấm nút ghi lần đầu VÀ lúc tách thẻ giữa chừng do gõ
+  /// tay (xem `_chotTheDoGoTayVaBatDauTheMoi`). Số thẻ được DÀNH SẴN ngay
+  /// tại đây, KHÔNG đợi tới lúc dữ liệu âm thanh sẵn sàng (sự kiện 'stop'
+  /// bất đồng bộ) — nhờ vậy lúc cần chốt thẻ có thể đổi ngay token hiển thị
+  /// mà không phải chờ, tránh đúng lỗi "token rác" đã gặp trước đây.
+  void _batDauMotThe() {
+    final luong = _luongGhiAm;
+    if (luong == null) return;
+    // Safari/WebKit KHÔNG hỗ trợ 'audio/webm' (mặc định của Chrome) — nếu
+    // ép ghi/gói bằng webm trên Safari, trình duyệt vẫn "ghi" được (không
+    // báo lỗi) nhưng dữ liệu thực chất ở định dạng khác, khiến thẻ <audio>
+    // không giải mã nổi và IM LẶNG không báo lỗi gì. Dò định dạng trình
+    // duyệt THỰC SỰ hỗ trợ trước khi ghi.
+    const cacDinhDangUuTien = [
+      'audio/mp4',
+      'audio/webm',
+      'audio/ogg',
+      'audio/wav',
+    ];
+    String? dinhDangDung;
+    for (final dd in cacDinhDangUuTien) {
+      if (html.MediaRecorder.isTypeSupported(dd)) {
+        dinhDangDung = dd;
+        break;
+      }
+    }
+    final boGhi = dinhDangDung == null
+        ? html.MediaRecorder(luong)
+        : html.MediaRecorder(luong, {'mimeType': dinhDangDung});
+    final soThe = _soThuTuGhiAmTiepTheo++;
+    final doanGhi = <html.Blob>[];
+    _boGhiAm = boGhi;
+    _soTheDangGhiHienTai = soThe;
+    boGhi.addEventListener('dataavailable', (suKien) {
+      final doan = (suKien as html.BlobEvent).data;
+      if (doan != null && doan.size > 0) doanGhi.add(doan);
+    });
+    // Listener này CHỈ lưu blob vào đúng số thẻ đã dành sẵn — KHÔNG động gì
+    // tới văn bản nữa, vì token hiển thị đã được đổi thành "Ghi âm N" NGAY
+    // LÚC CHỐT (đồng bộ, xem `_dungHanGhiAm`/`_chotTheDoGoTayVaBatDauTheMoi`)
+    // chứ không đợi tới đây — sự kiện 'stop' luôn tới SAU (bất đồng bộ),
+    // nên nếu vẫn còn động vào văn bản ở đây sẽ chèn sai vị trí (đúng lỗi
+    // "token rác"/"chèn thẻ lộn xộn" đã gặp trước đây).
+    boGhi.addEventListener('stop', (_) {
+      final loaiThuc = boGhi.mimeType;
+      final blob =
+          html.Blob(doanGhi, loaiThuc.isEmpty ? 'audio/mp4' : loaiThuc);
+      _cacDoanGhiAmTheoThe[soThe] = blob;
+      _ghiLog('Thẻ #$soThe: ghi xong (${doanGhi.length} đoạn dữ liệu).');
+    });
+    boGhi.start();
+    _ghiLog('MediaRecorder.mimeType thực tế: "${boGhi.mimeType}" (thẻ #$soThe).');
+    _chenTokenDangGhiVaoVanBan();
+    _thoiLuongDangGhi = Duration.zero;
+    _bomDongHoGhiAm?.cancel();
+    _bomDongHoGhiAm = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() => _thoiLuongDangGhi += const Duration(seconds: 1));
+    });
+  }
+
+  /// Chèn token tĩnh "đang ghi âm" tại vị trí con trỏ HIỆN TẠI. Ghi lại vị
+  /// trí ký tự để lúc chốt thẻ (dừng tay hoặc gõ phím) thay ĐÚNG token này
+  /// bằng "〔🎙️ Ghi âm N〕", không chèn thêm token mới sai chỗ.
   void _chenTokenDangGhiVaoVanBan() {
     final vanBanCu = _boDieuKhienVanBan.text;
     var viTri = _boDieuKhienVanBan.selection.baseOffset;
     if (viTri < 0 || viTri > vanBanCu.length) viTri = vanBanCu.length;
-    final vanBanMoi =
-        vanBanCu.replaceRange(viTri, viTri, _tenTokenDangGhi);
+    final vanBanMoi = vanBanCu.replaceRange(viTri, viTri, _tenTokenDangGhi);
     _viTriTokenDangGhi = viTri;
     _boQuaKiemTraGoTrongLucGhiMotLan = true;
     _boDieuKhienVanBan.value = TextEditingValue(
       text: vanBanMoi,
-      selection: TextSelection.collapsed(offset: viTri + _tenTokenDangGhi.length),
+      selection:
+          TextSelection.collapsed(offset: viTri + _tenTokenDangGhi.length),
     );
     // KHÔNG gọi thẳng `_khiNguoiDungGoPhim` ở đây — gán `.value` cho
-    // controller đã tự khiến `TextField.onChanged` bắn ra (y hệt cách
-    // `_chenTheGhiAmVaoVanBan` vẫn làm), nên nó tự đi qua đúng đường xử lý
-    // gõ tay bình thường (chốt cứng đoạn mới, tắt micro...).
-    _ghiLog('Chèn token "đang ghi âm" tại vị trí ký tự $viTri.');
+    // controller đã tự khiến `TextField.onChanged` bắn ra, nên nó tự đi
+    // qua đúng đường xử lý gõ tay bình thường (chốt cứng đoạn mới...).
+    _ghiLog('Chèn token "đang ghi âm" tại vị trí ký tự $viTri (thẻ '
+        '#$_soTheDangGhiHienTai).');
   }
 
-  /// Nếu người dùng gõ tay trong lúc đang ghi thẻ, huỷ ngay bản ghi dở đó —
-  /// đúng nguyên tắc "gõ tay luôn luôn thắng micro kể cả đang ghi âm". Token
-  /// tĩnh đã chèn lúc bắt đầu ghi (nếu người dùng chưa xoá nó) được coi là
-  /// văn bản gõ tay bình thường từ giờ — không có thẻ nào được tạo ra cho
-  /// lần ghi bị huỷ này.
-  void _huyGhiAmDangDoDoGoTay() {
-    if (!_dangGhiAm) return;
-    _ghiLog('Người dùng gõ tay trong lúc đang ghi thẻ — huỷ bản ghi dở này '
-        '(gõ tay luôn thắng micro).');
-    _dangHuyGhiAmDoGoTay = true;
+  /// Bấm nút dừng bằng tay: CHỐT thẻ đang ghi thành "〔🎙️ Ghi âm N〕" và
+  /// dừng HẲN — không ghi tiếp, không có thẻ mới nào được tạo ra.
+  void _dungHanGhiAm() {
+    final soThe = _soTheDangGhiHienTai;
     _bomDongHoGhiAm?.cancel();
     _bomDongHoGhiAm = null;
-    _viTriTokenDangGhi = null;
-    _boGhiAm?.stop(); // sự kiện 'stop' vẫn tới sau — xem `_dangHuyGhiAmDoGoTay`.
+    if (soThe != null) _chenTheGhiAmVaoVanBan(soThe);
+    _boGhiAm?.stop();
+    _boGhiAm = null;
+    _soTheDangGhiHienTai = null;
     for (final track in _luongGhiAm?.getTracks() ?? const []) {
       track.stop();
     }
+    _luongGhiAm = null;
     if (mounted) setState(() => _dangGhiAm = false);
+    _ghiLog('Dừng ghi âm theo yêu cầu — đã chốt thẻ #$soThe.');
   }
 
-  /// Xoá token tĩnh "đang ghi âm" khỏi văn bản — dùng khi một lần ghi bị
-  /// huỷ do gõ tay (xem `_dangHuyGhiAmDoGoTay`), để không để lại rác. Tìm
-  /// bằng NỘI DUNG token (không dùng lại vị trí đã lưu trước đó), vì văn
-  /// bản có thể đã đổi (người dùng vừa gõ thêm) giữa lúc huỷ và lúc sự kiện
-  /// 'stop' thực sự tới.
-  void _xoaTokenDangGhiKhoiVanBan() {
-    final vanBanCu = _boDieuKhienVanBan.text;
-    final viTri = vanBanCu.indexOf(_tenTokenDangGhi);
-    if (viTri < 0) return; // đã bị người dùng tự xoá/sửa trước đó — không sao.
-    final vanBanMoi =
-        vanBanCu.replaceRange(viTri, viTri + _tenTokenDangGhi.length, '');
-    _boDieuKhienVanBan.value = TextEditingValue(
-      text: vanBanMoi,
-      selection: TextSelection.collapsed(offset: viTri),
-    );
-    _ghiLog('Đã dọn token "đang ghi âm" còn sót (bản ghi vừa bị huỷ do gõ '
-        'tay) tại vị trí $viTri.');
-  }
-
-  void _hoanTatGhiAm() {
-    _bomDongHoGhiAm?.cancel();
-    _bomDongHoGhiAm = null;
-    if (_dangHuyGhiAmDoGoTay) {
-      _dangHuyGhiAmDoGoTay = false;
-      _xoaTokenDangGhiKhoiVanBan();
-      return;
-    }
-    // Dùng ĐÚNG mimeType mà bộ ghi thật sự đã dùng (đọc lại từ chính đối
-    // tượng MediaRecorder) — không đoán/ép cứng, vì mỗi trình duyệt trả về
-    // một định dạng khác nhau (xem log lúc bắt đầu ghi).
-    final loaiThuc = _boGhiAm?.mimeType;
-    final blob = html.Blob(
-      _cacDoanGhiAm,
-      (loaiThuc == null || loaiThuc.isEmpty) ? 'audio/mp4' : loaiThuc,
-    );
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    if (_urlAmThanhDaGhi != null) {
-      html.Url.revokeObjectUrl(_urlAmThanhDaGhi!);
-    }
-    for (final track in _luongGhiAm?.getTracks() ?? const []) {
-      track.stop();
-    }
-    // Gỡ thẻ <audio> cũ khỏi DOM trước khi tạo cái mới — một số bản WebKit
-    // phát ÂM THẦM (không lỗi, không tiếng) nếu thẻ audio được tạo bằng JS
-    // mà không thực sự nằm trong cây DOM, nên phải gắn hẳn vào <body>.
-    _phatLaiAmThanh?.pause();
-    _phatLaiAmThanh?.remove();
-    final audio = html.AudioElement()
-      ..src = url
-      ..style.display = 'none'
-      ..controls = false;
-    audio.onEnded.listen((_) {
-      if (mounted) setState(() => _dangPhatLai = false);
-    });
-    html.document.body?.append(audio);
-    _phatLaiAmThanh = audio;
-    // Gán số thẻ, lưu blob theo số thẻ, và chèn token đánh dấu vào đúng vị
-    // trí con trỏ trong khung nhập — đây là bước "chèn thẻ giữa các đoạn gõ
-    // tay" theo đúng yêu cầu, dành riêng cho luồng ghi-âm-nhiều-lần trên
-    // iPhone. Bản ghi lẻ ("Nghe lại"/"Tải xuống" phía trên) vẫn giữ nguyên
-    // để kiểm tra nhanh, độc lập với cơ chế thẻ.
-    final soThe = _soThuTuGhiAmTiepTheo++;
-    _cacDoanGhiAmTheoThe[soThe] = blob;
-    if (mounted) {
-      setState(() {
-        _urlAmThanhDaGhi = url;
-        _dangGhiAm = false;
-        _dangPhatLai = false;
-      });
-    }
-    _chenTheGhiAmVaoVanBan(soThe);
-    _ghiLog('Ghi âm xong (${_cacDoanGhiAm.length} đoạn dữ liệu, thẻ #$soThe) '
-        '— bấm "Nghe lại" để kiểm tra nhanh, hoặc "Tạo văn bản" để gửi tất '
-        'cả thẻ cho Gemini phiên âm.');
+  /// Người dùng gõ tay trong lúc thẻ đang ghi dở: đúng nguyên tắc "gõ tay
+  /// luôn luôn thắng micro kể cả đang ghi âm", nhưng ở đây "thắng" nghĩa là
+  /// CHỐT NGAY thẻ đang ghi thành thẻ hoàn chỉnh tại đúng vị trí cũ (trước
+  /// ký tự vừa gõ), rồi bắt đầu một thẻ MỚI ngay sau chỗ vừa gõ để ghi âm
+  /// tiếp tục liền mạch — KHÔNG làm mất bản ghi, chỉ tách nó thành hai thẻ.
+  /// Dùng lại đúng `_luongGhiAm` đã xin quyền, không xin lại từ đầu.
+  void _chotTheDoGoTayVaBatDauTheMoi() {
+    if (!_dangGhiAm) return;
+    final soTheCu = _soTheDangGhiHienTai;
+    _ghiLog('Người dùng gõ tay trong lúc đang ghi thẻ #$soTheCu — chốt '
+        'ngay thành thẻ hoàn chỉnh, bắt đầu thẻ MỚI tiếp tục ghi ngay sau '
+        'chỗ vừa gõ.');
+    if (soTheCu != null) _chenTheGhiAmVaoVanBan(soTheCu);
+    _boGhiAm?.stop(); // 'stop' sẽ tới sau, chỉ để lưu blob vào thẻ #$soTheCu.
+    _batDauMotThe(); // thẻ mới, dùng lại đúng `_luongGhiAm` hiện có.
   }
 
   /// Thay ĐÚNG token tĩnh "đang ghi âm" (chèn lúc bắt đầu ghi, xem
-  /// `_chenTokenDangGhiVaoVanBan`) bằng "〔🎙️ Ghi âm N〕" — nếu vì lý do gì
-  /// đó không còn tìm thấy token đó nữa (người dùng đã xoá/sửa nó trong lúc
-  /// ghi), rơi về hành vi cũ: chèn thẻ mới tại vị trí con trỏ hiện tại.
+  /// `_chenTokenDangGhiVaoVanBan`) bằng "〔🎙️ Ghi âm N〕", GIỮ NGUYÊN vị trí
+  /// tương đối của con trỏ so với phần văn bản NẰM SAU token (ví dụ dấu
+  /// phẩy người dùng vừa gõ ngay sau token) — nếu không giữ, con trỏ sẽ bị
+  /// nhảy lùi về trước ký tự vừa gõ, đúng lỗi đã gặp. Nếu vì lý do gì đó
+  /// không còn tìm thấy token đó nữa (người dùng đã xoá/sửa nó), rơi về
+  /// hành vi cũ: chèn thẻ mới tại vị trí con trỏ hiện tại.
   void _chenTheGhiAmVaoVanBan(int soThe) {
     final the = '〔🎙️ Ghi âm $soThe〕';
     final vanBanCu = _boDieuKhienVanBan.text;
     final viTriToken = _viTriTokenDangGhi;
+    final chonCu = _boDieuKhienVanBan.selection;
     _viTriTokenDangGhi = null;
     if (viTriToken != null &&
         viTriToken >= 0 &&
@@ -829,18 +789,31 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
             _tenTokenDangGhi) {
       final vanBanMoi = vanBanCu.replaceRange(
           viTriToken, viTriToken + _tenTokenDangGhi.length, the);
+      final ketThucTokenCu = viTriToken + _tenTokenDangGhi.length;
+      final lech = the.length - _tenTokenDangGhi.length;
+      int dichChuyen(int viTri) {
+        if (viTri >= ketThucTokenCu) return viTri + lech;
+        if (viTri <= viTriToken) return viTri;
+        return viTriToken + the.length; // rơi giữa token cũ (hiếm) — đẩy ra sau.
+      }
+      final baseMoi = chonCu.baseOffset < 0
+          ? viTriToken + the.length
+          : dichChuyen(chonCu.baseOffset);
+      final extentMoi =
+          chonCu.extentOffset < 0 ? baseMoi : dichChuyen(chonCu.extentOffset);
       _boQuaKiemTraGoTrongLucGhiMotLan = true;
       _boDieuKhienVanBan.value = TextEditingValue(
         text: vanBanMoi,
-        selection: TextSelection.collapsed(offset: viTriToken + the.length),
+        selection: TextSelection(baseOffset: baseMoi, extentOffset: extentMoi),
       );
       _ghiLog('Thay token "đang ghi âm" bằng thẻ #$soThe tại vị trí '
-          '$viTriToken.');
+          '$viTriToken (giữ con trỏ ở $baseMoi).');
       return;
     }
     var viTri = _boDieuKhienVanBan.selection.baseOffset;
     if (viTri < 0 || viTri > vanBanCu.length) viTri = vanBanCu.length;
     final vanBanMoi = vanBanCu.replaceRange(viTri, viTri, the);
+    _boQuaKiemTraGoTrongLucGhiMotLan = true;
     _boDieuKhienVanBan.value = TextEditingValue(
       text: vanBanMoi,
       selection: TextSelection.collapsed(offset: viTri + the.length),
@@ -849,11 +822,10 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
         '(không tìm thấy token "đang ghi âm" — có thể đã bị xoá/sửa).');
   }
 
-  // `_bamNutNgheLai`/`_taiXuongGhiAm` (nút "Nghe lại"/"Tải xuống") đã bỏ —
-  // cơ chế ghi âm đã kiểm chứng hoạt động đúng qua nhiều bản thử, không cần
-  // công cụ kiểm tra nhanh này nữa. `_phatLaiAmThanh`/`_urlAmThanhDaGhi`
-  // vẫn giữ lại: `_hoanTatGhiAm` vẫn tạo thẻ `<audio>` (đề phòng cần debug
-  // sau này) dù không còn nút bấm nào gọi tới chúng.
+  // `_bamNutNgheLai`/`_taiXuongGhiAm` (nút "Nghe lại"/"Tải xuống") đã bỏ từ
+  // v19 — cơ chế ghi âm đã kiểm chứng hoạt động đúng qua nhiều bản thử,
+  // không cần công cụ kiểm tra nhanh này nữa; thẻ `<audio>` để nghe lại
+  // cũng bỏ theo từ v20 (không còn nút nào gọi tới nó).
 
   /// Đọc [blob] thành chuỗi base64 thuần (không kèm tiền tố
   /// "data:...;base64,") — dùng FileReader vì Blob trên web không có sẵn
@@ -879,10 +851,11 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   Future<void> _taoVanBanTuTheGhiAm() async {
     if (_dangTaoVanBan) return;
     var vanBanHienTai = _boDieuKhienVanBan.text;
-    // Lưới an toàn: đáng lẽ không còn token "đang ghi âm" nào sót lại (xem
-    // `_dangHuyGhiAmDoGoTay`/`_xoaTokenDangGhiKhoiVanBan`), nhưng nếu vẫn có
-    // (ví dụ lỗi chưa lường hết) thì dọn sạch trước khi gửi, đừng để nó lọt
-    // vào văn bản cuối cùng dưới dạng chữ vô nghĩa.
+    // Lưới an toàn: đáng lẽ không còn token "đang ghi âm" nào sót lại (mọi
+    // lần chốt thẻ — dừng tay hoặc gõ phím giữa chừng — đều thay token
+    // ngay, đồng bộ, xem `_dungHanGhiAm`/`_chotTheDoGoTayVaBatDauTheMoi`),
+    // nhưng nếu vẫn còn (ví dụ lỗi chưa lường hết) thì dọn sạch trước khi
+    // gửi, đừng để nó lọt vào văn bản cuối cùng dưới dạng chữ vô nghĩa.
     if (vanBanHienTai.contains(_tenTokenDangGhi)) {
       _ghiLog('Cảnh báo: còn sót token "đang ghi âm" trong văn bản — dọn '
           'trước khi tạo văn bản.');
@@ -962,20 +935,19 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   /// micro cập nhật chữ.
   void _khiNguoiDungGoPhim(String vanBanMoi) {
     if (_dangGhiTuMicro) return;
-    // Log chẩn đoán cho báo cáo "gõ dấu ngoặc lúc đang ghi mà ghi âm không
-    // tắt" — in ra đúng lúc này để xác nhận `_dangGhiAm` có thật sự đúng
-    // hay đã bị lệch trạng thái trước khi tới đây.
-    if (_dangGhiAm || _boQuaKiemTraGoTrongLucGhiMotLan) {
-      _ghiLog('onChanged trong lúc _dangGhiAm=$_dangGhiAm, '
-          'boQua=$_boQuaKiemTraGoTrongLucGhiMotLan, '
-          'dangHuy=$_dangHuyGhiAmDoGoTay.');
-    }
     if (_boQuaKiemTraGoTrongLucGhiMotLan) {
       _boQuaKiemTraGoTrongLucGhiMotLan = false;
     } else if (_dangGhiAm) {
       // Người dùng gõ tay thật trong lúc thẻ đang ghi dở — gõ tay luôn
-      // thắng micro, kể cả khi đó là đang ghi âm: huỷ ngay bản ghi dở này.
-      _huyGhiAmDangDoDoGoTay();
+      // thắng micro, nhưng ở đây "thắng" nghĩa là CHỐT NGAY thẻ đang ghi
+      // rồi bắt đầu thẻ MỚI tiếp tục ghi (không huỷ/mất bản ghi).
+      _chotTheDoGoTayVaBatDauTheMoi();
+      // Việc chốt/khởi tạo thẻ mới ở trên tự đi qua `onChanged` (đệ quy,
+      // do gán `.value` cho controller) và đã tự cập nhật `_vanBanDaChot`
+      // xong xuôi — KHÔNG xử lý tiếp `vanBanMoi` (tham số của lần gọi
+      // NGOÀI CÙNG, giờ đã lỗi thời) ở dưới nữa, kẻo ghi đè lên đúng kết
+      // quả vừa cập nhật.
+      return;
     }
     _vanBan = vanBanMoi;
     // Coi toàn bộ chữ hiện có (kể cả phần vừa gõ tay, NGUYÊN VĂN không bị
@@ -1398,11 +1370,6 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     _boDieuKhienVanBan.dispose();
     for (final track in _luongGhiAm?.getTracks() ?? const []) {
       track.stop();
-    }
-    _phatLaiAmThanh?.pause();
-    _phatLaiAmThanh?.remove();
-    if (_urlAmThanhDaGhi != null) {
-      html.Url.revokeObjectUrl(_urlAmThanhDaGhi!);
     }
     super.dispose();
   }
