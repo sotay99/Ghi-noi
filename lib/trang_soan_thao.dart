@@ -25,9 +25,36 @@ import 'man_hinh_cai_dat.dart';
 import 'man_hinh_thu_muc.dart';
 import 'modal_cai_dat_kiem_tra_toan_van.dart';
 import 'mo_hinh.dart';
+import 'phien_ban_web_day_du.dart';
 import 'thanh_cong_cu.dart';
 import 'thong_bao_giua.dart';
 import 'trang_huong_dan.dart';
+
+// Chrome trên Android (web) trả `recognizedWords` bị lặp lại TOÀN BỘ lịch
+// sử của phiên như tiền tố mỗi lần có kết quả mới (ví dụ lần 3 gửi
+// "XinXin chàoXin chàoXin chào" thay vì chỉ "Xin chào") — mỗi lần lặp lại
+// luôn bắt đầu bằng chữ hoa. speech_to_text NATIVE trên Android/iOS không
+// có lỗi này (chỉ web mới đụng bộ máy Web Speech API của Chrome), nên chỉ
+// áp dụng khi `kIsWeb && _thietBiHienTai == ThietBi.android` (xem nơi gọi
+// `_catDoanCuoiCungChromeAndroid` trong `_khiCoChu`). Thuật toán và hằng số
+// NGUYÊN VĂN đã kiểm chứng ở `main_web_test.dart`.
+const _chuThuongVietChromeAndroid =
+    'a-zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ';
+const _chuHoaVietChromeAndroid =
+    'A-ZÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ';
+final RegExp _reRanhGioiDoanDinhChromeAndroid = RegExp(
+    '[$_chuThuongVietChromeAndroid][$_chuHoaVietChromeAndroid]');
+
+/// Cắt lấy đoạn cuối cùng (từ lần chuyển chữ-thường→chữ-hoa gần cuối chuỗi
+/// nhất tới hết chuỗi) — đây là bản ghi sạch, không lặp. Không tìm thấy mốc
+/// nào thì trả về nguyên văn (an toàn cho câu ngắn/chưa lặp lần nào).
+String _catDoanCuoiCungChromeAndroid(String s) {
+  var viTri = 0;
+  for (final m in _reRanhGioiDoanDinhChromeAndroid.allMatches(s)) {
+    viTri = m.start + 1;
+  }
+  return s.substring(viTri);
+}
 
 /// Một vùng chữ AI cho là "không phù hợp" (câu từ lủng củng, lạc đề, thừa ý,
 /// lặp lại, quá nhiều lỗi chính tả, hoặc nên thay bằng đoạn khác hay hơn).
@@ -1692,6 +1719,22 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// đọc ở những chỗ đã tự bọc `kIsWeb`).
   late ThietBi _thietBiHienTai;
 
+  /// Nhật ký gỡ lỗi micro — CHỈ ghi trên web (xem `_ghiNhatKyMicro`), để
+  /// người dùng bấm "Xem nhật ký micro" trong Cài đặt, sao chép rồi gửi lại
+  /// khi micro ra chữ sai — không cần USB debug hay console trình duyệt.
+  /// Giới hạn 300 dòng, dòng cũ nhất bị bỏ khi đầy (y hệt bản thử nghiệm
+  /// `main_web_test.dart`).
+  final List<String> _nhatKyMicro = [];
+
+  void _ghiNhatKyMicro(String dong) {
+    if (!kIsWeb) return;
+    final gio = DateTime.now();
+    String hai(int n) => n.toString().padLeft(2, '0');
+    final gioChuoi = '${hai(gio.hour)}:${hai(gio.minute)}:${hai(gio.second)}';
+    _nhatKyMicro.add('[$gioChuoi] $dong');
+    if (_nhatKyMicro.length > 300) _nhatKyMicro.removeAt(0);
+  }
+
   /// Đang hiện dòng chữ chú thích dọc bên trên từng nút của thanh công cụ
   /// hay không — bật bằng nút "i" (chỉ xuất hiện khi micro tắt), hoặc tự bật
   /// khi vừa mở một ghi chú còn trống trơn. Tắt bằng bất kỳ thao tác nào:
@@ -2794,6 +2837,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       MaterialPageRoute(
         builder: (_) => ManHinhCaiDat(
           caiDat: widget.caiDat,
+          layNhatKyMicro: () => List<String>.from(_nhatKyMicro),
+          xoaNhatKyMicro: _nhatKyMicro.clear,
           // Người dùng vừa tắt "kiểm tra chính tả bằng AI": xoá hết gạch đỏ
           // đang hiển thị ngay, vì đó là dữ liệu riêng của trang soạn thảo,
           // màn Cài đặt không cầm được.
@@ -3015,6 +3060,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   Future<void> _batMicro() async {
     if (!_sanSang) return;
+    _ghiNhatKyMicro(
+        'Bật micro — bản $phienBanWebDayDu, thiết bị đang dùng: '
+        '${_thietBiHienTai.ten}${widget.caiDat.thietBiChonTay != null ? ' (đã CHỌN TAY)' : ' (tự đoán)'}');
     // (RACE CONDITION KHI CHUYỂN PHIÊN — LỚP 2) Chụp lại đệm chống nhân đôi
     // TRƯỚC khi `_chotCauDangDoc()` xoá rỗng `_tuDaChotTrongPhien` ngay dưới
     // đây — đây là điểm MỘT phiên nghe MỚI thật sự sắp bắt đầu.
@@ -3364,7 +3412,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 
   void _khiCoChu(dynamic ketQua, int idPhien) {
-    final noi = (ketQua.recognizedWords as String? ?? '').trim();
+    var noi = (ketQua.recognizedWords as String? ?? '').trim();
     final xong = ketQua.finalResult as bool? ?? false;
 
     // Người dùng vừa gõ phím giữa chừng: chữ đã hiện ra phải nằm im. Nuốt hết
@@ -3374,6 +3422,20 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
     if (noi.isEmpty) return;
+
+    _ghiNhatKyMicro(
+        'onResult(xong=$xong): "${noi.length > 120 ? '${noi.substring(0, 120)}…' : noi}"');
+
+    // Xem chú thích tại khai báo `_catDoanCuoiCungChromeAndroid` — CHỈ áp
+    // dụng cho web + Android, không đụng tới Android/iOS gốc hay các bản
+    // thiết bị web khác (PC/iPhone không có lỗi lặp này).
+    if (kIsWeb && _thietBiHienTai == ThietBi.android) {
+      final noiDaCat = _catDoanCuoiCungChromeAndroid(noi);
+      if (noiDaCat != noi) {
+        _ghiNhatKyMicro('  → cắt lặp Chrome còn: "$noiDaCat"');
+        noi = noiDaCat;
+      }
+    }
 
     final cu = _boDieuKhien.text;
 
