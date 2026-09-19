@@ -72,6 +72,22 @@ jobs:
       # cách web/ ở trên cũng không nằm trong git.
       - name: Tạo cấu hình Firebase Hosting
         run: |
+          # `index.html`, `flutter_service_worker.js` và `version.json` phải
+          # LUÔN được trình duyệt hỏi lại máy chủ (no-cache = "kiểm tra lại
+          # trước khi dùng", không phải "đừng lưu") — đây là ba tệp Flutter
+          # Web dùng để phát hiện có bản mới hay không lúc F5. Không đặt
+          # header này thì trình duyệt có thể tự ý dùng bản `index.html` cũ
+          # trong cache HTTP của nó mà không hề hỏi lại, nên bấm F5 vẫn thấy
+          # bản cũ dù server đã có bản mới. Các tệp còn lại (main.dart.js,
+          # ảnh, font...) đều có vân tay trong tên do chính service worker
+          # quản lý nên giữ cache dài hạn bình thường, không cần khai riêng.
+          #
+          # Đây KHÔNG tắt khả năng dùng ngoại tuyến: service worker của
+          # Flutter vẫn giữ nguyên (không đổi `--pwa-strategy`), nên khi mất
+          # mạng, trình duyệt không gọi được máy chủ để "kiểm tra lại" thì
+          # tự động dùng bản đã lưu trong cache của service worker — người
+          # dùng vẫn mở được trang và tài liệu đang soạn (tự lưu ở
+          # localStorage, xem `_khoiPhucVanBanDaLuu`) vẫn còn nguyên.
           cat > firebase.json << 'EOF'
           {
             "hosting": {
@@ -79,6 +95,26 @@ jobs:
               "ignore": ["firebase.json", "**/.*"],
               "rewrites": [
                 { "source": "**", "destination": "/index.html" }
+              ],
+              "headers": [
+                {
+                  "source": "/index.html",
+                  "headers": [
+                    { "key": "Cache-Control", "value": "no-cache" }
+                  ]
+                },
+                {
+                  "source": "/flutter_service_worker.js",
+                  "headers": [
+                    { "key": "Cache-Control", "value": "no-cache" }
+                  ]
+                },
+                {
+                  "source": "/version.json",
+                  "headers": [
+                    { "key": "Cache-Control", "value": "no-cache" }
+                  ]
+                }
               ]
             }
           }

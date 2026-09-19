@@ -187,6 +187,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:html' as html;
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -204,7 +205,13 @@ import 'ai_cau_hinh.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v29';
+const _phienBanThuNghiem = 'v30';
+// v30: chữ Gemini vừa nhận nhấp nháy xanh↔đen 4 giây; tự động gửi ngầm bật
+// SẴN mặc định (vẫn tắt được); tự lưu văn bản đang soạn vào localStorage
+// (khôi phục lúc mở lại trang, kể cả không có mạng); Firebase Hosting đặt
+// Cache-Control: no-cache cho index.html/flutter_service_worker.js/
+// version.json để F5 lúc có mạng luôn lấy bản mới nhất mà không mất khả
+// năng dùng ngoại tuyến (service worker vẫn còn nguyên).
 
 // `diaChiMayChuAI`/`matKhauMayChuAI` đến từ ai_cau_hinh.dart (import ở
 // trên) — máy chủ đó đã có sẵn action 'ghi_am' (xem cloud-function/
@@ -279,6 +286,20 @@ ThietBi _doanThietBi() {
 /// đụng gì tới cách lưu trữ text (`text`/`value` vẫn y hệt controller gốc),
 /// chỉ override cách VẼ ra màn hình.
 class _BoDieuKhienVanBanCoThe extends TextEditingController {
+  /// Các đoạn chữ Gemini VỪA chèn vào (thay cho một thẻ ghi âm), còn đang
+  /// trong hiệu ứng nhấp nháy — (vị trí bắt đầu, vị trí kết thúc, thời điểm
+  /// chèn). `buildTextSpan` tự tính màu theo thời gian trôi qua kể từ lúc
+  /// chèn, và tự dọn các mục đã quá hạn nhấp nháy (xem `_thoiGianNhapNhay`).
+  final List<(int, int, DateTime)> doanVuaNhanDuoc = [];
+
+  static const _thoiGianNhapNhay = Duration(seconds: 4);
+  static const _chuKyNhapNhay = Duration(milliseconds: 500);
+
+  void danhDauVuaNhanDuoc(int batDau, int ketThuc) {
+    if (batDau < 0 || ketThuc <= batDau) return;
+    doanVuaNhanDuoc.add((batDau, ketThuc, DateTime.now()));
+  }
+
   @override
   TextSpan buildTextSpan({
     required BuildContext context,
@@ -299,6 +320,24 @@ class _BoDieuKhienVanBanCoThe extends TextEditingController {
           Colors.red.shade700));
       timTu = i + _TrangThuMicroState._tenTokenDangGhi.length;
     }
+
+    // Hiệu ứng nhấp nháy xanh dương ↔ đen trong 4 giây cho chữ Gemini vừa
+    // trả về — dọn các mục đã quá hạn, những mục còn lại tô màu dao động
+    // theo sóng sin (nhấp nháy thật, không phải mờ dần một chiều).
+    final bayGio = DateTime.now();
+    doanVuaNhanDuoc
+        .removeWhere((d) => bayGio.difference(d.$3) > _thoiGianNhapNhay);
+    for (final d in doanVuaNhanDuoc) {
+      if (d.$2 > noiDung.length) continue; // văn bản đổi, vị trí không còn hợp lệ.
+      final troiQua = bayGio.difference(d.$3).inMilliseconds;
+      final pha = (troiQua % _chuKyNhapNhay.inMilliseconds) /
+          _chuKyNhapNhay.inMilliseconds;
+      final heSo = (math.sin(pha * 2 * math.pi) + 1) / 2; // 0..1
+      final mau =
+          Color.lerp(Colors.black, Colors.blue.shade700, heSo) ?? Colors.black;
+      moc.add((d.$1, d.$2, mau));
+    }
+
     moc.sort((a, b) => a.$1.compareTo(b.$1));
 
     final spans = <InlineSpan>[];
@@ -598,7 +637,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   // gửi (thủ công hoặc tự động) được đánh dấu trong `_theDangDuocGui` để
   // hai đường không gửi trùng nhau. Gemini lỗi ở một thẻ đang gửi ngầm thì
   // ÂM THẦM để đó, lần kiểm tra sau sẽ tự thử lại — không báo lỗi ồn ào.
-  bool _tuDongGuiNgam = false;
+  bool _tuDongGuiNgam = true;
   static const _nguongTongThoiLuongTuDongGui = Duration(seconds: 20);
   final Set<int> _theDangDuocGui = {};
 
@@ -611,6 +650,19 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   // `_chenTheDangGhiVaoVanBan`), rồi được thay bằng "Thẻ ghi âm số N" khi
   // dừng.
   Timer? _bomDongHoGhiAm;
+
+  // Bơm vẽ lại khung nhập liên tục trong lúc còn đoạn chữ Gemini đang nhấp
+  // nháy (xem `_BoDieuKhienVanBanCoThe.doanVuaNhanDuoc`) — tự dừng khi danh
+  // sách đó rỗng, không chạy vô ích lúc không có gì đang nhấp nháy.
+  Timer? _bomNhapNhay;
+
+  // Tự lưu văn bản đang soạn vào localStorage của trình duyệt — sống sót qua
+  // F5 và hoạt động cả khi mất mạng (localStorage không cần mạng). Ghi có
+  // dồn (debounce) 500ms để không ghi liên tục theo từng ký tự lúc micro
+  // đang tuôn chữ. Khôi phục lúc mở trang, TRƯỚC khi `_khoiTao()` bật micro,
+  // để người dùng thấy ngay tài liệu cũ mà không bị micro ghi đè lên.
+  static const _khoaLuuVanBan = 'flowrite_van_ban_dang_soan';
+  Timer? _bomLuuVanBan;
   Duration _thoiLuongDangGhi = Duration.zero;
   int? _viTriTokenDangGhi; // vị trí ký tự bắt đầu của token đang ghi dở.
 
@@ -657,6 +709,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     // không đủ để bắt lúc người dùng chỉ di chuyển con trỏ. Xem
     // `_khiGiaTriKhungNhapDoi`.
     _boDieuKhienVanBan.addListener(_khiGiaTriKhungNhapDoi);
+    _khoiPhucVanBanDaLuu();
     _khoiTao();
   }
 
@@ -775,6 +828,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     final gt = _boDieuKhienVanBan.value;
     if (gt.text != _vanBanChoTheoDoiConTro) {
       _vanBanChoTheoDoiConTro = gt.text;
+      _luuVanBanVaoBoNhoTrinhDuyet();
       return; // Đổi CHỮ — đã có `_khiNguoiDungGoPhim` và các hàm ghi của
       // micro/thẻ ghi âm tự lo phần của chúng, không việc gì của hàm này.
     }
@@ -971,6 +1025,57 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   String _chotThoiLuongVaLayNhanThe(int soThe) {
     _thoiLuongTheoThe[soThe] = _thoiLuongDangGhi;
     return _nhanTheHoanChinh(soThe);
+  }
+
+  /// Đánh dấu [batDau, ketThuc) trong khung nhập là chữ Gemini VỪA trả về
+  /// (nhấp nháy 4 giây) rồi bắt đầu bơm vẽ lại liên tục cho tới khi hết
+  /// hiệu ứng — gọi ngay sau mỗi lần thay một thẻ bằng chữ Gemini (cả
+  /// đường thủ công lẫn đường gửi ngầm).
+  void _danhDauVuaNhanTuGeminiVaNhapNhay(int batDau, int ketThuc) {
+    _boDieuKhienVanBan.danhDauVuaNhanDuoc(batDau, ketThuc);
+    _bomNhapNhay?.cancel();
+    _bomNhapNhay = Timer.periodic(const Duration(milliseconds: 120), (t) {
+      if (!mounted || _boDieuKhienVanBan.doanVuaNhanDuoc.isEmpty) {
+        t.cancel();
+        return;
+      }
+      setState(() {}); // chỉ để vẽ lại — buildTextSpan tự tính màu theo giờ.
+    });
+  }
+
+  /// Ghi văn bản hiện tại vào localStorage, có dồn 500ms — gọi mỗi khi chữ
+  /// đổi (xem `_khiGiaTriKhungNhapDoi`). Bọc try/catch vì localStorage có
+  /// thể bị trình duyệt chặn (chế độ ẩn danh, đầy dung lượng...) — mất tính
+  /// năng tự lưu không nên làm sập cả ứng dụng.
+  void _luuVanBanVaoBoNhoTrinhDuyet() {
+    _bomLuuVanBan?.cancel();
+    _bomLuuVanBan = Timer(const Duration(milliseconds: 500), () {
+      try {
+        html.window.localStorage[_khoaLuuVanBan] = _boDieuKhienVanBan.text;
+      } catch (e) {
+        _ghiLog('Không lưu được văn bản vào bộ nhớ trình duyệt: $e');
+      }
+    });
+  }
+
+  /// Khôi phục văn bản đã lưu (nếu có) lúc mở trang — gọi trong `initState`,
+  /// TRƯỚC khi `_khoiTao()` bật micro.
+  void _khoiPhucVanBanDaLuu() {
+    try {
+      final daLuu = html.window.localStorage[_khoaLuuVanBan];
+      if (daLuu == null || daLuu.isEmpty) return;
+      _vanBanDaChot = daLuu;
+      _tuDaChot = _tachTu(daLuu);
+      _boDieuKhienVanBan.value = TextEditingValue(
+        text: daLuu,
+        selection: TextSelection.collapsed(offset: daLuu.length),
+      );
+      _vanBanChoTheoDoiConTro = daLuu;
+      _ghiLog('Đã khôi phục văn bản đang soạn dở từ lần trước '
+          '(${daLuu.length} ký tự).');
+    } catch (e) {
+      _ghiLog('Không khôi phục được văn bản đã lưu: $e');
+    }
   }
 
   /// Bắt đầu MỘT PHIÊN `MediaRecorder` mới trên `_luongGhiAm` đã xin quyền
@@ -1347,6 +1452,11 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     // vì mọi thay thế trước đó chỉ động vào phần văn bản NẰM SAU vị trí của
     // chúng.
     var vanBanMoi = vanBanHienTai;
+    // Các đoạn vừa thay bằng chữ Gemini (để nhấp nháy) — đo trên `vanBanMoi`
+    // sau MỖI lần thay, nên khi một lần thay tiếp theo (ở phía TRƯỚC, do đi
+    // từ cuối về đầu) làm lệch độ dài văn bản, phải dịch các đoạn đã ghi
+    // trước đó theo đúng độ lệch ấy.
+    final cacDoanVuaThay = <(int, int)>[];
     for (final khop in cacKhop.toList().reversed) {
       final soThe = int.parse(khop.group(1)!);
       if (_theDangDuocGui.contains(soThe)) {
@@ -1364,6 +1474,12 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       try {
         final chu = await _guiMotTheChoGemini(soThe, blob);
         vanBanMoi = vanBanMoi.replaceRange(khop.start, khop.end, chu);
+        final lech = chu.length - (khop.end - khop.start);
+        for (var i = 0; i < cacDoanVuaThay.length; i++) {
+          final (s, e) = cacDoanVuaThay[i];
+          cacDoanVuaThay[i] = (s + lech, e + lech);
+        }
+        cacDoanVuaThay.add((khop.start, khop.start + chu.length));
         _ghiLog('  Thẻ #$soThe: xong — "$chu"');
       } catch (e) {
         _ghiLog('  Thẻ #$soThe: LỖI — $e');
@@ -1375,6 +1491,9 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     _vanBanDaChot = vanBanMoi;
     _tuDaChot = _tachTu(vanBanMoi);
     _ghiVanBanTuMicro(vanBanMoi);
+    for (final (s, e) in cacDoanVuaThay) {
+      _danhDauVuaNhanTuGeminiVaNhapNhay(s, e);
+    }
     if (mounted) setState(() => _dangTaoVanBan = false);
     _ghiLog('Hoàn tất tạo văn bản từ các thẻ ghi âm.');
   }
@@ -1480,6 +1599,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       _vanBanDaChot = vanBanMoi;
       _tuDaChot = _tachTu(vanBanMoi);
       _ghiVanBanTuMicro(vanBanMoi, viTriConTro: baseMoi);
+      _danhDauVuaNhanTuGeminiVaNhapNhay(viTri, viTri + chu.length);
       _ghiLog('  Thẻ #$soThe (gửi ngầm): xong — "$chu"');
     } catch (e) {
       _ghiLog('  Thẻ #$soThe (gửi ngầm): LỖI — $e (sẽ tự thử lại ở lần '
@@ -2052,6 +2172,8 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     _henBatLai?.cancel();
     _henMoLaiMicroSauKhiGo?.cancel();
     _bomDongHoGhiAm?.cancel();
+    _bomNhapNhay?.cancel();
+    _bomLuuVanBan?.cancel();
     _micro.cancel();
     _cuonNhatKy.dispose();
     _boDieuKhienVanBan.removeListener(_khiGiaTriKhungNhapDoi);
