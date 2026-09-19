@@ -129,10 +129,20 @@
 //   `_apDungXoaVungChonMicNeuCo` xoá đúng vùng đó ngay lúc có chữ THẬT đầu
 //   tiên để thay vào — cố tình KHÔNG xoá ngay lúc bật micro, để bật rồi
 //   tắt mà chưa nói gì thì vùng chọn vẫn còn nguyên.
-//   CHƯA LÀM (còn nợ, sẽ làm khi có xác nhận thêm): tự kết thúc thẻ khi con
-//   trỏ DI CHUYỂN mà không gõ tay; chế độ tự động gửi ngầm các thẻ đã xong
-//   trong lúc ghi thẻ mới; gộp nhiều thẻ vào một lần gọi Gemini để có ngữ
-//   cảnh (cần sửa cả Cloud Function, phải làm riêng).
+// - (v26) Ở chế độ ngăn bàn phím ảo: ép hiện con trỏ nhấp nháy
+//   (`showCursor: true`) và hai đầu mút kéo vùng chọn
+//   (`selectionControls: materialTextSelectionControls`) — mặc định
+//   Flutter có thể ẩn cả hai ở ô `readOnly`.
+//   RÚT LẠI ý "tự kết thúc thẻ khi con trỏ di chuyển" đã ghi ở trên (v20) —
+//   quá rủi ro cho một tính năng GHI ÂM (khác hẳn micro vừa nói vừa ra
+//   chữ): di chuyển con trỏ trong lúc một thẻ đang ghi dở giờ KHÔNG đụng
+//   gì tới nó nữa, thẻ cứ ghi tiếp tại đúng vị trí cũ dù con trỏ đi đâu.
+//   Chỉ GÕ TAY thật (không phải chỉ di chuyển con trỏ) mới chốt thẻ đang
+//   ghi và bắt đầu thẻ mới — logic này giữ nguyên như cũ.
+//   CHƯA LÀM (còn nợ, đang bàn bạc thêm): chế độ tự động gửi ngầm các thẻ
+//   đã xong (≥1 thẻ, tổng thời lượng ≥20 giây) trong lúc ghi thẻ mới, thay
+//   thẻ bằng chữ Gemini trả về ngay khi xong — CHƯA làm, đang thảo luận
+//   thiết kế trước khi code.
 
 import 'dart:async';
 import 'dart:convert';
@@ -154,7 +164,7 @@ import 'ai_cau_hinh.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v25';
+const _phienBanThuNghiem = 'v26';
 
 // `diaChiMayChuAI`/`matKhauMayChuAI` đến từ ai_cau_hinh.dart (import ở
 // trên) — máy chủ đó đã có sẵn action 'ghi_am' (xem cloud-function/
@@ -1922,6 +1932,15 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                         onChanged: _khiNguoiDungGoPhim,
                         inputFormatters: [_ChanSuaGiuaThe()],
                         readOnly: _chanBanPhimAo,
+                        // Flutter mặc định có thể không hiện con trỏ nhấp
+                        // nháy/tay cầm kéo vùng chọn ở ô `readOnly` — ép rõ
+                        // ràng cả hai để người dùng vẫn THẤY được con trỏ
+                        // (dù không gõ được) và có hai đầu mút để kéo chỉnh
+                        // vùng chọn bằng ngón tay, y hệt ô nhập bình thường.
+                        showCursor: true,
+                        selectionControls: _chanBanPhimAo
+                            ? materialTextSelectionControls
+                            : null,
                         maxLines: null,
                         expands: true,
                         textAlignVertical: TextAlignVertical.top,
