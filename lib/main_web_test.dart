@@ -68,6 +68,19 @@
 //   để GIỮ NGUYÊN vị trí tương đối của con trỏ so với phần chữ nằm sau
 //   token (ví dụ dấu phẩy vừa gõ), thay vì luôn đẩy con trỏ về ngay sau
 //   token — tránh lỗi con trỏ nhảy lùi đã gặp.
+// - (v21) v20 vẫn còn một lỗi: phải gõ ĐỦ HAI ký tự mới thấy thẻ tách ra
+//   (gõ 1 ký tự thì chỉ ký tự đó hiện thêm, thẻ "đang ghi âm" chưa đổi; gõ
+//   thêm 1 ký tự nữa mới đổi). Nguyên nhân: `_chotTheDoGoTayVaBatDauTheMoi`
+//   làm HAI lượt gán `.value=` nối tiếp (chốt token cũ, rồi chèn token
+//   mới) — mỗi lượt kích một vòng `onChanged` lồng nhau riêng, và trên bàn
+//   phím thật (không chỉ trong log) điều đó gây lệch một nhịp. Sửa: gộp
+//   toàn bộ (chốt token cũ + giữ ký tự vừa gõ + chèn token mới) thành MỘT
+//   chuỗi văn bản rồi gán `.value=` ĐÚNG MỘT LẦN — tách thẻ ngay từ ký tự
+//   gõ đầu tiên. `_batDauMotThe` được tách làm hai: `_taoBoGhiAmMoi` (chỉ
+//   tạo `MediaRecorder`, không đụng văn bản) dùng trong lượt gộp này, còn
+//   `_batDauMotThe` (gọi thêm `_chenTokenDangGhiVaoVanBan`) vẫn dùng khi
+//   bấm nút ghi lần đầu. Ca hiếm (gõ không ngay sau token, ví dụ bấm con
+//   trỏ ra chỗ khác rồi gõ) vẫn rơi về cách cũ (hai lượt).
 //   CHƯA LÀM (còn nợ, sẽ làm khi có xác nhận thêm): tự kết thúc thẻ khi con
 //   trỏ DI CHUYỂN mà không gõ tay; chế độ tự động gửi ngầm các thẻ đã xong
 //   trong lúc ghi thẻ mới; gộp nhiều thẻ vào một lần gọi Gemini để có ngữ
@@ -93,7 +106,7 @@ import 'ai_cau_hinh.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v20';
+const _phienBanThuNghiem = 'v21';
 
 // `diaChiMayChuAI`/`matKhauMayChuAI` đến từ ai_cau_hinh.dart (import ở
 // trên) — máy chủ đó đã có sẵn action 'ghi_am' (xem cloud-function/
@@ -657,6 +670,18 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   /// bất đồng bộ) — nhờ vậy lúc cần chốt thẻ có thể đổi ngay token hiển thị
   /// mà không phải chờ, tránh đúng lỗi "token rác" đã gặp trước đây.
   void _batDauMotThe() {
+    _taoBoGhiAmMoi();
+    _chenTokenDangGhiVaoVanBan();
+  }
+
+  /// Phần LÕI của `_batDauMotThe` — chỉ tạo `MediaRecorder` mới và dành sẵn
+  /// số thẻ, KHÔNG động gì tới văn bản. Tách riêng để dùng trong
+  /// `_chotTheDoGoTayVaBatDauTheMoi`, nơi việc chèn token mới phải nằm
+  /// CHUNG một lượt cập nhật văn bản DUY NHẤT với việc chốt token cũ (xem
+  /// chú thích ở đó) — gọi `_chenTokenDangGhiVaoVanBan` riêng ở đây sẽ tạo
+  /// thêm một lượt `.value=`/`onChanged` thứ hai, đúng nguyên nhân gây lỗi
+  /// "phải gõ hai ký tự mới tách thẻ" đã gặp.
+  void _taoBoGhiAmMoi() {
     final luong = _luongGhiAm;
     if (luong == null) return;
     // Safari/WebKit KHÔNG hỗ trợ 'audio/webm' (mặc định của Chrome) — nếu
@@ -696,14 +721,13 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     // "token rác"/"chèn thẻ lộn xộn" đã gặp trước đây).
     boGhi.addEventListener('stop', (_) {
       final loaiThuc = boGhi.mimeType;
-      final blob = html.Blob(
-          doanGhi, (loaiThuc == null || loaiThuc.isEmpty) ? 'audio/mp4' : loaiThuc);
+      final blob = html.Blob(doanGhi,
+          (loaiThuc == null || loaiThuc.isEmpty) ? 'audio/mp4' : loaiThuc);
       _cacDoanGhiAmTheoThe[soThe] = blob;
       _ghiLog('Thẻ #$soThe: ghi xong (${doanGhi.length} đoạn dữ liệu).');
     });
     boGhi.start();
     _ghiLog('MediaRecorder.mimeType thực tế: "${boGhi.mimeType}" (thẻ #$soThe).');
-    _chenTokenDangGhiVaoVanBan();
     _thoiLuongDangGhi = Duration.zero;
     _bomDongHoGhiAm?.cancel();
     _bomDongHoGhiAm = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -758,15 +782,70 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   /// ký tự vừa gõ), rồi bắt đầu một thẻ MỚI ngay sau chỗ vừa gõ để ghi âm
   /// tiếp tục liền mạch — KHÔNG làm mất bản ghi, chỉ tách nó thành hai thẻ.
   /// Dùng lại đúng `_luongGhiAm` đã xin quyền, không xin lại từ đầu.
-  void _chotTheDoGoTayVaBatDauTheMoi() {
+  ///
+  /// [vanBanSauKhiGo] là văn bản NGAY SAU khi ký tự vừa gõ đã được chèn vào
+  /// (tham số gốc của `_khiNguoiDungGoPhim`) — QUAN TRỌNG: toàn bộ việc
+  /// chốt token cũ + giữ ký tự vừa gõ + chèn token mới được dựng thành MỘT
+  /// chuỗi văn bản DUY NHẤT rồi gán `.value=` ĐÚNG MỘT LẦN. Bản trước đây
+  /// làm hai lượt `.value=` nối tiếp (chốt token cũ, rồi chèn token mới) —
+  /// mỗi lượt kích một vòng `onChanged` lồng nhau riêng, và trên thực tế
+  /// (bàn phím thật, không phải log) điều đó khiến phải gõ ĐỦ HAI ký tự mới
+  /// thấy thẻ tách ra: gộp làm một lượt duy nhất để chắc chắn tách ngay từ
+  /// ký tự đầu tiên.
+  void _chotTheDoGoTayVaBatDauTheMoi(String vanBanSauKhiGo) {
     if (!_dangGhiAm) return;
     final soTheCu = _soTheDangGhiHienTai;
+    final viTriTokenCu = _viTriTokenDangGhi;
+    final viTriConTro = _boDieuKhienVanBan.selection.baseOffset;
+    final sauTokenCu = viTriTokenCu == null
+        ? null
+        : viTriTokenCu + _tenTokenDangGhi.length;
+
+    if (soTheCu == null ||
+        viTriTokenCu == null ||
+        sauTokenCu == null ||
+        sauTokenCu > vanBanSauKhiGo.length ||
+        vanBanSauKhiGo.substring(viTriTokenCu, sauTokenCu) !=
+            _tenTokenDangGhi ||
+        viTriConTro < 0 ||
+        viTriConTro < sauTokenCu) {
+      // Không rơi đúng vào ca thường gặp (gõ ngay sau/tại vị trí token) —
+      // ví dụ người dùng bấm con trỏ ra chỗ khác rồi gõ. Rơi về cách cũ:
+      // chốt token cũ tại đúng vị trí lưu, rồi bắt đầu thẻ mới tại vị trí
+      // con trỏ hiện tại (hai lượt cập nhật riêng, chấp nhận độ trễ này ở
+      // ca hiếm gặp).
+      _ghiLog('Người dùng gõ tay trong lúc đang ghi thẻ #$soTheCu, không '
+          'phải ngay sau token — dùng đường xử lý chung (hai lượt).');
+      if (soTheCu != null) _chenTheGhiAmVaoVanBan(soTheCu);
+      _boGhiAm?.stop();
+      _batDauMotThe();
+      return;
+    }
+
     _ghiLog('Người dùng gõ tay trong lúc đang ghi thẻ #$soTheCu — chốt '
         'ngay thành thẻ hoàn chỉnh, bắt đầu thẻ MỚI tiếp tục ghi ngay sau '
-        'chỗ vừa gõ.');
-    if (soTheCu != null) _chenTheGhiAmVaoVanBan(soTheCu);
+        'chỗ vừa gõ (một lượt cập nhật văn bản duy nhất).');
+
+    final theCu = '〔🎙️ Ghi âm $soTheCu〕';
+    final truocToken = vanBanSauKhiGo.substring(0, viTriTokenCu);
+    // Phần nằm giữa hết token cũ và vị trí con trỏ hiện tại — chính là ký
+    // tự (hoặc các ký tự) người dùng vừa gõ.
+    final phanVuaGo = vanBanSauKhiGo.substring(sauTokenCu, viTriConTro);
+    final phanConLai = vanBanSauKhiGo.substring(viTriConTro);
+    final vanBanKetQua =
+        '$truocToken$theCu$phanVuaGo$_tenTokenDangGhi$phanConLai';
+    final conTroMoi =
+        truocToken.length + theCu.length + phanVuaGo.length + _tenTokenDangGhi.length;
+
+    _boQuaKiemTraGoTrongLucGhiMotLan = true;
+    _boDieuKhienVanBan.value = TextEditingValue(
+      text: vanBanKetQua,
+      selection: TextSelection.collapsed(offset: conTroMoi),
+    );
+
     _boGhiAm?.stop(); // 'stop' sẽ tới sau, chỉ để lưu blob vào thẻ #$soTheCu.
-    _batDauMotThe(); // thẻ mới, dùng lại đúng `_luongGhiAm` hiện có.
+    _taoBoGhiAmMoi(); // thẻ mới — KHÔNG chèn token nữa, đã chèn ở trên rồi.
+    _viTriTokenDangGhi = truocToken.length + theCu.length + phanVuaGo.length;
   }
 
   /// Thay ĐÚNG token tĩnh "đang ghi âm" (chèn lúc bắt đầu ghi, xem
@@ -941,7 +1020,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       // Người dùng gõ tay thật trong lúc thẻ đang ghi dở — gõ tay luôn
       // thắng micro, nhưng ở đây "thắng" nghĩa là CHỐT NGAY thẻ đang ghi
       // rồi bắt đầu thẻ MỚI tiếp tục ghi (không huỷ/mất bản ghi).
-      _chotTheDoGoTayVaBatDauTheMoi();
+      _chotTheDoGoTayVaBatDauTheMoi(vanBanMoi);
       // Việc chốt/khởi tạo thẻ mới ở trên tự đi qua `onChanged` (đệ quy,
       // do gán `.value` cho controller) và đã tự cập nhật `_vanBanDaChot`
       // xong xuôi — KHÔNG xử lý tiếp `vanBanMoi` (tham số của lần gọi
