@@ -1,0 +1,135 @@
+name: Dựng bản Web ĐẦY ĐỦ (nhân bản app Android)
+
+# Chạy khi bản Web đầy đủ (main_web_full.dart) hoặc bất kỳ file nào nó phụ
+# thuộc (toàn bộ màn hình soạn thảo của app Android) đổi — tách biệt hoàn
+# toàn khỏi build-apk.yml và deploy-web-test.yml.
+on:
+  push:
+    paths:
+      - 'lib/main_web_full.dart'
+      - 'lib/main.dart'
+      - 'lib/trang_soan_thao.dart'
+      - 'lib/cai_dat.dart'
+      - 'lib/ghi_am_ai.dart'
+      - 'lib/ghi_am_ai_io.dart'
+      - 'lib/ghi_am_ai_web.dart'
+      - 'lib/kho_du_lieu.dart'
+      - 'lib/kiem_tra_chinh_ta.dart'
+      - 'lib/kiem_tra_toan_van.dart'
+      - 'lib/man_hinh_cai_dat.dart'
+      - 'lib/man_hinh_thu_muc.dart'
+      - 'lib/modal_cai_dat_kiem_tra_toan_van.dart'
+      - 'lib/mo_hinh.dart'
+      - 'lib/tai_ve_ghi_chu.dart'
+      - 'lib/tai_ve_ghi_chu_io.dart'
+      - 'lib/tai_ve_ghi_chu_web.dart'
+      - 'lib/thanh_cong_cu.dart'
+      - 'lib/thong_bao_giua.dart'
+      - 'lib/trang_huong_dan.dart'
+      - 'lib/ai_cau_hinh.dart'
+      - '.github/workflows/deploy-web-full.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  dung-va-trien-khai-web-day-du:
+    name: Dựng Flutter Web (bản đầy đủ) và đưa lên Firebase Hosting
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Lấy mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Cài Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Xem phiên bản
+        run: flutter --version
+
+      - name: Bật hỗ trợ Flutter Web
+        run: flutter config --enable-web
+
+      - name: Tải thư viện
+        run: flutter pub get
+
+      - name: Soát mã (chỉ cảnh báo, không chặn build)
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+        continue-on-error: true
+
+      # Thư mục web/ không nằm trong git — sinh động lúc CI chạy, y hệt
+      # deploy-web-test.yml.
+      - name: Sinh phần Web
+        run: |
+          set -e
+          flutter create --platforms=web \
+            --project-name=flowrite \
+            --org=com.flowrite \
+            /tmp/khung-web
+          cp -r /tmp/khung-web/web ./web
+
+      - name: Dựng bản Web (entry point riêng cho bản đầy đủ)
+        run: |
+          flutter build web \
+            --target=lib/main_web_full.dart \
+            --base-href /
+
+      # Cùng project Firebase (flowrite219) với bản thử micro, nhưng đưa
+      # lên một CHANNEL RIÊNG (không phải "live") để có địa chỉ xem KHÁC
+      # hẳn với bản phòng thí nghiệm (flowrite219.web.app) — không đụng gì
+      # tới bản đó. Channel không hết hạn theo mặc định 7 ngày như preview
+      # thường mà gia hạn 30 ngày mỗi lần đẩy, dùng lâu dài như một bản xem
+      # thứ hai của cùng project.
+      - name: Tạo cấu hình Firebase Hosting
+        run: |
+          cat > firebase.json << 'EOF'
+          {
+            "hosting": {
+              "public": "build/web",
+              "ignore": ["firebase.json", "**/.*"],
+              "rewrites": [
+                { "source": "**", "destination": "/index.html" }
+              ],
+              "headers": [
+                {
+                  "source": "/index.html",
+                  "headers": [
+                    { "key": "Cache-Control", "value": "no-cache" }
+                  ]
+                },
+                {
+                  "source": "/flutter_service_worker.js",
+                  "headers": [
+                    { "key": "Cache-Control", "value": "no-cache" }
+                  ]
+                },
+                {
+                  "source": "/version.json",
+                  "headers": [
+                    { "key": "Cache-Control", "value": "no-cache" }
+                  ]
+                }
+              ]
+            }
+          }
+          EOF
+          cat > .firebaserc << 'EOF'
+          {
+            "projects": {
+              "default": "flowrite219"
+            }
+          }
+          EOF
+
+      - name: Đưa build/web lên Firebase Hosting (channel "day-du")
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
+          channelId: day-du
+          expires: 30d
+          projectId: flowrite219

@@ -2,16 +2,12 @@
 // mục và ghi chú. Bấm vào một ghi chú thì trả id của nó về cho trang soạn
 // thảo qua Navigator.pop; đi dạo rồi quay lại tay không thì trả về null.
 
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import 'kho_du_lieu.dart';
 import 'mo_hinh.dart';
+import 'tai_ve_ghi_chu.dart';
 
 enum _LoaiChoDan { catThuMuc, catGhiChu, chepThuMuc, chepGhiChu }
 
@@ -219,13 +215,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   Future<void> _taiVeGhiChu(GhiChuFile g) async {
     try {
       final tenTep = '${g.ten.trim().isEmpty ? 'Ghi chú' : g.ten.trim()}.txt';
-      final thuMucTam = await getTemporaryDirectory();
-      final tep = File('${thuMucTam.path}/$tenTep');
-      await tep.writeAsString(g.noiDung, encoding: utf8);
-
-      await SharePlus.instance.share(
-        ShareParams(files: [XFile(tep.path)], subject: g.ten),
-      );
+      await luuVaChiaSeGhiChu(tenTep, g.noiDung, g.ten);
     } catch (_) {
       _bao('Không xuất được tệp. Thử lại sau.');
     }
