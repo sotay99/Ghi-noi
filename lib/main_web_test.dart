@@ -68,19 +68,22 @@
 //   để GIỮ NGUYÊN vị trí tương đối của con trỏ so với phần chữ nằm sau
 //   token (ví dụ dấu phẩy vừa gõ), thay vì luôn đẩy con trỏ về ngay sau
 //   token — tránh lỗi con trỏ nhảy lùi đã gặp.
-// - (v21) v20 vẫn còn một lỗi: phải gõ ĐỦ HAI ký tự mới thấy thẻ tách ra
-//   (gõ 1 ký tự thì chỉ ký tự đó hiện thêm, thẻ "đang ghi âm" chưa đổi; gõ
-//   thêm 1 ký tự nữa mới đổi). Nguyên nhân: `_chotTheDoGoTayVaBatDauTheMoi`
-//   làm HAI lượt gán `.value=` nối tiếp (chốt token cũ, rồi chèn token
-//   mới) — mỗi lượt kích một vòng `onChanged` lồng nhau riêng, và trên bàn
-//   phím thật (không chỉ trong log) điều đó gây lệch một nhịp. Sửa: gộp
-//   toàn bộ (chốt token cũ + giữ ký tự vừa gõ + chèn token mới) thành MỘT
-//   chuỗi văn bản rồi gán `.value=` ĐÚNG MỘT LẦN — tách thẻ ngay từ ký tự
-//   gõ đầu tiên. `_batDauMotThe` được tách làm hai: `_taoBoGhiAmMoi` (chỉ
-//   tạo `MediaRecorder`, không đụng văn bản) dùng trong lượt gộp này, còn
-//   `_batDauMotThe` (gọi thêm `_chenTokenDangGhiVaoVanBan`) vẫn dùng khi
-//   bấm nút ghi lần đầu. Ca hiếm (gõ không ngay sau token, ví dụ bấm con
-//   trỏ ra chỗ khác rồi gõ) vẫn rơi về cách cũ (hai lượt).
+// - (v21) `_batDauMotThe` tách làm hai (`_taoBoGhiAmMoi` chỉ tạo
+//   `MediaRecorder`, không đụng văn bản) để lúc tách thẻ có thể gộp
+//   chốt-token-cũ + chèn-token-mới vào một thao tác — mục đích ban đầu là
+//   sửa lỗi "phải gõ hai ký tự", nhưng chẩn đoán lúc đó SAI (xem v22).
+// - (v22) TÌM RA nguyên nhân THẬT của lỗi "phải gõ hai ký tự mới tách thẻ":
+//   gán `TextEditingController.value =` theo cách lập trình KHÔNG khiến
+//   `TextField.onChanged` tự chạy lại — khác hẳn giả định ở các bản v18–v21.
+//   Bằng chứng (log v21): token "đang ghi âm" chèn lúc 17:30:13, nhưng
+//   dòng log lẽ ra phải in NGAY nếu có `onChanged` chạy lại chỉ thực sự
+//   xuất hiện lúc 17:30:17 — đúng lúc người dùng gõ phím THẬT tiếp theo.
+//   Cờ "bỏ qua một lần" (`_boQuaKiemTraGoTrongLucGhiMotLan`) vì vậy nằm
+//   chờ mãi và NUỐT MẤT đúng lượt gõ phím thật kế tiếp — đó là lý do luôn
+//   phải gõ thêm một ký tự nữa. Sửa: BỎ HẲN cơ chế cờ; mọi hàm chèn/thay
+//   token giờ tự chốt cứng trạng thái (`_vanBanDaChot`, `_tuDaChot`...)
+//   NGAY TẠI CHỖ bằng `_ghiVanBanChoTheVaChotCung`, không còn trông chờ
+//   một `onChanged` không tồn tại nữa.
 //   CHƯA LÀM (còn nợ, sẽ làm khi có xác nhận thêm): tự kết thúc thẻ khi con
 //   trỏ DI CHUYỂN mà không gõ tay; chế độ tự động gửi ngầm các thẻ đã xong
 //   trong lúc ghi thẻ mới; gộp nhiều thẻ vào một lần gọi Gemini để có ngữ
@@ -106,7 +109,7 @@ import 'ai_cau_hinh.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v21';
+const _phienBanThuNghiem = 'v22';
 
 // `diaChiMayChuAI`/`matKhauMayChuAI` đến từ ai_cau_hinh.dart (import ở
 // trên) — máy chủ đó đã có sẵn action 'ghi_am' (xem cloud-function/
@@ -429,12 +432,6 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   int? _soTheDangGhiHienTai;
   static const String _tenTokenDangGhi = '〔🎙️ … đang ghi âm …〕';
 
-  // Bỏ qua ĐÚNG MỘT lần kiểm tra "gõ tay trong lúc đang ghi" trong
-  // `_khiNguoiDungGoPhim` — dùng khi chính code (không phải người dùng) vừa
-  // chèn/thay token bằng cách gán `.value` (việc đó tự khiến `onChanged`
-  // bắn ra), để không hiểu nhầm chính hành động đó là "người dùng gõ tay".
-  bool _boQuaKiemTraGoTrongLucGhiMotLan = false;
-
   // Đếm số lần lỗi liên tiếp KHÔNG kèm bất kỳ chữ nào (không có partial nào
   // trước khi lỗi) — dấu hiệu bộ nhận dạng bị chặn ngay từ đầu chứ không
   // phải lỗi tạm thời giữa chừng. Thấy thật trên iPhone (Safari/WebKit):
@@ -736,6 +733,32 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     });
   }
 
+  /// Ghi [vanBanMoi] vào khung nhập VÀ chốt cứng nó ngay tại đây — dùng cho
+  /// MỌI chỉnh sửa văn bản do CHÍNH CODE (không phải người dùng) thực hiện
+  /// xoay quanh cơ chế thẻ ghi âm (chèn/thay/xoá token).
+  ///
+  /// QUAN TRỌNG: gán `TextEditingController.value =` theo cách lập trình
+  /// KHÔNG khiến `TextField.onChanged` (do đó `_khiNguoiDungGoPhim`) tự
+  /// chạy — khác với suy đoán ban đầu ở các bản trước. Bằng chứng thực tế
+  /// (log v21): token "đang ghi âm" được chèn lúc 17:30:13, nhưng dòng log
+  /// đáng lẽ phải in ra NGAY SAU đó (nếu `onChanged` chạy lại) chỉ thực sự
+  /// xuất hiện lúc 17:30:17 — đúng thời điểm người dùng gõ phím THẬT tiếp
+  /// theo. Nghĩa là `onChanged` không hề chạy lại cho lần gán `.value=` đó;
+  /// cờ "bỏ qua một lần" ở các bản trước vì vậy nằm chờ mãi và vô tình NUỐT
+  /// MẤT đúng lượt gõ phím thật kế tiếp — đó là lý do phải gõ hai lần mới
+  /// thấy thẻ tách ra. Sửa bằng cách bỏ hẳn cơ chế cờ, và tự chốt cứng
+  /// trạng thái NGAY TẠI ĐÂY thay vì trông chờ một `onChanged` không tồn
+  /// tại.
+  void _ghiVanBanChoTheVaChotCung(String vanBanMoi, TextSelection luaChonMoi) {
+    _boDieuKhienVanBan.value =
+        TextEditingValue(text: vanBanMoi, selection: luaChonMoi);
+    _vanBan = vanBanMoi;
+    _vanBanDaChot = vanBanMoi;
+    _tuDaChot = _tachTu(vanBanMoi);
+    _partialTruocDo = [];
+    _rawTruocDoTrongPhien = '';
+  }
+
   /// Chèn token tĩnh "đang ghi âm" tại vị trí con trỏ HIỆN TẠI. Ghi lại vị
   /// trí ký tự để lúc chốt thẻ (dừng tay hoặc gõ phím) thay ĐÚNG token này
   /// bằng "〔🎙️ Ghi âm N〕", không chèn thêm token mới sai chỗ.
@@ -745,15 +768,10 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     if (viTri < 0 || viTri > vanBanCu.length) viTri = vanBanCu.length;
     final vanBanMoi = vanBanCu.replaceRange(viTri, viTri, _tenTokenDangGhi);
     _viTriTokenDangGhi = viTri;
-    _boQuaKiemTraGoTrongLucGhiMotLan = true;
-    _boDieuKhienVanBan.value = TextEditingValue(
-      text: vanBanMoi,
-      selection:
-          TextSelection.collapsed(offset: viTri + _tenTokenDangGhi.length),
+    _ghiVanBanChoTheVaChotCung(
+      vanBanMoi,
+      TextSelection.collapsed(offset: viTri + _tenTokenDangGhi.length),
     );
-    // KHÔNG gọi thẳng `_khiNguoiDungGoPhim` ở đây — gán `.value` cho
-    // controller đã tự khiến `TextField.onChanged` bắn ra, nên nó tự đi
-    // qua đúng đường xử lý gõ tay bình thường (chốt cứng đoạn mới...).
     _ghiLog('Chèn token "đang ghi âm" tại vị trí ký tự $viTri (thẻ '
         '#$_soTheDangGhiHienTai).');
   }
@@ -784,14 +802,12 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   /// Dùng lại đúng `_luongGhiAm` đã xin quyền, không xin lại từ đầu.
   ///
   /// [vanBanSauKhiGo] là văn bản NGAY SAU khi ký tự vừa gõ đã được chèn vào
-  /// (tham số gốc của `_khiNguoiDungGoPhim`) — QUAN TRỌNG: toàn bộ việc
-  /// chốt token cũ + giữ ký tự vừa gõ + chèn token mới được dựng thành MỘT
-  /// chuỗi văn bản DUY NHẤT rồi gán `.value=` ĐÚNG MỘT LẦN. Bản trước đây
-  /// làm hai lượt `.value=` nối tiếp (chốt token cũ, rồi chèn token mới) —
-  /// mỗi lượt kích một vòng `onChanged` lồng nhau riêng, và trên thực tế
-  /// (bàn phím thật, không phải log) điều đó khiến phải gõ ĐỦ HAI ký tự mới
-  /// thấy thẻ tách ra: gộp làm một lượt duy nhất để chắc chắn tách ngay từ
-  /// ký tự đầu tiên.
+  /// (tham số gốc của `_khiNguoiDungGoPhim`). Toàn bộ việc chốt token cũ +
+  /// giữ ký tự vừa gõ + chèn token mới được dựng thành MỘT chuỗi văn bản
+  /// DUY NHẤT rồi gán `.value=` ĐÚNG MỘT LẦN, và trạng thái (`_vanBanDaChot`
+  /// v.v.) được chốt cứng NGAY TẠI ĐÂY qua `_ghiVanBanChoTheVaChotCung` —
+  /// xem chú thích ở hàm đó để biết vì sao KHÔNG được trông chờ một
+  /// `onChanged` chạy lại sau khi gán `.value=`.
   void _chotTheDoGoTayVaBatDauTheMoi(String vanBanSauKhiGo) {
     if (!_dangGhiAm) return;
     final soTheCu = _soTheDangGhiHienTai;
@@ -837,10 +853,9 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     final conTroMoi =
         truocToken.length + theCu.length + phanVuaGo.length + _tenTokenDangGhi.length;
 
-    _boQuaKiemTraGoTrongLucGhiMotLan = true;
-    _boDieuKhienVanBan.value = TextEditingValue(
-      text: vanBanKetQua,
-      selection: TextSelection.collapsed(offset: conTroMoi),
+    _ghiVanBanChoTheVaChotCung(
+      vanBanKetQua,
+      TextSelection.collapsed(offset: conTroMoi),
     );
 
     _boGhiAm?.stop(); // 'stop' sẽ tới sau, chỉ để lưu blob vào thẻ #$soTheCu.
@@ -880,10 +895,9 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
           : dichChuyen(chonCu.baseOffset);
       final extentMoi =
           chonCu.extentOffset < 0 ? baseMoi : dichChuyen(chonCu.extentOffset);
-      _boQuaKiemTraGoTrongLucGhiMotLan = true;
-      _boDieuKhienVanBan.value = TextEditingValue(
-        text: vanBanMoi,
-        selection: TextSelection(baseOffset: baseMoi, extentOffset: extentMoi),
+      _ghiVanBanChoTheVaChotCung(
+        vanBanMoi,
+        TextSelection(baseOffset: baseMoi, extentOffset: extentMoi),
       );
       _ghiLog('Thay token "đang ghi âm" bằng thẻ #$soThe tại vị trí '
           '$viTriToken (giữ con trỏ ở $baseMoi).');
@@ -892,10 +906,9 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     var viTri = _boDieuKhienVanBan.selection.baseOffset;
     if (viTri < 0 || viTri > vanBanCu.length) viTri = vanBanCu.length;
     final vanBanMoi = vanBanCu.replaceRange(viTri, viTri, the);
-    _boQuaKiemTraGoTrongLucGhiMotLan = true;
-    _boDieuKhienVanBan.value = TextEditingValue(
-      text: vanBanMoi,
-      selection: TextSelection.collapsed(offset: viTri + the.length),
+    _ghiVanBanChoTheVaChotCung(
+      vanBanMoi,
+      TextSelection.collapsed(offset: viTri + the.length),
     );
     _ghiLog('Chèn thẻ ghi âm #$soThe vào văn bản tại vị trí ký tự $viTri '
         '(không tìm thấy token "đang ghi âm" — có thể đã bị xoá/sửa).');
@@ -1014,18 +1027,14 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   /// micro cập nhật chữ.
   void _khiNguoiDungGoPhim(String vanBanMoi) {
     if (_dangGhiTuMicro) return;
-    if (_boQuaKiemTraGoTrongLucGhiMotLan) {
-      _boQuaKiemTraGoTrongLucGhiMotLan = false;
-    } else if (_dangGhiAm) {
+    if (_dangGhiAm) {
       // Người dùng gõ tay thật trong lúc thẻ đang ghi dở — gõ tay luôn
       // thắng micro, nhưng ở đây "thắng" nghĩa là CHỐT NGAY thẻ đang ghi
-      // rồi bắt đầu thẻ MỚI tiếp tục ghi (không huỷ/mất bản ghi).
+      // rồi bắt đầu thẻ MỚI tiếp tục ghi (không huỷ/mất bản ghi). Hàm này
+      // tự chốt cứng trạng thái ngay bên trong nó (xem
+      // `_ghiVanBanChoTheVaChotCung`) — KHÔNG xử lý tiếp `vanBanMoi` ở dưới
+      // nữa, kẻo ghi đè lên đúng kết quả vừa cập nhật.
       _chotTheDoGoTayVaBatDauTheMoi(vanBanMoi);
-      // Việc chốt/khởi tạo thẻ mới ở trên tự đi qua `onChanged` (đệ quy,
-      // do gán `.value` cho controller) và đã tự cập nhật `_vanBanDaChot`
-      // xong xuôi — KHÔNG xử lý tiếp `vanBanMoi` (tham số của lần gọi
-      // NGOÀI CÙNG, giờ đã lỗi thời) ở dưới nữa, kẻo ghi đè lên đúng kết
-      // quả vừa cập nhật.
       return;
     }
     _vanBan = vanBanMoi;
