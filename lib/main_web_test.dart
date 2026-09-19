@@ -137,7 +137,23 @@
 //   nhập sang "xem + chọn" thay vì "soạn thảo"), dùng `keyboardType:
 //   TextInputType.none` thay thế — ô vẫn ở chế độ soạn thảo BÌNH THƯỜNG
 //   (mọi cử chỉ chọn vùng hoạt động y hệt lúc tắt chế độ), chỉ báo hệ
-//   thống đừng bật bàn phím ảo.
+//   thống đừng bật bàn phím ảo. (Sau này phát hiện: đổi này KHÔNG sửa được
+//   lỗi kéo-chọn-vùng — xem v28.)
+// - (v28) Lỗi kéo-chọn-vùng ở v25–v27 hoá ra không liên quan gì tới
+//   `readOnly`/`keyboardType` — bằng chứng: máy tính bảng Android bị lỗi,
+//   điện thoại Android CÙNG hệ điều hành lại không, kể cả khi tắt hẳn chế
+//   độ ngăn bàn phím. Nguyên nhân thật: Flutter TỰ ĐOÁN kiểu bộ điều khiển
+//   chọn-vùng (di động — có đầu mút kéo được — hay bàn phím/chuột — kéo
+//   bằng chuột, không cần đầu mút) dựa theo tên hệ điều hành trình duyệt
+//   khai báo, và bị đoán sai trên một số thiết bị cảm ứng — CÙNG KIỂU lỗi
+//   User-Agent "chế độ máy tính" đã gặp ở việc nhận diện thiết bị của
+//   chính trang này, nhưng lần này nằm BÊN TRONG khung Flutter, không sửa
+//   được bằng `_doanThietBi()`.
+//   Sửa: khi bật chế độ ngăn bàn phím ảo (người dùng đã tự xác nhận không
+//   dùng chuột/bàn phím rời — đúng mục đích sinh ra nút đó), ép hẳn
+//   `selectionControls: materialTextSelectionControls` — bộ điều khiển
+//   kiểu di động, không để Flutter tự đoán nữa. KHÔNG ép khi tắt chế độ —
+//   lúc đó không chắc người dùng có chuột/bàn phím rời hay không.
 //   RÚT LẠI ý "tự kết thúc thẻ khi con trỏ di chuyển" đã ghi ở trên (v20) —
 //   quá rủi ro cho một tính năng GHI ÂM (khác hẳn micro vừa nói vừa ra
 //   chữ): di chuyển con trỏ trong lúc một thẻ đang ghi dở giờ KHÔNG đụng
@@ -169,7 +185,7 @@ import 'ai_cau_hinh.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v27';
+const _phienBanThuNghiem = 'v28';
 
 // `diaChiMayChuAI`/`matKhauMayChuAI` đến từ ai_cau_hinh.dart (import ở
 // trên) — máy chủ đó đã có sẵn action 'ghi_am' (xem cloud-function/
@@ -1949,6 +1965,24 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                         keyboardType: _chanBanPhimAo
                             ? TextInputType.none
                             : TextInputType.multiline,
+                        // Ở chế độ ngăn bàn phím ảo, người dùng ĐÃ tự tay
+                        // xác nhận không dùng chuột/bàn phím rời (đúng mục
+                        // đích sinh ra nút này) — ép hẳn bộ điều khiển
+                        // chọn-vùng kiểu DI ĐỘNG (hai đầu mút kéo được)
+                        // thay vì để Flutter tự đoán theo tên hệ điều hành
+                        // trình duyệt khai báo. Cần ép vì bộ tự đoán này bị
+                        // sai trên một số thiết bị cảm ứng (ví dụ máy tính
+                        // bảng Android tự nhận nhầm là không phải di động),
+                        // khiến chọn vùng bằng ngón tay không ra đầu mút
+                        // hoặc đầu mút lệch/kẹt — y hệt kiểu lỗi User-Agent
+                        // "chế độ máy tính" đã gặp ở việc nhận diện thiết
+                        // bị của chính trang này, nhưng lần này nằm bên
+                        // trong chính khung Flutter. KHÔNG ép khi tắt chế
+                        // độ này — lúc đó không chắc người dùng có
+                        // chuột/bàn phím rời hay không.
+                        selectionControls: _chanBanPhimAo
+                            ? materialTextSelectionControls
+                            : null,
                         showCursor: true,
                         maxLines: null,
                         expands: true,
