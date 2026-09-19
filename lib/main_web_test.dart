@@ -16,9 +16,11 @@
 // `_khiNguoiDungGoPhim`) để test vừa nói vừa gõ tay.
 //
 // THÊM MỚI (vòng test di động):
-// - Nhận diện thiết bị (điện thoại/PC) qua User-Agent, có nút chuyển tay để
-//   ép chế độ khi nhận diện sai — hai chế độ dùng CÙNG MỘT khối logic, chỉ
-//   khác một cờ `_laDiDong` để tránh việc sửa cho di động làm hỏng PC.
+// - Nhận diện thiết bị qua User-Agent (enum `ThietBi`: android/pc/iphone),
+//   có nút chuyển tay (SegmentedButton) để ép chế độ khi nhận diện sai —
+//   MỖI nhánh gọi một hàm xử lý kết quả RIÊNG (`_xuLyKetQuaDienThoai` /
+//   `_xuLyKetQuaPc` / `_xuLyKetQuaIphone`) để sửa nhánh này không đụng
+//   nhánh khác.
 // - Khung "Nhật ký" hiển thị NGAY trên trang (không cần USB debug) để người
 //   dùng chụp màn hình gửi lại khi rà lỗi trên điện thoại.
 // - Vá lỗi nhân bản chữ đã thấy trên Chrome Android: khi không tìm được
@@ -39,7 +41,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v10';
+const _phienBanThuNghiem = 'v11';
 
 // (Chỉ import đúng MỘT file `speech_to_text/speech_to_text.dart` — y hệt
 // cách `trang_soan_thao.dart` đang dùng đã chứng minh hoạt động — thay vì
@@ -69,14 +71,37 @@ class UngDungThuMicroWeb extends StatelessWidget {
   }
 }
 
+/// Ba nhánh thiết bị — mỗi nhánh một cách xử lý kết quả giọng nói riêng, vì
+/// mỗi hệ điều hành/trình duyệt có cách trả kết quả khác nhau:
+/// - `android`: Chrome trên Android (đã test kỹ, dùng bộ máy Chromium thật).
+/// - `pc`: Chrome/Edge trên Windows/Linux VÀ trên macOS (Chrome trên Mac
+///   dùng đúng bộ máy Chromium như Windows/Linux, không bị Apple ép dùng
+///   WebKit như trên iOS — nên gộp chung một nhánh).
+/// - `iPhone`: Safari/Chrome trên iOS — trên iOS, MỌI trình duyệt (kể cả
+///   Chrome) đều bị Apple bắt buộc dùng chung bộ máy WebKit của Safari, nên
+///   chỉ cần MỘT nhánh cho toàn bộ iPhone/iPad, bất kể tên trình duyệt.
+enum ThietBi { android, pc, iphone }
+
+String _tenThietBi(ThietBi t) {
+  switch (t) {
+    case ThietBi.android:
+      return 'Android';
+    case ThietBi.pc:
+      return 'PC/Mac';
+    case ThietBi.iphone:
+      return 'iPhone';
+  }
+}
+
 /// Đoán thiết bị bằng User-Agent — chỉ dùng làm giá trị GỢI Ý ban đầu, người
 /// dùng luôn bấm được nút chuyển tay nếu đoán sai (ví dụ PC thu nhỏ cửa sổ).
-bool _doanLaDiDong() {
+ThietBi _doanThietBi() {
   final ua = html.window.navigator.userAgent.toLowerCase();
-  return ua.contains('android') ||
-      ua.contains('iphone') ||
-      ua.contains('ipad') ||
-      ua.contains('mobile');
+  // iOS trước Android/mobile: iPad ở chế độ "Desktop site" vẫn có thể lẫn
+  // chữ "mobile", nhưng chữ "iphone"/"ipad" luôn xuất hiện trên iOS thật.
+  if (ua.contains('iphone') || ua.contains('ipad')) return ThietBi.iphone;
+  if (ua.contains('android') || ua.contains('mobile')) return ThietBi.android;
+  return ThietBi.pc;
 }
 
 class TrangThuMicro extends StatefulWidget {
@@ -95,9 +120,10 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   String _loi = '';
 
   // Chế độ thiết bị: đoán ban đầu qua User-Agent, người dùng đổi được bằng
-  // nút chuyển tay. Cả hai chế độ dùng chung một khối xử lý bên dưới, chỉ
-  // khác đúng MỘT cờ `_laDiDong` — sửa cho di động sẽ không đụng nhánh PC.
-  late bool _laDiDong;
+  // nút chuyển tay (SegmentedButton 3 lựa chọn). Mỗi nhánh gọi một hàm xử
+  // lý kết quả RIÊNG (`_xuLyKetQuaPc`/`_xuLyKetQuaDienThoai`/
+  // `_xuLyKetQuaIphone`) — sửa cho nhánh này không đụng nhánh khác.
+  late ThietBi _thietBi;
 
   // ---- đếm để nhìn bằng mắt lúc debug ----
   int _soLanPartial = 0;
@@ -154,9 +180,9 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   @override
   void initState() {
     super.initState();
-    _laDiDong = _doanLaDiDong();
+    _thietBi = _doanThietBi();
     _ghiLog('Phiên bản bản thử: $_phienBanThuNghiem');
-    _ghiLog('Đoán thiết bị: ${_laDiDong ? "điện thoại" : "PC"} '
+    _ghiLog('Đoán thiết bị: ${_tenThietBi(_thietBi)} '
         '(User-Agent: ${html.window.navigator.userAgent})');
     _khoiTao();
   }
@@ -237,10 +263,11 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   void _henNgheLai() {
     if (!_muonNghe) return;
     _henBatLai?.cancel();
-    // Điện thoại (Chrome Android) có xu hướng tự ngắt phiên dày hơn PC — bật
+    // Điện thoại (Android/iPhone) có xu hướng tự ngắt phiên dày hơn PC — bật
     // lại nhanh hơn một chút để đỡ hụt tiếng nói giữa hai phiên.
-    final treDoiChoDo =
-        Duration(milliseconds: _laDiDong ? 150 : 300);
+    final treDoiChoDo = Duration(
+      milliseconds: _thietBi == ThietBi.pc ? 300 : 150,
+    );
     _henBatLai = Timer(treDoiChoDo, () {
       if (_muonNghe && !_micro.isListening) _batNghe();
     });
@@ -250,7 +277,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     if (!_sanSang) return;
     final idPhien = ++_phienHienTai;
     _rawTruocDoTrongPhien = '';
-    _ghiLog('Bắt đầu phiên nghe #$idPhien (${_laDiDong ? "điện thoại" : "PC"})');
+    _ghiLog('Bắt đầu phiên nghe #$idPhien (${_tenThietBi(_thietBi)})');
     try {
       await _micro.listen(
         onResult: (ketQua) {
@@ -423,11 +450,10 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     );
   }
 
-  void _doiCheDoThietBi() {
-    setState(() {
-      _laDiDong = !_laDiDong;
-    });
-    _ghiLog('Chuyển tay sang chế độ: ${_laDiDong ? "điện thoại" : "PC"}');
+  void _doiCheDoThietBi(ThietBi moi) {
+    if (moi == _thietBi) return;
+    setState(() => _thietBi = moi);
+    _ghiLog('Chuyển tay sang chế độ: ${_tenThietBi(moi)}');
   }
 
   // ------------------------------------------------------ thuật toán lõi
@@ -560,10 +586,13 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
 
     if (noi.isEmpty) return;
 
-    if (_laDiDong) {
-      _xuLyKetQuaDienThoai(noi);
-    } else {
-      _xuLyKetQuaPc(noi, xong);
+    switch (_thietBi) {
+      case ThietBi.android:
+        _xuLyKetQuaDienThoai(noi);
+      case ThietBi.pc:
+        _xuLyKetQuaPc(noi, xong);
+      case ThietBi.iphone:
+        _xuLyKetQuaIphone(noi, xong);
     }
   }
 
@@ -608,6 +637,58 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     if (xong) {
       // Kết quả FINAL: toàn bộ nội dung hiện có (kể cả phần xem trước) coi
       // là chốt cứng, giữ nguyên văn.
+      _vanBanDaChot = vanBanHienThi;
+      _tuDaChot = _tachTu(vanBanHienThi);
+      _partialTruocDo = [];
+    }
+  }
+
+  /// Nhánh iPhone: CHƯA có máy iOS thật để test (xem log v10 trở về trước —
+  /// chỉ test được Android và PC/Mac). Trên iOS, mọi trình duyệt đều bị
+  /// Apple ép dùng chung bộ máy WebKit của Safari — hoàn toàn khác bộ máy
+  /// Chromium (Chrome/Edge) đang chạy trên Android và PC/Mac. Không có dữ
+  /// liệu thật để biết WebKit có bị lỗi lặp-lịch-sử giống Chrome Android
+  /// hay không.
+  ///
+  /// Tạm dùng NGUYÊN VẸN thuật toán của nhánh PC (`_xuLyKetQuaPc`) làm điểm
+  /// khởi đầu — lý do chọn PC thay vì Android: thuật toán PC giả định bộ
+  /// nhận dạng trả hypothesis tăng dần SẠCH (không tự lặp lại lịch sử), đây
+  /// là hành vi "đúng chuẩn" của Web Speech API mà đa số trình duyệt tuân
+  /// theo — lỗi lặp lịch sử là ĐẶC THÙ riêng của Chrome Android (xem thuật
+  /// toán `_xuLyKetQuaDienThoai`), không có gì cho thấy WebKit trên iOS
+  /// cũng mắc lỗi y hệt vậy. Tách thành hàm riêng (không gọi thẳng
+  /// `_xuLyKetQuaPc`) để sau này có log/bằng chứng thật từ máy iPhone thì
+  /// sửa riêng nhánh này mà không đụng tới nhánh PC đã test kỹ.
+  void _xuLyKetQuaIphone(String noi, bool xong) {
+    final tuMoi = _tachTu(noi);
+    if (tuMoi.isEmpty) return;
+
+    List<String> phanMoiCanNoi;
+    if (_batDauBangPhanDaChot(tuMoi, _tuDaChot)) {
+      final tienToChung = _doDaiTienToChung(tuMoi, _partialTruocDo);
+      if (tienToChung > _tuDaChot.length) {
+        final tuMoiChotThem = tuMoi.sublist(_tuDaChot.length, tienToChung);
+        _vanBanDaChot = _noiTiep(_vanBanDaChot, tuMoiChotThem);
+        _tuDaChot = tuMoi.sublist(0, tienToChung);
+      }
+      phanMoiCanNoi = tuMoi.sublist(_tuDaChot.length);
+    } else {
+      final ketQuaNoi = _timDiemNoiTrong(_tuDaChot, tuMoi);
+      if (ketQuaNoi == null) {
+        phanMoiCanNoi = tuMoi;
+      } else if (ketQuaNoi.isEmpty) {
+        _partialTruocDo = tuMoi;
+        return;
+      } else {
+        phanMoiCanNoi = ketQuaNoi;
+      }
+    }
+
+    _partialTruocDo = tuMoi;
+    final vanBanHienThi = _noiTiep(_vanBanDaChot, phanMoiCanNoi);
+    setState(() => _ghiVanBanTuMicro(vanBanHienThi));
+
+    if (xong) {
       _vanBanDaChot = vanBanHienThi;
       _tuDaChot = _tachTu(vanBanHienThi);
       _partialTruocDo = [];
@@ -693,19 +774,6 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
         child: Scaffold(
       appBar: AppBar(
         title: const Text('Flowrite — thử micro trên Web ($_phienBanThuNghiem)'),
-        actions: [
-          TextButton.icon(
-            onPressed: _doiCheDoThietBi,
-            icon: Icon(
-              _laDiDong ? Icons.smartphone : Icons.laptop_mac,
-              color: Colors.white,
-            ),
-            label: Text(
-              _laDiDong ? 'Điện thoại' : 'PC',
-              style: const TextStyle(color: Colors.white),
-            ),
-          ),
-        ],
       ),
       body: SafeArea(
         child: Padding(
@@ -713,6 +781,55 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Nút chuyển thiết bị — cố tình KHÔNG đặt trong AppBar nữa
+              // (chữ trắng từng bị chìm mất trên nền AppBar gần trắng của
+              // Material 3). Đặt hẳn trong thân trang, có khung nền riêng
+              // để luôn nổi bật bất kể theme màu gì.
+              Container(
+                padding: const EdgeInsets.all(8),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Thiết bị đang chọn:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    SegmentedButton<ThietBi>(
+                      segments: const [
+                        ButtonSegment(
+                          value: ThietBi.android,
+                          icon: Icon(Icons.android),
+                          label: Text('Android'),
+                        ),
+                        ButtonSegment(
+                          value: ThietBi.pc,
+                          icon: Icon(Icons.laptop_mac),
+                          label: Text('PC/Mac'),
+                        ),
+                        ButtonSegment(
+                          value: ThietBi.iphone,
+                          icon: Icon(Icons.phone_iphone),
+                          label: Text('iPhone'),
+                        ),
+                      ],
+                      selected: {_thietBi},
+                      onSelectionChanged: (chon) =>
+                          _doiCheDoThietBi(chon.first),
+                      style: SegmentedButton.styleFrom(
+                        selectedBackgroundColor: Colors.blue.shade700,
+                        selectedForegroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               if (!_sanSang)
                 const Padding(
                   padding: EdgeInsets.only(bottom: 8),
