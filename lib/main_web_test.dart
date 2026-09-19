@@ -47,10 +47,28 @@
 //   -rồi-gửi-Gemini thay vì thử Web Speech API (vốn không chạy được trên
 //   iOS). Bàn phím ảo hiện lên thì ẩn hết các hàng bên dưới khung nhập, để
 //   khung nhập giãn hết cỡ phần còn lại phía trên bàn phím.
-//   CHƯA LÀM trong v18 (còn nợ, sẽ làm khi có xác nhận thêm): tự kết thúc
-//   thẻ khi con trỏ DI CHUYỂN mà không gõ tay; chế độ tự động gửi ngầm các
-//   thẻ đã xong trong lúc ghi thẻ mới; gộp nhiều thẻ vào một lần gọi Gemini
-//   để có ngữ cảnh (cần sửa cả Cloud Function, phải làm riêng).
+// - (v19) Vá 4 lỗi người dùng báo sau khi thử v18:
+//   1. Gõ tay huỷ một thẻ đang ghi dở KHÔNG còn để lại token "đang ghi âm"
+//      làm rác nữa — nguyên nhân cũ: `MediaRecorder.stop()` vẫn bắn sự
+//      kiện 'stop' sau đó nên `_hoanTatGhiAm` vẫn chạy như bình thường và
+//      chèn thẻ mới sai chỗ; nay có cờ `_dangHuyGhiAmDoGoTay` để phân biệt,
+//      và dọn sạch token bằng `_xoaTokenDangGhiKhoiVanBan`.
+//   2. "Tạo văn bản" tự dọn nốt token "đang ghi âm" còn sót (lưới an toàn).
+//   3. Thêm log chẩn đoán cho ca "gõ dấu ngoặc lúc đang ghi mà không tắt"
+//      (nghi ngờ là hệ quả của lỗi #1, chưa có bằng chứng chắc chắn khác).
+//   4. Thẻ giờ KHÔNG thể sửa/xoá từng ký tự bên trong — `_ChanSuaGiuaThe`
+//      (một `TextInputFormatter`) phóng to mọi chỉnh sửa chồng lấn một
+//      phần vùng thẻ thành xoá TRỌN thẻ, và đẩy con trỏ ra khỏi giữa thẻ
+//      khi chỉ di chuyển (không gõ). Thẻ cũng được tô màu: "Ghi âm N" màu
+//      xanh lá, token "đang ghi âm" màu đỏ (`_BoDieuKhienVanBanCoThe`,
+//      override `buildTextSpan`).
+//   Ngoài ra: bỏ hai nút "Nghe lại"/"Tải xuống" (không cần nữa, cơ chế ghi
+//   âm đã kiểm chứng ổn định); trên iPhone ẩn nút "Ghi âm" riêng vì nút
+//   micro chính đã làm đúng việc đó rồi (tránh hai nút trùng chức năng).
+//   CHƯA LÀM (còn nợ, sẽ làm khi có xác nhận thêm): tự kết thúc thẻ khi con
+//   trỏ DI CHUYỂN mà không gõ tay; chế độ tự động gửi ngầm các thẻ đã xong
+//   trong lúc ghi thẻ mới; gộp nhiều thẻ vào một lần gọi Gemini để có ngữ
+//   cảnh (cần sửa cả Cloud Function, phải làm riêng).
 
 import 'dart:async';
 import 'dart:convert';
@@ -72,7 +90,7 @@ import 'ai_cau_hinh.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v18';
+const _phienBanThuNghiem = 'v19';
 
 // `diaChiMayChuAI`/`matKhauMayChuAI` đến từ ai_cau_hinh.dart (import ở
 // trên) — máy chủ đó đã có sẵn action 'ghi_am' (xem cloud-function/
@@ -140,6 +158,144 @@ ThietBi _doanThietBi() {
   return ThietBi.pc;
 }
 
+/// Bộ điều khiển văn bản riêng, CHỈ khác `TextEditingController` chuẩn ở
+/// việc tô màu: thẻ đã ghi âm xong ("〔🎙️ Ghi âm N〕") màu XANH LÁ, token
+/// đang ghi dở ("〔🎙️ … đang ghi âm …〕") màu ĐỎ — để người dùng phân biệt
+/// bằng mắt ngay trong khung nhập, không cần chờ bấm "Tạo văn bản". Không
+/// đụng gì tới cách lưu trữ text (`text`/`value` vẫn y hệt controller gốc),
+/// chỉ override cách VẼ ra màn hình.
+class _BoDieuKhienVanBanCoThe extends TextEditingController {
+  @override
+  TextSpan buildTextSpan({
+    required BuildContext context,
+    TextStyle? style,
+    required bool withComposing,
+  }) {
+    final noiDung = text;
+    final moc = <(int, int, Color)>[];
+    for (final m in _TrangThuMicroState._reTheGhiAm.allMatches(noiDung)) {
+      moc.add((m.start, m.end, Colors.green.shade700));
+    }
+    var timTu = 0;
+    while (true) {
+      final i = noiDung.indexOf(
+          _TrangThuMicroState._tenTokenDangGhi, timTu);
+      if (i < 0) break;
+      moc.add((i, i + _TrangThuMicroState._tenTokenDangGhi.length,
+          Colors.red.shade700));
+      timTu = i + _TrangThuMicroState._tenTokenDangGhi.length;
+    }
+    moc.sort((a, b) => a.$1.compareTo(b.$1));
+
+    final spans = <InlineSpan>[];
+    var conTro = 0;
+    for (final m in moc) {
+      if (m.$1 < conTro) continue; // đè nhau (không nên xảy ra) — bỏ qua.
+      if (m.$1 > conTro) {
+        spans.add(TextSpan(text: noiDung.substring(conTro, m.$1)));
+      }
+      spans.add(TextSpan(
+        text: noiDung.substring(m.$1, m.$2),
+        style: TextStyle(color: m.$3, fontWeight: FontWeight.bold),
+      ));
+      conTro = m.$2;
+    }
+    if (conTro < noiDung.length) {
+      spans.add(TextSpan(text: noiDung.substring(conTro)));
+    }
+    return TextSpan(style: style, children: spans);
+  }
+}
+
+/// Chặn sửa/xoá TỪNG KÝ TỰ bên trong một thẻ ghi âm (dù đã xong hay đang
+/// ghi dở) — mọi chỉnh sửa CHỒNG LẤN một phần vùng ký tự của thẻ (không phủ
+/// trọn thẻ) sẽ bị "phóng to" thành xoá NGUYÊN CẢ THẺ đó, để người dùng chỉ
+/// có hai lựa chọn: giữ nguyên thẻ, hoặc xoá trọn một lần. Đồng thời chặn
+/// con trỏ (hoặc vùng chọn) dừng lại ở GIỮA một thẻ khi người dùng chỉ di
+/// chuyển con trỏ (không gõ gì) — tự đẩy ra biên gần nhất.
+class _ChanSuaGiuaThe extends TextInputFormatter {
+  List<(int, int)> _cacVungThe(String text) {
+    final vung = <(int, int)>[];
+    for (final m in _TrangThuMicroState._reTheGhiAm.allMatches(text)) {
+      vung.add((m.start, m.end));
+    }
+    var timTu = 0;
+    while (true) {
+      final i = text.indexOf(_TrangThuMicroState._tenTokenDangGhi, timTu);
+      if (i < 0) break;
+      vung.add((i, i + _TrangThuMicroState._tenTokenDangGhi.length));
+      timTu = i + _TrangThuMicroState._tenTokenDangGhi.length;
+    }
+    return vung;
+  }
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final oldText = oldValue.text;
+    final newText = newValue.text;
+
+    if (oldText == newText) {
+      // Không đổi chữ — chỉ đổi vùng chọn (di chuyển con trỏ bằng phím mũi
+      // tên hoặc chạm/bấm chuột). Đẩy con trỏ ra khỏi giữa thẻ nếu cần.
+      final vung = _cacVungThe(newText);
+      if (vung.isEmpty) return newValue;
+      int day(int viTri) {
+        for (final v in vung) {
+          if (viTri > v.$1 && viTri < v.$2) {
+            return (viTri - v.$1) < (v.$2 - viTri) ? v.$1 : v.$2;
+          }
+        }
+        return viTri;
+      }
+      final base = day(newValue.selection.baseOffset);
+      final extent = day(newValue.selection.extentOffset);
+      if (base == newValue.selection.baseOffset &&
+          extent == newValue.selection.extentOffset) {
+        return newValue;
+      }
+      return newValue.copyWith(
+        selection: TextSelection(baseOffset: base, extentOffset: extent),
+      );
+    }
+
+    final vungCu = _cacVungThe(oldText);
+    if (vungCu.isEmpty) return newValue;
+
+    // Tìm đoạn khác nhau đầu/cuối giữa văn bản cũ và mới — cách đơn giản để
+    // biết chính xác vùng ký tự nào trong `oldText` vừa bị đổi.
+    var dau = 0;
+    final ngan =
+        oldText.length < newText.length ? oldText.length : newText.length;
+    while (dau < ngan && oldText[dau] == newText[dau]) dau++;
+    var cuoiCu = oldText.length;
+    var cuoiMoi = newText.length;
+    while (cuoiCu > dau &&
+        cuoiMoi > dau &&
+        oldText[cuoiCu - 1] == newText[cuoiMoi - 1]) {
+      cuoiCu--;
+      cuoiMoi--;
+    }
+
+    for (final v in vungCu) {
+      final chongLan = dau < v.$2 && cuoiCu > v.$1;
+      final phuTron = dau <= v.$1 && cuoiCu >= v.$2;
+      if (chongLan && !phuTron) {
+        // Sửa/xoá một phần của thẻ — phóng to vùng xoá ra trọn thẻ đó,
+        // giữ nguyên phần chữ gõ tay còn lại ở hai đầu (nếu có).
+        final vanBanKetQua = oldText.replaceRange(v.$1, v.$2, '');
+        return TextEditingValue(
+          text: vanBanKetQua,
+          selection: TextSelection.collapsed(offset: v.$1),
+        );
+      }
+    }
+    return newValue;
+  }
+}
+
 class TrangThuMicro extends StatefulWidget {
   const TrangThuMicro({super.key});
 
@@ -170,7 +326,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   // `_nguoiDungVuaGo()` bên app chính): gõ một phím là micro tắt NGAY, tự
   // bật lại sau 1 giây không gõ tiếp. ----
   String _vanBan = '';
-  final _boDieuKhienVanBan = TextEditingController();
+  final _boDieuKhienVanBan = _BoDieuKhienVanBanCoThe();
 
   // Văn bản đã "chốt cứng" — giữ NGUYÊN VĂN (kể cả dấu xuống dòng/khoảng
   // trắng người dùng tự gõ). Micro chỉ được phép NỐI THÊM vào biến này
@@ -253,7 +409,6 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   Timer? _bomDongHoGhiAm;
   Duration _thoiLuongDangGhi = Duration.zero;
   int? _viTriTokenDangGhi; // vị trí ký tự bắt đầu của token đang ghi dở.
-  int? _soTheDangGhi;
   static const String _tenTokenDangGhi = '〔🎙️ … đang ghi âm …〕';
 
   // Bỏ qua ĐÚNG MỘT lần kiểm tra "gõ tay trong lúc đang ghi" trong
@@ -262,6 +417,13 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   // bắn ra), để không hiểu nhầm chính hành động chèn token là "người dùng
   // gõ tay huỷ bản ghi".
   bool _boQuaKiemTraGoTrongLucGhiMotLan = false;
+
+  // Đặt TRUE bởi `_huyGhiAmDangDoDoGoTay` khi gõ tay huỷ một lần ghi dở —
+  // `MediaRecorder.stop()` vẫn luôn bắn sự kiện 'stop' SAU ĐÓ (bất đồng bộ),
+  // nên `_hoanTatGhiAm` vẫn sẽ được gọi như một lần ghi bình thường nếu
+  // không có cờ này để phân biệt. Khi cờ này bật, `_hoanTatGhiAm` KHÔNG tạo
+  // thẻ mới — chỉ dọn sạch token "đang ghi âm" còn sót trong văn bản.
+  bool _dangHuyGhiAmDoGoTay = false;
 
   // Đếm số lần lỗi liên tiếp KHÔNG kèm bất kỳ chữ nào (không có partial nào
   // trước khi lỗi) — dấu hiệu bộ nhận dạng bị chặn ngay từ đầu chứ không
@@ -564,25 +726,47 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     if (!_dangGhiAm) return;
     _ghiLog('Người dùng gõ tay trong lúc đang ghi thẻ — huỷ bản ghi dở này '
         '(gõ tay luôn thắng micro).');
+    _dangHuyGhiAmDoGoTay = true;
     _bomDongHoGhiAm?.cancel();
     _bomDongHoGhiAm = null;
     _viTriTokenDangGhi = null;
-    _soTheDangGhi = null;
-    final boGhi = _boGhiAm;
-    _boGhiAm = null; // để listener 'stop' (nếu còn tới) không chèn thẻ nữa.
-    boGhi?.stop();
+    _boGhiAm?.stop(); // sự kiện 'stop' vẫn tới sau — xem `_dangHuyGhiAmDoGoTay`.
     for (final track in _luongGhiAm?.getTracks() ?? const []) {
       track.stop();
     }
     if (mounted) setState(() => _dangGhiAm = false);
   }
 
+  /// Xoá token tĩnh "đang ghi âm" khỏi văn bản — dùng khi một lần ghi bị
+  /// huỷ do gõ tay (xem `_dangHuyGhiAmDoGoTay`), để không để lại rác. Tìm
+  /// bằng NỘI DUNG token (không dùng lại vị trí đã lưu trước đó), vì văn
+  /// bản có thể đã đổi (người dùng vừa gõ thêm) giữa lúc huỷ và lúc sự kiện
+  /// 'stop' thực sự tới.
+  void _xoaTokenDangGhiKhoiVanBan() {
+    final vanBanCu = _boDieuKhienVanBan.text;
+    final viTri = vanBanCu.indexOf(_tenTokenDangGhi);
+    if (viTri < 0) return; // đã bị người dùng tự xoá/sửa trước đó — không sao.
+    final vanBanMoi =
+        vanBanCu.replaceRange(viTri, viTri + _tenTokenDangGhi.length, '');
+    _boDieuKhienVanBan.value = TextEditingValue(
+      text: vanBanMoi,
+      selection: TextSelection.collapsed(offset: viTri),
+    );
+    _ghiLog('Đã dọn token "đang ghi âm" còn sót (bản ghi vừa bị huỷ do gõ '
+        'tay) tại vị trí $viTri.');
+  }
+
   void _hoanTatGhiAm() {
+    _bomDongHoGhiAm?.cancel();
+    _bomDongHoGhiAm = null;
+    if (_dangHuyGhiAmDoGoTay) {
+      _dangHuyGhiAmDoGoTay = false;
+      _xoaTokenDangGhiKhoiVanBan();
+      return;
+    }
     // Dùng ĐÚNG mimeType mà bộ ghi thật sự đã dùng (đọc lại từ chính đối
     // tượng MediaRecorder) — không đoán/ép cứng, vì mỗi trình duyệt trả về
     // một định dạng khác nhau (xem log lúc bắt đầu ghi).
-    _bomDongHoGhiAm?.cancel();
-    _bomDongHoGhiAm = null;
     final loaiThuc = _boGhiAm?.mimeType;
     final blob = html.Blob(
       _cacDoanGhiAm,
@@ -638,7 +822,6 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     final vanBanCu = _boDieuKhienVanBan.text;
     final viTriToken = _viTriTokenDangGhi;
     _viTriTokenDangGhi = null;
-    _soTheDangGhi = null;
     if (viTriToken != null &&
         viTriToken >= 0 &&
         viTriToken + _tenTokenDangGhi.length <= vanBanCu.length &&
@@ -666,40 +849,11 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
         '(không tìm thấy token "đang ghi âm" — có thể đã bị xoá/sửa).');
   }
 
-  void _bamNutNgheLai() {
-    final audio = _phatLaiAmThanh;
-    if (audio == null) return;
-    if (_dangPhatLai) {
-      audio.pause();
-      setState(() => _dangPhatLai = false);
-    } else {
-      audio.currentTime = 0;
-      setState(() => _dangPhatLai = true);
-      _ghiLog('Phát lại bản ghi âm.');
-      audio.play().catchError((Object loi) {
-        _ghiLog('Lỗi khi phát: $loi');
-        if (mounted) setState(() => _dangPhatLai = false);
-      });
-    }
-  }
-
-  /// Tải file ghi âm về máy — để mở bằng ứng dụng ngoài trình duyệt (Ảnh/
-  /// Files trên iPhone) kiểm tra xem dữ liệu ghi được có tiếng thật hay
-  /// không. Tách bạch "ghi hỏng" khỏi "trình duyệt phát lỗi": WebKit có lỗi
-  /// đã biết là file MediaRecorder tạo ra đôi khi thiếu metadata thời
-  /// lượng (duration: Infinity), khiến thẻ <audio> không phát được dù dữ
-  /// liệu ghi vẫn nguyên vẹn.
-  void _taiXuongGhiAm() {
-    final url = _urlAmThanhDaGhi;
-    if (url == null) return;
-    final theLienKet = html.AnchorElement(href: url)
-      ..download = 'ghi-am-thu.mp4'
-      ..style.display = 'none';
-    html.document.body?.append(theLienKet);
-    theLienKet.click();
-    theLienKet.remove();
-    _ghiLog('Đã yêu cầu tải file ghi âm về máy.');
-  }
+  // `_bamNutNgheLai`/`_taiXuongGhiAm` (nút "Nghe lại"/"Tải xuống") đã bỏ —
+  // cơ chế ghi âm đã kiểm chứng hoạt động đúng qua nhiều bản thử, không cần
+  // công cụ kiểm tra nhanh này nữa. `_phatLaiAmThanh`/`_urlAmThanhDaGhi`
+  // vẫn giữ lại: `_hoanTatGhiAm` vẫn tạo thẻ `<audio>` (đề phòng cần debug
+  // sau này) dù không còn nút bấm nào gọi tới chúng.
 
   /// Đọc [blob] thành chuỗi base64 thuần (không kèm tiền tố
   /// "data:...;base64,") — dùng FileReader vì Blob trên web không có sẵn
@@ -724,7 +878,16 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   /// giữ nguyên các phần chữ gõ tay xen kẽ xung quanh.
   Future<void> _taoVanBanTuTheGhiAm() async {
     if (_dangTaoVanBan) return;
-    final vanBanHienTai = _boDieuKhienVanBan.text;
+    var vanBanHienTai = _boDieuKhienVanBan.text;
+    // Lưới an toàn: đáng lẽ không còn token "đang ghi âm" nào sót lại (xem
+    // `_dangHuyGhiAmDoGoTay`/`_xoaTokenDangGhiKhoiVanBan`), nhưng nếu vẫn có
+    // (ví dụ lỗi chưa lường hết) thì dọn sạch trước khi gửi, đừng để nó lọt
+    // vào văn bản cuối cùng dưới dạng chữ vô nghĩa.
+    if (vanBanHienTai.contains(_tenTokenDangGhi)) {
+      _ghiLog('Cảnh báo: còn sót token "đang ghi âm" trong văn bản — dọn '
+          'trước khi tạo văn bản.');
+      vanBanHienTai = vanBanHienTai.replaceAll(_tenTokenDangGhi, '');
+    }
     final cacKhop = _reTheGhiAm.allMatches(vanBanHienTai).toList();
     if (cacKhop.isEmpty) {
       _ghiLog('Không có thẻ ghi âm nào trong văn bản để gửi.');
@@ -799,6 +962,14 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   /// micro cập nhật chữ.
   void _khiNguoiDungGoPhim(String vanBanMoi) {
     if (_dangGhiTuMicro) return;
+    // Log chẩn đoán cho báo cáo "gõ dấu ngoặc lúc đang ghi mà ghi âm không
+    // tắt" — in ra đúng lúc này để xác nhận `_dangGhiAm` có thật sự đúng
+    // hay đã bị lệch trạng thái trước khi tới đây.
+    if (_dangGhiAm || _boQuaKiemTraGoTrongLucGhiMotLan) {
+      _ghiLog('onChanged trong lúc _dangGhiAm=$_dangGhiAm, '
+          'boQua=$_boQuaKiemTraGoTrongLucGhiMotLan, '
+          'dangHuy=$_dangHuyGhiAmDoGoTay.');
+    }
     if (_boQuaKiemTraGoTrongLucGhiMotLan) {
       _boQuaKiemTraGoTrongLucGhiMotLan = false;
     } else if (_dangGhiAm) {
@@ -1357,6 +1528,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                       child: TextField(
                         controller: _boDieuKhienVanBan,
                         onChanged: _khiNguoiDungGoPhim,
+                        inputFormatters: [_ChanSuaGiuaThe()],
                         maxLines: null,
                         expands: true,
                         textAlignVertical: TextAlignVertical.top,
@@ -1449,135 +1621,59 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      // Nút "Ghi âm" — dùng MediaRecorder chuẩn của trình
-                      // duyệt, KHÔNG qua Web Speech API. Thử nghiệm riêng
-                      // cho hướng "ghi âm rồi gửi AI khác nghe" khi Web
-                      // Speech API không dùng được (vd trên iPhone).
-                      Tooltip(
-                        message: _dangGhiAm ? 'Dừng ghi âm' : 'Ghi âm thử',
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: _bamNutGhiAm,
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: _dangGhiAm
-                                  ? Colors.red
-                                  : Colors.orange.shade100,
-                              border: Border.all(
-                                color: Colors.orange.shade900,
-                                width: 2,
+                      // Nút "Ghi âm" riêng — trên iPhone nút micro chính ở
+                      // trên đã gọi thẳng đúng cơ chế này rồi (xem
+                      // `_bamNutMicro`), nên ẨN nút riêng này đi để khỏi có
+                      // hai nút làm cùng một việc. Trên Android/PC (nơi
+                      // micro chính vẫn dùng Web Speech API) vẫn giữ nút
+                      // này làm lựa chọn phụ.
+                      if (_thietBi != ThietBi.iphone) ...[
+                        const SizedBox(width: 8),
+                        Tooltip(
+                          message: _dangGhiAm ? 'Dừng ghi âm' : 'Ghi âm thử',
+                          child: InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap: _bamNutGhiAm,
+                            child: Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: _dangGhiAm
+                                    ? Colors.red
+                                    : Colors.orange.shade100,
+                                border: Border.all(
+                                  color: Colors.orange.shade900,
+                                  width: 2,
+                                ),
                               ),
-                            ),
-                            alignment: Alignment.center,
-                            child: Icon(
-                              _dangGhiAm
-                                  ? Icons.stop
-                                  : Icons.fiber_manual_record,
-                              color: _dangGhiAm
-                                  ? Colors.white
-                                  : Colors.orange.shade900,
-                              size: 22,
+                              alignment: Alignment.center,
+                              child: Icon(
+                                _dangGhiAm
+                                    ? Icons.stop
+                                    : Icons.fiber_manual_record,
+                                color: _dangGhiAm
+                                    ? Colors.white
+                                    : Colors.orange.shade900,
+                                size: 22,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Nút "Nghe lại" — chỉ bấm được sau khi đã ghi âm
-                      // xong ít nhất một lần.
-                      Tooltip(
-                        message: _urlAmThanhDaGhi == null
-                            ? 'Chưa có bản ghi nào'
-                            : (_dangPhatLai ? 'Dừng phát' : 'Nghe lại'),
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: _urlAmThanhDaGhi == null
-                              ? null
-                              : _bamNutNgheLai,
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: _urlAmThanhDaGhi == null
-                                  ? Colors.grey.shade200
-                                  : Colors.purple.shade100,
-                              border: Border.all(
-                                color: _urlAmThanhDaGhi == null
-                                    ? Colors.grey.shade400
-                                    : Colors.purple.shade900,
-                                width: 2,
-                              ),
-                            ),
-                            alignment: Alignment.center,
-                            child: Icon(
-                              _dangPhatLai
-                                  ? Icons.pause
-                                  : Icons.play_arrow,
-                              color: _urlAmThanhDaGhi == null
-                                  ? Colors.grey.shade500
-                                  : Colors.purple.shade900,
-                              size: 22,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Nút "Tải xuống" — để kiểm tra file ghi âm bằng ứng
-                      // dụng NGOÀI trình duyệt, tách bạch "ghi hỏng" khỏi
-                      // "trình duyệt phát lỗi".
-                      Tooltip(
-                        message: _urlAmThanhDaGhi == null
-                            ? 'Chưa có bản ghi nào'
-                            : 'Tải file ghi âm về máy',
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: _urlAmThanhDaGhi == null
-                              ? null
-                              : _taiXuongGhiAm,
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: _urlAmThanhDaGhi == null
-                                  ? Colors.grey.shade200
-                                  : Colors.teal.shade100,
-                              border: Border.all(
-                                color: _urlAmThanhDaGhi == null
-                                    ? Colors.grey.shade400
-                                    : Colors.teal.shade900,
-                                width: 2,
-                              ),
-                            ),
-                            alignment: Alignment.center,
-                            child: Icon(
-                              Icons.download,
-                              color: _urlAmThanhDaGhi == null
-                                  ? Colors.grey.shade500
-                                  : Colors.teal.shade900,
-                              size: 22,
-                            ),
-                          ),
-                        ),
-                      ),
+                      ],
+                      // Nút "Nghe lại" và "Tải xuống" đã bỏ — cơ chế ghi âm
+                      // đã kiểm chứng hoạt động đúng (không cần công cụ
+                      // kiểm tra nhanh này nữa), thẻ đã được nghe qua Gemini
+                      // phiên âm là đủ tin cậy.
                     ],
                   ),
-                  if (_dangGhiAm || _urlAmThanhDaGhi != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
+                  if (_dangGhiAm)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 6),
                       child: Center(
                         child: Text(
-                          _dangGhiAm
-                              ? 'Đang ghi âm… bấm lại để dừng.'
-                              : 'Đã có bản ghi âm — bấm nút tím để nghe lại.',
-                          style: TextStyle(
-                            color: _dangGhiAm ? Colors.red : Colors.grey[700],
-                            fontSize: 12,
-                          ),
+                          'Đang ghi âm… bấm lại để dừng.',
+                          style: TextStyle(color: Colors.red, fontSize: 12),
                         ),
                       ),
                     ),
