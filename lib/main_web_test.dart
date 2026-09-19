@@ -98,6 +98,21 @@
 //   là "toàn bộ văn bản") — tính lại mỗi khi neo đổi, để thuật toán dò
 //   trùng lặp/điểm nối không so khớp nhầm với chữ không liên quan nằm ở
 //   chỗ khác trong văn bản.
+// - (v24) Sửa lại v23: đang nói mà kéo con trỏ đi chỗ khác GIỮA CHỪNG một
+//   phiên nghe (chưa đợi phiên tự ngắt) vẫn phải đổi chỗ chèn NGAY — đúng
+//   hành vi thật của app Android (`_dongBangDoanDangNhay()` trong
+//   `trang_soan_thao.dart`: mọi lần con trỏ bị người dùng dời trong lúc
+//   đang nghe đều CẮT phiên hiện tại và nghe lại ngay, không có chuyện
+//   "cứ nói liên tục thì bỏ qua" — điều đó ở v23 là hiểu sai). Thêm
+//   `_khiGiaTriKhungNhapDoi`, gắn qua `_boDieuKhienVanBan.addListener` (bắt
+//   được cả lúc CHỈ đổi vị trí con trỏ, không đổi chữ — `onChanged` không
+//   bắt được ca này): con trỏ đổi trong lúc micro đang nghe → cắt hẳn
+//   phiên (`_micro.cancel()`) rồi nghe lại (`_henNgheLai()`), để `_batNghe`
+//   tự dời neo theo đúng vị trí mới. Bắt buộc phải CẮT PHIÊN thật (không
+//   chỉ dời neo tại chỗ) vì hypothesis Web Speech API trả về là hypothesis
+//   TÍCH LUỸ của CẢ PHIÊN — nếu phiên cũ cứ chạy tiếp mà neo đã đổi, lần
+//   kết quả kế tiếp sẽ hiểu nhầm toàn bộ tích luỹ là "chữ mới" và chèn
+//   nhân đôi.
 //   CHƯA LÀM (còn nợ, sẽ làm khi có xác nhận thêm): tự kết thúc thẻ khi con
 //   trỏ DI CHUYỂN mà không gõ tay; chế độ tự động gửi ngầm các thẻ đã xong
 //   trong lúc ghi thẻ mới; gộp nhiều thẻ vào một lần gọi Gemini để có ngữ
@@ -123,7 +138,7 @@ import 'ai_cau_hinh.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v23';
+const _phienBanThuNghiem = 'v24';
 
 // `diaChiMayChuAI`/`matKhauMayChuAI` đến từ ai_cau_hinh.dart (import ở
 // trên) — máy chủ đó đã có sẵn action 'ghi_am' (xem cloud-function/
@@ -477,6 +492,11 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     _ghiLog('Phiên bản bản thử: $_phienBanThuNghiem');
     _ghiLog('Đoán thiết bị: ${_tenThietBi(_thietBi)} '
         '(User-Agent: ${html.window.navigator.userAgent})');
+    // Lắng nghe MỌI thay đổi của khung nhập (kể cả chỉ đổi vùng chọn/con
+    // trỏ, không đổi chữ) — `TextField.onChanged` CHỈ bắn khi chữ đổi, nên
+    // không đủ để bắt lúc người dùng chỉ di chuyển con trỏ. Xem
+    // `_khiGiaTriKhungNhapDoi`.
+    _boDieuKhienVanBan.addListener(_khiGiaTriKhungNhapDoi);
     _khoiTao();
   }
 
@@ -569,6 +589,46 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       _phienHienTai++;
       _henNgheLai();
     }
+  }
+
+  /// Văn bản lần gần nhất listener này thấy — để phân biệt "chữ vừa đổi"
+  /// (việc khác đã lo, bỏ qua ở đây) với "chỉ vùng chọn/con trỏ đổi" (việc
+  /// CHÍNH của hàm này).
+  String _vanBanChoTheoDoiConTro = '';
+
+  /// Bắt MỌI thay đổi của khung nhập, kể cả chỉ đổi vị trí con trỏ (không
+  /// đổi chữ) — `TextField.onChanged` không bắt được ca này.
+  ///
+  /// Y HỆT tinh thần `_dongBangDoanDangNhay()` bên app chính
+  /// (`trang_soan_thao.dart`): người dùng tự tay di chuyển con trỏ trong
+  /// lúc micro đang nghe (dù đang nói liên tục hay không) → CẮT NGAY phiên
+  /// nghe hiện tại và nghe lại ngay tại vị trí mới — không đợi phiên tự
+  /// ngắt. KHÔNG chỉ đơn giản dời neo (`_neoChenMic`) tại chỗ mà giữ
+  /// nguyên phiên nghe cũ chạy tiếp: hypothesis (`noi`) của Web Speech API
+  /// là hypothesis TÍCH LUỸ của CẢ PHIÊN, không phải chỉ phần mới — nếu
+  /// phiên cũ vẫn tiếp tục chạy mà neo đã đổi giữa chừng, lần kết quả kế
+  /// tiếp sẽ hiểu nhầm toàn bộ hypothesis tích luỹ là "chữ mới toanh" và
+  /// chèn NHÂN ĐÔI cả những từ đã hiện ra trước đó. Cắt hẳn phiên (như
+  /// Android làm bằng `_micro.stop()`/`cancel()`) đảm bảo phiên MỚI luôn
+  /// bắt đầu với hypothesis rỗng, tránh hẳn nguy cơ đó.
+  Future<void> _khiGiaTriKhungNhapDoi() async {
+    final gt = _boDieuKhienVanBan.value;
+    if (gt.text != _vanBanChoTheoDoiConTro) {
+      _vanBanChoTheoDoiConTro = gt.text;
+      return; // Đổi CHỮ — đã có `_khiNguoiDungGoPhim` và các hàm ghi của
+      // micro/thẻ ghi âm tự lo phần của chúng, không việc gì của hàm này.
+    }
+    var viTri = gt.selection.baseOffset;
+    if (viTri < 0 || viTri > gt.text.length) return; // vùng chọn không hợp lệ.
+    if (viTri == _neoChenMic) return; // con trỏ vẫn đúng chỗ cũ — không có gì để làm.
+    if (!_muonNghe || !_micro.isListening) return; // micro không đang nghe.
+
+    _ghiLog('Con trỏ di chuyển tới $viTri trong lúc micro đang nghe — cắt '
+        'phiên hiện tại, nghe lại ngay tại vị trí mới (không đợi phiên tự '
+        'ngắt), tránh nhân đôi chữ do hypothesis tích luỹ của phiên cũ.');
+    _phienHienTai++; // huỷ callback trễ của phiên đang cắt (LỚP 1).
+    await _micro.cancel();
+    _henNgheLai();
   }
 
   /// Y hệt `_henBatLai()` bên app chính: nếu người dùng vẫn đang muốn nghe mà
@@ -1554,6 +1614,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     _bomDongHoGhiAm?.cancel();
     _micro.cancel();
     _cuonNhatKy.dispose();
+    _boDieuKhienVanBan.removeListener(_khiGiaTriKhungNhapDoi);
     _boDieuKhienVanBan.dispose();
     for (final track in _luongGhiAm?.getTracks() ?? const []) {
       track.stop();
