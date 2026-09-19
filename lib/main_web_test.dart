@@ -160,10 +160,29 @@
 //   gì tới nó nữa, thẻ cứ ghi tiếp tại đúng vị trí cũ dù con trỏ đi đâu.
 //   Chỉ GÕ TAY thật (không phải chỉ di chuyển con trỏ) mới chốt thẻ đang
 //   ghi và bắt đầu thẻ mới — logic này giữ nguyên như cũ.
-//   CHƯA LÀM (còn nợ, đang bàn bạc thêm): chế độ tự động gửi ngầm các thẻ
-//   đã xong (≥1 thẻ, tổng thời lượng ≥20 giây) trong lúc ghi thẻ mới, thay
-//   thẻ bằng chữ Gemini trả về ngay khi xong — CHƯA làm, đang thảo luận
-//   thiết kế trước khi code.
+// - (v29) Làm xong "chế độ tự động gửi ngầm" đã bàn ở v28:
+//   - Nút riêng (icon đám mây cạnh "Tạo văn bản") bật/tắt `_tuDongGuiNgam`
+//     (mặc định TẮT). Bật lên thì mỗi khi có ≥1 thẻ đã ghi xong CHƯA gửi
+//     mà TỔNG thời lượng ≥20 giây, tự gửi ngầm hết các thẻ đó cho Gemini
+//     (không chờ, không khoá giao diện) trong lúc thẻ mới vẫn đang ghi
+//     tiếp — xong thẻ nào, thay đúng thẻ đó bằng chữ ngay, không đợi thẻ
+//     khác. Nút "Tạo văn bản" thủ công vẫn giữ nguyên cho thẻ chưa đủ
+//     ngưỡng hoặc muốn chuyển ngay; hai đường phối hợp qua `_theDangDuocGui`
+//     để không gửi trùng một thẻ. Gemini lỗi ở một thẻ gửi ngầm thì ÂM
+//     THẦM bỏ qua, lần kiểm tra sau tự thử lại — không báo ồn ào.
+//   - Định dạng thẻ hoàn chỉnh đổi thành "〔Ghi âm N 🎙️ mm:ss〕" (thêm thời
+//     lượng thật của thẻ) — `_thoiLuongTheoThe` lưu thời lượng theo số thẻ,
+//     `_chotThoiLuongVaLayNhanThe` chốt và dựng nhãn ĐÚNG MỘT LẦN khi thẻ
+//     được chốt.
+//   - Giới hạn 5 phút/thẻ: cảnh báo bằng hộp thoại giữa màn hình ở phút
+//     4:30 (nút "Tạo bản ghi âm mới" hoặc "Dừng và không ghi âm nữa"); nếu
+//     không chọn gì, tới đúng phút thứ 5 tự động xử lý y hệt "Tạo bản ghi
+//     âm mới" (chốt thẻ cũ, bắt đầu thẻ mới đếm lại từ 0) — dùng chung cơ
+//     chế chốt-thẻ đã có (`_chenTheGhiAmVaoVanBan`/`_batDauMotThe`), không
+//     cần logic mới. KHÔNG dùng cách dò "có tiếng nói hay không" để hoãn
+//     cắt — thời điểm ngắt cố định, không phụ thuộc âm lượng/độ nhạy mic
+//     (đã bàn: cách dò tiếng nói khả thi nhưng cần chỉnh ngưỡng theo từng
+//     máy, không tự kiểm chứng được).
 
 import 'dart:async';
 import 'dart:convert';
@@ -185,7 +204,7 @@ import 'ai_cau_hinh.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v28';
+const _phienBanThuNghiem = 'v29';
 
 // `diaChiMayChuAI`/`matKhauMayChuAI` đến từ ai_cau_hinh.dart (import ở
 // trên) — máy chủ đó đã có sẵn action 'ghi_am' (xem cloud-function/
@@ -559,7 +578,29 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   int _soThuTuGhiAmTiepTheo = 1;
   final Map<int, html.Blob> _cacDoanGhiAmTheoThe = {};
   bool _dangTaoVanBan = false;
-  static final RegExp _reTheGhiAm = RegExp('〔🎙️ Ghi âm (\\d+)〕');
+  // Định dạng thẻ hoàn chỉnh giờ có kèm thời lượng: "〔Ghi âm N 🎙️ mm:ss〕" —
+  // nhóm bắt (1) là số thẻ, phần thời lượng chỉ để NGƯỜI xem, không cần bắt
+  // riêng (khớp lỏng bằng \d+:\d+).
+  static final RegExp _reTheGhiAm = RegExp('〔Ghi âm (\\d+) 🎙️ \\d+:\\d+〕');
+
+  // Thời lượng ghi âm THẬT của từng thẻ ĐÃ chốt (số thẻ → thời lượng) — cần
+  // để: (1) in vào nhãn thẻ "〔Ghi âm N 🎙️ mm:ss〕", (2) tính tổng thời
+  // lượng các thẻ chưa gửi cho chế độ tự động gửi ngầm (xem
+  // `_kiemTraVaGuiNgamNeuDu`).
+  final Map<int, Duration> _thoiLuongTheoThe = {};
+
+  // ---- Chế độ tự động gửi ngầm các thẻ đã ghi xong trong lúc ghi thẻ mới
+  // (nút bật/tắt riêng, mặc định TẮT). Điều kiện kích hoạt: có ≥1 thẻ đã
+  // ghi xong CHƯA gửi, và TỔNG thời lượng các thẻ đó ≥
+  // `_nguongTongThoiLuongTuDongGui` — đủ ngữ cảnh để Gemini phiên âm tốt
+  // hơn một đoạn quá ngắn. Nút "Tạo văn bản" thủ công vẫn giữ nguyên, dùng
+  // cho các thẻ chưa đủ ngưỡng hoặc muốn chuyển ngay. Thẻ nào đang được
+  // gửi (thủ công hoặc tự động) được đánh dấu trong `_theDangDuocGui` để
+  // hai đường không gửi trùng nhau. Gemini lỗi ở một thẻ đang gửi ngầm thì
+  // ÂM THẦM để đó, lần kiểm tra sau sẽ tự thử lại — không báo lỗi ồn ào.
+  bool _tuDongGuiNgam = false;
+  static const _nguongTongThoiLuongTuDongGui = Duration(seconds: 20);
+  final Set<int> _theDangDuocGui = {};
 
   // ---- Đếm giờ hiển thị lúc đang ghi thẻ — hiển thị NGOÀI khung nhập (ở
   // hàng trạng thái), không nhét vào trong nội dung văn bản: TextField
@@ -579,6 +620,18 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   // chừng) có thể đổi ngay token hiển thị trong văn bản mà không phải chờ.
   int? _soTheDangGhiHienTai;
   static const String _tenTokenDangGhi = '〔🎙️ … đang ghi âm …〕';
+
+  // ---- Giới hạn 5 phút MỖI thẻ ghi âm — tự động chốt thẻ đang ghi và bắt
+  // đầu thẻ mới (đếm lại từ 0) nếu chạm mốc, để tránh một thẻ ghi âm dài vô
+  // hạn khiến việc gửi Gemini sau này chậm/tốn. Cảnh báo trước ở phút 4:30
+  // bằng hộp thoại giữa màn hình, cho người dùng chủ động chọn "Tạo bản ghi
+  // âm mới" (chốt + ghi tiếp ngay) hoặc "Dừng và không ghi âm nữa" (chốt +
+  // dừng hẳn) — nếu không chọn gì, tới đúng phút thứ 5 tự động xử lý y hệt
+  // như bấm "Tạo bản ghi âm mới".
+  static const _gioiHanThoiLuongMoiThe = Duration(minutes: 5);
+  static const _moTaCanhBaoGioiHan = Duration(minutes: 4, seconds: 30);
+  bool _daCanhBaoGioiHanChoThe = false;
+  bool _hopThoaiCanhBaoDangMo = false;
 
   // Đếm số lần lỗi liên tiếp KHÔNG kèm bất kỳ chữ nào (không có partial nào
   // trước khi lỗi) — dấu hiệu bộ nhận dạng bị chặn ngay từ đầu chứ không
@@ -900,6 +953,26 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     }
   }
 
+  /// "mm:ss" — dùng cho cả đồng hồ đang ghi và nhãn thẻ đã chốt.
+  static String _dinhDangMmSs(Duration d) {
+    String hai(int n) => n.toString().padLeft(2, '0');
+    return '${hai(d.inMinutes)}:${hai(d.inSeconds % 60)}';
+  }
+
+  /// Nhãn hiển thị đầy đủ của thẻ #[soThe] theo ĐÚNG thời lượng đã lưu
+  /// trong `_thoiLuongTheoThe` (mặc định 0 nếu vì lý do gì đó chưa có).
+  String _nhanTheHoanChinh(int soThe) =>
+      '〔Ghi âm $soThe 🎙️ ${_dinhDangMmSs(_thoiLuongTheoThe[soThe] ?? Duration.zero)}〕';
+
+  /// Chốt thời lượng hiện tại (`_thoiLuongDangGhi`) làm thời lượng CHÍNH
+  /// THỨC của thẻ #[soThe] rồi trả về nhãn hiển thị đầy đủ — gọi ĐÚNG MỘT
+  /// LẦN mỗi khi một thẻ được chốt (trước khi `_taoBoGhiAmMoi` reset lại
+  /// `_thoiLuongDangGhi` cho thẻ tiếp theo).
+  String _chotThoiLuongVaLayNhanThe(int soThe) {
+    _thoiLuongTheoThe[soThe] = _thoiLuongDangGhi;
+    return _nhanTheHoanChinh(soThe);
+  }
+
   /// Bắt đầu MỘT PHIÊN `MediaRecorder` mới trên `_luongGhiAm` đã xin quyền
   /// sẵn — dùng cả lúc bấm nút ghi lần đầu VÀ lúc tách thẻ giữa chừng do gõ
   /// tay (xem `_chotTheDoGoTayVaBatDauTheMoi`). Số thẻ được DÀNH SẴN ngay
@@ -966,11 +1039,75 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     boGhi.start();
     _ghiLog('MediaRecorder.mimeType thực tế: "${boGhi.mimeType}" (thẻ #$soThe).');
     _thoiLuongDangGhi = Duration.zero;
+    _daCanhBaoGioiHanChoThe = false;
     _bomDongHoGhiAm?.cancel();
     _bomDongHoGhiAm = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
       setState(() => _thoiLuongDangGhi += const Duration(seconds: 1));
+      if (_thoiLuongDangGhi >= _gioiHanThoiLuongMoiThe) {
+        _dongHopThoaiCanhBaoNeuMo();
+        _chotTheVaBatDauTheMoiDoQuaGioiHan();
+      } else if (_thoiLuongDangGhi >= _moTaCanhBaoGioiHan) {
+        _hienCanhBaoGioiHanNeuChua();
+      }
     });
+  }
+
+  void _dongHopThoaiCanhBaoNeuMo() {
+    if (_hopThoaiCanhBaoDangMo && mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  /// Hộp thoại cảnh báo giữa màn hình, hiện ĐÚNG MỘT LẦN mỗi thẻ khi chạm
+  /// mốc 4 phút 30 giây — cho người dùng chủ động chọn trước khi bị tự
+  /// động xử lý ở đúng phút thứ 5 (`_chotTheVaBatDauTheMoiDoQuaGioiHan`).
+  void _hienCanhBaoGioiHanNeuChua() {
+    if (_daCanhBaoGioiHanChoThe || !mounted) return;
+    _daCanhBaoGioiHanChoThe = true;
+    _hopThoaiCanhBaoDangMo = true;
+    final soThe = _soTheDangGhiHienTai;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Sắp chạm giới hạn 5 phút'),
+        content: Text('Thẻ ghi âm #$soThe sắp ghi đủ 5 phút. Nếu không chọn, '
+            'tới đúng phút thứ 5 nó sẽ tự động chốt và ghi tiếp bằng một '
+            'thẻ mới. Bạn muốn làm gì bây giờ?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _chotTheVaBatDauTheMoiDoQuaGioiHan();
+            },
+            child: const Text('Tạo bản ghi âm mới'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _dungHanGhiAm();
+            },
+            child: const Text('Dừng và không ghi âm nữa'),
+          ),
+        ],
+      ),
+    ).then((_) => _hopThoaiCanhBaoDangMo = false);
+  }
+
+  /// Thẻ đang ghi chạm giới hạn thời lượng (5 phút) — CHỐT ngay thành thẻ
+  /// hoàn chỉnh và BẮT ĐẦU một thẻ MỚI ngay lập tức (đếm lại từ 0), ghi âm
+  /// tiếp tục liền mạch. Dùng khi người dùng chủ động bấm "Tạo bản ghi âm
+  /// mới" ở hộp thoại cảnh báo, HOẶC tự động khi không ai chọn gì tới đúng
+  /// phút thứ 5.
+  void _chotTheVaBatDauTheMoiDoQuaGioiHan() {
+    if (!_dangGhiAm) return;
+    final soThe = _soTheDangGhiHienTai;
+    _ghiLog('Thẻ #$soThe chạm giới hạn ${_dinhDangMmSs(_gioiHanThoiLuongMoiThe)} '
+        '— tự động chốt, bắt đầu thẻ mới ghi tiếp.');
+    if (soThe != null) _chenTheGhiAmVaoVanBan(soThe);
+    _boGhiAm?.stop();
+    _batDauMotThe();
   }
 
   /// Ghi [vanBanMoi] vào khung nhập VÀ chốt cứng nó ngay tại đây — dùng cho
@@ -1001,7 +1138,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
 
   /// Chèn token tĩnh "đang ghi âm" tại vị trí con trỏ HIỆN TẠI. Ghi lại vị
   /// trí ký tự để lúc chốt thẻ (dừng tay hoặc gõ phím) thay ĐÚNG token này
-  /// bằng "〔🎙️ Ghi âm N〕", không chèn thêm token mới sai chỗ.
+  /// bằng "〔Ghi âm N 🎙️ mm:ss〕", không chèn thêm token mới sai chỗ.
   void _chenTokenDangGhiVaoVanBan() {
     final vanBanCu = _boDieuKhienVanBan.text;
     var viTri = _boDieuKhienVanBan.selection.baseOffset;
@@ -1016,7 +1153,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
         '#$_soTheDangGhiHienTai).');
   }
 
-  /// Bấm nút dừng bằng tay: CHỐT thẻ đang ghi thành "〔🎙️ Ghi âm N〕" và
+  /// Bấm nút dừng bằng tay: CHỐT thẻ đang ghi thành "〔Ghi âm N 🎙️ mm:ss〕" và
   /// dừng HẲN — không ghi tiếp, không có thẻ mới nào được tạo ra.
   void _dungHanGhiAm() {
     final soThe = _soTheDangGhiHienTai;
@@ -1082,7 +1219,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
         'ngay thành thẻ hoàn chỉnh, bắt đầu thẻ MỚI tiếp tục ghi ngay sau '
         'chỗ vừa gõ (một lượt cập nhật văn bản duy nhất).');
 
-    final theCu = '〔🎙️ Ghi âm $soTheCu〕';
+    final theCu = _chotThoiLuongVaLayNhanThe(soTheCu);
     final truocToken = vanBanSauKhiGo.substring(0, viTriTokenCu);
     // Phần nằm giữa hết token cũ và vị trí con trỏ hiện tại — chính là ký
     // tự (hoặc các ký tự) người dùng vừa gõ.
@@ -1101,17 +1238,18 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     _boGhiAm?.stop(); // 'stop' sẽ tới sau, chỉ để lưu blob vào thẻ #$soTheCu.
     _taoBoGhiAmMoi(); // thẻ mới — KHÔNG chèn token nữa, đã chèn ở trên rồi.
     _viTriTokenDangGhi = truocToken.length + theCu.length + phanVuaGo.length;
+    _kiemTraVaGuiNgamNeuDu();
   }
 
   /// Thay ĐÚNG token tĩnh "đang ghi âm" (chèn lúc bắt đầu ghi, xem
-  /// `_chenTokenDangGhiVaoVanBan`) bằng "〔🎙️ Ghi âm N〕", GIỮ NGUYÊN vị trí
+  /// `_chenTokenDangGhiVaoVanBan`) bằng "〔Ghi âm N 🎙️ mm:ss〕", GIỮ NGUYÊN vị trí
   /// tương đối của con trỏ so với phần văn bản NẰM SAU token (ví dụ dấu
   /// phẩy người dùng vừa gõ ngay sau token) — nếu không giữ, con trỏ sẽ bị
   /// nhảy lùi về trước ký tự vừa gõ, đúng lỗi đã gặp. Nếu vì lý do gì đó
   /// không còn tìm thấy token đó nữa (người dùng đã xoá/sửa nó), rơi về
   /// hành vi cũ: chèn thẻ mới tại vị trí con trỏ hiện tại.
   void _chenTheGhiAmVaoVanBan(int soThe) {
-    final the = '〔🎙️ Ghi âm $soThe〕';
+    final the = _chotThoiLuongVaLayNhanThe(soThe);
     final vanBanCu = _boDieuKhienVanBan.text;
     final viTriToken = _viTriTokenDangGhi;
     final chonCu = _boDieuKhienVanBan.selection;
@@ -1141,6 +1279,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       );
       _ghiLog('Thay token "đang ghi âm" bằng thẻ #$soThe tại vị trí '
           '$viTriToken (giữ con trỏ ở $baseMoi).');
+      _kiemTraVaGuiNgamNeuDu();
       return;
     }
     var viTri = _boDieuKhienVanBan.selection.baseOffset;
@@ -1152,6 +1291,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     );
     _ghiLog('Chèn thẻ ghi âm #$soThe vào văn bản tại vị trí ký tự $viTri '
         '(không tìm thấy token "đang ghi âm" — có thể đã bị xoá/sửa).');
+    _kiemTraVaGuiNgamNeuDu();
   }
 
   // `_bamNutNgheLai`/`_taiXuongGhiAm` (nút "Nghe lại"/"Tải xuống") đã bỏ từ
@@ -1175,7 +1315,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     return xong.future;
   }
 
-  /// Nút "Tạo văn bản": quét toàn bộ văn bản tìm các thẻ "〔🎙️ Ghi âm N〕",
+  /// Nút "Tạo văn bản": quét toàn bộ văn bản tìm các thẻ "〔Ghi âm N 🎙️ mm:ss〕",
   /// gửi từng file ghi âm tương ứng cho máy chủ trung gian AI (action
   /// 'ghi_am' — đã có sẵn, xem cloud-function/index.js, app Android cũng
   /// đang dùng chung), rồi thay ĐÚNG mỗi thẻ bằng chữ Gemini phiên âm được,
@@ -1209,44 +1349,26 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     var vanBanMoi = vanBanHienTai;
     for (final khop in cacKhop.toList().reversed) {
       final soThe = int.parse(khop.group(1)!);
+      if (_theDangDuocGui.contains(soThe)) {
+        _ghiLog('  Thẻ #$soThe: đang được chế độ gửi ngầm xử lý rồi — bỏ '
+            'qua ở lượt thủ công này.');
+        continue;
+      }
       final blob = _cacDoanGhiAmTheoThe[soThe];
       if (blob == null) {
         _ghiLog('  Thẻ #$soThe: không còn dữ liệu ghi âm (đã bị thay/xoá '
             'trước đó?) — bỏ qua.');
         continue;
       }
+      _theDangDuocGui.add(soThe);
       try {
-        final base64 = await _doiBlobSangBase64(blob);
-        _ghiLog('  Thẻ #$soThe: đã mã hoá xong, đang gửi…');
-        final phanHoi = await http
-            .post(
-              Uri.parse(diaChiMayChuAI),
-              headers: {
-                'content-type': 'application/json',
-                'x-flowrite-secret': matKhauMayChuAI,
-              },
-              body: jsonEncode({
-                'action': 'ghi_am',
-                'audioBase64': base64,
-                'mimeType': blob.type.isNotEmpty ? blob.type : 'audio/mp4',
-              }),
-            )
-            .timeout(const Duration(minutes: 3));
-        if (phanHoi.statusCode != 200) {
-          throw Exception(
-              'Máy chủ AI trả về lỗi ${phanHoi.statusCode}: ${phanHoi.body}');
-        }
-        final goc =
-            jsonDecode(utf8.decode(phanHoi.bodyBytes)) as Map<String, dynamic>;
-        final chu = (goc['text'] as String?)?.trim();
-        if (chu == null || chu.isEmpty) {
-          throw Exception(
-              goc['loi']?.toString() ?? 'Không có nội dung trả về.');
-        }
+        final chu = await _guiMotTheChoGemini(soThe, blob);
         vanBanMoi = vanBanMoi.replaceRange(khop.start, khop.end, chu);
         _ghiLog('  Thẻ #$soThe: xong — "$chu"');
       } catch (e) {
         _ghiLog('  Thẻ #$soThe: LỖI — $e');
+      } finally {
+        _theDangDuocGui.remove(soThe);
       }
     }
 
@@ -1255,6 +1377,116 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     _ghiVanBanTuMicro(vanBanMoi);
     if (mounted) setState(() => _dangTaoVanBan = false);
     _ghiLog('Hoàn tất tạo văn bản từ các thẻ ghi âm.');
+  }
+
+  /// Gửi MỘT thẻ (đã có blob) cho Gemini phiên âm, trả về chữ nhận được
+  /// hoặc ném lỗi ra ngoài — KHÔNG đụng gì tới văn bản, để nơi gọi (thủ
+  /// công qua `_taoVanBanTuTheGhiAm`, hoặc tự động ngầm qua
+  /// `_guiMotTheNgamRoiThayVaoVanBan`) tự lo việc thay thế đúng chỗ của nó.
+  Future<String> _guiMotTheChoGemini(int soThe, html.Blob blob) async {
+    final base64 = await _doiBlobSangBase64(blob);
+    _ghiLog('  Thẻ #$soThe: đã mã hoá xong, đang gửi…');
+    final phanHoi = await http
+        .post(
+          Uri.parse(diaChiMayChuAI),
+          headers: {
+            'content-type': 'application/json',
+            'x-flowrite-secret': matKhauMayChuAI,
+          },
+          body: jsonEncode({
+            'action': 'ghi_am',
+            'audioBase64': base64,
+            'mimeType': blob.type.isNotEmpty ? blob.type : 'audio/mp4',
+          }),
+        )
+        .timeout(const Duration(minutes: 3));
+    if (phanHoi.statusCode != 200) {
+      throw Exception(
+          'Máy chủ AI trả về lỗi ${phanHoi.statusCode}: ${phanHoi.body}');
+    }
+    final goc =
+        jsonDecode(utf8.decode(phanHoi.bodyBytes)) as Map<String, dynamic>;
+    final chu = (goc['text'] as String?)?.trim();
+    if (chu == null || chu.isEmpty) {
+      throw Exception(goc['loi']?.toString() ?? 'Không có nội dung trả về.');
+    }
+    return chu;
+  }
+
+  /// Kiểm tra điều kiện gửi ngầm (xem chú thích `_tuDongGuiNgam`) — gọi mỗi
+  /// khi một thẻ vừa được chốt xong. Nếu đủ điều kiện, gửi NGẦM (không chờ,
+  /// không khoá giao diện) tất cả các thẻ đã ghi xong mà chưa gửi, trong
+  /// lúc thẻ mới vẫn đang ghi tiếp bình thường.
+  void _kiemTraVaGuiNgamNeuDu() {
+    if (!_tuDongGuiNgam) return;
+    final vanBan = _boDieuKhienVanBan.text;
+    final soTheChuaGui = <int>[];
+    for (final khop in _reTheGhiAm.allMatches(vanBan)) {
+      final soThe = int.parse(khop.group(1)!);
+      if (_theDangDuocGui.contains(soThe)) continue;
+      if (!_cacDoanGhiAmTheoThe.containsKey(soThe)) continue;
+      soTheChuaGui.add(soThe);
+    }
+    if (soTheChuaGui.isEmpty) return;
+    final tongThoiLuong = soTheChuaGui.fold<Duration>(
+      Duration.zero,
+      (tong, soThe) => tong + (_thoiLuongTheoThe[soThe] ?? Duration.zero),
+    );
+    if (tongThoiLuong < _nguongTongThoiLuongTuDongGui) return;
+
+    _ghiLog('Tự động gửi ngầm ${soTheChuaGui.length} thẻ đã ghi xong (tổng '
+        '${_dinhDangMmSs(tongThoiLuong)}) trong lúc tiếp tục ghi…');
+    for (final soThe in soTheChuaGui) {
+      _guiMotTheNgamRoiThayVaoVanBan(soThe);
+    }
+  }
+
+  /// Gửi ngầm thẻ #[soThe], rồi thay đúng token của nó bằng chữ Gemini trả
+  /// về — tìm lại vị trí token NGAY LÚC NÀY (không phải lúc bắt đầu gửi),
+  /// vì văn bản có thể đã đổi trong lúc chờ (người dùng gõ thêm, thẻ khác
+  /// đã được thay...). Không tìm thấy nữa (ví dụ người dùng đã xoá thẻ đó)
+  /// thì âm thầm bỏ qua. Lỗi mạng/máy chủ cũng âm thầm bỏ qua — thẻ rơi trở
+  /// lại danh sách "chưa gửi", `_kiemTraVaGuiNgamNeuDu` lần sau sẽ tự thử
+  /// lại, không cần báo lỗi ồn ào giữa lúc người dùng đang ghi âm tiếp.
+  Future<void> _guiMotTheNgamRoiThayVaoVanBan(int soThe) async {
+    final blob = _cacDoanGhiAmTheoThe[soThe];
+    if (blob == null) return;
+    _theDangDuocGui.add(soThe);
+    try {
+      final chu = await _guiMotTheChoGemini(soThe, blob);
+      final vanBanHienTai = _boDieuKhienVanBan.text;
+      final theCanTim = _nhanTheHoanChinh(soThe);
+      final viTri = vanBanHienTai.indexOf(theCanTim);
+      if (viTri < 0) {
+        _ghiLog('  Thẻ #$soThe (gửi ngầm): không còn tìm thấy trong văn bản '
+            '(có thể đã bị xoá) — bỏ qua.');
+        return;
+      }
+      final vanBanMoi =
+          vanBanHienTai.replaceRange(viTri, viTri + theCanTim.length, chu);
+      // Giữ nguyên vị trí con trỏ HIỆN TẠI của người dùng một cách tương
+      // đối — không giật con trỏ về chỗ vừa thay, vì người dùng có thể
+      // đang gõ/ghi âm ở một chỗ khác trong lúc thẻ này được gửi ngầm.
+      final chonCu = _boDieuKhienVanBan.selection;
+      final lech = chu.length - theCanTim.length;
+      int dichChuyen(int viTriC) {
+        if (viTriC >= viTri + theCanTim.length) return viTriC + lech;
+        if (viTriC <= viTri) return viTriC;
+        return viTri + chu.length; // con trỏ rơi giữa thẻ (hiếm) — đẩy ra sau.
+      }
+      final baseMoi = chonCu.baseOffset < 0
+          ? vanBanMoi.length
+          : dichChuyen(chonCu.baseOffset);
+      _vanBanDaChot = vanBanMoi;
+      _tuDaChot = _tachTu(vanBanMoi);
+      _ghiVanBanTuMicro(vanBanMoi, viTriConTro: baseMoi);
+      _ghiLog('  Thẻ #$soThe (gửi ngầm): xong — "$chu"');
+    } catch (e) {
+      _ghiLog('  Thẻ #$soThe (gửi ngầm): LỖI — $e (sẽ tự thử lại ở lần '
+          'kiểm tra sau).');
+    } finally {
+      _theDangDuocGui.remove(soThe);
+    }
   }
 
   /// Gắn vào `onChanged` của khung kết quả — NGUYÊN TẮC gõ-phím-thắng-micro,
@@ -1908,13 +2140,33 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                                   color: Colors.red, size: 14),
                               const SizedBox(width: 4),
                               Text(
-                                'Đang ghi: ${_thoiLuongDangGhi.inMinutes.toString().padLeft(2, '0')}:'
-                                '${(_thoiLuongDangGhi.inSeconds % 60).toString().padLeft(2, '0')}',
+                                'Đang ghi: ${_dinhDangMmSs(_thoiLuongDangGhi)}'
+                                ' / ${_dinhDangMmSs(_gioiHanThoiLuongMoiThe)}',
                                 style: const TextStyle(color: Colors.red),
                               ),
                             ],
                           ),
                         ),
+                      Tooltip(
+                        message: _tuDongGuiNgam
+                            ? 'Đang tự động gửi ngầm các thẻ đã ghi xong '
+                                '(bấm để tắt)'
+                            : 'Bật tự động gửi ngầm các thẻ đã ghi xong '
+                                'trong lúc ghi thẻ mới (từ ${_nguongTongThoiLuongTuDongGui.inSeconds}s trở lên)',
+                        child: IconButton(
+                          onPressed: () =>
+                              setState(() => _tuDongGuiNgam = !_tuDongGuiNgam),
+                          icon: Icon(
+                            _tuDongGuiNgam
+                                ? Icons.cloud_sync
+                                : Icons.cloud_sync_outlined,
+                            color: _tuDongGuiNgam
+                                ? Colors.deepPurple
+                                : Colors.grey,
+                          ),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
                       if (_dangTaoVanBan)
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 8),
@@ -1926,9 +2178,9 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                         )
                       else
                         Tooltip(
-                          message: 'Gửi tất cả thẻ 〔🎙️ Ghi âm…〕 trong văn '
-                              'bản cho Gemini phiên âm, thay đúng vào chỗ '
-                              'của từng thẻ',
+                          message: 'Gửi tất cả thẻ 〔Ghi âm N 🎙️ mm:ss〕 '
+                              'trong văn bản cho Gemini phiên âm, thay đúng '
+                              'vào chỗ của từng thẻ',
                           child: TextButton(
                             onPressed: _taoVanBanTuTheGhiAm,
                             child: const Text('Tạo văn bản'),
