@@ -696,8 +696,8 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     // "token rác"/"chèn thẻ lộn xộn" đã gặp trước đây).
     boGhi.addEventListener('stop', (_) {
       final loaiThuc = boGhi.mimeType;
-      final blob =
-          html.Blob(doanGhi, loaiThuc.isEmpty ? 'audio/mp4' : loaiThuc);
+      final blob = html.Blob(
+          doanGhi, (loaiThuc == null || loaiThuc.isEmpty) ? 'audio/mp4' : loaiThuc);
       _cacDoanGhiAmTheoThe[soThe] = blob;
       _ghiLog('Thẻ #$soThe: ghi xong (${doanGhi.length} đoạn dữ liệu).');
     });
