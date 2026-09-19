@@ -130,9 +130,14 @@
 //   tiên để thay vào — cố tình KHÔNG xoá ngay lúc bật micro, để bật rồi
 //   tắt mà chưa nói gì thì vùng chọn vẫn còn nguyên.
 // - (v26) Ở chế độ ngăn bàn phím ảo: ép hiện con trỏ nhấp nháy
-//   (`showCursor: true`) và hai đầu mút kéo vùng chọn
-//   (`selectionControls: materialTextSelectionControls`) — mặc định
-//   Flutter có thể ẩn cả hai ở ô `readOnly`.
+//   (`showCursor: true`).
+// - (v27) Đổi hẳn cơ chế ngăn bàn phím ảo: BỎ `readOnly` (gây lỗi kéo-chọn-
+//   vùng bằng ngón tay — vuốt không ra đầu mút, kéo đầu mút xa bị kẹt, đầu
+//   mút lệch vị trí thật, vì `readOnly` đổi hẳn đường xử lý cử chỉ của ô
+//   nhập sang "xem + chọn" thay vì "soạn thảo"), dùng `keyboardType:
+//   TextInputType.none` thay thế — ô vẫn ở chế độ soạn thảo BÌNH THƯỜNG
+//   (mọi cử chỉ chọn vùng hoạt động y hệt lúc tắt chế độ), chỉ báo hệ
+//   thống đừng bật bàn phím ảo.
 //   RÚT LẠI ý "tự kết thúc thẻ khi con trỏ di chuyển" đã ghi ở trên (v20) —
 //   quá rủi ro cho một tính năng GHI ÂM (khác hẳn micro vừa nói vừa ra
 //   chữ): di chuyển con trỏ trong lúc một thẻ đang ghi dở giờ KHÔNG đụng
@@ -164,7 +169,7 @@ import 'ai_cau_hinh.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v26';
+const _phienBanThuNghiem = 'v27';
 
 // `diaChiMayChuAI`/`matKhauMayChuAI` đến từ ai_cau_hinh.dart (import ở
 // trên) — máy chủ đó đã có sẵn action 'ghi_am' (xem cloud-function/
@@ -1931,16 +1936,20 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                         controller: _boDieuKhienVanBan,
                         onChanged: _khiNguoiDungGoPhim,
                         inputFormatters: [_ChanSuaGiuaThe()],
-                        readOnly: _chanBanPhimAo,
-                        // Flutter mặc định có thể không hiện con trỏ nhấp
-                        // nháy/tay cầm kéo vùng chọn ở ô `readOnly` — ép rõ
-                        // ràng cả hai để người dùng vẫn THẤY được con trỏ
-                        // (dù không gõ được) và có hai đầu mút để kéo chỉnh
-                        // vùng chọn bằng ngón tay, y hệt ô nhập bình thường.
+                        // KHÔNG dùng `readOnly` để ngăn bàn phím ảo nữa —
+                        // `readOnly` đổi hẳn đường xử lý cử chỉ của ô nhập
+                        // (dành cho "xem + chọn", không phải "soạn thảo"),
+                        // gây đúng các lỗi kéo-chọn-vùng đã gặp (vuốt không
+                        // ra đầu mút, kéo đầu mút xa bị kẹt, đầu mút lệch vị
+                        // trí thật). `TextInputType.none` mới là đúng cách:
+                        // ô vẫn ở chế độ soạn thảo BÌNH THƯỜNG (mọi cử chỉ
+                        // chọn vùng/kéo đầu mút hoạt động y hệt lúc không
+                        // bật chế độ ngăn bàn phím), chỉ báo cho hệ thống
+                        // đừng bật bàn phím ảo cho ô này.
+                        keyboardType: _chanBanPhimAo
+                            ? TextInputType.none
+                            : TextInputType.multiline,
                         showCursor: true,
-                        selectionControls: _chanBanPhimAo
-                            ? materialTextSelectionControls
-                            : null,
                         maxLines: null,
                         expands: true,
                         textAlignVertical: TextAlignVertical.top,
