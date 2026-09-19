@@ -29,19 +29,42 @@
 //   mới — thì coi partial mới là toàn bộ nội dung phiên, không nối thêm
 //   (nối thêm trong trường hợp này là nguyên nhân gây chữ nhân bản chồng
 //   chất trong ảnh chụp người dùng gửi).
+// - Ghi âm thô + gửi Gemini phiên âm (dành cho iPhone, nơi Web Speech API
+//   không hoạt động kể cả bấm tay): mỗi lần dừng ghi âm chèn một token
+//   "〔🎙️ Ghi âm N〕" vào đúng vị trí con trỏ trong khung nhập — token văn
+//   bản THUẦN TUÝ, không phải ô chip đồ hoạ thật (TextField của Flutter
+//   không hỗ trợ chèn widget vào giữa văn bản có thể sửa). Nút "Tạo văn
+//   bản" gửi từng file ghi âm cho máy chủ trung gian AI đã có sẵn action
+//   'ghi_am' (xem cloud-function/index.js, app Android cũng dùng chung —
+//   lib/ghi_am_ai.dart), rồi thay đúng mỗi token bằng chữ phiên âm được,
+//   giữ nguyên các đoạn gõ tay xen kẽ xung quanh.
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:speech_to_text/speech_to_text.dart';
+
+// Ngoại lệ DUY NHẤT cho luật "không import file nào khác của app" ở đầu
+// file — import CHỈ hai hằng số (địa chỉ + mật khẩu máy chủ trung gian AI),
+// không kéo theo bất kỳ logic nào có thể ảnh hưởng tới thuật toán mic đã
+// test kỹ. Giữ một nguồn duy nhất cho bí mật thay vì chép tay chuỗi mật
+// khẩu ra thêm một chỗ trong mã nguồn.
+import 'ai_cau_hinh.dart';
 
 // Số phiên bản bản thử — TĂNG THỦ CÔNG mỗi lần đẩy bản mới lên Firebase
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v16';
+const _phienBanThuNghiem = 'v17';
+
+// `diaChiMayChuAI`/`matKhauMayChuAI` đến từ ai_cau_hinh.dart (import ở
+// trên) — máy chủ đó đã có sẵn action 'ghi_am' (xem cloud-function/
+// index.js) dùng đúng cho việc gửi âm thanh cho Gemini phiên âm, app
+// Android cũng đang dùng chung cơ chế này (lib/ghi_am_ai.dart).
 
 // (Chỉ import đúng MỘT file `speech_to_text/speech_to_text.dart` — y hệt
 // cách `trang_soan_thao.dart` đang dùng đã chứng minh hoạt động — thay vì
@@ -193,6 +216,18 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   String? _urlAmThanhDaGhi;
   html.AudioElement? _phatLaiAmThanh;
   bool _dangPhatLai = false;
+
+  // ---- Ghi âm NHIỀU LẦN, chèn thành "thẻ" giữa các đoạn gõ tay (dành riêng
+  // cho iPhone, nơi Web Speech API không hoạt động). Mỗi lần dừng ghi âm,
+  // một token văn bản dạng "〔🎙️ Ghi âm N〕" được chèn vào đúng vị trí con
+  // trỏ trong khung nhập — ĐÂY LÀ TOKEN VĂN BẢN THUẦN TUÝ, không phải ô
+  // chip đồ hoạ thật, vì TextField của Flutter không hỗ trợ chèn widget vào
+  // giữa văn bản có thể sửa. Khi bấm "Tạo văn bản", từng thẻ được thay bằng
+  // đúng chữ Gemini phiên âm được từ file ghi âm tương ứng.
+  int _soThuTuGhiAmTiepTheo = 1;
+  final Map<int, html.Blob> _cacDoanGhiAmTheoThe = {};
+  bool _dangTaoVanBan = false;
+  static final RegExp _reTheGhiAm = RegExp('〔🎙️ Ghi âm (\\d+)〕');
 
   // Đếm số lần lỗi liên tiếp KHÔNG kèm bất kỳ chữ nào (không có partial nào
   // trước khi lỗi) — dấu hiệu bộ nhận dạng bị chặn ngay từ đầu chứ không
@@ -478,6 +513,13 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     });
     html.document.body?.append(audio);
     _phatLaiAmThanh = audio;
+    // Gán số thẻ, lưu blob theo số thẻ, và chèn token đánh dấu vào đúng vị
+    // trí con trỏ trong khung nhập — đây là bước "chèn thẻ giữa các đoạn gõ
+    // tay" theo đúng yêu cầu, dành riêng cho luồng ghi-âm-nhiều-lần trên
+    // iPhone. Bản ghi lẻ ("Nghe lại"/"Tải xuống" phía trên) vẫn giữ nguyên
+    // để kiểm tra nhanh, độc lập với cơ chế thẻ.
+    final soThe = _soThuTuGhiAmTiepTheo++;
+    _cacDoanGhiAmTheoThe[soThe] = blob;
     if (mounted) {
       setState(() {
         _urlAmThanhDaGhi = url;
@@ -485,8 +527,28 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
         _dangPhatLai = false;
       });
     }
-    _ghiLog('Ghi âm xong (${_cacDoanGhiAm.length} đoạn dữ liệu) — bấm '
-        '"Nghe lại" để kiểm tra.');
+    _chenTheGhiAmVaoVanBan(soThe);
+    _ghiLog('Ghi âm xong (${_cacDoanGhiAm.length} đoạn dữ liệu, thẻ #$soThe) '
+        '— bấm "Nghe lại" để kiểm tra nhanh, hoặc "Tạo văn bản" để gửi tất '
+        'cả thẻ cho Gemini phiên âm.');
+  }
+
+  /// Chèn token "〔🎙️ Ghi âm N〕" vào đúng vị trí con trỏ hiện tại trong
+  /// khung nhập kết quả — coi như một lượt "gõ tay" đặc biệt (đi qua đúng
+  /// `onChanged` → `_khiNguoiDungGoPhim`, không có đường tắt riêng), để giữ
+  /// nguyên mọi bất biến sẵn có (chốt cứng nguyên văn, tắt micro khi có
+  /// thay đổi bằng tay...).
+  void _chenTheGhiAmVaoVanBan(int soThe) {
+    final vanBanCu = _boDieuKhienVanBan.text;
+    var viTri = _boDieuKhienVanBan.selection.baseOffset;
+    if (viTri < 0 || viTri > vanBanCu.length) viTri = vanBanCu.length;
+    final the = '〔🎙️ Ghi âm $soThe〕';
+    final vanBanMoi = vanBanCu.replaceRange(viTri, viTri, the);
+    _boDieuKhienVanBan.value = TextEditingValue(
+      text: vanBanMoi,
+      selection: TextSelection.collapsed(offset: viTri + the.length),
+    );
+    _ghiLog('Chèn thẻ ghi âm #$soThe vào văn bản tại vị trí ký tự $viTri.');
   }
 
   void _bamNutNgheLai() {
@@ -522,6 +584,94 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     theLienKet.click();
     theLienKet.remove();
     _ghiLog('Đã yêu cầu tải file ghi âm về máy.');
+  }
+
+  /// Đọc [blob] thành chuỗi base64 thuần (không kèm tiền tố
+  /// "data:...;base64,") — dùng FileReader vì Blob trên web không có sẵn
+  /// phương thức đồng bộ để lấy bytes.
+  Future<String> _doiBlobSangBase64(html.Blob blob) {
+    final doc = html.FileReader();
+    final xong = Completer<String>();
+    doc.onLoadEnd.listen((_) {
+      final ketQua = doc.result as String;
+      final viTriPhay = ketQua.indexOf(',');
+      xong.complete(viTriPhay >= 0 ? ketQua.substring(viTriPhay + 1) : ketQua);
+    });
+    doc.onError.listen((e) => xong.completeError(e));
+    doc.readAsDataUrl(blob);
+    return xong.future;
+  }
+
+  /// Nút "Tạo văn bản": quét toàn bộ văn bản tìm các thẻ "〔🎙️ Ghi âm N〕",
+  /// gửi từng file ghi âm tương ứng cho máy chủ trung gian AI (action
+  /// 'ghi_am' — đã có sẵn, xem cloud-function/index.js, app Android cũng
+  /// đang dùng chung), rồi thay ĐÚNG mỗi thẻ bằng chữ Gemini phiên âm được,
+  /// giữ nguyên các phần chữ gõ tay xen kẽ xung quanh.
+  Future<void> _taoVanBanTuTheGhiAm() async {
+    if (_dangTaoVanBan) return;
+    final vanBanHienTai = _boDieuKhienVanBan.text;
+    final cacKhop = _reTheGhiAm.allMatches(vanBanHienTai).toList();
+    if (cacKhop.isEmpty) {
+      _ghiLog('Không có thẻ ghi âm nào trong văn bản để gửi.');
+      return;
+    }
+
+    setState(() => _dangTaoVanBan = true);
+    _ghiLog('Bắt đầu gửi ${cacKhop.length} thẻ ghi âm cho Gemini phiên âm…');
+
+    // Thay TỪ CUỐI VĂN BẢN VỀ ĐẦU — để vị trí ký tự (đo trên văn bản GỐC,
+    // trước khi thay bất kỳ thẻ nào) của các thẻ CHƯA xử lý luôn còn đúng,
+    // vì mọi thay thế trước đó chỉ động vào phần văn bản NẰM SAU vị trí của
+    // chúng.
+    var vanBanMoi = vanBanHienTai;
+    for (final khop in cacKhop.toList().reversed) {
+      final soThe = int.parse(khop.group(1)!);
+      final blob = _cacDoanGhiAmTheoThe[soThe];
+      if (blob == null) {
+        _ghiLog('  Thẻ #$soThe: không còn dữ liệu ghi âm (đã bị thay/xoá '
+            'trước đó?) — bỏ qua.');
+        continue;
+      }
+      try {
+        final base64 = await _doiBlobSangBase64(blob);
+        _ghiLog('  Thẻ #$soThe: đã mã hoá xong, đang gửi…');
+        final phanHoi = await http
+            .post(
+              Uri.parse(diaChiMayChuAI),
+              headers: {
+                'content-type': 'application/json',
+                'x-flowrite-secret': matKhauMayChuAI,
+              },
+              body: jsonEncode({
+                'action': 'ghi_am',
+                'audioBase64': base64,
+                'mimeType': blob.type.isNotEmpty ? blob.type : 'audio/mp4',
+              }),
+            )
+            .timeout(const Duration(minutes: 3));
+        if (phanHoi.statusCode != 200) {
+          throw Exception(
+              'Máy chủ AI trả về lỗi ${phanHoi.statusCode}: ${phanHoi.body}');
+        }
+        final goc =
+            jsonDecode(utf8.decode(phanHoi.bodyBytes)) as Map<String, dynamic>;
+        final chu = (goc['text'] as String?)?.trim();
+        if (chu == null || chu.isEmpty) {
+          throw Exception(
+              goc['loi']?.toString() ?? 'Không có nội dung trả về.');
+        }
+        vanBanMoi = vanBanMoi.replaceRange(khop.start, khop.end, chu);
+        _ghiLog('  Thẻ #$soThe: xong — "$chu"');
+      } catch (e) {
+        _ghiLog('  Thẻ #$soThe: LỖI — $e');
+      }
+    }
+
+    _vanBanDaChot = vanBanMoi;
+    _tuDaChot = _tachTu(vanBanMoi);
+    _ghiVanBanTuMicro(vanBanMoi);
+    if (mounted) setState(() => _dangTaoVanBan = false);
+    _ghiLog('Hoàn tất tạo văn bản từ các thẻ ghi âm.');
   }
 
   /// Gắn vào `onChanged` của khung kết quả — NGUYÊN TẮC gõ-phím-thắng-micro,
@@ -1014,12 +1164,34 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                   // Khung nhập liệu — lên đầu tiên.
                   Row(
                     children: [
-                      const Text(
-                        'Kết quả (gõ tay được — gõ phím sẽ tắt micro ngay, '
-                        'tự bật lại sau 1 giây)',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                      Tooltip(
+                        message: 'Gõ tay được — gõ phím sẽ tắt micro ngay, '
+                            'tự bật lại sau 1 giây',
+                        child: const Text(
+                          'Kết quả',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ),
                       const Spacer(),
+                      if (_dangTaoVanBan)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8),
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      else
+                        Tooltip(
+                          message: 'Gửi tất cả thẻ 〔🎙️ Ghi âm…〕 trong văn '
+                              'bản cho Gemini phiên âm, thay đúng vào chỗ '
+                              'của từng thẻ',
+                          child: TextButton(
+                            onPressed: _taoVanBanTuTheGhiAm,
+                            child: const Text('Tạo văn bản'),
+                          ),
+                        ),
                       TextButton(
                         onPressed: _saoChepVanBan,
                         child: const Text('Sao chép tất cả'),
