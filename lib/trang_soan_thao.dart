@@ -30,32 +30,6 @@ import 'thanh_cong_cu.dart';
 import 'thong_bao_giua.dart';
 import 'trang_huong_dan.dart';
 
-// Chrome trên Android (web) trả `recognizedWords` bị lặp lại TOÀN BỘ lịch
-// sử của phiên như tiền tố mỗi lần có kết quả mới (ví dụ lần 3 gửi
-// "XinXin chàoXin chàoXin chào" thay vì chỉ "Xin chào") — mỗi lần lặp lại
-// luôn bắt đầu bằng chữ hoa. speech_to_text NATIVE trên Android/iOS không
-// có lỗi này (chỉ web mới đụng bộ máy Web Speech API của Chrome), nên chỉ
-// áp dụng khi `kIsWeb && _thietBiHienTai == ThietBi.android` (xem nơi gọi
-// `_catDoanCuoiCungChromeAndroid` trong `_khiCoChu`). Thuật toán và hằng số
-// NGUYÊN VĂN đã kiểm chứng ở `main_web_test.dart`.
-const _chuThuongVietChromeAndroid =
-    'a-zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ';
-const _chuHoaVietChromeAndroid =
-    'A-ZÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ';
-final RegExp _reRanhGioiDoanDinhChromeAndroid = RegExp(
-    '[$_chuThuongVietChromeAndroid][$_chuHoaVietChromeAndroid]');
-
-/// Cắt lấy đoạn cuối cùng (từ lần chuyển chữ-thường→chữ-hoa gần cuối chuỗi
-/// nhất tới hết chuỗi) — đây là bản ghi sạch, không lặp. Không tìm thấy mốc
-/// nào thì trả về nguyên văn (an toàn cho câu ngắn/chưa lặp lần nào).
-String _catDoanCuoiCungChromeAndroid(String s) {
-  var viTri = 0;
-  for (final m in _reRanhGioiDoanDinhChromeAndroid.allMatches(s)) {
-    viTri = m.start + 1;
-  }
-  return s.substring(viTri);
-}
-
 /// Một vùng chữ AI cho là "không phù hợp" (câu từ lủng củng, lạc đề, thừa ý,
 /// lặp lại, quá nhiều lỗi chính tả, hoặc nên thay bằng đoạn khác hay hơn).
 /// Đoạn GỐC [batDauGoc, ketThucGoc) và đoạn ĐỀ XUẤT [batDauDeXuat,
@@ -1726,6 +1700,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// `main_web_test.dart`).
   final List<String> _nhatKyMicro = [];
 
+  /// CHỈ dùng cho web + Android — xem chú thích chi tiết tại nơi dùng trong
+  /// `_khiCoChu`. Reset về rỗng mỗi khi một PHIÊN nghe mới thật sự bắt đầu
+  /// (`_batMicro()`) — bộ nhận dạng của trình duyệt tạo lại từ đầu lúc đó.
+  String _rawTichLuyChromeAndroid = '';
+
   void _ghiNhatKyMicro(String dong) {
     if (!kIsWeb) return;
     final gio = DateTime.now();
@@ -3063,6 +3042,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _ghiNhatKyMicro(
         'Bật micro — bản $phienBanWebDayDu, thiết bị đang dùng: '
         '${_thietBiHienTai.ten}${widget.caiDat.thietBiChonTay != null ? ' (đã CHỌN TAY)' : ' (tự đoán)'}');
+    _rawTichLuyChromeAndroid = '';
     // (RACE CONDITION KHI CHUYỂN PHIÊN — LỚP 2) Chụp lại đệm chống nhân đôi
     // TRƯỚC khi `_chotCauDangDoc()` xoá rỗng `_tuDaChotTrongPhien` ngay dưới
     // đây — đây là điểm MỘT phiên nghe MỚI thật sự sắp bắt đầu.
@@ -3426,15 +3406,31 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _ghiNhatKyMicro(
         'onResult(xong=$xong): "${noi.length > 120 ? '${noi.substring(0, 120)}…' : noi}"');
 
-    // Xem chú thích tại khai báo `_catDoanCuoiCungChromeAndroid` — CHỈ áp
-    // dụng cho web + Android, không đụng tới Android/iOS gốc hay các bản
-    // thiết bị web khác (PC/iPhone không có lỗi lặp này).
+    // Chrome trên Android (web) không gửi `recognizedWords` là "toàn bộ
+    // utterance tính từ đầu, sạch sẽ" như speech_to_text NATIVE vẫn làm —
+    // nó CỘNG DỒN vô hạn, ghép thêm nội dung mới vào đuôi của TOÀN BỘ raw
+    // đã gửi ở lần gọi trước (kể cả những đoạn đã lặp/im ắng), nên chuỗi cứ
+    // phình to dần qua mỗi lần callback (không có mốc chữ hoa hay dấu hiệu
+    // gì cố định để nhận ra — quan sát thực tế cho thấy raw LUÔN bắt đầu
+    // đúng bằng raw của lần gọi ngay trước, chỉ có phần ĐUÔI đổi). Cách sửa
+    // đúng: TRỪ ĐI phần raw đã thấy ở lần gọi trước, chỉ giữ lại đúng phần
+    // ĐUÔI MỚI — rồi đưa ĐÚNG phần đuôi đó (không phải raw đầy đủ) vào
+    // thuật toán "chốt dần + tìm điểm nối" bên dưới, y hệt như no đang xử
+    // lý một partial bình thường. Phần đuôi mới tự nó cũng tăng dần một
+    // cách sạch (xem log thực tế), nên thuật toán sẵn có xử lý đúng mà
+    // không cần sửa gì thêm. CHỈ áp dụng cho web + Android — PC không có
+    // lỗi này, Android/iOS gốc không đụng Web Speech API nên cũng không có.
     if (kIsWeb && _thietBiHienTai == ThietBi.android) {
-      final noiDaCat = _catDoanCuoiCungChromeAndroid(noi);
-      if (noiDaCat != noi) {
-        _ghiNhatKyMicro('  → cắt lặp Chrome còn: "$noiDaCat"');
-        noi = noiDaCat;
+      final raw = noi;
+      if (raw.startsWith(_rawTichLuyChromeAndroid)) {
+        noi = raw.substring(_rawTichLuyChromeAndroid.length).trim();
       }
+      // else: raw không còn khớp tiền tố đã theo dõi (ví dụ trình duyệt vừa
+      // âm thầm khởi động lại bộ đệm) — coi nguyên `noi` hiện tại là nội
+      // dung mới, an toàn hơn là cố trừ nhầm.
+      _rawTichLuyChromeAndroid = raw;
+      if (noi.isEmpty) return;
+      _ghiNhatKyMicro('  → phần đuôi mới sau khi trừ raw lần trước: "$noi"');
     }
 
     final cu = _boDieuKhien.text;
