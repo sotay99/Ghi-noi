@@ -41,7 +41,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v15';
+const _phienBanThuNghiem = 'v16';
 
 // (Chỉ import đúng MỘT file `speech_to_text/speech_to_text.dart` — y hệt
 // cách `trang_soan_thao.dart` đang dùng đã chứng minh hoạt động — thay vì
@@ -504,6 +504,24 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
         if (mounted) setState(() => _dangPhatLai = false);
       });
     }
+  }
+
+  /// Tải file ghi âm về máy — để mở bằng ứng dụng ngoài trình duyệt (Ảnh/
+  /// Files trên iPhone) kiểm tra xem dữ liệu ghi được có tiếng thật hay
+  /// không. Tách bạch "ghi hỏng" khỏi "trình duyệt phát lỗi": WebKit có lỗi
+  /// đã biết là file MediaRecorder tạo ra đôi khi thiếu metadata thời
+  /// lượng (duration: Infinity), khiến thẻ <audio> không phát được dù dữ
+  /// liệu ghi vẫn nguyên vẹn.
+  void _taiXuongGhiAm() {
+    final url = _urlAmThanhDaGhi;
+    if (url == null) return;
+    final theLienKet = html.AnchorElement(href: url)
+      ..download = 'ghi-am-thu.mp4'
+      ..style.display = 'none';
+    html.document.body?.append(theLienKet);
+    theLienKet.click();
+    theLienKet.remove();
+    _ghiLog('Đã yêu cầu tải file ghi âm về máy.');
   }
 
   /// Gắn vào `onChanged` của khung kết quả — NGUYÊN TẮC gõ-phím-thắng-micro,
@@ -1181,6 +1199,45 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                               color: _urlAmThanhDaGhi == null
                                   ? Colors.grey.shade500
                                   : Colors.purple.shade900,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Nút "Tải xuống" — để kiểm tra file ghi âm bằng ứng
+                      // dụng NGOÀI trình duyệt, tách bạch "ghi hỏng" khỏi
+                      // "trình duyệt phát lỗi".
+                      Tooltip(
+                        message: _urlAmThanhDaGhi == null
+                            ? 'Chưa có bản ghi nào'
+                            : 'Tải file ghi âm về máy',
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: _urlAmThanhDaGhi == null
+                              ? null
+                              : _taiXuongGhiAm,
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _urlAmThanhDaGhi == null
+                                  ? Colors.grey.shade200
+                                  : Colors.teal.shade100,
+                              border: Border.all(
+                                color: _urlAmThanhDaGhi == null
+                                    ? Colors.grey.shade400
+                                    : Colors.teal.shade900,
+                                width: 2,
+                              ),
+                            ),
+                            alignment: Alignment.center,
+                            child: Icon(
+                              Icons.download,
+                              color: _urlAmThanhDaGhi == null
+                                  ? Colors.grey.shade500
+                                  : Colors.teal.shade900,
                               size: 22,
                             ),
                           ),
