@@ -41,7 +41,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v13';
+const _phienBanThuNghiem = 'v14';
 
 // (Chỉ import đúng MỘT file `speech_to_text/speech_to_text.dart` — y hệt
 // cách `trang_soan_thao.dart` đang dùng đã chứng minh hoạt động — thay vì
@@ -385,6 +385,15 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       _boGhiAm?.stop();
       return;
     }
+    // Tắt hẳn vòng Web Speech API trước khi ghi âm thô — hai bên cùng
+    // tranh giành một microphone có thể làm hỏng/im tiếng bản ghi. Ghi âm
+    // thử cần độc chiếm mic để kết quả đáng tin.
+    _henBatLai?.cancel();
+    _henMoLaiMicroSauKhiGo?.cancel();
+    _muonNghe = false;
+    await _micro.cancel();
+    if (mounted) setState(() => _dangNghe = false);
+
     final thietBiMedia = html.window.navigator.mediaDevices;
     if (thietBiMedia == null) {
       _ghiLog('Trình duyệt không hỗ trợ getUserMedia (ghi âm).');
@@ -423,11 +432,19 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     for (final track in _luongGhiAm?.getTracks() ?? const []) {
       track.stop();
     }
+    // Gỡ thẻ <audio> cũ khỏi DOM trước khi tạo cái mới — một số bản WebKit
+    // phát ÂM THẦM (không lỗi, không tiếng) nếu thẻ audio được tạo bằng JS
+    // mà không thực sự nằm trong cây DOM, nên phải gắn hẳn vào <body>.
     _phatLaiAmThanh?.pause();
-    final audio = html.AudioElement()..src = url;
+    _phatLaiAmThanh?.remove();
+    final audio = html.AudioElement()
+      ..src = url
+      ..style.display = 'none'
+      ..controls = false;
     audio.onEnded.listen((_) {
       if (mounted) setState(() => _dangPhatLai = false);
     });
+    html.document.body?.append(audio);
     _phatLaiAmThanh = audio;
     if (mounted) {
       setState(() {
@@ -448,9 +465,12 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       setState(() => _dangPhatLai = false);
     } else {
       audio.currentTime = 0;
-      audio.play();
       setState(() => _dangPhatLai = true);
       _ghiLog('Phát lại bản ghi âm.');
+      audio.play().catchError((Object loi) {
+        _ghiLog('Lỗi khi phát: $loi');
+        if (mounted) setState(() => _dangPhatLai = false);
+      });
     }
   }
 
@@ -886,6 +906,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       track.stop();
     }
     _phatLaiAmThanh?.pause();
+    _phatLaiAmThanh?.remove();
     if (_urlAmThanhDaGhi != null) {
       html.Url.revokeObjectUrl(_urlAmThanhDaGhi!);
     }
