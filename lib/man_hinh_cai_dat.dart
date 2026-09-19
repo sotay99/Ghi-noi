@@ -3,11 +3,14 @@
 // chèn dấu câu bằng AI, phím tắt tắt/mở micro, và trạng thái quyền micro
 // của thiết bị.
 
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'cai_dat.dart';
+import 'loai_thiet_bi.dart';
 
 /// Hai bộ biến đổi cho phép chọn làm phím tắt — bàn phím Android/desktop
 /// thường chỉ có hai phím này ở vị trí dễ bấm cùng lúc với một phím khác.
@@ -216,6 +219,10 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         children: [
+          if (kIsWeb) ...[
+            _dong0ThietBi(),
+            const Divider(height: 40),
+          ],
           _dong1ThoiGian(),
           const Divider(height: 40),
           _dong2TuTatMicro(),
@@ -251,6 +258,104 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
         alignment: Alignment.centerLeft,
         child: TextButton(onPressed: onPressed, child: const Text('Tìm hiểu thêm')),
       );
+
+  /// Chỉ hiện trên WEB (xem `kIsWeb` ở `build`) — micro trên web tự đoán
+  /// thiết bị (Android/PC-Mac/iPhone) bằng User-Agent, đoán sai thì người
+  /// dùng bấm dòng này để tự chọn tay. Đặt ĐẦU TIÊN trong Cài đặt vì đây là
+  /// lối thoát quan trọng nhất khi micro "im re" không rõ lý do.
+  Widget _dong0ThietBi() {
+    return GestureDetector(
+      onTap: _moChonThietBi,
+      behavior: HitTestBehavior.opaque,
+      child: RichText(
+        text: TextSpan(
+          style: const TextStyle(
+            fontSize: 15,
+            color: Colors.black87,
+            height: 1.4,
+          ),
+          children: [
+            const TextSpan(text: 'Nếu Micro bị trục trặc, hãy '),
+            TextSpan(
+              text: 'Bấm vào đây',
+              style: const TextStyle(
+                color: Colors.blue,
+                decoration: TextDecoration.underline,
+                fontWeight: FontWeight.w600,
+              ),
+              recognizer: TapGestureRecognizer()..onTap = _moChonThietBi,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Bảng modal nhỏ hiện lên từ dưới, mỗi thiết bị một dòng gồm HAI dòng
+  /// chồng lên nhau (tên đậm ở trên, mô tả ngắn ở dưới) — dễ chọn bằng
+  /// ngón tay. Trả về `(true, thietBi)` khi người dùng THẬT SỰ chọn một
+  /// mục (kể cả "Tự động nhận diện", lúc đó `thietBi` là `null`) để phân
+  /// biệt với việc đóng modal mà không chọn gì (trả về `null`).
+  Future<void> _moChonThietBi() async {
+    final ketQua = await showModalBottomSheet<(bool, ThietBi?)>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        Widget dong({
+          required String ten,
+          required String moTa,
+          required bool dangChon,
+          required VoidCallback onTap,
+        }) {
+          return ListTile(
+            onTap: onTap,
+            title: Text(ten,
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text(moTa),
+            trailing:
+                dangChon ? const Icon(Icons.check, color: Colors.blue) : null,
+          );
+        }
+
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 4, 20, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Chọn thiết bị',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+              ),
+              dong(
+                ten: 'Tự động nhận diện (mặc định)',
+                moTa: 'Để app tự đoán qua trình duyệt.',
+                dangChon: widget.caiDat.thietBiChonTay == null,
+                onTap: () => Navigator.of(context).pop((true, null)),
+              ),
+              for (final t in ThietBi.values)
+                dong(
+                  ten: t.ten,
+                  moTa: t.moTa,
+                  dangChon: widget.caiDat.thietBiChonTay == t,
+                  onTap: () => Navigator.of(context).pop((true, t)),
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+    if (ketQua == null) return; // đóng modal mà không chọn gì.
+    final (_, thietBiMoi) = ketQua;
+    await widget.caiDat.datThietBiChonTay(thietBiMoi);
+    await widget.khiKiemTraLaiMicro();
+    if (mounted) setState(() {});
+  }
 
   Widget _dong2TuTatMicro() {
     return Column(

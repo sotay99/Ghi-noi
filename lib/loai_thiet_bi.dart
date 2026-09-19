@@ -1,0 +1,18 @@
+// Ba "bản" hành vi micro trên web — chỉ có ý nghĩa khi chạy trên web
+// (`kIsWeb`). App Android/iOS gốc luôn nói thẳng với hệ điều hành qua
+// `speech_to_text`, không dùng tới khái niệm này.
+enum ThietBi { android, pc, iphone }
+
+extension ThongTinThietBi on ThietBi {
+  String get ten => switch (this) {
+        ThietBi.android => 'Android',
+        ThietBi.pc => 'Máy tính (PC/Mac)',
+        ThietBi.iphone => 'iPhone',
+      };
+
+  String get moTa => switch (this) {
+        ThietBi.android => 'Điện thoại/máy tính bảng Android.',
+        ThietBi.pc => 'Windows, macOS hoặc Linux.',
+        ThietBi.iphone => 'iPhone/iPad — micro tạm thời chưa dùng được.',
+      };
+}

@@ -7,6 +7,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -14,10 +15,12 @@ import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import 'cai_dat.dart';
+import 'doan_thiet_bi.dart';
 import 'ghi_am_ai.dart';
 import 'kho_du_lieu.dart';
 import 'kiem_tra_chinh_ta.dart';
 import 'kiem_tra_toan_van.dart';
+import 'loai_thiet_bi.dart';
 import 'man_hinh_cai_dat.dart';
 import 'man_hinh_thu_muc.dart';
 import 'modal_cai_dat_kiem_tra_toan_van.dart';
@@ -1682,6 +1685,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   bool _sanSang = false;
   String _loi = '';
 
+  /// Chỉ có ý nghĩa trên WEB — thiết bị dùng để quyết định nút micro có
+  /// dùng được hay không (xem `loai_thiet_bi.dart`/`man_hinh_cai_dat.dart`).
+  /// Lấy lựa chọn thủ công của người dùng nếu có, không thì tự đoán qua
+  /// User-Agent. Trên Android/iOS gốc, giá trị này không ảnh hưởng gì (chỉ
+  /// đọc ở những chỗ đã tự bọc `kIsWeb`).
+  late ThietBi _thietBiHienTai;
+
   /// Đang hiện dòng chữ chú thích dọc bên trên từng nút của thanh công cụ
   /// hay không — bật bằng nút "i" (chỉ xuất hiện khi micro tắt), hoặc tự bật
   /// khi vừa mở một ghi chú còn trống trơn. Tắt bằng bất kỳ thao tác nào:
@@ -2473,6 +2483,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void initState() {
     super.initState();
     _ghiChuHienTai = widget.kho.timGhiChu(widget.ghiChuId)!;
+    _thietBiHienTai = widget.caiDat.thietBiChonTay ?? doanThietBi();
     _tenController = TextEditingController(text: _ghiChuHienTai.ten);
     _oTen.addListener(_khiOTenMatFocus);
     // (VIỆC 2) Bật/tắt nhấp nháy con trỏ tự vẽ theo đúng lúc `_oChu` được/mất
@@ -2807,9 +2818,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         ),
       ),
     );
-    // Phím tắt có thể vừa đổi trong màn Cài đặt — vẽ lại nhãn hiện trên nút
-    // micro cho khớp giá trị mới nhất.
-    if (mounted) setState(() {});
+    // Phím tắt (và trên web: thiết bị chọn tay) có thể vừa đổi trong màn
+    // Cài đặt — vẽ lại nhãn/gate nút micro cho khớp giá trị mới nhất.
+    if (mounted) {
+      setState(() {
+        _thietBiHienTai = widget.caiDat.thietBiChonTay ?? doanThietBi();
+      });
+    }
   }
 
   // --------------------------------------------------------------- thư mục
@@ -3065,7 +3080,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
   }
 
+  /// Trên WEB, iPhone tạm thời "liệt" nút micro (Web Speech API gần như
+  /// không dùng được trên WebKit/iOS — xem thảo luận trước) — chặn cả bấm
+  /// nút lẫn phím tắt, không chỉ ẩn giao diện. Luôn `true` trên Android/iOS
+  /// gốc (không đọc `_thietBiHienTai` ở đó).
+  bool get _microDungDuocTrenThietBiNay =>
+      !(kIsWeb && _thietBiHienTai == ThietBi.iphone);
+
   void _bamNutMicro() {
+    if (!_microDungDuocTrenThietBiNay) return;
     // Người dùng tự bấm thì ý họ là quyết định cuối cùng — bỏ mọi kế hoạch
     // tự bật lại đang chờ.
     _microNgungDeGo = false;
@@ -6919,7 +6942,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               bat: _muonNghe,
               dangNghe: _dangNghe,
               songAm: _songAm,
-              sanSang: _sanSang,
+              sanSang: _sanSang && _microDungDuocTrenThietBiNay,
               hienChuThich: _hienChuThich,
               khiBamChuThich: _khiBamChuThich,
               nhanPhimTat: '${widget.caiDat.phimTatBoBienDoi} + ${widget.caiDat.phimTatPhim}',

@@ -5,6 +5,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'loai_thiet_bi.dart';
+
 class CaiDat {
   static const _khoaThoiGianBatLai = 'ghi_noi_thoi_gian_bat_lai_micro_giay';
   static const _khoaTuDongChenCach = 'ghi_noi_tu_dong_chen_khoang_cach';
@@ -118,6 +120,15 @@ class CaiDat {
 
   static const _khoaTuDongVietHoaDauCau = 'ghi_noi_tu_dong_viet_hoa_dau_cau';
 
+  /// Chỉ có ý nghĩa trên WEB (xem `loai_thiet_bi.dart`): người dùng tự chọn
+  /// tay một trong ba "bản" thiết bị khi cơ chế tự đoán (User-Agent) đoán
+  /// sai — mic bị trục trặc. `null` (mặc định) nghĩa là để tự đoán, không
+  /// ép. Vô hại trên Android/iOS gốc — không có chỗ nào đọc giá trị này ở
+  /// đó.
+  ThietBi? thietBiChonTay;
+
+  static const _khoaThietBiChonTay = 'ghi_noi_thiet_bi_chon_tay';
+
   Future<void> tai() async {
     final kho = await SharedPreferences.getInstance();
     thoiGianBatLaiGiay = kho.getDouble(_khoaThoiGianBatLai) ?? 1.0;
@@ -142,6 +153,24 @@ class CaiDat {
     tuDongThutDauDong = kho.getBool(_khoaTuDongThutDauDong) ?? true;
     tuDongThemDuongKeChia = kho.getBool(_khoaTuDongThemDuongKeChia) ?? true;
     tuDongVietHoaDauCau = kho.getBool(_khoaTuDongVietHoaDauCau) ?? true;
+    final tenThietBiDaLuu = kho.getString(_khoaThietBiChonTay);
+    thietBiChonTay = tenThietBiDaLuu == null
+        ? null
+        : ThietBi.values.cast<ThietBi?>().firstWhere(
+              (t) => t!.name == tenThietBiDaLuu,
+              orElse: () => null,
+            );
+  }
+
+  /// `null` = xoá lựa chọn thủ công, quay về tự đoán.
+  Future<void> datThietBiChonTay(ThietBi? t) async {
+    thietBiChonTay = t;
+    final kho = await SharedPreferences.getInstance();
+    if (t == null) {
+      await kho.remove(_khoaThietBiChonTay);
+    } else {
+      await kho.setString(_khoaThietBiChonTay, t.name);
+    }
   }
 
   Future<void> datTuDongThemDauCham(bool bat) async {
