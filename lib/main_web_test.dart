@@ -39,7 +39,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v9';
+const _phienBanThuNghiem = 'v10';
 
 // (Chỉ import đúng MỘT file `speech_to_text/speech_to_text.dart` — y hệt
 // cách `trang_soan_thao.dart` đang dùng đã chứng minh hoạt động — thay vì
@@ -109,6 +109,13 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   // bật lại sau 1 giây không gõ tiếp. ----
   String _vanBan = '';
   final _boDieuKhienVanBan = TextEditingController();
+
+  // Văn bản đã "chốt cứng" — giữ NGUYÊN VĂN (kể cả dấu xuống dòng/khoảng
+  // trắng người dùng tự gõ). Micro chỉ được phép NỐI THÊM vào biến này
+  // (không bao giờ dựng lại toàn bộ `_vanBan` bằng cách join(' ') danh sách
+  // từ — làm vậy sẽ nuốt mất mọi dấu xuống dòng gõ tay, đúng lỗi người dùng
+  // báo: bấm Enter xong nói tiếp thì dấu xuống dòng biến mất).
+  String _vanBanDaChot = '';
 
   // Cờ chặn: khi TRUE nghĩa là đoạn `_boDieuKhienVanBan.text` đang được
   // chính code (do micro) ghi vào, không phải người dùng gõ — để
@@ -303,9 +310,11 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   void _khiNguoiDungGoPhim(String vanBanMoi) {
     if (_dangGhiTuMicro) return;
     _vanBan = vanBanMoi;
-    // Coi toàn bộ chữ hiện có (kể cả phần vừa gõ tay) là đã "chốt cứng", để
-    // khi micro bật lại nó nối tiếp sau đúng chỗ người dùng vừa gõ, không
-    // đè lên hay xoá mất.
+    // Coi toàn bộ chữ hiện có (kể cả phần vừa gõ tay, NGUYÊN VĂN không bị
+    // tách-rồi-nối lại) là đã "chốt cứng", để khi micro bật lại nó nối tiếp
+    // sau đúng chỗ người dùng vừa gõ mà không đè lên, xoá mất, hay làm mất
+    // định dạng (xuống dòng, khoảng trắng) người dùng tự gõ.
+    _vanBanDaChot = vanBanMoi;
     _tuDaChot = _tachTu(vanBanMoi);
     _partialTruocDo = [];
     _rawTruocDoTrongPhien = '';
@@ -361,6 +370,59 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     );
   }
 
+  /// Nhật ký giờ nằm trong modal riêng (mở bằng nút nhỏ cạnh micro) thay vì
+  /// chiếm nguyên một khối trên trang — theo yêu cầu để khung nhập to ra.
+  void _moModalNhatKy() {
+    showDialog<void>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, capNhatModal) {
+            return AlertDialog(
+              title: const Text('Nhật ký'),
+              content: SizedBox(
+                width: double.maxFinite,
+                height: MediaQuery.of(context).size.height * 0.6,
+                child: Scrollbar(
+                  controller: _cuonNhatKy,
+                  child: SingleChildScrollView(
+                    controller: _cuonNhatKy,
+                    child: SelectableText(
+                      _nhatKy.isEmpty
+                          ? '(chưa có nhật ký)'
+                          : _nhatKy.join('\n'),
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: _saoChepNhatKy,
+                  child: const Text('Sao chép tất cả'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() => _nhatKy.clear());
+                    capNhatModal(() {});
+                  },
+                  child: const Text('Xoá tất cả'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Đóng'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _doiCheDoThietBi() {
     setState(() {
       _laDiDong = !_laDiDong;
@@ -395,6 +457,20 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       viTri = m.start + 1;
     }
     return s.substring(viTri);
+  }
+
+  /// Nối [tuMoi] vào SAU [hienTai] theo đúng nguyên tắc "chỉ nối thêm,
+  /// không dựng lại" — giữ NGUYÊN VĂN [hienTai] (kể cả dấu xuống dòng gõ
+  /// tay), chỉ thêm dấu cách phân tách nếu [hienTai] chưa tự kết thúc bằng
+  /// khoảng trắng/xuống dòng sẵn.
+  static String _noiTiep(String hienTai, List<String> tuMoi) {
+    if (tuMoi.isEmpty) return hienTai;
+    final phanMoi = tuMoi.join(' ');
+    if (hienTai.isEmpty) return phanMoi;
+    if (hienTai.endsWith('\n') || hienTai.endsWith(' ')) {
+      return '$hienTai$phanMoi';
+    }
+    return '$hienTai $phanMoi';
   }
 
   /// Tách chuỗi thành danh sách từ theo khoảng trắng — y hệt `_tachTu`.
@@ -498,30 +574,42 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     final tuMoi = _tachTu(noi);
     if (tuMoi.isEmpty) return;
 
-    List<String> hienThi;
+    // Phần từ CHƯA/MỚI cần hiển thị thêm sau `_vanBanDaChot` hiện tại —
+    // không bao giờ dựng lại toàn bộ văn bản, chỉ nối thêm, để giữ nguyên
+    // định dạng (xuống dòng...) người dùng có thể đã gõ tay trước đó.
+    List<String> phanMoiCanNoi;
     if (_batDauBangPhanDaChot(tuMoi, _tuDaChot)) {
       final tienToChung = _doDaiTienToChung(tuMoi, _partialTruocDo);
       if (tienToChung > _tuDaChot.length) {
+        // Chỉ đúng phần MỚI được coi là ổn định (tienToChung tăng thêm) mới
+        // thật sự chốt cứng vào `_vanBanDaChot` — phần còn lại của tuMoi
+        // (dưới đây) vẫn chỉ là xem trước, chưa ghi đè lên bản chốt.
+        final tuMoiChotThem = tuMoi.sublist(_tuDaChot.length, tienToChung);
+        _vanBanDaChot = _noiTiep(_vanBanDaChot, tuMoiChotThem);
         _tuDaChot = tuMoi.sublist(0, tienToChung);
       }
-      hienThi = tuMoi;
+      phanMoiCanNoi = tuMoi.sublist(_tuDaChot.length);
     } else {
       final ketQuaNoi = _timDiemNoiTrong(_tuDaChot, tuMoi);
       if (ketQuaNoi == null) {
-        hienThi = [..._tuDaChot, ...tuMoi];
+        phanMoiCanNoi = tuMoi;
       } else if (ketQuaNoi.isEmpty) {
         _partialTruocDo = tuMoi;
         return;
       } else {
-        hienThi = [..._tuDaChot, ...ketQuaNoi];
+        phanMoiCanNoi = ketQuaNoi;
       }
     }
 
     _partialTruocDo = tuMoi;
-    setState(() => _ghiVanBanTuMicro(hienThi.join(' ')));
+    final vanBanHienThi = _noiTiep(_vanBanDaChot, phanMoiCanNoi);
+    setState(() => _ghiVanBanTuMicro(vanBanHienThi));
 
     if (xong) {
-      _tuDaChot = _tachTu(_vanBan);
+      // Kết quả FINAL: toàn bộ nội dung hiện có (kể cả phần xem trước) coi
+      // là chốt cứng, giữ nguyên văn.
+      _vanBanDaChot = vanBanHienThi;
+      _tuDaChot = _tachTu(vanBanHienThi);
       _partialTruocDo = [];
     }
   }
@@ -555,22 +643,25 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     _ghiLog('  → phần đuôi mới so với lần trước: "${tuMoi.join(' ')}"');
 
     final ketQuaNoi = _timDiemNoiTrong(_tuDaChot, tuMoi);
-    List<String> hienThi;
+    List<String> tuThemVao;
     if (ketQuaNoi == null) {
       _ghiLog('  → không tìm được điểm nối, nối thẳng đuôi mới vào cuối');
-      hienThi = [..._tuDaChot, ...tuMoi];
+      tuThemVao = tuMoi;
     } else if (ketQuaNoi.isEmpty) {
       _ghiLog('  → đuôi mới trùng hoàn toàn với phần đã chốt, bỏ qua');
       return;
     } else {
       _ghiLog('  → tìm được điểm nối, thêm ${ketQuaNoi.length} từ mới');
-      hienThi = [..._tuDaChot, ...ketQuaNoi];
+      tuThemVao = ketQuaNoi;
     }
 
-    // Nhánh điện thoại không có FINAL đáng tin cậy — chốt cứng ngay mỗi
-    // lần có nội dung mới, để không bao giờ mất chữ đã hiện ra.
-    _tuDaChot = hienThi;
-    setState(() => _ghiVanBanTuMicro(hienThi.join(' ')));
+    // Nhánh điện thoại không có FINAL đáng tin cậy — chốt cứng ngay mỗi lần
+    // có nội dung mới, để không bao giờ mất chữ đã hiện ra. CHỈ NỐI THÊM
+    // vào `_vanBanDaChot` (giữ nguyên văn, kể cả xuống dòng gõ tay), không
+    // bao giờ dựng lại bằng join(' ') từ danh sách từ.
+    _vanBanDaChot = _noiTiep(_vanBanDaChot, tuThemVao);
+    _tuDaChot = _tachTu(_vanBanDaChot);
+    setState(() => _ghiVanBanTuMicro(_vanBanDaChot));
   }
 
   @override
@@ -587,7 +678,19 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    // Phím tắt Ctrl+G bật/tắt micro — CallbackShortcuts bọc NGOÀI Scaffold
+    // nên vẫn bắt được dù đang focus vào khung nhập kết quả (Shortcuts đi
+    // theo cây tổ tiên của focus hiện tại, không cần focus đúng widget này).
+    return CallbackShortcuts(
+      bindings: {
+        LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyG):
+            () {
+          if (_sanSang) _bamNutMicro();
+        },
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
       appBar: AppBar(
         title: const Text('Flowrite — thử micro trên Web ($_phienBanThuNghiem)'),
         actions: [
@@ -651,7 +754,9 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                 ],
               ),
               Expanded(
-                flex: 3,
+                // Không giới hạn flex — nhật ký đã chuyển vào modal riêng
+                // (nút nhỏ cạnh micro), nên khung nhập được dùng gần hết
+                // chỗ trống, dễ thao tác trên màn hình hẹp của điện thoại.
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
@@ -675,85 +780,69 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
               ),
               const SizedBox(height: 12),
               Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('Nhật ký',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  const Spacer(),
                   TextButton(
-                    onPressed: _saoChepNhatKy,
-                    child: const Text('Sao chép tất cả'),
+                    onPressed: () {
+                      setState(() {
+                        _ghiVanBanTuMicro('');
+                        _vanBanDaChot = '';
+                        _tuDaChot = [];
+                        _partialTruocDo = [];
+                        _rawTruocDoTrongPhien = '';
+                        _soLanPartial = 0;
+                        _soLanFinal = 0;
+                      });
+                      _ghiLog('Xoá để thử lại.');
+                    },
+                    child: const Text('Xoá để thử lại'),
                   ),
-                  TextButton(
-                    onPressed: () => setState(() => _nhatKy.clear()),
-                    child: const Text('Xoá nhật ký'),
+                  const SizedBox(width: 16),
+                  // Nút nhật ký — nhỏ, mở modal riêng thay vì chiếm chỗ
+                  // ngay trên trang như trước.
+                  Tooltip(
+                    message: 'Xem nhật ký',
+                    child: IconButton(
+                      onPressed: _moModalNhatKy,
+                      icon: const Icon(Icons.receipt_long),
+                    ),
                   ),
-                ],
-              ),
-              Expanded(
-                flex: 2,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.black87,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Scrollbar(
-                    controller: _cuonNhatKy,
-                    child: SingleChildScrollView(
-                      controller: _cuonNhatKy,
-                      child: SelectableText(
-                        _nhatKy.isEmpty
-                            ? '(chưa có nhật ký)'
-                            : _nhatKy.join('\n'),
-                        style: const TextStyle(
-                          color: Colors.greenAccent,
-                          fontFamily: 'monospace',
-                          fontSize: 12,
+                  const SizedBox(width: 8),
+                  // Nút micro — thu nhỏ lại giống kiểu nút trong app APK,
+                  // có phím tắt Ctrl+G (xem `CallbackShortcuts` bao ngoài).
+                  Tooltip(
+                    message: 'Bật/tắt micro (Ctrl+G)',
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: _sanSang ? _bamNutMicro : null,
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _muonNghe
+                              ? Colors.red
+                              : Colors.lightGreen.shade200,
+                          border: Border.all(
+                            color: Colors.blue.shade900,
+                            width: 2,
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          _muonNghe ? Icons.mic : Icons.mic_none,
+                          color: _muonNghe ? Colors.white : Colors.blue.shade900,
+                          size: 22,
                         ),
                       ),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Center(
-                child: GestureDetector(
-                  onTap: _sanSang ? _bamNutMicro : null,
-                  child: Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _muonNghe ? Colors.red : Colors.blue,
-                    ),
-                    child: Icon(
-                      _muonNghe ? Icons.mic : Icons.mic_none,
-                      color: Colors.white,
-                      size: 32,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _ghiVanBanTuMicro('');
-                      _tuDaChot = [];
-                      _partialTruocDo = [];
-                      _rawTruocDoTrongPhien = '';
-                      _soLanPartial = 0;
-                      _soLanFinal = 0;
-                    });
-                    _ghiLog('Xoá để thử lại.');
-                  },
-                  child: const Text('Xoá để thử lại'),
-                ),
+                ],
               ),
             ],
           ),
+        ),
+      ),
         ),
       ),
     );
