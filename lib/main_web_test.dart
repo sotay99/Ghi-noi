@@ -113,6 +113,22 @@
 //   TÍCH LUỸ của CẢ PHIÊN — nếu phiên cũ cứ chạy tiếp mà neo đã đổi, lần
 //   kết quả kế tiếp sẽ hiểu nhầm toàn bộ tích luỹ là "chữ mới" và chèn
 //   nhân đôi.
+// - (v25) Chế độ "ngăn bàn phím ảo" (nút hình bàn phím cạnh nút micro):
+//   không có cách nào ra lệnh cho hệ điều hành đừng hiện bàn phím ảo của
+//   MỘT Ô CÓ THỂ GÕ ĐƯỢC (giới hạn cố ý của trình duyệt), nên né bằng cách
+//   chuyển khung nhập sang `readOnly` khi bật chế độ này — Flutter CHÍNH
+//   THỨC hỗ trợ: chạm để di chuyển con trỏ/chọn vùng vẫn hoạt động, nhưng
+//   trình duyệt không gọi bàn phím ảo lên vì ô "không cho gõ". Bù lại bằng
+//   hàng phím ảo riêng (chấm/phẩy/cách/xuống dòng/xoá) — mỗi phím đi qua
+//   ĐÚNG `_ChanSuaGiuaThe.formatEditUpdate` trước khi áp dụng (bảo vệ thẻ
+//   ghi âm khỏi bị sửa một phần, y hệt bàn phím thật) rồi gọi
+//   `_khiNguoiDungGoPhim` — coi như một lượt gõ tay bình thường.
+//   Đồng thời thêm "chọn vùng rồi nói tiếp thì giọng nói ĐÈ LÊN vùng đó" —
+//   y hệt tinh thần `_datNeoTaiConTro()` bên app Android: `_batNghe` giờ
+//   nhớ luôn độ dài vùng đang chọn (`_doDaiVungDeDeMic`) khi đặt neo, và
+//   `_apDungXoaVungChonMicNeuCo` xoá đúng vùng đó ngay lúc có chữ THẬT đầu
+//   tiên để thay vào — cố tình KHÔNG xoá ngay lúc bật micro, để bật rồi
+//   tắt mà chưa nói gì thì vùng chọn vẫn còn nguyên.
 //   CHƯA LÀM (còn nợ, sẽ làm khi có xác nhận thêm): tự kết thúc thẻ khi con
 //   trỏ DI CHUYỂN mà không gõ tay; chế độ tự động gửi ngầm các thẻ đã xong
 //   trong lúc ghi thẻ mới; gộp nhiều thẻ vào một lần gọi Gemini để có ngữ
@@ -138,7 +154,7 @@ import 'ai_cau_hinh.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v24';
+const _phienBanThuNghiem = 'v25';
 
 // `diaChiMayChuAI`/`matKhauMayChuAI` đến từ ai_cau_hinh.dart (import ở
 // trên) — máy chủ đó đã có sẵn action 'ghi_am' (xem cloud-function/
@@ -344,6 +360,46 @@ class _ChanSuaGiuaThe extends TextInputFormatter {
   }
 }
 
+/// Một phím ảo trong hàng phím thay thế bàn phím hệ thống ở chế độ "ngăn
+/// bàn phím ảo" (xem `_chanBanPhimAo`) — chấm/phẩy/cách/xuống dòng/xoá.
+class _NutPhimAo extends StatelessWidget {
+  const _NutPhimAo({
+    required this.nhan,
+    required this.onTap,
+    this.moTa,
+    this.mauNen,
+    this.mauVien,
+  });
+
+  final String nhan;
+  final String? moTa;
+  final VoidCallback onTap;
+  final Color? mauNen;
+  final Color? mauVien;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: moTa ?? nhan,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Container(
+          width: 48,
+          height: 40,
+          decoration: BoxDecoration(
+            color: mauNen ?? Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: mauVien ?? Colors.grey.shade400),
+          ),
+          alignment: Alignment.center,
+          child: Text(nhan, style: const TextStyle(fontSize: 18)),
+        ),
+      ),
+    );
+  }
+}
+
 class TrangThuMicro extends StatefulWidget {
   const TrangThuMicro({super.key});
 
@@ -358,6 +414,17 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   bool _muonNghe = false; // người dùng bấm bật, kể cả khi trình duyệt tạm dừng.
   bool _dangNghe = false;
   String _loi = '';
+
+  // Chế độ "ngăn bàn phím ảo" — khung nhập chuyển `readOnly` (Flutter CHÍNH
+  // THỨC hỗ trợ: chạm để di chuyển con trỏ/chọn vùng vẫn hoạt động bình
+  // thường, nhưng trình duyệt không gọi bàn phím ảo lên vì ô "không cho
+  // gõ"). Không có cách nào "ra lệnh" cho hệ điều hành đừng hiện bàn phím
+  // của MỘT Ô CÓ THỂ GÕ ĐƯỢC — đây là giới hạn cố ý của trình duyệt, không
+  // phải thiếu sót — nên né bằng cách đổi hẳn sang ô không-thể-gõ, và bù
+  // lại bằng hàng phím ảo riêng (chấm/phẩy/cách/xuống dòng/xoá) cho những
+  // thao tác gõ tay tối thiểu, còn phần lớn nội dung vẫn vào bằng giọng
+  // nói (micro/thẻ ghi âm) — không phụ thuộc bàn phím thật.
+  bool _chanBanPhimAo = false;
 
   // Chế độ thiết bị: đoán ban đầu qua User-Agent, người dùng đổi được bằng
   // nút chuyển tay (SegmentedButton 3 lựa chọn). Mỗi nhánh gọi một hàm xử
@@ -417,15 +484,24 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
 
   // Vị trí ký tự — trong `_vanBanDaChot` — nơi chữ do micro nhận dạng được
   // CHÈN VÀO, y hệt tinh thần `_neo` bên app chính (`trang_soan_thao.dart`):
-  // KHÔNG phải luôn luôn ở cuối văn bản. Chỉ được đặt lại (dời theo con trỏ
-  // hiện tại) mỗi khi một PHIÊN NGHE MỚI bắt đầu (`_batNghe`) — bấm nút bật
-  // micro, tự bật lại sau khi gõ tay xong, hay trình duyệt tự khởi động lại
-  // phiên sau khoảng lặng — KHÔNG dời giữa chừng một phiên đang nói liên
-  // tục dù con trỏ có bị người dùng kéo đi chỗ khác (đúng hành vi app
-  // Android: đang nói liên tục thì chữ vẫn tiếp tục ra ở chỗ cũ, phải đợi
-  // phiên nghe mới — tức là phải dừng nói/mic tự ngắt rồi bắt đầu lại —
-  // chữ mới đi theo con trỏ mới).
+  // KHÔNG phải luôn luôn ở cuối văn bản. Đặt lại (dời theo con trỏ hiện
+  // tại) mỗi khi một PHIÊN NGHE MỚI bắt đầu (`_batNghe`) — bấm nút bật
+  // micro, tự bật lại sau khi gõ tay xong, con trỏ bị người dùng di chuyển
+  // trong lúc đang nghe (`_khiGiaTriKhungNhapDoi` chủ động cắt phiên để
+  // ép một phiên mới), hay trình duyệt tự khởi động lại phiên sau khoảng
+  // lặng.
   int _neoChenMic = 0;
+
+  // Độ dài (số ký tự) của một VÙNG ĐANG CHỌN cần bị THAY THẾ bởi lần chốt
+  // chữ ĐẦU TIÊN của phiên nghe kế tiếp — y hệt tinh thần `_chuTam` được
+  // gán từ vùng chọn trong `_datNeoTaiConTro()` bên app chính: chọn một
+  // vùng rồi nói tiếp thì giọng nói ĐÈ LÊN đúng vùng đó, giống hệt gõ tay
+  // đè lên vùng đang chọn. Đặt cùng lúc với `_neoChenMic` (xem `_batNghe`),
+  // tiêu thụ (đưa về 0) ngay khi có chữ THẬT đầu tiên để chèn — xem
+  // `_apDungXoaVungChonMicNeuCo`. Cố tình KHÔNG xoá vùng chọn ngay lúc bật
+  // micro: nếu người dùng bật rồi tắt luôn mà chưa nói được chữ nào, vùng
+  // chọn phải còn nguyên, không bị xoá oan.
+  int _doDaiVungDeDeMic = 0;
 
   Timer? _henBatLai;
 
@@ -618,14 +694,22 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       return; // Đổi CHỮ — đã có `_khiNguoiDungGoPhim` và các hàm ghi của
       // micro/thẻ ghi âm tự lo phần của chúng, không việc gì của hàm này.
     }
-    var viTri = gt.selection.baseOffset;
-    if (viTri < 0 || viTri > gt.text.length) return; // vùng chọn không hợp lệ.
-    if (viTri == _neoChenMic) return; // con trỏ vẫn đúng chỗ cũ — không có gì để làm.
+    final chon = gt.selection;
+    if (!chon.isValid || chon.start < 0 || chon.end > gt.text.length) {
+      return; // vùng chọn không hợp lệ.
+    }
+    final laVungChon = !chon.isCollapsed;
+    final viTri = chon.isCollapsed ? chon.baseOffset : chon.start;
+    // Chỉ bỏ qua khi con trỏ vẫn ở đúng chỗ cũ VÀ không phải một vùng chọn
+    // mới (một vùng chọn luôn cần xử lý riêng — "đè lên vùng chọn" — dù vô
+    // tình bắt đầu đúng tại neo cũ).
+    if (viTri == _neoChenMic && !laVungChon) return;
     if (!_muonNghe || !_micro.isListening) return; // micro không đang nghe.
 
-    _ghiLog('Con trỏ di chuyển tới $viTri trong lúc micro đang nghe — cắt '
-        'phiên hiện tại, nghe lại ngay tại vị trí mới (không đợi phiên tự '
-        'ngắt), tránh nhân đôi chữ do hypothesis tích luỹ của phiên cũ.');
+    _ghiLog('${laVungChon ? "Người dùng chọn một vùng" : "Con trỏ di chuyển tới $viTri"} '
+        'trong lúc micro đang nghe — cắt phiên hiện tại, nghe lại ngay tại '
+        'vị trí mới (không đợi phiên tự ngắt), tránh nhân đôi chữ do '
+        'hypothesis tích luỹ của phiên cũ.');
     _phienHienTai++; // huỷ callback trễ của phiên đang cắt (LỚP 1).
     await _micro.cancel();
     _henNgheLai();
@@ -662,13 +746,28 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     // điểm nối sẽ so khớp nhầm với đoạn văn bản không liên quan nằm trước
     // vị trí neo cũ.
     final vanBanHienTai = _boDieuKhienVanBan.text;
-    var neoMoi = _boDieuKhienVanBan.selection.baseOffset;
+    final chonHienTai = _boDieuKhienVanBan.selection;
+    var neoMoi = vanBanHienTai.length;
+    var doDaiVungMoi = 0;
+    if (chonHienTai.isValid) {
+      if (!chonHienTai.isCollapsed) {
+        // Đang CHỌN một vùng (tô đậm) — giọng nói tiếp theo sẽ ĐÈ LÊN đúng
+        // vùng đó, y hệt tinh thần `_datNeoTaiConTro()` bên app Android:
+        // neo đặt ở ĐẦU vùng, và nhớ luôn độ dài vùng để lần chốt chữ ĐẦU
+        // TIÊN của phiên này thay thế nó (xem `_apDungXoaVungChonMicNeuCo`).
+        neoMoi = chonHienTai.start;
+        doDaiVungMoi = chonHienTai.end - chonHienTai.start;
+      } else {
+        neoMoi = chonHienTai.end;
+      }
+    }
     if (neoMoi < 0 || neoMoi > vanBanHienTai.length) neoMoi = vanBanHienTai.length;
-    if (neoMoi != _neoChenMic) {
+    if (neoMoi != _neoChenMic || doDaiVungMoi > 0) {
       _ghiLog('Vị trí chèn chữ mic đổi từ $_neoChenMic sang $neoMoi (con '
-          'trỏ đã được di chuyển) — tính lại phần "đã chốt" ngay trước vị '
-          'trí mới.');
+          'trỏ đã được di chuyển${doDaiVungMoi > 0 ? ", đang chọn $doDaiVungMoi ký tự để đè lên" : ""}) '
+          '— tính lại phần "đã chốt" ngay trước vị trí mới.');
       _neoChenMic = neoMoi;
+      _doDaiVungDeDeMic = doDaiVungMoi;
       _tuDaChot = _tachTu(vanBanHienTai.substring(0, _neoChenMic));
       _partialTruocDo = [];
     }
@@ -1161,6 +1260,68 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     _ngatMicroNgayViGoPhim();
   }
 
+  /// Bật/tắt chế độ ngăn bàn phím ảo (xem `_chanBanPhimAo`).
+  void _bamNutChanBanPhimAo() {
+    setState(() => _chanBanPhimAo = !_chanBanPhimAo);
+    _ghiLog(_chanBanPhimAo
+        ? 'Bật chế độ ngăn bàn phím ảo — chạm để di chuyển con trỏ/chọn '
+            'vùng vẫn được, nhưng bàn phím ảo sẽ không hiện lên nữa. Dùng '
+            'hàng phím bên dưới để chấm/phẩy/cách/xuống dòng/xoá.'
+        : 'Tắt chế độ ngăn bàn phím ảo — bàn phím thật hoạt động lại bình '
+            'thường.');
+  }
+
+  /// Áp một chỉnh sửa THÔ (chưa qua `_ChanSuaGiuaThe`) vào khung nhập — dùng
+  /// chung cho mọi phím ảo (chấm/phẩy/cách/xuống dòng/xoá) ở chế độ ngăn
+  /// bàn phím. Đi qua ĐÚNG `_ChanSuaGiuaThe.formatEditUpdate` trước khi áp
+  /// dụng — y hệt bảo vệ mà bàn phím thật vẫn được hưởng (không cho sửa
+  /// một phần thẻ ghi âm) — vì các phím ảo này gán `.value=` trực tiếp,
+  /// không tự đi qua `TextInputFormatter` như gõ bàn phím thật.
+  void _apDungChinhSuaTuPhimAo(TextEditingValue tho) {
+    final cu = _boDieuKhienVanBan.value;
+    final ketQua = _ChanSuaGiuaThe().formatEditUpdate(cu, tho);
+    _boDieuKhienVanBan.value = ketQua;
+    _khiNguoiDungGoPhim(ketQua.text);
+  }
+
+  /// Chèn [kyTu] tại vị trí đang chọn (đè lên nếu đang chọn một vùng) —
+  /// dùng cho các phím ảo chấm/phẩy/cách/xuống dòng.
+  void _chenKyTuTuPhimAo(String kyTu) {
+    final cu = _boDieuKhienVanBan.value;
+    var batDau = cu.selection.start;
+    var ketThuc = cu.selection.end;
+    if (batDau < 0 || batDau > cu.text.length) batDau = cu.text.length;
+    if (ketThuc < 0 || ketThuc > cu.text.length) ketThuc = cu.text.length;
+    final tho = TextEditingValue(
+      text: cu.text.replaceRange(batDau, ketThuc, kyTu),
+      selection: TextSelection.collapsed(offset: batDau + kyTu.length),
+    );
+    _apDungChinhSuaTuPhimAo(tho);
+  }
+
+  /// Phím ảo "Xoá": xoá cả vùng đang chọn nếu có, không thì xoá lùi một ký
+  /// tự (y hệt phím Backspace thật).
+  void _xoaKyTuTuPhimAo() {
+    final cu = _boDieuKhienVanBan.value;
+    final chon = cu.selection;
+    TextEditingValue tho;
+    if (chon.isValid && !chon.isCollapsed) {
+      tho = TextEditingValue(
+        text: cu.text.replaceRange(chon.start, chon.end, ''),
+        selection: TextSelection.collapsed(offset: chon.start),
+      );
+    } else {
+      var viTri = chon.baseOffset;
+      if (viTri < 0 || viTri > cu.text.length) viTri = cu.text.length;
+      if (viTri == 0) return; // đầu văn bản — không có gì để xoá lùi.
+      tho = TextEditingValue(
+        text: cu.text.replaceRange(viTri - 1, viTri, ''),
+        selection: TextSelection.collapsed(offset: viTri - 1),
+      );
+    }
+    _apDungChinhSuaTuPhimAo(tho);
+  }
+
   Future<void> _ngatMicroNgayViGoPhim() async {
     _henMoLaiMicroSauKhiGo?.cancel();
     _henBatLai?.cancel();
@@ -1221,6 +1382,19 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     }
     final vanBanMoi = hienTai.replaceRange(viTri, viTri, phanMoi);
     return (vanBanMoi, viTri + phanMoi.length);
+  }
+
+  /// Xoá vùng đang chờ bị "đè lên" (nếu có, xem `_doDaiVungDeDeMic`) khỏi
+  /// `_vanBanDaChot` — gọi NGAY TRƯỚC lần chèn chữ mic đầu tiên của một
+  /// phiên nghe, tức đúng lúc có chữ THẬT để thay vào chỗ vùng chọn cũ.
+  void _apDungXoaVungChonMicNeuCo() {
+    if (_doDaiVungDeDeMic <= 0) return;
+    final ketThuc =
+        (_neoChenMic + _doDaiVungDeDeMic).clamp(0, _vanBanDaChot.length);
+    _ghiLog('Đè lên vùng đang chọn ($_doDaiVungDeDeMic ký tự) bằng chữ '
+        'vừa nhận dạng được.');
+    _vanBanDaChot = _vanBanDaChot.replaceRange(_neoChenMic, ketThuc, '');
+    _doDaiVungDeDeMic = 0;
   }
 
   Future<void> _saoChepVanBan() async {
@@ -1440,6 +1614,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   void _xuLyKetQuaPc(String noi, bool xong) {
     final tuMoi = _tachTu(noi);
     if (tuMoi.isEmpty) return;
+    _apDungXoaVungChonMicNeuCo();
 
     // Phần từ CHƯA/MỚI cần hiển thị thêm sau `_vanBanDaChot` hiện tại —
     // không bao giờ dựng lại toàn bộ văn bản, chỉ nối thêm, để giữ nguyên
@@ -1512,6 +1687,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   void _xuLyKetQuaIphone(String noi, bool xong) {
     final tuMoi = _tachTu(noi);
     if (tuMoi.isEmpty) return;
+    _apDungXoaVungChonMicNeuCo();
 
     List<String> phanMoiCanNoi;
     if (_batDauBangPhanDaChot(tuMoi, _tuDaChot)) {
@@ -1596,6 +1772,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     // có nội dung mới, để không bao giờ mất chữ đã hiện ra. CHỈ NỐI THÊM,
     // không bao giờ dựng lại bằng join(' ') từ danh sách từ — nhưng chèn
     // ĐÚNG TẠI NEO (`_neoChenMic`), không phải luôn ở cuối văn bản.
+    _apDungXoaVungChonMicNeuCo();
     final (vbMoi, neoMoi) =
         _chenTuVaoViTri(_vanBanDaChot, _neoChenMic, tuThemVao);
     _vanBanDaChot = vbMoi;
@@ -1744,17 +1921,54 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                         controller: _boDieuKhienVanBan,
                         onChanged: _khiNguoiDungGoPhim,
                         inputFormatters: [_ChanSuaGiuaThe()],
+                        readOnly: _chanBanPhimAo,
                         maxLines: null,
                         expands: true,
                         textAlignVertical: TextAlignVertical.top,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           border: InputBorder.none,
-                          hintText: '(chưa có chữ nào — nói hoặc gõ vào đây)',
+                          hintText: _chanBanPhimAo
+                              ? '(đang ngăn bàn phím ảo — chạm để đặt con '
+                                  'trỏ/chọn vùng, dùng hàng phím bên dưới '
+                                  'hoặc micro để nhập chữ)'
+                              : '(chưa có chữ nào — nói hoặc gõ vào đây)',
                         ),
                         style: const TextStyle(fontSize: 18, height: 1.5),
                       ),
                     ),
                   ),
+                  if (_chanBanPhimAo && !banPhimDangMo)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _NutPhimAo(
+                              nhan: '.', onTap: () => _chenKyTuTuPhimAo('.')),
+                          _NutPhimAo(
+                              nhan: ',', onTap: () => _chenKyTuTuPhimAo(',')),
+                          _NutPhimAo(
+                            nhan: '␣',
+                            moTa: 'Dấu cách',
+                            onTap: () => _chenKyTuTuPhimAo(' '),
+                          ),
+                          _NutPhimAo(
+                            nhan: '⏎',
+                            moTa: 'Xuống dòng',
+                            onTap: () => _chenKyTuTuPhimAo('\n'),
+                          ),
+                          _NutPhimAo(
+                            nhan: '⌫',
+                            moTa: 'Xoá',
+                            mauNen: Colors.red.shade50,
+                            mauVien: Colors.red.shade300,
+                            onTap: _xoaKyTuTuPhimAo,
+                          ),
+                        ],
+                      ),
+                    ),
                   if (!banPhimDangMo) ...[
                   const SizedBox(height: 8),
                   Row(
@@ -1832,6 +2046,44 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                               color: _muonNghe
                                   ? Colors.white
                                   : Colors.blue.shade900,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Nút bật/tắt chế độ ngăn bàn phím ảo — đặt ngay cạnh
+                      // nút micro cho dễ bấm (theo đúng yêu cầu).
+                      Tooltip(
+                        message: _chanBanPhimAo
+                            ? 'Tắt chế độ ngăn bàn phím ảo'
+                            : 'Bật chế độ ngăn bàn phím ảo (chạm để di '
+                                'chuyển con trỏ, không bị bàn phím ảo che '
+                                'khung nhập)',
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: _bamNutChanBanPhimAo,
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _chanBanPhimAo
+                                  ? Colors.deepPurple
+                                  : Colors.deepPurple.shade50,
+                              border: Border.all(
+                                color: Colors.deepPurple.shade400,
+                                width: 2,
+                              ),
+                            ),
+                            alignment: Alignment.center,
+                            child: Icon(
+                              _chanBanPhimAo
+                                  ? Icons.keyboard_hide
+                                  : Icons.keyboard_alt_outlined,
+                              color: _chanBanPhimAo
+                                  ? Colors.white
+                                  : Colors.deepPurple.shade400,
                               size: 22,
                             ),
                           ),
