@@ -38,6 +38,19 @@
 //   'ghi_am' (xem cloud-function/index.js, app Android cũng dùng chung —
 //   lib/ghi_am_ai.dart), rồi thay đúng mỗi token bằng chữ phiên âm được,
 //   giữ nguyên các đoạn gõ tay xen kẽ xung quanh.
+// - (v18) Thẻ hiện NGAY lúc bắt đầu ghi (token tĩnh "đang ghi âm", đồng hồ
+//   đếm giờ hiển thị ở hàng tiêu đề "Kết quả", KHÔNG nhét vào trong nội
+//   dung văn bản để tránh xung đột với gõ tay), đổi thành "Thẻ ghi âm số N"
+//   khi dừng. Gõ tay trong lúc đang ghi thẻ sẽ HUỶ NGAY bản ghi dở đó (gõ
+//   tay luôn thắng micro, kể cả đang ghi âm — `_huyGhiAmDangDoDoGoTay`).
+//   Trên iPhone, nút micro CHÍNH (nút xanh lá) giờ gọi thẳng cơ chế ghi-âm
+//   -rồi-gửi-Gemini thay vì thử Web Speech API (vốn không chạy được trên
+//   iOS). Bàn phím ảo hiện lên thì ẩn hết các hàng bên dưới khung nhập, để
+//   khung nhập giãn hết cỡ phần còn lại phía trên bàn phím.
+//   CHƯA LÀM trong v18 (còn nợ, sẽ làm khi có xác nhận thêm): tự kết thúc
+//   thẻ khi con trỏ DI CHUYỂN mà không gõ tay; chế độ tự động gửi ngầm các
+//   thẻ đã xong trong lúc ghi thẻ mới; gộp nhiều thẻ vào một lần gọi Gemini
+//   để có ngữ cảnh (cần sửa cả Cloud Function, phải làm riêng).
 
 import 'dart:async';
 import 'dart:convert';
@@ -59,7 +72,7 @@ import 'ai_cau_hinh.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v17';
+const _phienBanThuNghiem = 'v18';
 
 // `diaChiMayChuAI`/`matKhauMayChuAI` đến từ ai_cau_hinh.dart (import ở
 // trên) — máy chủ đó đã có sẵn action 'ghi_am' (xem cloud-function/
@@ -228,6 +241,27 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   final Map<int, html.Blob> _cacDoanGhiAmTheoThe = {};
   bool _dangTaoVanBan = false;
   static final RegExp _reTheGhiAm = RegExp('〔🎙️ Ghi âm (\\d+)〕');
+
+  // ---- Đếm giờ hiển thị lúc đang ghi thẻ — hiển thị NGOÀI khung nhập (ở
+  // hàng trạng thái), không nhét vào trong nội dung văn bản: TextField
+  // không hỗ trợ widget sống động chèn giữa chữ có thể sửa, và việc tự động
+  // ghi đè chữ mỗi giây vào đúng lúc người dùng có thể đang gõ tay ở chỗ
+  // khác sẽ phá vỡ nguyên tắc gõ-phím-thắng-micro. Token trong văn bản vẫn
+  // chỉ là placeholder tĩnh, chèn một lần duy nhất lúc BẮT ĐẦU ghi (xem
+  // `_chenTheDangGhiVaoVanBan`), rồi được thay bằng "Thẻ ghi âm số N" khi
+  // dừng.
+  Timer? _bomDongHoGhiAm;
+  Duration _thoiLuongDangGhi = Duration.zero;
+  int? _viTriTokenDangGhi; // vị trí ký tự bắt đầu của token đang ghi dở.
+  int? _soTheDangGhi;
+  static const String _tenTokenDangGhi = '〔🎙️ … đang ghi âm …〕';
+
+  // Bỏ qua ĐÚNG MỘT lần kiểm tra "gõ tay trong lúc đang ghi" trong
+  // `_khiNguoiDungGoPhim` — dùng khi chính code (không phải người dùng) vừa
+  // chèn/thay token bằng cách gán `.value` (việc đó tự khiến `onChanged`
+  // bắn ra), để không hiểu nhầm chính hành động chèn token là "người dùng
+  // gõ tay huỷ bản ghi".
+  bool _boQuaKiemTraGoTrongLucGhiMotLan = false;
 
   // Đếm số lần lỗi liên tiếp KHÔNG kèm bất kỳ chữ nào (không có partial nào
   // trước khi lỗi) — dấu hiệu bộ nhận dạng bị chặn ngay từ đầu chứ không
@@ -401,6 +435,14 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   }
 
   void _bamNutMicro() {
+    // Trên iPhone, Web Speech API không hoạt động kể cả bấm tay (xem log
+    // "onError: aborted" lặp lại) — nút micro chính vì thế chuyển hẳn sang
+    // cơ chế ghi-âm-rồi-gửi-Gemini (đúng nút "ghi âm" bên dưới), để người
+    // dùng iPhone không cần biết có hai nút khác nhau.
+    if (_thietBi == ThietBi.iphone) {
+      _bamNutGhiAm();
+      return;
+    }
     if (_muonNghe) {
       _tatNghe();
     } else {
@@ -475,6 +517,13 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
       setState(() {
         _dangGhiAm = true;
         _loi = '';
+        _thoiLuongDangGhi = Duration.zero;
+      });
+      _chenTokenDangGhiVaoVanBan();
+      _bomDongHoGhiAm?.cancel();
+      _bomDongHoGhiAm = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted) return;
+        setState(() => _thoiLuongDangGhi += const Duration(seconds: 1));
       });
       _ghiLog('Bắt đầu ghi âm thử (không qua Web Speech API).');
     } catch (e) {
@@ -483,10 +532,57 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     }
   }
 
+  /// Chèn token tĩnh "đang ghi âm" NGAY khi bắt đầu ghi (không đợi tới lúc
+  /// dừng) — để người dùng thấy ngay trong văn bản có một thẻ đang hình
+  /// thành. Ghi lại vị trí ký tự để lúc dừng ghi thay ĐÚNG token này bằng
+  /// "Thẻ ghi âm số N", không chèn thêm token mới.
+  void _chenTokenDangGhiVaoVanBan() {
+    final vanBanCu = _boDieuKhienVanBan.text;
+    var viTri = _boDieuKhienVanBan.selection.baseOffset;
+    if (viTri < 0 || viTri > vanBanCu.length) viTri = vanBanCu.length;
+    final vanBanMoi =
+        vanBanCu.replaceRange(viTri, viTri, _tenTokenDangGhi);
+    _viTriTokenDangGhi = viTri;
+    _boQuaKiemTraGoTrongLucGhiMotLan = true;
+    _boDieuKhienVanBan.value = TextEditingValue(
+      text: vanBanMoi,
+      selection: TextSelection.collapsed(offset: viTri + _tenTokenDangGhi.length),
+    );
+    // KHÔNG gọi thẳng `_khiNguoiDungGoPhim` ở đây — gán `.value` cho
+    // controller đã tự khiến `TextField.onChanged` bắn ra (y hệt cách
+    // `_chenTheGhiAmVaoVanBan` vẫn làm), nên nó tự đi qua đúng đường xử lý
+    // gõ tay bình thường (chốt cứng đoạn mới, tắt micro...).
+    _ghiLog('Chèn token "đang ghi âm" tại vị trí ký tự $viTri.');
+  }
+
+  /// Nếu người dùng gõ tay trong lúc đang ghi thẻ, huỷ ngay bản ghi dở đó —
+  /// đúng nguyên tắc "gõ tay luôn luôn thắng micro kể cả đang ghi âm". Token
+  /// tĩnh đã chèn lúc bắt đầu ghi (nếu người dùng chưa xoá nó) được coi là
+  /// văn bản gõ tay bình thường từ giờ — không có thẻ nào được tạo ra cho
+  /// lần ghi bị huỷ này.
+  void _huyGhiAmDangDoDoGoTay() {
+    if (!_dangGhiAm) return;
+    _ghiLog('Người dùng gõ tay trong lúc đang ghi thẻ — huỷ bản ghi dở này '
+        '(gõ tay luôn thắng micro).');
+    _bomDongHoGhiAm?.cancel();
+    _bomDongHoGhiAm = null;
+    _viTriTokenDangGhi = null;
+    _soTheDangGhi = null;
+    final boGhi = _boGhiAm;
+    _boGhiAm = null; // để listener 'stop' (nếu còn tới) không chèn thẻ nữa.
+    boGhi?.stop();
+    for (final track in _luongGhiAm?.getTracks() ?? const []) {
+      track.stop();
+    }
+    if (mounted) setState(() => _dangGhiAm = false);
+  }
+
   void _hoanTatGhiAm() {
     // Dùng ĐÚNG mimeType mà bộ ghi thật sự đã dùng (đọc lại từ chính đối
     // tượng MediaRecorder) — không đoán/ép cứng, vì mỗi trình duyệt trả về
     // một định dạng khác nhau (xem log lúc bắt đầu ghi).
+    _bomDongHoGhiAm?.cancel();
+    _bomDongHoGhiAm = null;
     final loaiThuc = _boGhiAm?.mimeType;
     final blob = html.Blob(
       _cacDoanGhiAm,
@@ -533,22 +629,41 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
         'cả thẻ cho Gemini phiên âm.');
   }
 
-  /// Chèn token "〔🎙️ Ghi âm N〕" vào đúng vị trí con trỏ hiện tại trong
-  /// khung nhập kết quả — coi như một lượt "gõ tay" đặc biệt (đi qua đúng
-  /// `onChanged` → `_khiNguoiDungGoPhim`, không có đường tắt riêng), để giữ
-  /// nguyên mọi bất biến sẵn có (chốt cứng nguyên văn, tắt micro khi có
-  /// thay đổi bằng tay...).
+  /// Thay ĐÚNG token tĩnh "đang ghi âm" (chèn lúc bắt đầu ghi, xem
+  /// `_chenTokenDangGhiVaoVanBan`) bằng "〔🎙️ Ghi âm N〕" — nếu vì lý do gì
+  /// đó không còn tìm thấy token đó nữa (người dùng đã xoá/sửa nó trong lúc
+  /// ghi), rơi về hành vi cũ: chèn thẻ mới tại vị trí con trỏ hiện tại.
   void _chenTheGhiAmVaoVanBan(int soThe) {
+    final the = '〔🎙️ Ghi âm $soThe〕';
     final vanBanCu = _boDieuKhienVanBan.text;
+    final viTriToken = _viTriTokenDangGhi;
+    _viTriTokenDangGhi = null;
+    _soTheDangGhi = null;
+    if (viTriToken != null &&
+        viTriToken >= 0 &&
+        viTriToken + _tenTokenDangGhi.length <= vanBanCu.length &&
+        vanBanCu.substring(viTriToken, viTriToken + _tenTokenDangGhi.length) ==
+            _tenTokenDangGhi) {
+      final vanBanMoi = vanBanCu.replaceRange(
+          viTriToken, viTriToken + _tenTokenDangGhi.length, the);
+      _boQuaKiemTraGoTrongLucGhiMotLan = true;
+      _boDieuKhienVanBan.value = TextEditingValue(
+        text: vanBanMoi,
+        selection: TextSelection.collapsed(offset: viTriToken + the.length),
+      );
+      _ghiLog('Thay token "đang ghi âm" bằng thẻ #$soThe tại vị trí '
+          '$viTriToken.');
+      return;
+    }
     var viTri = _boDieuKhienVanBan.selection.baseOffset;
     if (viTri < 0 || viTri > vanBanCu.length) viTri = vanBanCu.length;
-    final the = '〔🎙️ Ghi âm $soThe〕';
     final vanBanMoi = vanBanCu.replaceRange(viTri, viTri, the);
     _boDieuKhienVanBan.value = TextEditingValue(
       text: vanBanMoi,
       selection: TextSelection.collapsed(offset: viTri + the.length),
     );
-    _ghiLog('Chèn thẻ ghi âm #$soThe vào văn bản tại vị trí ký tự $viTri.');
+    _ghiLog('Chèn thẻ ghi âm #$soThe vào văn bản tại vị trí ký tự $viTri '
+        '(không tìm thấy token "đang ghi âm" — có thể đã bị xoá/sửa).');
   }
 
   void _bamNutNgheLai() {
@@ -684,6 +799,13 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   /// micro cập nhật chữ.
   void _khiNguoiDungGoPhim(String vanBanMoi) {
     if (_dangGhiTuMicro) return;
+    if (_boQuaKiemTraGoTrongLucGhiMotLan) {
+      _boQuaKiemTraGoTrongLucGhiMotLan = false;
+    } else if (_dangGhiAm) {
+      // Người dùng gõ tay thật trong lúc thẻ đang ghi dở — gõ tay luôn
+      // thắng micro, kể cả khi đó là đang ghi âm: huỷ ngay bản ghi dở này.
+      _huyGhiAmDangDoDoGoTay();
+    }
     _vanBan = vanBanMoi;
     // Coi toàn bộ chữ hiện có (kể cả phần vừa gõ tay, NGUYÊN VĂN không bị
     // tách-rồi-nối lại) là đã "chốt cứng", để khi micro bật lại nó nối tiếp
@@ -1099,6 +1221,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   void dispose() {
     _henBatLai?.cancel();
     _henMoLaiMicroSauKhiGo?.cancel();
+    _bomDongHoGhiAm?.cancel();
     _micro.cancel();
     _cuonNhatKy.dispose();
     _boDieuKhienVanBan.dispose();
@@ -1117,6 +1240,14 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
 
   @override
   Widget build(BuildContext context) {
+    // Bàn phím ảo đang mở hay không: `viewInsets.bottom > 0` khi hệ điều
+    // hành đẩy bàn phím lên. Lúc gõ tay, người dùng chỉ cần thấy khung nhập
+    // — các hàng bên dưới (trạng thái nghe, dãy nút micro/ghi âm/nghe lại/
+    // tải xuống, tên trang, bộ chọn thiết bị) không cần thiết và chỉ làm
+    // khung nhập bị bóp nhỏ lại. Ẩn hẳn chúng khi bàn phím đang mở, để
+    // khung nhập giãn ra chiếm trọn phần còn lại phía trên bàn phím.
+    final banPhimDangMo = MediaQuery.of(context).viewInsets.bottom > 0;
+
     // Phím tắt Ctrl+G bật/tắt micro — CallbackShortcuts bọc NGOÀI Scaffold
     // nên vẫn bắt được dù đang focus vào khung nhập kết quả (Shortcuts đi
     // theo cây tổ tiên của focus hiện tại, không cần focus đúng widget này).
@@ -1173,6 +1304,23 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                         ),
                       ),
                       const Spacer(),
+                      if (_dangGhiAm)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.fiber_manual_record,
+                                  color: Colors.red, size: 14),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Đang ghi: ${_thoiLuongDangGhi.inMinutes.toString().padLeft(2, '0')}:'
+                                '${(_thoiLuongDangGhi.inSeconds % 60).toString().padLeft(2, '0')}',
+                                style: const TextStyle(color: Colors.red),
+                              ),
+                            ],
+                          ),
+                        ),
                       if (_dangTaoVanBan)
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 8),
@@ -1220,6 +1368,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                       ),
                     ),
                   ),
+                  if (!banPhimDangMo) ...[
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -1493,6 +1642,7 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                       ],
                     ),
                   ),
+                  ], // đóng `if (!banPhimDangMo) ...[`
                 ],
               ),
             ),
