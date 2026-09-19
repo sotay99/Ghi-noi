@@ -205,13 +205,20 @@ import 'ai_cau_hinh.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v30';
+const _phienBanThuNghiem = 'v31';
 // v30: chữ Gemini vừa nhận nhấp nháy xanh↔đen 4 giây; tự động gửi ngầm bật
 // SẴN mặc định (vẫn tắt được); tự lưu văn bản đang soạn vào localStorage
 // (khôi phục lúc mở lại trang, kể cả không có mạng); Firebase Hosting đặt
 // Cache-Control: no-cache cho index.html/flutter_service_worker.js/
 // version.json để F5 lúc có mạng luôn lấy bản mới nhất mà không mất khả
 // năng dùng ngoại tuyến (service worker vẫn còn nguyên).
+// v31: bước 1 của việc "chuyển bố cục app Android sang web" — nút micro
+// chuyển ra NGOÀI CÙNG bên phải của thanh công cụ dưới (đúng vị trí
+// `_NutMicroTron` trong `ThanhCongCu` của app); nút "ngăn bàn phím ảo"
+// chuyển vào menu "+ Thêm lựa chọn" mới (PopupMenuButton, đúng vị trí/tên
+// như app Android); bộ chọn thiết bị (SegmentedButton) chuyển vào trang
+// "Cài đặt" mới (mở từ "+ Thêm lựa chọn" → "Cài đặt"), đặt Ở ĐẦU TIÊN.
+// Thuật toán mic/ghi âm/gửi Gemini/nhấp nháy/tự lưu — KHÔNG đổi gì.
 
 // `diaChiMayChuAI`/`matKhauMayChuAI` đến từ ai_cau_hinh.dart (import ở
 // trên) — máy chủ đó đã có sẵn action 'ghi_am' (xem cloud-function/
@@ -1863,6 +1870,63 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     _ghiLog('Chuyển tay sang chế độ: ${_tenThietBi(moi)}');
   }
 
+  /// Trang Cài đặt — vị trí bố cục phỏng theo `ManHinhCaiDat` của app
+  /// Android (mở qua "+ Thêm lựa chọn" → "Cài đặt"). Mục "Chuyển tay thiết
+  /// bị" đặt ĐẦU TIÊN, đúng như yêu cầu — bản thử web này chỉ có mục cài
+  /// đặt riêng của nó (các mục cài đặt khác của app Android như tự tắt
+  /// micro, kiểm tra chính tả AI... thuộc phạm vi bước sau, chưa chuyển
+  /// sang đây).
+  void _moCaiDat() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => Scaffold(
+          appBar: AppBar(title: const Text('Cài đặt')),
+          body: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              const Text(
+                'Chuyển tay thiết bị (ép chế độ nhận diện thủ công):',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              StatefulBuilder(
+                builder: (context, capNhat) => SegmentedButton<ThietBi>(
+                  segments: const [
+                    ButtonSegment(
+                      value: ThietBi.android,
+                      icon: Icon(Icons.android),
+                      label: Text('Android'),
+                    ),
+                    ButtonSegment(
+                      value: ThietBi.pc,
+                      icon: Icon(Icons.laptop_mac),
+                      label: Text('PC/Mac'),
+                    ),
+                    ButtonSegment(
+                      value: ThietBi.iphone,
+                      icon: Icon(Icons.phone_iphone),
+                      label: Text('iPhone'),
+                    ),
+                  ],
+                  selected: {_thietBi},
+                  onSelectionChanged: (chon) {
+                    _doiCheDoThietBi(chon.first);
+                    capNhat(() {});
+                  },
+                  style: SegmentedButton.styleFrom(
+                    selectedBackgroundColor: Colors.blue.shade700,
+                    selectedForegroundColor: Colors.white,
+                  ),
+                ),
+              ),
+              const Divider(height: 40),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ------------------------------------------------------ thuật toán lõi
 
   // Chrome Android trả `recognizedWords` bị lặp lại TOÀN BỘ lịch sử của
@@ -2422,106 +2486,81 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Thanh ngang chứa nút Xoá / Nhật ký / Micro.
+                  // Thanh công cụ dưới cùng — bố cục phỏng theo `ThanhCongCu`
+                  // của app Android: nhóm nút phụ bên trái (co giãn được),
+                  // nút "Ghi âm" sát trước, và nút MICRO CHÍNH nằm NGOÀI
+                  // CÙNG bên phải — đúng vị trí `_NutMicroTron` trong app.
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _ghiVanBanTuMicro('');
-                            _vanBanDaChot = '';
-                            _neoChenMic = 0;
-                            _tuDaChot = [];
-                            _partialTruocDo = [];
-                            _rawTruocDoTrongPhien = '';
-                            _soLanPartial = 0;
-                            _soLanFinal = 0;
-                          });
-                          _ghiLog('Xoá để thử lại.');
-                        },
-                        child: const Text('Xoá để thử lại'),
-                      ),
-                      const SizedBox(width: 16),
-                      // Nút nhật ký — nhỏ, mở modal riêng thay vì chiếm chỗ
-                      // ngay trên trang như trước.
-                      Tooltip(
-                        message: 'Xem nhật ký',
-                        child: IconButton(
-                          onPressed: _moModalNhatKy,
-                          icon: const Icon(Icons.receipt_long),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Nút micro — thu nhỏ lại giống kiểu nút trong app
-                      // APK, có phím tắt Ctrl+G (xem `CallbackShortcuts`
-                      // bao ngoài).
-                      Tooltip(
-                        message: 'Bật/tắt micro (Ctrl+G)',
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: (_sanSang && !_dangGhiAm)
-                              ? _bamNutMicro
-                              : null,
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: _muonNghe
-                                  ? Colors.red
-                                  : Colors.lightGreen.shade200,
-                              border: Border.all(
-                                color: Colors.blue.shade900,
-                                width: 2,
+                      Expanded(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _ghiVanBanTuMicro('');
+                                    _vanBanDaChot = '';
+                                    _neoChenMic = 0;
+                                    _tuDaChot = [];
+                                    _partialTruocDo = [];
+                                    _rawTruocDoTrongPhien = '';
+                                    _soLanPartial = 0;
+                                    _soLanFinal = 0;
+                                  });
+                                  _ghiLog('Xoá để thử lại.');
+                                },
+                                child: const Text('Xoá để thử lại'),
                               ),
-                            ),
-                            alignment: Alignment.center,
-                            child: Icon(
-                              _muonNghe ? Icons.mic : Icons.mic_none,
-                              color: _muonNghe
-                                  ? Colors.white
-                                  : Colors.blue.shade900,
-                              size: 22,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Nút bật/tắt chế độ ngăn bàn phím ảo — đặt ngay cạnh
-                      // nút micro cho dễ bấm (theo đúng yêu cầu).
-                      Tooltip(
-                        message: _chanBanPhimAo
-                            ? 'Tắt chế độ ngăn bàn phím ảo'
-                            : 'Bật chế độ ngăn bàn phím ảo (chạm để di '
-                                'chuyển con trỏ, không bị bàn phím ảo che '
-                                'khung nhập)',
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: _bamNutChanBanPhimAo,
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: _chanBanPhimAo
-                                  ? Colors.deepPurple
-                                  : Colors.deepPurple.shade50,
-                              border: Border.all(
-                                color: Colors.deepPurple.shade400,
-                                width: 2,
+                              // Nút nhật ký — nhỏ, mở modal riêng thay vì
+                              // chiếm chỗ ngay trên trang như trước.
+                              Tooltip(
+                                message: 'Xem nhật ký',
+                                child: IconButton(
+                                  onPressed: _moModalNhatKy,
+                                  icon: const Icon(Icons.receipt_long),
+                                ),
                               ),
-                            ),
-                            alignment: Alignment.center,
-                            child: Icon(
-                              _chanBanPhimAo
-                                  ? Icons.keyboard_hide
-                                  : Icons.keyboard_alt_outlined,
-                              color: _chanBanPhimAo
-                                  ? Colors.white
-                                  : Colors.deepPurple.shade400,
-                              size: 22,
-                            ),
+                              // "+ Thêm lựa chọn" — gộp các nút phụ ít bấm
+                              // (ngăn bàn phím ảo) đúng như vị trí của nó
+                              // trong menu cùng tên bên app Android.
+                              Tooltip(
+                                message: '+ Thêm lựa chọn',
+                                child: PopupMenuButton<void>(
+                                  icon: const Icon(Icons.add_circle_outline),
+                                  itemBuilder: (context) => [
+                                    PopupMenuItem<void>(
+                                      onTap: _bamNutChanBanPhimAo,
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            _chanBanPhimAo
+                                                ? Icons.check_box
+                                                : Icons
+                                                    .check_box_outline_blank,
+                                            color: Colors.deepPurple,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          const Text('Ngăn bàn phím ảo'),
+                                        ],
+                                      ),
+                                    ),
+                                    const PopupMenuDivider(),
+                                    PopupMenuItem<void>(
+                                      onTap: _moCaiDat,
+                                      child: const Row(
+                                        children: [
+                                          Icon(Icons.settings),
+                                          SizedBox(width: 8),
+                                          Text('Cài đặt'),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -2530,9 +2569,10 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                       // `_bamNutMicro`), nên ẨN nút riêng này đi để khỏi có
                       // hai nút làm cùng một việc. Trên Android/PC (nơi
                       // micro chính vẫn dùng Web Speech API) vẫn giữ nút
-                      // này làm lựa chọn phụ.
+                      // này làm lựa chọn phụ — đây chính là chức năng ghi âm
+                      // của WEB sẽ thay thế nút ghi-âm-rồi-ra-chữ của app
+                      // Android khi hai bên hợp nhất.
                       if (_thietBi != ThietBi.iphone) ...[
-                        const SizedBox(width: 8),
                         Tooltip(
                           message: _dangGhiAm ? 'Dừng ghi âm' : 'Ghi âm thử',
                           child: InkWell(
@@ -2564,7 +2604,43 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                             ),
                           ),
                         ),
+                        const SizedBox(width: 8),
                       ],
+                      // Nút micro — NGOÀI CÙNG bên phải, đúng vị trí
+                      // `_NutMicroTron` trong `ThanhCongCu` của app Android.
+                      // Có phím tắt Ctrl+G (xem `CallbackShortcuts` bao
+                      // ngoài).
+                      Tooltip(
+                        message: 'Bật/tắt micro (Ctrl+G)',
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: (_sanSang && !_dangGhiAm)
+                              ? _bamNutMicro
+                              : null,
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _muonNghe
+                                  ? Colors.red
+                                  : Colors.lightGreen.shade200,
+                              border: Border.all(
+                                color: Colors.blue.shade900,
+                                width: 2,
+                              ),
+                            ),
+                            alignment: Alignment.center,
+                            child: Icon(
+                              _muonNghe ? Icons.mic : Icons.mic_none,
+                              color: _muonNghe
+                                  ? Colors.white
+                                  : Colors.blue.shade900,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                      ),
                       // Nút "Nghe lại" và "Tải xuống" đã bỏ — cơ chế ghi âm
                       // đã kiểm chứng hoạt động đúng (không cần công cụ
                       // kiểm tra nhanh này nữa), thẻ đã được nghe qua Gemini
@@ -2591,55 +2667,6 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Thiết bị đang chọn — cố tình KHÔNG đặt trong AppBar
-                  // (chữ trắng từng bị chìm mất trên nền AppBar gần trắng
-                  // của Material 3). Khung nền riêng để luôn nổi bật.
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue.shade200),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const Text(
-                          'Thiết bị đang chọn:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 6),
-                        SegmentedButton<ThietBi>(
-                          segments: const [
-                            ButtonSegment(
-                              value: ThietBi.android,
-                              icon: Icon(Icons.android),
-                              label: Text('Android'),
-                            ),
-                            ButtonSegment(
-                              value: ThietBi.pc,
-                              icon: Icon(Icons.laptop_mac),
-                              label: Text('PC/Mac'),
-                            ),
-                            ButtonSegment(
-                              value: ThietBi.iphone,
-                              icon: Icon(Icons.phone_iphone),
-                              label: Text('iPhone'),
-                            ),
-                          ],
-                          selected: {_thietBi},
-                          onSelectionChanged: (chon) =>
-                              _doiCheDoThietBi(chon.first),
-                          style: SegmentedButton.styleFrom(
-                            selectedBackgroundColor: Colors.blue.shade700,
-                            selectedForegroundColor: Colors.white,
-                          ),
-                        ),
-                      ],
                     ),
                   ),
                   ], // đóng `if (!banPhimDangMo) ...[`
