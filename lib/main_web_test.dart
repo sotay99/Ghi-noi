@@ -41,7 +41,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 // Hosting, để người test biết chắc trình duyệt đã tải đúng bản mới nhất
 // hay đang dùng bản cache cũ (Chrome hay giữ cache service worker của
 // Flutter Web dù đã bấm tải lại thường).
-const _phienBanThuNghiem = 'v12';
+const _phienBanThuNghiem = 'v13';
 
 // (Chỉ import đúng MỘT file `speech_to_text/speech_to_text.dart` — y hệt
 // cách `trang_soan_thao.dart` đang dùng đã chứng minh hoạt động — thay vì
@@ -176,6 +176,23 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
   int _phienHienTai = 0;
 
   Timer? _henBatLai;
+
+  // ---- Ghi âm thô + nghe lại — TÁCH BIỆT HOÀN TOÀN khỏi Web Speech API ở
+  // trên. Dùng MediaRecorder chuẩn của trình duyệt (ghi ra file âm thanh,
+  // không nhận dạng chữ gì cả) — vì trên iPhone (Safari/Chrome đều chung
+  // WebKit) Web Speech API không hoạt động được kể cả khi bấm tay từng lần
+  // (xem log thực tế: "onError: aborted" ngay lập tức bất kể tự động hay
+  // bấm tay). Mục đích: kiểm chứng máy CÓ ghi được âm thanh hay không, để
+  // sau này nếu ổn thì gửi file ghi được cho một AI khác (vd Gemini) nghe
+  // và chuyển thành chữ — đường vòng khi trình duyệt tự nhận dạng không ăn
+  // thua trên iOS.
+  html.MediaStream? _luongGhiAm;
+  html.MediaRecorder? _boGhiAm;
+  List<html.Blob> _cacDoanGhiAm = [];
+  bool _dangGhiAm = false;
+  String? _urlAmThanhDaGhi;
+  html.AudioElement? _phatLaiAmThanh;
+  bool _dangPhatLai = false;
 
   // Đếm số lần lỗi liên tiếp KHÔNG kèm bất kỳ chữ nào (không có partial nào
   // trước khi lỗi) — dấu hiệu bộ nhận dạng bị chặn ngay từ đầu chứ không
@@ -358,6 +375,82 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
         _loi = '';
       });
       _batNghe();
+    }
+  }
+
+  // ------------------------------------------------ ghi âm thô + nghe lại
+
+  Future<void> _bamNutGhiAm() async {
+    if (_dangGhiAm) {
+      _boGhiAm?.stop();
+      return;
+    }
+    final thietBiMedia = html.window.navigator.mediaDevices;
+    if (thietBiMedia == null) {
+      _ghiLog('Trình duyệt không hỗ trợ getUserMedia (ghi âm).');
+      setState(() => _loi = 'Trình duyệt này không hỗ trợ ghi âm.');
+      return;
+    }
+    try {
+      final luong = await thietBiMedia.getUserMedia({'audio': true});
+      _luongGhiAm = luong;
+      _cacDoanGhiAm = [];
+      final boGhi = html.MediaRecorder(luong);
+      _boGhiAm = boGhi;
+      boGhi.addEventListener('dataavailable', (suKien) {
+        final doan = (suKien as html.BlobEvent).data;
+        if (doan != null && doan.size > 0) _cacDoanGhiAm.add(doan);
+      });
+      boGhi.addEventListener('stop', (_) => _hoanTatGhiAm());
+      boGhi.start();
+      setState(() {
+        _dangGhiAm = true;
+        _loi = '';
+      });
+      _ghiLog('Bắt đầu ghi âm thử (không qua Web Speech API).');
+    } catch (e) {
+      _ghiLog('Lỗi khi xin quyền/ghi âm: $e');
+      if (mounted) setState(() => _loi = 'Không ghi âm được: $e');
+    }
+  }
+
+  void _hoanTatGhiAm() {
+    final blob = html.Blob(_cacDoanGhiAm, 'audio/webm');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    if (_urlAmThanhDaGhi != null) {
+      html.Url.revokeObjectUrl(_urlAmThanhDaGhi!);
+    }
+    for (final track in _luongGhiAm?.getTracks() ?? const []) {
+      track.stop();
+    }
+    _phatLaiAmThanh?.pause();
+    final audio = html.AudioElement()..src = url;
+    audio.onEnded.listen((_) {
+      if (mounted) setState(() => _dangPhatLai = false);
+    });
+    _phatLaiAmThanh = audio;
+    if (mounted) {
+      setState(() {
+        _urlAmThanhDaGhi = url;
+        _dangGhiAm = false;
+        _dangPhatLai = false;
+      });
+    }
+    _ghiLog('Ghi âm xong (${_cacDoanGhiAm.length} đoạn dữ liệu) — bấm '
+        '"Nghe lại" để kiểm tra.');
+  }
+
+  void _bamNutNgheLai() {
+    final audio = _phatLaiAmThanh;
+    if (audio == null) return;
+    if (_dangPhatLai) {
+      audio.pause();
+      setState(() => _dangPhatLai = false);
+    } else {
+      audio.currentTime = 0;
+      audio.play();
+      setState(() => _dangPhatLai = true);
+      _ghiLog('Phát lại bản ghi âm.');
     }
   }
 
@@ -789,6 +882,13 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
     _micro.cancel();
     _cuonNhatKy.dispose();
     _boDieuKhienVanBan.dispose();
+    for (final track in _luongGhiAm?.getTracks() ?? const []) {
+      track.stop();
+    }
+    _phatLaiAmThanh?.pause();
+    if (_urlAmThanhDaGhi != null) {
+      html.Url.revokeObjectUrl(_urlAmThanhDaGhi!);
+    }
     super.dispose();
   }
 
@@ -955,8 +1055,99 @@ class _TrangThuMicroState extends State<TrangThuMicro> {
                           ),
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      // Nút "Ghi âm" — dùng MediaRecorder chuẩn của trình
+                      // duyệt, KHÔNG qua Web Speech API. Thử nghiệm riêng
+                      // cho hướng "ghi âm rồi gửi AI khác nghe" khi Web
+                      // Speech API không dùng được (vd trên iPhone).
+                      Tooltip(
+                        message: _dangGhiAm ? 'Dừng ghi âm' : 'Ghi âm thử',
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: _bamNutGhiAm,
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _dangGhiAm
+                                  ? Colors.red
+                                  : Colors.orange.shade100,
+                              border: Border.all(
+                                color: Colors.orange.shade900,
+                                width: 2,
+                              ),
+                            ),
+                            alignment: Alignment.center,
+                            child: Icon(
+                              _dangGhiAm
+                                  ? Icons.stop
+                                  : Icons.fiber_manual_record,
+                              color: _dangGhiAm
+                                  ? Colors.white
+                                  : Colors.orange.shade900,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Nút "Nghe lại" — chỉ bấm được sau khi đã ghi âm
+                      // xong ít nhất một lần.
+                      Tooltip(
+                        message: _urlAmThanhDaGhi == null
+                            ? 'Chưa có bản ghi nào'
+                            : (_dangPhatLai ? 'Dừng phát' : 'Nghe lại'),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: _urlAmThanhDaGhi == null
+                              ? null
+                              : _bamNutNgheLai,
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _urlAmThanhDaGhi == null
+                                  ? Colors.grey.shade200
+                                  : Colors.purple.shade100,
+                              border: Border.all(
+                                color: _urlAmThanhDaGhi == null
+                                    ? Colors.grey.shade400
+                                    : Colors.purple.shade900,
+                                width: 2,
+                              ),
+                            ),
+                            alignment: Alignment.center,
+                            child: Icon(
+                              _dangPhatLai
+                                  ? Icons.pause
+                                  : Icons.play_arrow,
+                              color: _urlAmThanhDaGhi == null
+                                  ? Colors.grey.shade500
+                                  : Colors.purple.shade900,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
+                  if (_dangGhiAm || _urlAmThanhDaGhi != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Center(
+                        child: Text(
+                          _dangGhiAm
+                              ? 'Đang ghi âm… bấm lại để dừng.'
+                              : 'Đã có bản ghi âm — bấm nút tím để nghe lại.',
+                          style: TextStyle(
+                            color: _dangGhiAm ? Colors.red : Colors.grey[700],
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 16),
 
                   // Tên trang.
