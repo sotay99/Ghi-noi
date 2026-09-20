@@ -35,9 +35,18 @@ Future<void> ghiAmTheBatDauThe() async {
   if (luong == null) return;
   // Safari/WebKit KHÔNG hỗ trợ 'audio/webm' (mặc định của Chrome) — dò định
   // dạng trình duyệt THỰC SỰ hỗ trợ trước khi ghi, không ép cứng một loại.
+  //
+  // 'audio/webm' đứng ĐẦU, KHÔNG PHẢI 'audio/mp4' — dù Safari cần mp4, để
+  // mp4 lên đầu lại làm hỏng ghi âm trên CHROME: nhiều bản Chrome
+  // `isTypeSupported('audio/mp4')` trả về true (có hỗ trợ codec) nhưng
+  // MediaRecorder ghi ra file mp4 RỖNG hoặc hỏng thật sự (lỗi đã biết của
+  // Chromium, không phải lỗi ở đây) — ghi âm trông vẫn chạy bình thường
+  // (đồng hồ chạy, không báo lỗi gì) nhưng lúc hoàn thành luôn ra 0 byte.
+  // Safari không khai hỗ trợ 'audio/webm' (`isTypeSupported` trả về false)
+  // nên vẫn tự rơi xuống đúng 'audio/mp4' như cũ, không mất gì.
   const cacDinhDangUuTien = [
-    'audio/mp4',
     'audio/webm',
+    'audio/mp4',
     'audio/ogg',
     'audio/wav',
   ];
@@ -62,7 +71,11 @@ Future<void> ghiAmTheBatDauThe() async {
     final mime = (loaiThuc == null || loaiThuc.isEmpty) ? 'audio/mp4' : loaiThuc;
     final blob = html.Blob(_doanHienTai, mime);
     final bytes = await _doiBlobSangBytes(blob);
-    _dangChoKetThuc?.complete((bytes, mime));
+    // Lưới an toàn cho ĐÚNG lỗi vừa nêu ở trên (định dạng "có hỗ trợ" theo
+    // isTypeSupported nhưng ghi ra rỗng thật) — dù đã đổi thứ tự ưu tiên để
+    // tránh gặp lại, vẫn coi 0 byte là ghi âm thất bại thay vì gửi lên một
+    // file rỗng coi như bình thường.
+    _dangChoKetThuc?.complete(bytes.isEmpty ? null : (bytes, mime));
     _dangChoKetThuc = null;
   });
   boGhi.start();
