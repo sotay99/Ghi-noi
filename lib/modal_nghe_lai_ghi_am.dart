@@ -4,9 +4,13 @@ import 'dart:typed_data';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
+import 'nguon_am_thanh_the_ghi_am.dart';
+
 /// Modal "Nghe bản ghi âm này" — phát lại trực tiếp từ bytes đang giữ trong
-/// bộ nhớ (`_duLieuTheoTheGhiAm`), không ghi ra file tạm, dùng chung được cho
-/// cả web và Android/iOS qua `BytesSource`.
+/// bộ nhớ (`_duLieuTheoTheGhiAm`), không ghi ra file tạm. Nguồn phát tạo qua
+/// `taoNguonPhatGhiAm` — TRÊN WEB là một Blob URL thật (không phải
+/// `BytesSource`/`setSourceBytes`, vốn từng làm trình duyệt từ chối phát với
+/// lỗi "content type (Code: 4)" — xem giải thích ở `nguon_am_thanh_the_ghi_am.dart`).
 Future<void> hienModalNgheLaiGhiAm(
   BuildContext context, {
   required Uint8List bytes,
@@ -40,10 +44,12 @@ class _ModalNgheLaiGhiAmState extends State<_ModalNgheLaiGhiAm> {
   StreamSubscription<Duration>? _dsThoiLuong;
   StreamSubscription<PlayerState>? _dsTrangThai;
   StreamSubscription<void>? _dsXongHet;
+  late final NguonPhatGhiAm _nguonPhat;
 
   @override
   void initState() {
     super.initState();
+    _nguonPhat = taoNguonPhatGhiAm(widget.bytes, widget.mime);
     _dsViTri = _player.onPositionChanged.listen((vt) {
       if (!mounted) return;
       setState(() => _viTri = vt);
@@ -63,7 +69,7 @@ class _ModalNgheLaiGhiAmState extends State<_ModalNgheLaiGhiAm> {
         _viTri = Duration.zero;
       });
     });
-    _player.setSourceBytes(widget.bytes, mimeType: widget.mime);
+    _player.setSource(_nguonPhat.nguon);
   }
 
   @override
@@ -73,12 +79,24 @@ class _ModalNgheLaiGhiAmState extends State<_ModalNgheLaiGhiAm> {
     _dsTrangThai?.cancel();
     _dsXongHet?.cancel();
     _player.dispose();
+    giaiPhongNguonPhatGhiAm(_nguonPhat);
     super.dispose();
   }
+
+  bool _daBatDauPhat = false;
 
   Future<void> _bamPlayTamDung() async {
     if (_dangPhat) {
       await _player.pause();
+      return;
+    }
+    // Lần bấm Play ĐẦU TIÊN: dùng `play(nguon)` để chắc chắn khởi động
+    // ngay từ nguồn đã dựng (`_nguonPhat.nguon`), không dựa vào `resume()`
+    // — ở trạng thái vừa `setSource` xong (chưa từng phát), `resume()` có
+    // lúc không khởi động được vì bộ máy chưa coi là "đang tạm dừng".
+    if (!_daBatDauPhat) {
+      _daBatDauPhat = true;
+      await _player.play(_nguonPhat.nguon);
     } else {
       await _player.resume();
     }
