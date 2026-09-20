@@ -23,7 +23,9 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamCaiDatKiemTraToanVan,
     required this.khiBamBanPhim,
     required this.khiBamKiemTraToanVan,
-    required this.khiBamGhiAmAI,
+    required this.dangGhiAmThe,
+    required this.khiBamGhiAmThe,
+    this.gopMicVaGhiAmThanhMotNut = false,
     required this.hienChuThich,
     required this.khiBamChuThich,
     required this.khiBamChepTatCa,
@@ -60,7 +62,19 @@ class ThanhCongCu extends StatelessWidget {
   final VoidCallback khiBamCaiDatKiemTraToanVan;
   final VoidCallback khiBamBanPhim;
   final VoidCallback khiBamKiemTraToanVan;
-  final VoidCallback khiBamGhiAmAI;
+
+  /// Trình ghi âm (thẻ ghi âm) đang mở hay không — đổi icon/màu nút Ghi âm
+  /// (ô vuông đỏ = dừng) và, ở thiết bị gộp-một-nút (`gopMicVaGhiAmThanhMotNut`),
+  /// cả nút micro/ghi âm chung.
+  final bool dangGhiAmThe;
+  final VoidCallback khiBamGhiAmThe;
+
+  /// CHỈ true trên web + iPhone (xem nơi gọi ở `trang_soan_thao.dart`) —
+  /// iPhone không dùng live-dictation qua Web Speech API được (WebKit
+  /// không hỗ trợ), nên gộp nút micro và nút Ghi âm thành MỘT nút duy
+  /// nhất, luôn đi thẳng vào luồng ghi-âm-tạo-thẻ. Android/iOS gốc và các
+  /// bản thiết bị web khác giữ hai nút riêng như cũ.
+  final bool gopMicVaGhiAmThanhMotNut;
 
   /// Ba mục đầu của menu "+ Thêm lựa chọn" — trước đây là ba nút riêng
   /// (Sao chép tất cả/Xoá tất cả trên thanh công cụ trên, cộng thêm mục gộp
@@ -215,16 +229,30 @@ class ThanhCongCu extends StatelessWidget {
                     ),
                   ),
 
-                  _NutCoChuThich(
-                    hien: hienChuThich,
-                    chu: 'Ghi âm xong rồi mới ra chữ',
-                    child: _nut(rong, Icons.settings_voice,
-                        'Ghi âm xong mới ra chữ', 'Ghi âm', khiBamGhiAmAI),
-                  ),
+                  // Nút Ghi âm riêng chỉ tồn tại khi KHÔNG gộp chung với
+                  // micro (iPhone gộp cả hai thành một nút duy nhất bên
+                  // phải, xem dưới).
+                  if (!gopMicVaGhiAmThanhMotNut)
+                    _NutCoChuThich(
+                      hien: hienChuThich,
+                      chu: dangGhiAmThe
+                          ? 'Đang ghi âm — bấm để dừng'
+                          : 'Ghi âm (tạo thẻ ghi âm)',
+                      child: _nut(
+                        rong,
+                        dangGhiAmThe ? Icons.stop : Icons.fiber_manual_record,
+                        dangGhiAmThe ? 'Dừng' : 'Ghi âm',
+                        dangGhiAmThe ? 'Dừng ghi âm' : 'Ghi âm',
+                        khiBamGhiAmThe,
+                        mau: dangGhiAmThe
+                            ? Colors.red.shade600
+                            : const Color(0xFF5F6368),
+                      ),
+                    ),
 
-                  // Bên phải: sóng âm, rồi micro sát mép phải. Micro luôn
-                  // giữ nguyên giao diện tròn quen thuộc, kể cả ở màn hình
-                  // rộng — và không nằm trong dải nền hồng phía trên.
+                  // Bên phải: sóng âm, rồi micro (hoặc nút gộp) sát mép
+                  // phải. Luôn giữ giao diện tròn quen thuộc, kể cả ở màn
+                  // hình rộng — và không nằm trong dải nền hồng phía trên.
                   _NutCoChuThich(
                     hien: hienChuThich && !bat,
                     chu: 'Hiện chú thích',
@@ -237,21 +265,76 @@ class ThanhCongCu extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  _NutCoChuThich(
-                    hien: hienChuThich,
-                    chu: 'Micro Vừa nói vừa ra chữ',
-                    child: _NutMicroTron(
-                      bat: bat,
-                      sanSang: sanSang,
-                      mau: mau,
-                      nhanPhimTat: nhanPhimTat,
-                      khiBam: sanSang ? khiBamMicro : null,
+                  if (gopMicVaGhiAmThanhMotNut)
+                    _NutCoChuThich(
+                      hien: hienChuThich,
+                      chu: 'Ghi âm (micro không dùng được trên iPhone)',
+                      child: _NutMicroHoacGhiAmGop(
+                        dangGhiAm: dangGhiAmThe,
+                        khiBam: khiBamGhiAmThe,
+                      ),
+                    )
+                  else
+                    _NutCoChuThich(
+                      hien: hienChuThich,
+                      chu: 'Micro Vừa nói vừa ra chữ',
+                      child: _NutMicroTron(
+                        bat: bat,
+                        sanSang: sanSang,
+                        mau: mau,
+                        nhanPhimTat: nhanPhimTat,
+                        khiBam: sanSang ? khiBamMicro : null,
+                      ),
                     ),
-                  ),
                 ],
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+/// Nút GỘP micro + ghi âm cho iPhone — icon của nút Ghi âm, nhưng khung
+/// tròn/màu nền/viền y hệt phong cách nút micro (`_NutMicroTron`): nền xanh
+/// nhạt + viền xanh dương đậm lúc chưa ghi, đỏ (không viền) lúc đang ghi.
+class _NutMicroHoacGhiAmGop extends StatelessWidget {
+  const _NutMicroHoacGhiAmGop({required this.dangGhiAm, required this.khiBam});
+
+  final bool dangGhiAm;
+  final VoidCallback khiBam;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: dangGhiAm ? 'Dừng ghi âm' : 'Ghi âm',
+      child: Tooltip(
+        message: dangGhiAm ? 'Dừng ghi âm' : 'Ghi âm (tạo thẻ ghi âm)',
+        child: Material(
+          color: dangGhiAm ? Colors.red.shade600 : Colors.blue.shade50,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: khiBam,
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: dangGhiAm
+                  ? null
+                  : BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.blue.shade900, width: 2.5),
+                    ),
+              alignment: Alignment.center,
+              child: Icon(
+                dangGhiAm ? Icons.stop : Icons.fiber_manual_record,
+                color: dangGhiAm ? Colors.white : Colors.blue.shade900,
+                size: 20,
+              ),
+            ),
+          ),
         ),
       ),
     );

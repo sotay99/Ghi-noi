@@ -5,6 +5,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -16,7 +17,8 @@ import 'package:speech_to_text/speech_to_text.dart';
 
 import 'cai_dat.dart';
 import 'doan_thiet_bi.dart';
-import 'ghi_am_ai.dart';
+import 'ghi_am_the.dart';
+import 'gui_ghi_am_gemini.dart';
 import 'kho_du_lieu.dart';
 import 'kiem_tra_chinh_ta.dart';
 import 'kiem_tra_toan_van.dart';
@@ -641,6 +643,7 @@ class _BoDieuKhienChinhTa extends TextEditingController {
   void Function(LoiChinhTa loi, Offset viTriManHinh)? khiBamTuSai;
   void Function(_VungKhongPhuHop vung, Offset viTriManHinh)? khiBamDoanKhongPhuHop;
   void Function(_VungCanXoa vung, Offset viTriManHinh)? khiBamDoanCanXoa;
+  void Function(int soThe, Offset viTriManHinh)? khiBamTheGhiAmHoanChinh;
 
   /// `notifyListeners()` được đánh dấu @protected trong ChangeNotifier — bọc
   /// lại một hàm công khai để trang soạn thảo gọi vẽ lại sau khi tự tay sửa
@@ -679,17 +682,28 @@ class _BoDieuKhienChinhTa extends TextEditingController {
     // bất kỳ vùng nào khác trong `vung` NHỜ được chặn ngay từ nguồn
     // (`_giaoVoiVungAi` từ chối mọi định dạng thủ công/AI đụng vào thẻ),
     // nên thêm vào đây không cần lo tranh chấp thứ tự.
-    for (final (tb, tk) in timCacVungTheGhiAm(vb)) {
-      final laDangGhi =
-          tk - tb == tenTokenDangGhiAm.length && vb.substring(tb, tk) == tenTokenDangGhiAm;
+    for (final m in reTheGhiAmHoanChinh.allMatches(vb)) {
+      final soThe = int.parse(m.group(1)!);
       vung.add(_VungVe(
-        batDau: tb,
-        ketThuc: tk,
-        style: TextStyle(
-          color: laDangGhi ? Colors.red.shade700 : Colors.green.shade700,
-          fontWeight: FontWeight.bold,
-        ),
+        batDau: m.start,
+        ketThuc: m.end,
+        style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold),
+        recognizer: TapGestureRecognizer()
+          ..onTapDown = (ct) => khiBamTheGhiAmHoanChinh?.call(soThe, ct.globalPosition),
       ));
+    }
+    {
+      var timTu = 0;
+      while (true) {
+        final i = vb.indexOf(tenTokenDangGhiAm, timTu);
+        if (i < 0) break;
+        vung.add(_VungVe(
+          batDau: i,
+          ketThuc: i + tenTokenDangGhiAm.length,
+          style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold),
+        ));
+        timTu = i + tenTokenDangGhiAm.length;
+      }
     }
 
     for (final l in loi) {
@@ -2548,6 +2562,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _boDieuKhien.khiBamTuSai = _khiBamTuSai;
     _boDieuKhien.khiBamDoanKhongPhuHop = _khiBamDoanKhongPhuHop;
     _boDieuKhien.khiBamDoanCanXoa = _khiBamDoanCanXoa;
+    _boDieuKhien.khiBamTheGhiAmHoanChinh = _khiBamTheGhiAmHoanChinh;
     _oTimKiem.addListener(_capNhatKetQuaTimKiem);
     _oTimKiem.addListener(_khiOTimKiemDoi);
     _oThayThe.addListener(_khiOThayTheDoi);
@@ -3130,11 +3145,425 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// không dùng được trên WebKit/iOS — xem thảo luận trước) — chặn cả bấm
   /// nút lẫn phím tắt, không chỉ ẩn giao diện. Luôn `true` trên Android/iOS
   /// gốc (không đọc `_thietBiHienTai` ở đó).
+  // ------------------------------------------------------------- thẻ ghi âm
+
+  /// Trình ghi âm đang mở (4 nút nhỏ hiện, thanh công cụ trên ẩn) — dùng
+  /// chung một cờ cho cả việc hiện overlay VÀ việc có một thẻ đang ghi hay
+  /// không, vì theo thiết kế đã chốt, mở trình ghi âm là lập tức ghi luôn.
+  bool _trinhGhiAmMo = false;
+  int _soThuTuTheGhiAmTiepTheo = 1;
+  int? _soTheGhiAmDangGhi;
+
+  /// Vị trí ký tự của token "đang ghi âm" hiện tại trong văn bản — được
+  /// `_dieuChinhLoiChinhTaSauKhiSua` tự dời theo mỗi khi có sửa đổi ở TRƯỚC
+  /// nó (gõ tay ở chỗ khác trong lúc vẫn đang ghi thẻ này), y hệt cách các
+  /// vị trí/vùng khác trong file này được theo dõi. `null` = không có thẻ
+  /// nào đang ghi dở.
+  int? _viTriTokenDangGhiThe;
+  Duration _thoiLuongTheGhiAmDangGhi = Duration.zero;
+  Timer? _bomDongHoTheGhiAm;
+  final Map<int, Duration> _thoiLuongTheoTheGhiAm = {};
+  final Map<int, (Uint8List, String)> _duLieuTheoTheGhiAm = {};
+  final Set<int> _theGhiAmDangGui = {};
+  bool _tuDongGuiNgamTheGhiAm = true;
+  bool _daCanhBaoGioiHanTheGhiAm = false;
+  bool _hopThoaiCanhBaoTheGhiAmDangMo = false;
+
+  static const _nguongTuDongGuiTheGhiAm = Duration(seconds: 20);
+  static const _gioiHanMoiTheGhiAm = Duration(minutes: 5);
+  static const _canhBaoGioiHanTheGhiAm = Duration(minutes: 4, seconds: 30);
+
+  /// Ghi âm và micro-vừa-nói-vừa-ra-chữ không được cùng chạy — cả hai đều
+  /// cần độc chiếm microphone của máy. Áp dụng cho MỌI nền tảng (kể cả
+  /// Android/iOS gốc), không riêng web.
+  bool get _ghiAmTheDangKhoaMicro => _trinhGhiAmMo;
+
+  String _nhanTheGhiAmHoanChinh(int soThe) =>
+      nhanTheHoanChinh(soThe, _thoiLuongTheoTheGhiAm[soThe] ?? Duration.zero);
+
+  Future<void> _bamNutGhiAmThe() async {
+    if (_trinhGhiAmMo) {
+      await _dongTrinhGhiAmThe();
+      return;
+    }
+    if (_muonNghe) await _tatMicro();
+    if (!mounted) return;
+    final ok = await ghiAmTheKhoiTao();
+    if (!mounted) return;
+    if (!ok) {
+      _bao('Không xin được quyền micro để ghi âm.');
+      return;
+    }
+    setState(() => _trinhGhiAmMo = true);
+    await _batDauMotTheGhiAmMoi();
+  }
+
+  Future<void> _batDauMotTheGhiAmMoi() async {
+    await ghiAmTheBatDauThe();
+    if (!mounted) return;
+    final soThe = _soThuTuTheGhiAmTiepTheo++;
+    _soTheGhiAmDangGhi = soThe;
+    _thoiLuongTheGhiAmDangGhi = Duration.zero;
+    _daCanhBaoGioiHanTheGhiAm = false;
+    _chenTokenDangGhiTheVaoVanBan();
+    _bomDongHoTheGhiAm?.cancel();
+    _bomDongHoTheGhiAm = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() => _thoiLuongTheGhiAmDangGhi += const Duration(seconds: 1));
+      if (_thoiLuongTheGhiAmDangGhi >= _gioiHanMoiTheGhiAm) {
+        _dongHopThoaiCanhBaoTheGhiAmNeuMo();
+        _chotTheGhiAmVaBatDauTheMoiDoQuaGioiHan();
+      } else if (_thoiLuongTheGhiAmDangGhi >= _canhBaoGioiHanTheGhiAm) {
+        _hienCanhBaoGioiHanTheGhiAmNeuChua();
+      }
+    });
+  }
+
+  void _chenTokenDangGhiTheVaoVanBan() {
+    final vb = _boDieuKhien.text;
+    var viTri = _boDieuKhien.selection.baseOffset;
+    if (viTri < 0 || viTri > vb.length) viTri = vb.length;
+    var chen = tenTokenDangGhiAm;
+    var lechDauChen = 0;
+    if (viTri > 0 && !_laKhoangTrang(vb[viTri - 1])) {
+      chen = ' $chen';
+      lechDauChen = 1;
+    }
+    if (viTri < vb.length && !_laKhoangTrang(vb[viTri])) chen = '$chen ';
+
+    _dieuChinhVungToanVanSauKhiSua(viTri, 0, chen.length);
+    _dieuChinhLoiChinhTaSauKhiSua(viTri, 0, chen.length);
+    final moi = vb.replaceRange(viTri, viTri, chen);
+    _gioiHanTreMuSauKhiChen(viTri, chen.length, moi);
+    _viTriTokenDangGhiThe = viTri + lechDauChen;
+    final viTriConTro = viTri + chen.length;
+    _neo = viTriConTro;
+    _ghiVaoO(moi, viTriConTro);
+  }
+
+  /// Dừng ghi thẻ HIỆN TẠI (đáy nền tảng), thay token "đang ghi" bằng nhãn
+  /// hoàn chỉnh tại đúng vị trí đã theo dõi. Trả về số thẻ vừa chốt, hoặc
+  /// null nếu không có thẻ nào đang ghi hoặc token đã bị xoá giữa chừng
+  /// (ví dụ người dùng chọn hết bài rồi xoá) — trường hợp đó âm thầm bỏ dữ
+  /// liệu ghi âm vừa thu được, không có chỗ nào để chèn nhãn vào nữa.
+  Future<int?> _chotTheGhiAmHienTaiThanhHoanChinh() async {
+    final soThe = _soTheGhiAmDangGhi;
+    final viTriToken = _viTriTokenDangGhiThe;
+    _bomDongHoTheGhiAm?.cancel();
+    _bomDongHoTheGhiAm = null;
+    if (soThe == null) return null;
+    _thoiLuongTheoTheGhiAm[soThe] = _thoiLuongTheGhiAmDangGhi;
+    final ketQua = await ghiAmTheKetThucThe();
+    _soTheGhiAmDangGhi = null;
+    _viTriTokenDangGhiThe = null;
+    if (!mounted) return soThe;
+    if (ketQua != null) _duLieuTheoTheGhiAm[soThe] = ketQua;
+
+    if (viTriToken == null) {
+      _ghiLog2(
+          'Thẻ ghi âm #$soThe: token đã bị xoá giữa chừng — bỏ dữ liệu ghi âm vừa thu.');
+      return soThe;
+    }
+    final vb = _boDieuKhien.text;
+    final ketThucToken = viTriToken + tenTokenDangGhiAm.length;
+    if (ketThucToken > vb.length ||
+        vb.substring(viTriToken, ketThucToken) != tenTokenDangGhiAm) {
+      // Lưới an toàn — về lý thuyết không xảy ra vì ChanSuaGiuaThe chặn mọi
+      // sửa một-phần, và trường hợp xoá TRỌN token đã được `_dieuChinhLoiChinhTaSauKhiSua`
+      // phát hiện và null hoá `_viTriTokenDangGhiThe` ở trên rồi.
+      return soThe;
+    }
+    final nhan = _nhanTheGhiAmHoanChinh(soThe);
+    _dieuChinhVungToanVanSauKhiSua(viTriToken, tenTokenDangGhiAm.length, nhan.length);
+    _dieuChinhLoiChinhTaSauKhiSua(viTriToken, tenTokenDangGhiAm.length, nhan.length);
+    final moi = vb.replaceRange(viTriToken, ketThucToken, nhan);
+    final viTriConTro = viTriToken + nhan.length;
+    _neo = viTriConTro;
+    _ghiVaoO(moi, viTriConTro);
+    _henLuu();
+    _kiemTraVaGuiNgamTheGhiAmNeuDu();
+    return soThe;
+  }
+
+  void _chotTheGhiAmVaBatDauTheMoiDoQuaGioiHan() {
+    if (_soTheGhiAmDangGhi == null) return;
+    _chotTheGhiAmHienTaiThanhHoanChinh().then((_) {
+      if (mounted && _trinhGhiAmMo) _batDauMotTheGhiAmMoi();
+    });
+  }
+
+  void _dongHopThoaiCanhBaoTheGhiAmNeuMo() {
+    if (_hopThoaiCanhBaoTheGhiAmDangMo && mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  void _hienCanhBaoGioiHanTheGhiAmNeuChua() {
+    if (_daCanhBaoGioiHanTheGhiAm || !mounted) return;
+    _daCanhBaoGioiHanTheGhiAm = true;
+    _hopThoaiCanhBaoTheGhiAmDangMo = true;
+    final soThe = _soTheGhiAmDangGhi;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Sắp chạm giới hạn 5 phút'),
+        content: Text('Thẻ ghi âm #$soThe sắp ghi đủ 5 phút. Nếu không chọn, '
+            'tới đúng phút thứ 5 nó sẽ tự động chốt và ghi tiếp bằng một '
+            'thẻ mới. Bạn muốn làm gì bây giờ?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _chotTheGhiAmVaBatDauTheMoiDoQuaGioiHan();
+            },
+            child: const Text('Tạo bản ghi âm mới'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _dongTrinhGhiAmThe();
+            },
+            child: const Text('Dừng và không ghi âm nữa'),
+          ),
+        ],
+      ),
+    ).then((_) => _hopThoaiCanhBaoTheGhiAmDangMo = false);
+  }
+
+  /// Nút "Tạo phiên ghi âm mới": chốt thẻ hiện tại, chèn 2 dấu xuống dòng
+  /// tại vị trí con trỏ hiện tại (đúng nơi thẻ vừa chốt để lại con trỏ),
+  /// rồi bắt đầu một thẻ mới.
+  Future<void> _taoPhienGhiAmMoiThe() async {
+    if (!_trinhGhiAmMo) return;
+    await _chotTheGhiAmHienTaiThanhHoanChinh();
+    if (!mounted || !_trinhGhiAmMo) return;
+    final vb = _boDieuKhien.text;
+    final viTri = _boDieuKhien.selection.baseOffset.clamp(0, vb.length);
+    _dieuChinhVungToanVanSauKhiSua(viTri, 0, 2);
+    _dieuChinhLoiChinhTaSauKhiSua(viTri, 0, 2);
+    final moi = vb.replaceRange(viTri, viTri, '\n\n');
+    _ghiVaoO(moi, viTri + 2);
+    await _batDauMotTheGhiAmMoi();
+  }
+
+  /// Nút "Đóng trình ghi âm": chốt thẻ đang ghi (nếu có) rồi đóng hẳn —
+  /// giải phóng micro, ẩn 4 nút nhỏ, thanh công cụ trên hiện lại.
+  Future<void> _dongTrinhGhiAmThe() async {
+    if (!_trinhGhiAmMo) return;
+    await _chotTheGhiAmHienTaiThanhHoanChinh();
+    await ghiAmTheDongHan();
+    if (mounted) setState(() => _trinhGhiAmMo = false);
+  }
+
+  /// Ghi tạm — dùng `_bao` (thông báo giữa màn hình) thay cho nhật ký
+  /// riêng, vì trang này (khác web-test) không có sẵn khung nhật ký hiển
+  /// thị liên tục; chỉ log khi thật sự đáng chú ý (lưới an toàn hiếm gặp).
+  void _ghiLog2(String s) {
+    // ignore: avoid_print
+    print(s);
+  }
+
+  /// Kiểm tra điều kiện gửi ngầm — gọi mỗi khi một thẻ vừa được chốt xong.
+  /// Nếu đủ điều kiện, gửi NGẦM (không chờ, không khoá giao diện) tất cả
+  /// các thẻ đã ghi xong mà chưa gửi, trong lúc thẻ mới vẫn đang ghi tiếp.
+  void _kiemTraVaGuiNgamTheGhiAmNeuDu() {
+    if (!_tuDongGuiNgamTheGhiAm) return;
+    final vanBan = _boDieuKhien.text;
+    final soTheChuaGui = <int>[];
+    for (final m in reTheGhiAmHoanChinh.allMatches(vanBan)) {
+      final soThe = int.parse(m.group(1)!);
+      if (_theGhiAmDangGui.contains(soThe)) continue;
+      if (!_duLieuTheoTheGhiAm.containsKey(soThe)) continue;
+      soTheChuaGui.add(soThe);
+    }
+    if (soTheChuaGui.isEmpty) return;
+    final tongThoiLuong = soTheChuaGui.fold<Duration>(
+      Duration.zero,
+      (tong, soThe) => tong + (_thoiLuongTheoTheGhiAm[soThe] ?? Duration.zero),
+    );
+    if (tongThoiLuong < _nguongTuDongGuiTheGhiAm) return;
+    for (final soThe in soTheChuaGui) {
+      _guiMotTheGhiAmNgamRoiThayVaoVanBan(soThe);
+    }
+  }
+
+  /// Gửi ngầm thẻ #[soThe] cho Gemini, rồi thay đúng token của nó bằng chữ
+  /// nhận được — tìm lại vị trí token NGAY LÚC NÀY (không phải lúc bắt đầu
+  /// gửi), vì văn bản có thể đã đổi trong lúc chờ mạng. Không tìm thấy nữa
+  /// (người dùng đã xoá thẻ đó) hoặc lỗi mạng/máy chủ đều âm thầm bỏ qua —
+  /// lượt kiểm tra sau (`_kiemTraVaGuiNgamTheGhiAmNeuDu`) sẽ tự thử lại.
+  Future<void> _guiMotTheGhiAmNgamRoiThayVaoVanBan(int soThe) async {
+    final duLieu = _duLieuTheoTheGhiAm[soThe];
+    if (duLieu == null) return;
+    _theGhiAmDangGui.add(soThe);
+    try {
+      final chu = await guiGhiAmChoGemini(duLieu.$1, duLieu.$2);
+      if (!mounted) return;
+      final vb = _boDieuKhien.text;
+      final theCanTim = _nhanTheGhiAmHoanChinh(soThe);
+      final viTri = vb.indexOf(theCanTim);
+      if (viTri < 0) return;
+      _thayTheGhiAmBangChuAiTaiViTri(viTri, theCanTim.length, chu);
+    } catch (_) {
+      // Âm thầm bỏ qua — xem chú thích ở đầu hàm.
+    } finally {
+      _theGhiAmDangGui.remove(soThe);
+    }
+  }
+
+  /// Thay [doDaiCu] ký tự tại [viTri] (đúng một token thẻ ghi âm) bằng chữ
+  /// AI [chu], rồi cho đoạn mới nhấp nháy 4 giây — dùng lại đúng cơ chế của
+  /// `_chenVanBanVoiNhapNhay`/vùng "không phù hợp", chỉ khác là THAY một
+  /// đoạn có sẵn (token) thay vì chèn tại điểm rỗng.
+  void _thayTheGhiAmBangChuAiTaiViTri(int viTri, int doDaiCu, String chu) {
+    final vb = _boDieuKhien.text;
+    _dieuChinhVungToanVanSauKhiSua(viTri, doDaiCu, chu.length);
+    _dieuChinhLoiChinhTaSauKhiSua(viTri, doDaiCu, chu.length);
+    final moi = vb.replaceRange(viTri, viTri + doDaiCu, chu);
+    _gioiHanTreMuSauKhiChen(viTri, chu.length, moi);
+    final viTriConTro = viTri + chu.length;
+    _ghiVaoO(moi, viTriConTro);
+    _henLuu();
+    final v = _VungKhongPhuHop(
+      batDauGoc: viTri,
+      ketThucGoc: viTri,
+      batDauDeXuat: viTri,
+      ketThucDeXuat: viTriConTro,
+    );
+    _boDieuKhien.khongPhuHop.add(v);
+    _batNhapNhayKhongPhuHop(v, 'xanh');
+  }
+
+  /// Nút "Tạo văn bản" (thủ công) trong trình ghi âm — gửi TẤT CẢ thẻ đã
+  /// ghi xong mà chưa gửi (bỏ qua thẻ đang được gửi ngầm xử lý), thay từ
+  /// CUỐI VĂN BẢN VỀ ĐẦU để vị trí các thẻ chưa xử lý luôn còn đúng.
+  Future<void> _taoVanBanTuTatCaTheGhiAm() async {
+    final vanBan = _boDieuKhien.text;
+    final cacKhop = reTheGhiAmHoanChinh.allMatches(vanBan).toList();
+    if (cacKhop.isEmpty) {
+      _bao('Không có thẻ ghi âm nào trong văn bản để gửi.');
+      return;
+    }
+    for (final khop in cacKhop.reversed) {
+      final soThe = int.parse(khop.group(1)!);
+      if (_theGhiAmDangGui.contains(soThe)) continue;
+      final duLieu = _duLieuTheoTheGhiAm[soThe];
+      if (duLieu == null) continue;
+      _theGhiAmDangGui.add(soThe);
+      try {
+        final chu = await guiGhiAmChoGemini(duLieu.$1, duLieu.$2);
+        if (!mounted) return;
+        // Tìm lại đúng vị trí NGAY LÚC NÀY — các lượt thay trước (nếu có,
+        // luôn ở SAU vị trí của khớp này vì đi từ cuối lên) có thể đã đổi
+        // độ dài văn bản.
+        final theCanTim = _nhanTheGhiAmHoanChinh(soThe);
+        final viTri = _boDieuKhien.text.indexOf(theCanTim);
+        if (viTri >= 0) {
+          _thayTheGhiAmBangChuAiTaiViTri(viTri, theCanTim.length, chu);
+        }
+      } catch (e) {
+        _bao('Thẻ ghi âm #$soThe: lỗi gửi — $e');
+      } finally {
+        _theGhiAmDangGui.remove(soThe);
+      }
+    }
+  }
+
+  /// Bấm vào một thẻ ghi âm ĐÃ XONG — menu 3 lựa chọn, y hệt cơ chế menu
+  /// của lỗi chính tả (`_khiBamTuSai`).
+  Future<void> _khiBamTheGhiAmHoanChinh(int soThe, Offset viTriManHinh) async {
+    final chon = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        viTriManHinh.dx,
+        viTriManHinh.dy,
+        viTriManHinh.dx,
+        viTriManHinh.dy,
+      ),
+      items: [
+        const PopupMenuItem(
+          value: 'tatCa',
+          child: Text('Chuyển hoá TẤT CẢ thẻ ghi âm'),
+        ),
+        const PopupMenuItem(
+          value: 'moiThe',
+          child: Text('Chỉ chuyển hoá thẻ này'),
+        ),
+        PopupMenuItem(
+          value: 'xoa',
+          child: Text('Xoá thẻ ghi âm này',
+              style: TextStyle(color: Colors.red.shade600)),
+        ),
+      ],
+    );
+    if (chon == null || !mounted) return;
+    switch (chon) {
+      case 'tatCa':
+        await _taoVanBanTuTatCaTheGhiAm();
+      case 'moiThe':
+        if (_theGhiAmDangGui.contains(soThe)) return;
+        final duLieu = _duLieuTheoTheGhiAm[soThe];
+        if (duLieu == null) return;
+        _theGhiAmDangGui.add(soThe);
+        try {
+          final chu = await guiGhiAmChoGemini(duLieu.$1, duLieu.$2);
+          if (!mounted) return;
+          final theCanTim = _nhanTheGhiAmHoanChinh(soThe);
+          final viTri = _boDieuKhien.text.indexOf(theCanTim);
+          if (viTri >= 0) {
+            _thayTheGhiAmBangChuAiTaiViTri(viTri, theCanTim.length, chu);
+          }
+        } catch (e) {
+          _bao('Thẻ ghi âm #$soThe: lỗi gửi — $e');
+        } finally {
+          _theGhiAmDangGui.remove(soThe);
+        }
+      case 'xoa':
+        await _hoiXoaTheGhiAm(soThe);
+    }
+  }
+
+  Future<void> _hoiXoaTheGhiAm(int soThe) async {
+    final dongY = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xoá thẻ ghi âm?'),
+        content: Text('Thẻ ghi âm #$soThe sẽ bị xoá VĨNH VIỄN, không thể '
+            'phục hồi lại được. Bạn có chắc chắn muốn xoá không?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Không, giữ lại'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text('Xoá', style: TextStyle(color: Colors.red.shade600)),
+          ),
+        ],
+      ),
+    );
+    if (dongY != true || !mounted) return;
+    final theCanTim = _nhanTheGhiAmHoanChinh(soThe);
+    final vb = _boDieuKhien.text;
+    final viTri = vb.indexOf(theCanTim);
+    if (viTri < 0) return;
+    _dieuChinhVungToanVanSauKhiSua(viTri, theCanTim.length, 0);
+    _dieuChinhLoiChinhTaSauKhiSua(viTri, theCanTim.length, 0);
+    final moi = vb.replaceRange(viTri, viTri + theCanTim.length, '');
+    _ghiVaoO(moi, viTri);
+    _henLuu();
+    _duLieuTheoTheGhiAm.remove(soThe);
+    _thoiLuongTheoTheGhiAm.remove(soThe);
+    _theGhiAmDangGui.remove(soThe);
+  }
+
   bool get _microDungDuocTrenThietBiNay =>
       !(kIsWeb && _thietBiHienTai == ThietBi.iphone);
 
   void _bamNutMicro() {
     if (!_microDungDuocTrenThietBiNay) return;
+    if (_ghiAmTheDangKhoaMicro) return;
     // Người dùng tự bấm thì ý họ là quyết định cuối cùng — bỏ mọi kế hoạch
     // tự bật lại đang chờ.
     _microNgungDeGo = false;
@@ -4267,6 +4696,23 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _viTriDaKiemTraChinhTa = vitri;
     }
 
+    // Dời vị trí token "đang ghi âm" (nếu có thẻ nào đang ghi dở) theo cùng
+    // phép biến đổi — gõ tay ở chỗ KHÁC trong lúc vẫn ghi thẻ không được
+    // làm sai lệch vị trí thật của token. `ChanSuaGiuaThe` đã chặn mọi sửa
+    // MỘT PHẦN token, nên ở đây chỉ còn hai khả năng: sửa nằm hẳn trước nó
+    // (dời theo [lech]) hoặc phủ trọn xoá nó luôn (select-all rồi xoá...)
+    // — mất token thì ngừng theo dõi, `_chotTheGhiAmHienTaiThanhHoanChinh`
+    // sẽ tự phát hiện và âm thầm bỏ dữ liệu ghi âm dở đó khi thẻ được chốt.
+    final tvt = _viTriTokenDangGhiThe;
+    if (tvt != null) {
+      final ktToken = tvt + tenTokenDangGhiAm.length;
+      if (vitri <= tvt && ketThucXoa >= ktToken) {
+        _viTriTokenDangGhiThe = null;
+      } else if (tvt >= ketThucXoa) {
+        _viTriTokenDangGhiThe = tvt + lech;
+      }
+    }
+
     // Dời/co giãn các vùng định dạng thủ công theo cùng phép biến đổi —
     // gõ thêm chữ NGAY TRONG một vùng thì vùng đó tự nới rộng ra (chữ mới
     // mang định dạng cũ), xoá bớt thì vùng co lại, còn vùng nằm hẳn SAU chỗ
@@ -4763,22 +5209,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henLuu();
   }
 
-  // ---------------------------------------------------- ghi âm xong mới ra chữ
-
-  /// Bấm nút "Ghi âm xong mới ra chữ": mở bảng ghi âm, chèn kết quả phiên âm
-  /// vào đúng vị trí con trỏ nếu có. Việc ghi âm, gửi lên AI, chờ kết quả
-  /// đều nằm trọn trong `moBangGhiAmAI` — ở đây chỉ lo phần chèn vào bài.
-  Future<void> _khiBamGhiAmAI() async {
-    final ketQua = await moBangGhiAmAI(context);
-    if (ketQua == null || ketQua.trim().isEmpty || !mounted) return;
-    _chenVanBanTuGhiAmAI(ketQua.trim());
-  }
+  // ---------------------------------------------------- chèn chữ AI có nhấp nháy
 
   /// Chèn văn bản mới vào đúng vị trí con trỏ, rồi cho nó nhấp nháy xanh/đen
   /// 4 giây trước khi hoá đen như chữ thường — dùng lại nguyên cơ chế nhấp
   /// nháy của "đoạn không phù hợp" (coi như đoạn GỐC rỗng, chỉ có đoạn ĐỀ
-  /// XUẤT, và nhảy thẳng vào trạng thái "đã chọn dùng đề xuất").
-  void _chenVanBanTuGhiAmAI(String vanBanMoi) {
+  /// XUẤT, và nhảy thẳng vào trạng thái "đã chọn dùng đề xuất"). Dùng cho
+  /// mọi chỗ chèn chữ AI thẳng vào bài (trước đây riêng cho "Ghi âm xong mới
+  /// ra chữ", giờ dùng chung với cả thẻ ghi âm).
+  void _chenVanBanVoiNhapNhay(String vanBanMoi) {
     _luuDiemMoc();
 
     final vb = _boDieuKhien.text;
@@ -6651,6 +7090,75 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         ),
       ];
 
+  /// Bốn nút nhỏ của trình ghi âm + đồng hồ đếm giây — thay HẲN cho AppBar
+  /// bình thường trong lúc trình ghi âm mở (xem nơi dùng ở `build`).
+  AppBar _xayAppBarTrinhGhiAmThe() {
+    return AppBar(
+      backgroundColor: Colors.red.shade50,
+      surfaceTintColor: Colors.red.shade50,
+      elevation: 1,
+      automaticallyImplyLeading: false,
+      title: const Text('Đang ghi âm'),
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(64),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    Tooltip(
+                      message: _tuDongGuiNgamTheGhiAm
+                          ? 'Tự động gửi ngầm thẻ ≥20s: đang BẬT (bấm để tắt)'
+                          : 'Tự động gửi ngầm thẻ ≥20s: đang TẮT (bấm để bật)',
+                      child: IconButton(
+                        onPressed: () => setState(
+                            () => _tuDongGuiNgamTheGhiAm = !_tuDongGuiNgamTheGhiAm),
+                        icon: Icon(
+                          _tuDongGuiNgamTheGhiAm
+                              ? Icons.cloud_sync
+                              : Icons.cloud_sync_outlined,
+                          color: _tuDongGuiNgamTheGhiAm
+                              ? Colors.deepPurple
+                              : Colors.grey,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _taoVanBanTuTatCaTheGhiAm,
+                      child: const Text('Tạo văn bản'),
+                    ),
+                    TextButton(
+                      onPressed: _taoPhienGhiAmMoiThe,
+                      child: const Text('Tạo phiên ghi âm mới'),
+                    ),
+                    TextButton(
+                      onPressed: _dongTrinhGhiAmThe,
+                      child: const Text('Đóng trình ghi âm'),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                'Đang ghi: ${dinhDangMmSs(_thoiLuongTheGhiAmDangGhi)} / '
+                '${dinhDangMmSs(_gioiHanMoiTheGhiAm)}',
+                style: TextStyle(
+                  color: Colors.red.shade700,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Tự đo chiều cao bàn phím thay vì giao cho Scaffold: đặt thanh công cụ
@@ -6706,8 +7214,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       resizeToAvoidBottomInset: false,
       // B1: thanh tìm kiếm mở thì nhường hẳn vị trí trên cùng — ẩn AppBar
       // (tên tệp, Lùi/Tiến/Lưu/Ẩn-hiện-định-dạng). Đóng lại thì AppBar trở
-      // về y nguyên như cũ.
-      appBar: _hienThanhTimKiem ? null : appBar,
+      // về y nguyên như cũ. Trình ghi âm đang mở thì appBar này CŨNG bị
+      // thay hẳn bằng 4 nút nhỏ của trình ghi âm (đúng yêu cầu: mọi thứ
+      // của thanh công cụ trên — tên tệp, Lùi/Tiến/Lưu/định dạng — đều
+      // nhường chỗ, không phải chồng lớp CSS lên, để tránh 2 hệ thống input
+      // giẫm lên nhau).
+      appBar: _hienThanhTimKiem
+          ? null
+          : (_trinhGhiAmMo ? _xayAppBarTrinhGhiAmThe() : appBar),
       // translucent: chỉ NGHE sự kiện chạm để tắt chú thích, không chặn nó
       // đi tiếp xuống nút/ô bên dưới — một cú bấm vừa tắt chú thích vừa làm
       // đúng việc của nút đó (mở cài đặt, bật micro...).
@@ -6761,12 +7275,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             // nhận ra có ranh giới, không tạo thêm một "đường kẻ đậm" nhìn
             // rối mắt giữa hai thanh vốn đã sát nhau.
             // B1: thanh định dạng thủ công cũng nhường chỗ khi tìm kiếm mở.
-            if (!_anThanhDinhDang && !_hienThanhTimKiem)
+            if (!_anThanhDinhDang && !_hienThanhTimKiem && !_trinhGhiAmMo)
               Divider(height: 1, thickness: 1, color: Colors.grey.withValues(alpha: 0.12)),
-            if (!_anThanhDinhDang && !_hienThanhTimKiem) _thanhDinhDangThuCong(),
+            if (!_anThanhDinhDang && !_hienThanhTimKiem && !_trinhGhiAmMo) _thanhDinhDangThuCong(),
             // Mục 7: và một đường kẻ mỏng nữa ở mép dưới thanh định dạng,
             // phân tách nó với vùng soạn thảo bên dưới.
-            if (!_anThanhDinhDang && !_hienThanhTimKiem)
+            if (!_anThanhDinhDang && !_hienThanhTimKiem && !_trinhGhiAmMo)
               Divider(height: 1, thickness: 1, color: Colors.grey.withValues(alpha: 0.12)),
             Expanded(
               child: Padding(
@@ -7032,7 +7546,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               bat: _muonNghe,
               dangNghe: _dangNghe,
               songAm: _songAm,
-              sanSang: _sanSang && _microDungDuocTrenThietBiNay,
+              sanSang: _sanSang &&
+                  _microDungDuocTrenThietBiNay &&
+                  !_ghiAmTheDangKhoaMicro,
               hienChuThich: _hienChuThich,
               khiBamChuThich: _khiBamChuThich,
               nhanPhimTat: '${widget.caiDat.phimTatBoBienDoi} + ${widget.caiDat.phimTatPhim}',
@@ -7058,7 +7574,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     'riêng của Flowrite thay vì bàn phím mặc định của máy.',
               ),
               khiBamKiemTraToanVan: _khiBamKiemTraToanVan,
-              khiBamGhiAmAI: _khiBamGhiAmAI,
+              dangGhiAmThe: _trinhGhiAmMo,
+              khiBamGhiAmThe: _bamNutGhiAmThe,
+              gopMicVaGhiAmThanhMotNut:
+                  kIsWeb && _thietBiHienTai == ThietBi.iphone,
               khiBamChepTatCa: () => _chepTatCa(),
               khiBamChepRoiXoaTatCa: _chepRoiXoaTatCa,
               khiBamXoaTatCa: () => _xoaTatCa(),
