@@ -2,7 +2,7 @@ name: Dựng bản Web ĐẦY ĐỦ (nhân bản app Android)
 
 # Chạy khi bản Web đầy đủ (main_web_full.dart) hoặc bất kỳ file nào nó phụ
 # thuộc (toàn bộ màn hình soạn thảo của app Android) đổi — tách biệt hoàn
-# toàn khỏi build-apk.yml và deploy-web-test.yml.
+# toàn khỏi build-apk.yml.
 on:
   push:
     paths:
@@ -85,12 +85,11 @@ jobs:
             --target=lib/main_web_full.dart \
             --base-href /
 
-      # Cùng project Firebase (flowrite219) với bản thử micro, nhưng đưa
-      # lên một CHANNEL RIÊNG (không phải "live") để có địa chỉ xem KHÁC
-      # hẳn với bản phòng thí nghiệm (flowrite219.web.app) — không đụng gì
-      # tới bản đó. Channel không hết hạn theo mặc định 7 ngày như preview
-      # thường mà gia hạn 30 ngày mỗi lần đẩy, dùng lâu dài như một bản xem
-      # thứ hai của cùng project.
+      # Đưa thẳng lên channel "live" — địa chỉ chính flowrite219.web.app,
+      # vĩnh viễn, không hết hạn (khác channel xem trước "day-du"/tên nhánh,
+      # gia hạn 7-30 ngày mỗi lần đẩy nhưng vẫn có ngày hết nếu ngừng đẩy).
+      # Bản phòng thí nghiệm cũ đã gỡ nên channel "live" của project này
+      # không còn ai khác dùng.
       - name: Tạo cấu hình Firebase Hosting
         run: |
           cat > firebase.json << 'EOF'
@@ -132,11 +131,10 @@ jobs:
           }
           EOF
 
-      - name: Đưa build/web lên Firebase Hosting (channel "day-du")
+      - name: Đưa build/web lên Firebase Hosting (channel "live" — vĩnh viễn)
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
-          channelId: day-du
-          expires: 30d
+          channelId: live
           projectId: flowrite219

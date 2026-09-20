@@ -2271,21 +2271,48 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Widget _goiYTrong() {
     if (_boDieuKhien.text.isNotEmpty) return const SizedBox.shrink();
     const mauChuMo = Color(0xFF9E9E9E);
+    final cacDong = <InlineSpan>[
+      const TextSpan(
+        text: 'Gõ chữ và bấm Micro để nói...\n'
+            'Thực hiện song song hai việc trên cùng lúc.\n'
+            'Vui lòng đọc hướng dẫn và mẹo sử dụng App (Nút ',
+      ),
+      WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        child: Icon(Icons.help_outline_rounded, size: 16, color: mauChuMo),
+      ),
+      const TextSpan(text: ')'),
+    ];
+    // Riêng bản WEB (không đụng bản Android/iOS gốc): thêm dòng chỉ đường
+    // khi micro trục trặc + tên thiết bị đang dùng (đoán/chọn tay, xem
+    // `_thietBiHienTai`) + số phiên bản web + gợi ý dùng Chrome.
+    if (kIsWeb) {
+      cacDong.addAll([
+        const TextSpan(
+          text: '\nNếu Micro trục trặc, hãy vào Cài đặt hệ thống\n',
+        ),
+        const TextSpan(
+          text: 'Đang sử dụng bộ Micro của Thiết bị ',
+          style: TextStyle(decoration: TextDecoration.underline),
+        ),
+        TextSpan(
+          text: _thietBiHienTai.ten,
+          style: const TextStyle(
+            decoration: TextDecoration.underline,
+            color: Color(0xFFD32F2F),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        TextSpan(
+          text: '\n@Flowrite web (phiên bản $phienBanWebDayDu)\n'
+              'Truy cập Web bằng trình duyệt Chrome để sử dụng tốt nhất!',
+        ),
+      ]);
+    }
     return RichText(
       text: TextSpan(
         style: TextStyle(fontSize: 17, height: 1.5, color: mauChuMo),
-        children: [
-          TextSpan(
-            text: 'Gõ chữ và bấm Micro để nói...\n'
-                'Thực hiện song song hai việc trên cùng lúc.\n'
-                'Vui lòng đọc hướng dẫn và mẹo sử dụng App (Nút ',
-          ),
-          WidgetSpan(
-            alignment: PlaceholderAlignment.middle,
-            child: Icon(Icons.help_outline_rounded, size: 16, color: mauChuMo),
-          ),
-          TextSpan(text: ')'),
-        ],
+        children: cacDong,
       ),
     );
   }
