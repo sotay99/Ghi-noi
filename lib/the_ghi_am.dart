@@ -143,24 +143,28 @@ class ChanSuaGiuaThe extends TextInputFormatter {
 
     for (final (batDau, ketThuc) in vungCu) {
       final chongLan = dau < ketThuc && cuoiCu > batDau;
-      final phuTron = dau <= batDau && cuoiCu >= ketThuc;
-      if (chongLan && !phuTron) {
-        final goi = khiCanXoaThe;
-        if (goi != null) {
-          // CHẶN hẳn, không tự xoá — báo lại để nơi gọi hỏi xác nhận trước.
-          // Không gọi [goi] ngay tại đây: formatter đang chạy giữa lượt cập
-          // nhật của chính TextField, mở dialog/setState ngay lúc này không
-          // an toàn.
-          SchedulerBinding.instance
-              .addPostFrameCallback((_) => goi(batDau, ketThuc));
-          return oldValue;
-        }
-        final vanBanKetQua = oldText.replaceRange(batDau, ketThuc, '');
-        return TextEditingValue(
-          text: vanBanKetQua,
-          selection: TextSelection.collapsed(offset: batDau),
-        );
+      if (!chongLan) continue;
+      final goi = khiCanXoaThe;
+      if (goi != null) {
+        // CHẶN hẳn, không tự xoá — báo lại để nơi gọi hỏi xác nhận trước
+        // (hoặc xoá thẳng không hỏi, nếu thẻ đã có trong bộ nhớ đệm — tuỳ
+        // nơi gọi quyết định, xem `_khiCanXoaTheTuBanPhim`). ÁP DỤNG CHO CẢ
+        // sửa một phần LẪN xoá TRỌN thẻ (ví dụ Ctrl+A rồi Xoá) — trước đây
+        // xoá trọn được cho qua thẳng không hỏi gì, khiến thẻ "chưa xử lý
+        // xong" mất không dấu vết. Không gọi [goi] ngay tại đây: formatter
+        // đang chạy giữa lượt cập nhật của chính TextField, mở dialog/
+        // setState ngay lúc này không an toàn.
+        SchedulerBinding.instance
+            .addPostFrameCallback((_) => goi(batDau, ketThuc));
+        return oldValue;
       }
+      final phuTron = dau <= batDau && cuoiCu >= ketThuc;
+      if (phuTron) continue; // không có callback — theo cách cũ, cho qua.
+      final vanBanKetQua = oldText.replaceRange(batDau, ketThuc, '');
+      return TextEditingValue(
+        text: vanBanKetQua,
+        selection: TextSelection.collapsed(offset: batDau),
+      );
     }
     return newValue;
   }

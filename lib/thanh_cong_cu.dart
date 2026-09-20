@@ -250,7 +250,7 @@ class ThanhCongCu extends StatelessWidget {
                           : 'Ghi âm (tạo thẻ ghi âm)',
                       child: _nut(
                         rong,
-                        dangGhiAmThe ? Icons.stop : Icons.fiber_manual_record,
+                        dangGhiAmThe ? Icons.stop : Icons.mic_rounded,
                         dangGhiAmThe ? 'Dừng' : 'Ghi âm',
                         dangGhiAmThe ? 'Dừng ghi âm' : 'Ghi âm',
                         khiBamGhiAmThe,
@@ -347,7 +347,7 @@ class _NutMicroHoacGhiAmGop extends StatelessWidget {
                     ),
               alignment: Alignment.center,
               child: Icon(
-                dangGhiAm ? Icons.stop : Icons.fiber_manual_record,
+                dangGhiAm ? Icons.stop : Icons.mic_rounded,
                 color: dangGhiAm ? Colors.white : Colors.blue.shade900,
                 size: 20,
               ),

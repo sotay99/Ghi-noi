@@ -3637,7 +3637,30 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _viTriTokenDangGhiThe = null;
     _theGhiAmDangTamDung = false;
     if (!mounted) return soThe;
-    if (ketQua != null) _duLieuTheoTheGhiAm[soThe] = ketQua;
+
+    if (ketQua == null) {
+      // Ghi âm thất bại — KHÔNG CÓ dữ liệu gì để chuyển hoá. Trước đây vẫn
+      // chốt thành thẻ "Ghi âm N" như bình thường dù rỗng ruột — tạo ra một
+      // thẻ trông giống mọi thẻ khác nhưng bấm chuyển hoá luôn báo "đã bị
+      // xoá vĩnh viễn" (sai — nó chưa từng có gì để xoá). Sửa: bỏ hẳn token
+      // "đang ghi" khỏi văn bản, không tạo thẻ ma, báo rõ lý do.
+      _thoiLuongTheoTheGhiAm.remove(soThe);
+      if (viTriToken != null) {
+        final vb = _boDieuKhien.text;
+        final ketThucToken = viTriToken + tenTokenDangGhiAm.length;
+        if (ketThucToken <= vb.length &&
+            vb.substring(viTriToken, ketThucToken) == tenTokenDangGhiAm) {
+          _dieuChinhVungToanVanSauKhiSua(viTriToken, tenTokenDangGhiAm.length, 0);
+          _dieuChinhLoiChinhTaSauKhiSua(viTriToken, tenTokenDangGhiAm.length, 0);
+          final moi = vb.replaceRange(viTriToken, ketThucToken, '');
+          _ghiVaoO(moi, viTriToken);
+          _henLuu();
+        }
+      }
+      _bao('Ghi âm #$soThe thất bại (không có dữ liệu) — đã bỏ thẻ này.');
+      return soThe;
+    }
+    _duLieuTheoTheGhiAm[soThe] = ketQua;
 
     if (viTriToken == null) {
       _ghiLog2(
@@ -7806,9 +7829,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// (input ẩn phía sau khung soạn thảo) chuyển đi lúc nhấc tay có thể "ăn"
   /// mất đúng lượt chạm đầu, buộc phải chạm lần hai (không xảy ra ở app
   /// Android/iOS gốc vì không có input DOM nào cả).
+  /// Ngưỡng "màn hình hẹp" (trình duyệt thu nhỏ, điện thoại) — CHỈ ảnh hưởng
+  /// tới cỡ chữ/khoảng đệm của thanh công cụ trình ghi âm; màn hình rộng giữ
+  /// nguyên như cũ.
+  static const _nguongManHinhHep = 480.0;
+
   Widget _nutTrinhGhiAm(String nhan, VoidCallback onBam,
-      {Color? mau, IconData? icon}) {
+      {Color? mau, IconData? icon, bool manHinhHep = false}) {
     final mauThuc = mau ?? Theme.of(context).colorScheme.primary;
+    // Màn hình hẹp: thu cỡ chữ/icon xuống bằng đúng cỡ "Đang ghi"/"Tạm dừng"
+    // (12) — trước đó cố định 17 nên trên màn hẹp các nút dễ vỡ dòng/tràn.
+    final coChu = manHinhHep ? 12.0 : 17.0;
+    final coIcon = manHinhHep ? 13.0 : 17.0;
     return InkWell(
       onTap: () {},
       onTapDown: (_) => onBam(),
@@ -7816,20 +7848,19 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // Đệm co lại tối thiểu — chỉ đủ vùng chạm, để cả thanh không cao hơn
       // mức cần thiết.
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: EdgeInsets.symmetric(
+            horizontal: manHinhHep ? 4 : 8, vertical: manHinhHep ? 2 : 4),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(icon, color: mauThuc, size: 17),
-              const SizedBox(width: 4),
+              Icon(icon, color: mauThuc, size: coIcon),
+              SizedBox(width: manHinhHep ? 2 : 4),
             ],
             Text(
               nhan,
-              // Cỡ chữ bằng đúng cỡ chữ thường của văn bản trong app
-              // (`_kieuVanBan.fontSize` = 17), không to hơn.
               style: TextStyle(
-                  color: mauThuc, fontWeight: FontWeight.w600, fontSize: 17),
+                  color: mauThuc, fontWeight: FontWeight.w600, fontSize: coChu),
             ),
           ],
         ),
@@ -7838,12 +7869,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 
   AppBar _xayAppBarTrinhGhiAmThe() {
+    final manHinhHep = MediaQuery.of(context).size.width < _nguongManHinhHep;
     return AppBar(
       backgroundColor: Colors.red.shade50,
       surfaceTintColor: Colors.red.shade50,
       elevation: 1,
       automaticallyImplyLeading: false,
-      titleSpacing: 4,
+      // Màn hình hẹp: bớt đệm hai bên tiêu đề để nhường thêm chỗ cho các nút
+      // — màn hình rộng giữ 4 như cũ.
+      titleSpacing: manHinhHep ? 0 : 4,
       // Dồn cả hai hàng (nút bấm + trạng thái/đồng hồ) vào ĐÚNG vùng
       // tiêu đề chính của AppBar — không còn hàng tiêu đề "Đang ghi âm"
       // rỗng ở trên cùng chiếm chỗ thừa, và cũng không cần một `bottom`
@@ -7864,7 +7898,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             // — không vừa một dòng thì tự xuống dòng, không cần cuộn.
             Wrap(
               alignment: WrapAlignment.center,
-              spacing: 4,
+              spacing: manHinhHep ? 2 : 4,
               runSpacing: 2,
               children: [
                 Tooltip(
@@ -7894,17 +7928,22 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 // thẻ đang ghi (kể cả đang tạm dừng).
                 if (_soTheGhiAmDangGhi != null)
                   _nutTrinhGhiAm(
-                      'Dừng và hoàn thành ghi âm', _dungVaHoanThanhGhiAmThe),
+                    'Dừng và hoàn thành ghi âm',
+                    _dungVaHoanThanhGhiAmThe,
+                    manHinhHep: manHinhHep,
+                  ),
                 _nutTrinhGhiAm(
                   'Tạo phiên ghi âm mới',
                   _taoPhienGhiAmMoiThe,
                   mau: Colors.green.shade700,
+                  manHinhHep: manHinhHep,
                 ),
                 _nutTrinhGhiAm(
                   'Đóng trình ghi âm',
                   _dongTrinhGhiAmThe,
                   mau: Colors.red.shade700,
                   icon: Icons.cancel,
+                  manHinhHep: manHinhHep,
                 ),
               ],
             ),
