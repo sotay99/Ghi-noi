@@ -34,6 +34,7 @@ on:
       - 'lib/thong_bao_giua.dart'
       - 'lib/trang_huong_dan.dart'
       - 'lib/ai_cau_hinh.dart'
+      - 'tool/va_web.py'
       - '.github/workflows/deploy-web-full.yml'
   workflow_dispatch:
 
@@ -68,8 +69,7 @@ jobs:
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
         continue-on-error: true
 
-      # Thư mục web/ không nằm trong git — sinh động lúc CI chạy, y hệt
-      # deploy-web-test.yml.
+      # Thư mục web/ không nằm trong git — sinh động lúc CI chạy.
       - name: Sinh phần Web
         run: |
           set -e
@@ -78,6 +78,9 @@ jobs:
             --org=com.flowrite \
             /tmp/khung-web
           cp -r /tmp/khung-web/web ./web
+
+      - name: Vá web/index.html để F5 luôn lấy bản mới (vẫn giữ offline)
+        run: python3 tool/va_web.py .
 
       - name: Dựng bản Web (entry point riêng cho bản đầy đủ)
         run: |
