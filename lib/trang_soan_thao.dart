@@ -5,6 +5,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -119,6 +120,68 @@ bool _kyTuHopLeChoTreMu(String kyTu) {
   final donVi = kyTu.codeUnitAt(0);
   return (donVi >= 0x30 && donVi <= 0x39) || // 0-9
       (donVi >= 0x61 && donVi <= 0x7A); // a-z
+}
+
+/// Chữ "Đang ghi" lượn sóng liên hồi — mỗi ký tự tự bay lên/xuống theo sóng
+/// sin, lệch pha nhau theo thứ tự, tạo hiệu ứng sóng chạy trái→phải. Dùng
+/// cho dòng trạng thái ghi âm (xem `_xayAppBarTrinhGhiAmThe`) — chỉ có ý
+/// nghĩa lúc ĐANG ghi (không dùng cho lúc tạm dừng, đứng yên).
+class _ChuLuonSong extends StatefulWidget {
+  const _ChuLuonSong({required this.chu, required this.mau});
+  final String chu;
+  final Color mau;
+
+  @override
+  State<_ChuLuonSong> createState() => _ChuLuonSongState();
+}
+
+class _ChuLuonSongState extends State<_ChuLuonSong>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _dieuKhien;
+
+  @override
+  void initState() {
+    super.initState();
+    _dieuKhien = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _dieuKhien.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final style = TextStyle(
+      color: widget.mau,
+      fontWeight: FontWeight.bold,
+      fontSize: 12,
+    );
+    return AnimatedBuilder(
+      animation: _dieuKhien,
+      builder: (context, _) {
+        final soKyTu = widget.chu.length;
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < soKyTu; i++)
+              Transform.translate(
+                offset: Offset(
+                  0,
+                  -3 *
+                      math.sin(2 * math.pi * (_dieuKhien.value - i / soKyTu)),
+                ),
+                child: Text(widget.chu[i], style: style),
+              ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class _VungVe {
@@ -1109,6 +1172,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void _khiOThayTheDoi() => _boNhoThayTheGanNhat = _oThayThe.text;
 
   void _moTimKiem() {
+    if (_trinhGhiAmMo) {
+      _bao('Đang mở trình ghi âm — hãy đóng trình ghi âm trước khi tìm kiếm.');
+      return;
+    }
     _oTimKiem.text = _boNhoTimKiemGanNhat;
     _oThayThe.text = _boNhoThayTheGanNhat;
     setState(() => _hienThanhTimKiem = true);
@@ -1799,30 +1866,30 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// đã làm trong file này, không thêm `AnimationController`/`vsync` mới cho
   /// một việc đơn giản là đảo một bool theo nhịp cố định) — chỉ chạy trong
   /// lúc `_oChu` đang giữ tiêu điểm, xem `_khiFocusConTroDoi`.
-  bool _conTroDangHien = true;
+  // ĐÃ SỬA (lỗi phải chạm hai lần mới bấm được nút trong lúc con trỏ đang
+  // nhấp nháy): nhịp nhấp nháy trước đây gọi `setState` toàn màn hình mỗi
+  // 500ms — bất kỳ cử chỉ chạm nào rơi đúng lúc một trong các lượt vẽ lại
+  // đó xảy ra (giữa "chạm xuống" và "nhấc lên") có thể mất luôn cử chỉ đó
+  // (Flutter huỷ recognizer đang chờ nếu cây widget bị dựng lại giữa
+  // chừng), buộc phải chạm lần hai mới trúng. Đổi hẳn sang `ValueNotifier`
+  // riêng, gộp vào ĐÚNG `Listenable.merge` mà overlay con trỏ đang nghe
+  // (xem `_veConTro`/nơi dùng ở `build`) — chỉ overlay con trỏ vẽ lại,
+  // không đụng gì tới toàn bộ cây widget (nút bấm ở AppBar không còn bị
+  // dựng lại theo nhịp này nữa).
+  final ValueNotifier<bool> _conTroDangHien = ValueNotifier<bool>(true);
   Timer? _henNhapNhayConTro;
 
   void _khiFocusConTroDoi() {
     if (_oChu.hasFocus) {
       if (_henNhapNhayConTro != null) return;
-      // `setState` ở đây (không chỉ đặt biến suông) để buộc `build()` chạy
-      // lại ngay lúc vừa giành được tiêu điểm — overlay con trỏ chỉ tự vẽ lại
-      // theo `_boDieuKhien`/`_cuonVanBan` (xem `AnimatedBuilder` ở `build`),
-      // không tự biết focus vừa đổi, nên không gọi `setState` thì caret có
-      // thể không hiện ra cho tới lần đổi văn bản/cuộn kế tiếp.
-      if (mounted) {
-        setState(() => _conTroDangHien = true);
-      } else {
-        _conTroDangHien = true;
-      }
+      _conTroDangHien.value = true;
       _henNhapNhayConTro = Timer.periodic(const Duration(milliseconds: 500), (_) {
-        if (!mounted) return;
-        setState(() => _conTroDangHien = !_conTroDangHien);
+        _conTroDangHien.value = !_conTroDangHien.value;
       });
     } else {
       _henNhapNhayConTro?.cancel();
       _henNhapNhayConTro = null;
-      if (mounted) setState(() => _conTroDangHien = false);
+      _conTroDangHien.value = false;
     }
   }
 
@@ -1866,7 +1933,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           khungBox: khungBox,
           viTri: chon.baseOffset,
           mau: mauConTro,
-          hienThi: _conTroDangHien,
+          hienThi: _conTroDangHien.value,
         ),
       ),
     );
@@ -2618,7 +2685,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henMoDamChamCuoi?.cancel();
     _henHetHanRanhGioiPhien?.cancel();
     _henNhapNhayConTro?.cancel();
+    _conTroDangHien.dispose();
     _oChu.removeListener(_khiFocusConTroDoi);
+    _bomDongHoTheGhiAm?.cancel();
+    _dangKyMucAmTheGhiAm?.cancel();
+    _thoiLuongTheGhiAmDangGhi.dispose();
+    if (_trinhGhiAmMo) unawaited(ghiAmTheDongHan());
     _micro.cancel();
     _boDieuKhien.dispose();
     _oChu.dispose();
@@ -3141,10 +3213,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
   }
 
-  /// Trên WEB, iPhone tạm thời "liệt" nút micro (Web Speech API gần như
-  /// không dùng được trên WebKit/iOS — xem thảo luận trước) — chặn cả bấm
-  /// nút lẫn phím tắt, không chỉ ẩn giao diện. Luôn `true` trên Android/iOS
-  /// gốc (không đọc `_thietBiHienTai` ở đó).
   // ------------------------------------------------------------- thẻ ghi âm
 
   /// Trình ghi âm đang mở (4 nút nhỏ hiện, thanh công cụ trên ẩn) — dùng
@@ -3160,8 +3228,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// vị trí/vùng khác trong file này được theo dõi. `null` = không có thẻ
   /// nào đang ghi dở.
   int? _viTriTokenDangGhiThe;
-  Duration _thoiLuongTheGhiAmDangGhi = Duration.zero;
+
+  /// Đếm giờ hiển thị RIÊNG bằng `ValueNotifier` (không dùng `setState`) —
+  /// y hệt lý do đã sửa ở `_conTroDangHien`: tránh dựng lại toàn cây mỗi
+  /// giây trong lúc trình ghi âm mở, để không lặp lại lỗi "phải chạm hai
+  /// lần" cho chính các nút của trình ghi âm.
+  final ValueNotifier<Duration> _thoiLuongTheGhiAmDangGhi =
+      ValueNotifier<Duration>(Duration.zero);
   Timer? _bomDongHoTheGhiAm;
+  bool _theGhiAmDangTamDung = false;
+  StreamSubscription<double>? _dangKyMucAmTheGhiAm;
   final Map<int, Duration> _thoiLuongTheoTheGhiAm = {};
   final Map<int, (Uint8List, String)> _duLieuTheoTheGhiAm = {};
   final Set<int> _theGhiAmDangGui = {};
@@ -3186,6 +3262,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       await _dongTrinhGhiAmThe();
       return;
     }
+    if (_hienThanhTimKiem) {
+      _bao('Đang mở tìm kiếm — hãy đóng tìm kiếm trước khi ghi âm.');
+      return;
+    }
     if (_muonNghe) await _tatMicro();
     if (!mounted) return;
     final ok = await ghiAmTheKhoiTao();
@@ -3203,20 +3283,53 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (!mounted) return;
     final soThe = _soThuTuTheGhiAmTiepTheo++;
     _soTheGhiAmDangGhi = soThe;
-    _thoiLuongTheGhiAmDangGhi = Duration.zero;
+    _theGhiAmDangTamDung = false;
+    _thoiLuongTheGhiAmDangGhi.value = Duration.zero;
     _daCanhBaoGioiHanTheGhiAm = false;
     _chenTokenDangGhiTheVaoVanBan();
+    _batDauTheoDoiMucAmGhiAm();
     _bomDongHoTheGhiAm?.cancel();
     _bomDongHoTheGhiAm = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      setState(() => _thoiLuongTheGhiAmDangGhi += const Duration(seconds: 1));
-      if (_thoiLuongTheGhiAmDangGhi >= _gioiHanMoiTheGhiAm) {
+      if (!mounted || _theGhiAmDangTamDung) return;
+      final moi = _thoiLuongTheGhiAmDangGhi.value + const Duration(seconds: 1);
+      _thoiLuongTheGhiAmDangGhi.value = moi;
+      if (moi >= _gioiHanMoiTheGhiAm) {
         _dongHopThoaiCanhBaoTheGhiAmNeuMo();
         _chotTheGhiAmVaBatDauTheMoiDoQuaGioiHan();
-      } else if (_thoiLuongTheGhiAmDangGhi >= _canhBaoGioiHanTheGhiAm) {
+      } else if (moi >= _canhBaoGioiHanTheGhiAm) {
         _hienCanhBaoGioiHanTheGhiAmNeuChua();
       }
     });
+  }
+
+  /// Sóng âm cạnh nút micro hoạt động y hệt lúc micro-vừa-nói-vừa-ra-chữ
+  /// đang nghe — dùng lại ĐÚNG `_songAm`/`_khiDoiMucAm` (chỉ đổi nguồn dữ
+  /// liệu: mức âm của ĐÁY GHI ÂM đang dùng thay vì của `speech_to_text`).
+  void _batDauTheoDoiMucAmGhiAm() {
+    _dangKyMucAmTheGhiAm?.cancel();
+    _dangKyMucAmTheGhiAm = ghiAmTheMucAm().listen(_khiDoiMucAm);
+  }
+
+  void _dungTheoDoiMucAmGhiAm() {
+    _dangKyMucAmTheGhiAm?.cancel();
+    _dangKyMucAmTheGhiAm = null;
+    if (mounted) setState(() => _songAm.fillRange(0, _songAm.length, 0));
+  }
+
+  Future<void> _tamDungTheGhiAmHienTai() async {
+    if (_soTheGhiAmDangGhi == null || _theGhiAmDangTamDung) return;
+    await ghiAmTheTamDung();
+    if (!mounted) return;
+    setState(() => _theGhiAmDangTamDung = true);
+    _dungTheoDoiMucAmGhiAm();
+  }
+
+  Future<void> _tiepTucTheGhiAmHienTai() async {
+    if (_soTheGhiAmDangGhi == null || !_theGhiAmDangTamDung) return;
+    await ghiAmTheTiepTuc();
+    if (!mounted) return;
+    setState(() => _theGhiAmDangTamDung = false);
+    _batDauTheoDoiMucAmGhiAm();
   }
 
   void _chenTokenDangGhiTheVaoVanBan() {
@@ -3251,11 +3364,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final viTriToken = _viTriTokenDangGhiThe;
     _bomDongHoTheGhiAm?.cancel();
     _bomDongHoTheGhiAm = null;
+    _dungTheoDoiMucAmGhiAm();
     if (soThe == null) return null;
-    _thoiLuongTheoTheGhiAm[soThe] = _thoiLuongTheGhiAmDangGhi;
+    _thoiLuongTheoTheGhiAm[soThe] = _thoiLuongTheGhiAmDangGhi.value;
+    // Đáy ghi âm dừng được cả khi đang TẠM DỪNG (record/MediaRecorder cho
+    // phép stop() ngay từ trạng thái pause) — không cần tự resume trước.
     final ketQua = await ghiAmTheKetThucThe();
     _soTheGhiAmDangGhi = null;
     _viTriTokenDangGhiThe = null;
+    _theGhiAmDangTamDung = false;
     if (!mounted) return soThe;
     if (ketQua != null) _duLieuTheoTheGhiAm[soThe] = ketQua;
 
@@ -3345,6 +3462,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final moi = vb.replaceRange(viTri, viTri, '\n\n');
     _ghiVaoO(moi, viTri + 2);
     await _batDauMotTheGhiAmMoi();
+  }
+
+  /// Nút "Dừng và hoàn thành ghi âm": chốt thẻ đang ghi (dù đang ghi hay
+  /// đang tạm dừng) thành thẻ ghi âm XONG, nhưng KHÔNG tạo thẻ mới nào —
+  /// trình ghi âm vẫn mở (người dùng có thể "Tạo phiên ghi âm mới" sau nếu
+  /// muốn ghi tiếp, hoặc "Đóng trình ghi âm" luôn).
+  Future<void> _dungVaHoanThanhGhiAmThe() async {
+    if (_soTheGhiAmDangGhi == null) return;
+    await _chotTheGhiAmHienTaiThanhHoanChinh();
+    if (mounted) setState(() {});
   }
 
   /// Nút "Đóng trình ghi âm": chốt thẻ đang ghi (nếu có) rồi đóng hẳn —
@@ -3522,6 +3649,73 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       case 'xoa':
         await _hoiXoaTheGhiAm(soThe);
     }
+  }
+
+  /// Bấm Backspace/Delete ngay cạnh một thẻ, đủ để xoá một phần thẻ đó —
+  /// `ChanSuaGiuaThe` đã CHẶN lại (không tự xoá) và báo về đây bằng đúng
+  /// [batDau, ketThuc) của thẻ. Hỏi xác nhận y hệt cách xoá qua menu bấm-
+  /// vào-thẻ, rồi mới xoá thật nếu đồng ý — không còn âm thầm xoá nữa.
+  Future<void> _khiCanXoaTheTuBanPhim(int batDau, int ketThuc) async {
+    if (!mounted) return;
+    final vb = _boDieuKhien.text;
+    if (ketThuc > vb.length) return;
+    final doanThe = vb.substring(batDau, ketThuc);
+    final khopHoanChinh = reTheGhiAmHoanChinh.firstMatch(doanThe);
+    final laDangGhi = doanThe == tenTokenDangGhiAm;
+    if (khopHoanChinh == null && !laDangGhi) return; // đã đổi, bỏ qua.
+
+    final dongY = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xoá thẻ ghi âm?'),
+        content: Text(laDangGhi
+            ? 'Thẻ này ĐANG GHI ÂM — xoá sẽ HUỶ LUÔN bản ghi đang thu, không '
+                'thể phục hồi lại được. Bạn có chắc chắn muốn xoá không?'
+            : 'Thẻ ghi âm này sẽ bị xoá VĨNH VIỄN, không thể phục hồi lại '
+                'được. Bạn có chắc chắn muốn xoá không?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Không, giữ lại'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text('Xoá', style: TextStyle(color: Colors.red.shade600)),
+          ),
+        ],
+      ),
+    );
+    if (dongY != true || !mounted) return;
+
+    if (laDangGhi) {
+      // Thẻ đang ghi dở — huỷ luôn bản ghi (không chốt thành thẻ xong).
+      _bomDongHoTheGhiAm?.cancel();
+      _bomDongHoTheGhiAm = null;
+      _dungTheoDoiMucAmGhiAm();
+      await ghiAmTheKetThucThe(); // dừng đáy ghi âm, bỏ luôn dữ liệu trả về.
+      _soTheGhiAmDangGhi = null;
+      _viTriTokenDangGhiThe = null;
+      _theGhiAmDangTamDung = false;
+      if (!mounted) return;
+    }
+
+    final vbHienTai = _boDieuKhien.text;
+    if (ketThuc > vbHienTai.length ||
+        vbHienTai.substring(batDau, ketThuc) != doanThe) {
+      return; // văn bản đã đổi trong lúc chờ hỏi — đừng xoá nhầm chỗ khác.
+    }
+    _dieuChinhVungToanVanSauKhiSua(batDau, doanThe.length, 0);
+    _dieuChinhLoiChinhTaSauKhiSua(batDau, doanThe.length, 0);
+    final moi = vbHienTai.replaceRange(batDau, ketThuc, '');
+    _ghiVaoO(moi, batDau);
+    _henLuu();
+    if (khopHoanChinh != null) {
+      final soThe = int.parse(khopHoanChinh.group(1)!);
+      _duLieuTheoTheGhiAm.remove(soThe);
+      _thoiLuongTheoTheGhiAm.remove(soThe);
+      _theGhiAmDangGui.remove(soThe);
+    }
+    if (mounted && _trinhGhiAmMo) setState(() {});
   }
 
   Future<void> _hoiXoaTheGhiAm(int soThe) async {
@@ -7098,7 +7292,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       surfaceTintColor: Colors.red.shade50,
       elevation: 1,
       automaticallyImplyLeading: false,
-      title: const Text('Đang ghi âm'),
+      // Không có tiêu đề "Đang ghi âm" nữa — dòng đếm giờ đỏ ngay dưới đã
+      // đủ nói lên điều đó, tiêu đề riêng chỉ chiếm chỗ thừa.
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(64),
         child: Padding(
@@ -7128,10 +7323,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                         visualDensity: VisualDensity.compact,
                       ),
                     ),
-                    TextButton(
-                      onPressed: _taoVanBanTuTatCaTheGhiAm,
-                      child: const Text('Tạo văn bản'),
-                    ),
+                    // Thay cho "Tạo văn bản" (từng thẻ đã có sẵn lựa chọn
+                    // này trong menu riêng của nó) — chỉ hiện khi có một
+                    // thẻ đang ghi (kể cả đang tạm dừng).
+                    if (_soTheGhiAmDangGhi != null)
+                      TextButton(
+                        onPressed: _dungVaHoanThanhGhiAmThe,
+                        child: const Text('Dừng và hoàn thành ghi âm'),
+                      ),
                     TextButton(
                       onPressed: _taoPhienGhiAmMoiThe,
                       child: const Text('Tạo phiên ghi âm mới'),
@@ -7143,14 +7342,47 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   ],
                 ),
               ),
-              Text(
-                'Đang ghi: ${dinhDangMmSs(_thoiLuongTheGhiAmDangGhi)} / '
-                '${dinhDangMmSs(_gioiHanMoiTheGhiAm)}',
-                style: TextStyle(
-                  color: Colors.red.shade700,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_soTheGhiAmDangGhi != null)
+                    _theGhiAmDangTamDung
+                        ? Text('Tạm dừng',
+                            style: TextStyle(
+                                color: Colors.red.shade700,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12))
+                        : _ChuLuonSong(chu: 'Đang ghi', mau: Colors.red.shade700),
+                  const SizedBox(width: 4),
+                  ValueListenableBuilder<Duration>(
+                    valueListenable: _thoiLuongTheGhiAmDangGhi,
+                    builder: (context, gia, _) => Text(
+                      '${dinhDangMmSs(gia)} / ${dinhDangMmSs(_gioiHanMoiTheGhiAm)}',
+                      style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (_soTheGhiAmDangGhi != null)
+                    Tooltip(
+                      message: _theGhiAmDangTamDung ? 'Tiếp tục' : 'Tạm dừng',
+                      child: InkWell(
+                        onTap: _theGhiAmDangTamDung
+                            ? _tiepTucTheGhiAmHienTai
+                            : _tamDungTheGhiAmHienTai,
+                        child: Icon(
+                          _theGhiAmDangTamDung
+                              ? Icons.play_circle_outline
+                              : Icons.pause_circle_outline,
+                          color: Colors.red.shade700,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ],
           ),
@@ -7457,7 +7689,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           keyboardType: TextInputType.multiline,
                           // Chặn sửa/xoá từng-ký-tự-riêng-lẻ bên trong một
                           // thẻ ghi âm — xem `ChanSuaGiuaThe`.
-                          inputFormatters: [ChanSuaGiuaThe()],
+                          inputFormatters: [
+                            ChanSuaGiuaThe(khiCanXoaThe: _khiCanXoaTheTuBanPhim),
+                          ],
                           textCapitalization: TextCapitalization.sentences,
                           style: _kieuVanBan,
                           decoration: const InputDecoration(
@@ -7529,7 +7763,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                         Positioned.fill(
                           child: IgnorePointer(
                             child: AnimatedBuilder(
-                              animation: Listenable.merge([_boDieuKhien, _cuonVanBan]),
+                              animation: Listenable.merge(
+                                  [_boDieuKhien, _cuonVanBan, _conTroDangHien]),
                               builder: (context, _) => Stack(
                                 children: [_veConTro()],
                               ),
@@ -7543,8 +7778,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               ),
             ),
             ThanhCongCu(
-              bat: _muonNghe,
-              dangNghe: _dangNghe,
+              // Bê nguyên xi hiệu ứng "đang nghe" (nền hồng, đường kẻ đỏ,
+              // sóng âm) từ micro sang cho lúc một thẻ ghi âm đang ghi —
+              // cùng logic, chỉ thêm điều kiện.
+              bat: _muonNghe || _soTheGhiAmDangGhi != null,
+              dangNghe: _dangNghe ||
+                  (_soTheGhiAmDangGhi != null && !_theGhiAmDangTamDung),
               songAm: _songAm,
               sanSang: _sanSang &&
                   _microDungDuocTrenThietBiNay &&

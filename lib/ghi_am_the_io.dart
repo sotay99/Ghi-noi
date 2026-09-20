@@ -47,3 +47,14 @@ Future<void> ghiAmTheDongHan() async {
   }
   _duongDanHienTai = null;
 }
+
+Future<void> ghiAmTheTamDung() => _may.pause();
+
+Future<void> ghiAmTheTiepTuc() => _may.resume();
+
+/// Mức âm 0..1 để vẽ sóng âm — `record` đã có sẵn qua `onAmplitudeChanged`
+/// (nguyên văn nguồn dữ liệu đã dùng ở `ghi_am_ai_io.dart` cũ). dBFS âm rất
+/// sâu (~-160 im lặng) tới 0 (to nhất) — ép về 0..1, coi dưới -60dB là 0.
+Stream<double> ghiAmTheMucAm() => _may
+    .onAmplitudeChanged(const Duration(milliseconds: 200))
+    .map((m) => ((m.current + 60) / 60).clamp(0.0, 1.0));

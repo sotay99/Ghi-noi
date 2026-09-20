@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:html' as html;
+import 'dart:math' as math;
 import 'dart:typed_data';
+import 'dart:web_audio' as web_audio;
 
 /// Đáy ghi âm cho web — `MediaRecorder` chuẩn của trình duyệt, nguyên văn
 /// cách dò định dạng/khởi tạo đã kiểm chứng trên cả Android, PC/Mac và
@@ -11,12 +13,31 @@ html.MediaRecorder? _boGhi;
 List<html.Blob> _doanHienTai = [];
 Completer<(Uint8List, String)?>? _dangChoKetThuc;
 
+// Phân tích mức âm CHỈ để vẽ sóng âm (song song với đường ghi thật của
+// MediaRecorder, không đụng gì tới nó) — `MediaRecorder` không có API đọc
+// mức âm, nên dùng Web Audio API (`AnalyserNode`) gắn vào ĐÚNG luồng đã xin
+// quyền, đọc dữ liệu dạng sóng rồi tính RMS quy về 0..1.
+web_audio.AudioContext? _bienDoiAm;
+web_audio.AnalyserNode? _phanTichAm;
+
 Future<bool> ghiAmTheKhoiTao() async {
   if (_luong != null) return true;
   final thietBiMedia = html.window.navigator.mediaDevices;
   if (thietBiMedia == null) return false;
   try {
-    _luong = await thietBiMedia.getUserMedia({'audio': true});
+    final luong = await thietBiMedia.getUserMedia({'audio': true});
+    _luong = luong;
+    try {
+      final ctx = web_audio.AudioContext();
+      final nguon = ctx.createMediaStreamSource(luong);
+      final analyser = ctx.createAnalyser()..fftSize = 256;
+      nguon.connectNode(analyser);
+      _bienDoiAm = ctx;
+      _phanTichAm = analyser;
+    } catch (_) {
+      // Sóng âm chỉ là hiệu ứng phụ — ghi âm thật vẫn chạy được dù việc
+      // này lỗi (ví dụ trình duyệt cũ không có AudioContext).
+    }
     return true;
   } catch (_) {
     return false;
@@ -78,6 +99,44 @@ Future<void> ghiAmTheDongHan() async {
     track.stop();
   }
   _luong = null;
+  _phanTichAm = null;
+  unawaited(_bienDoiAm?.close());
+  _bienDoiAm = null;
+}
+
+Future<void> ghiAmTheTamDung() async => _boGhi?.pause();
+
+Future<void> ghiAmTheTiepTuc() async => _boGhi?.resume();
+
+/// Mức âm 0..1 để vẽ sóng âm, lấy mẫu mỗi 200ms từ `AnalyserNode` (xem chú
+/// thích tại nơi khai báo `_phanTichAm`). Không có analyser (lỗi lúc khởi
+/// tạo) thì phát 0 liên tục — sóng âm phẳng nhưng ghi âm vẫn hoạt động.
+Stream<double> ghiAmTheMucAm() {
+  late StreamController<double> bo;
+  Timer? gio;
+  bo = StreamController<double>.broadcast(
+    onListen: () {
+      gio = Timer.periodic(const Duration(milliseconds: 200), (_) {
+        final analyser = _phanTichAm;
+        if (analyser == null) {
+          bo.add(0);
+          return;
+        }
+        final so = analyser.frequencyBinCount ?? 128;
+        final duLieu = Uint8List(so);
+        analyser.getByteTimeDomainData(duLieu);
+        var tong = 0.0;
+        for (final b in duLieu) {
+          final d = (b - 128) / 128;
+          tong += d * d;
+        }
+        final rms = math.sqrt(tong / duLieu.length);
+        bo.add(rms.clamp(0.0, 1.0));
+      });
+    },
+    onCancel: () => gio?.cancel(),
+  );
+  return bo.stream;
 }
 
 Future<Uint8List> _doiBlobSangBytes(html.Blob blob) {

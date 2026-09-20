@@ -10,6 +10,7 @@
 // nghiệm web) — chỉ tổng quát hoá thành hàm/lớp dùng chung, không đổi
 // thuật toán.
 
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 /// Token của một thẻ ĐANG ghi dở (chưa có thời lượng) — placeholder hiển
@@ -65,6 +66,15 @@ bool viTriNamGiuaThe(int viTri, List<(int, int)> vungThe) {
 /// toán từ `main_web_test.dart` (`_ChanSuaGiuaThe`), tổng quát hoá để dùng
 /// `timCacVungTheGhiAm` thay vì đọc trực tiếp state riêng của trang thử.
 class ChanSuaGiuaThe extends TextInputFormatter {
+  ChanSuaGiuaThe({this.khiCanXoaThe});
+
+  /// Gọi (một khung hình SAU, qua `addPostFrameCallback` — không gọi ngay
+  /// trong lúc formatter còn chạy) khi một lần gõ/xoá bằng BÀN PHÍM vừa bị
+  /// CHẶN vì nó sẽ xoá một phần thẻ tại [batDau, ketThuc) — nơi gọi tự hỏi
+  /// xác nhận rồi xoá thật nếu người dùng đồng ý (y hệt cách xoá qua menu
+  /// bấm-vào-thẻ, không âm thầm xoá ngay như trước).
+  final void Function(int batDau, int ketThuc)? khiCanXoaThe;
+
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
@@ -117,6 +127,16 @@ class ChanSuaGiuaThe extends TextInputFormatter {
       final chongLan = dau < ketThuc && cuoiCu > batDau;
       final phuTron = dau <= batDau && cuoiCu >= ketThuc;
       if (chongLan && !phuTron) {
+        final goi = khiCanXoaThe;
+        if (goi != null) {
+          // CHẶN hẳn, không tự xoá — báo lại để nơi gọi hỏi xác nhận trước.
+          // Không gọi [goi] ngay tại đây: formatter đang chạy giữa lượt cập
+          // nhật của chính TextField, mở dialog/setState ngay lúc này không
+          // an toàn.
+          SchedulerBinding.instance
+              .addPostFrameCallback((_) => goi(batDau, ketThuc));
+          return oldValue;
+        }
         final vanBanKetQua = oldText.replaceRange(batDau, ketThuc, '');
         return TextEditingValue(
           text: vanBanKetQua,
