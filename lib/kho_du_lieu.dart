@@ -266,6 +266,21 @@ class KhoDuLieu {
     return null;
   }
 
+  /// Đổi màu chữ tên ghi chú — `mau` là giá trị ARGB (`Color.value`),
+  /// `null` là trả về màu mặc định.
+  void datMauGhiChu(String id, int? mau) {
+    final g = timGhiChu(id);
+    if (g == null) return;
+    g.mau = mau;
+  }
+
+  /// Cùng vai trò với `datMauGhiChu`, cho thư mục.
+  void datMauThuMuc(String id, int? mau) {
+    final t = timThuMuc(id);
+    if (t == null) return;
+    t.mau = mau;
+  }
+
   void suaNoiDungGhiChu(String id, String noiDung) {
     final g = timGhiChu(id);
     if (g == null) return;

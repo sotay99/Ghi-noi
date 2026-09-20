@@ -20,6 +20,7 @@ import 'doan_thiet_bi.dart';
 import 'ghi_am_the.dart';
 import 'gui_ghi_am_gemini.dart';
 import 'kho_du_lieu.dart';
+import 'mau_co_ban.dart';
 import 'kiem_tra_chinh_ta.dart';
 import 'kiem_tra_toan_van.dart';
 import 'loai_thiet_bi.dart';
@@ -3181,6 +3182,136 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _baoDangOTrongTep(tepMoi.ten);
   }
 
+  /// Nút "Mở rộng" ở thanh công cụ tên tệp — "Tạo Tệp văn bản mới": hỏi tên
+  /// (gợi ý sẵn, sửa được) TRƯỚC khi tạo, giống hệt cách màn hình thư mục
+  /// làm (`_hoiTenMoiTao` trong `man_hinh_thu_muc.dart`) — không đi vòng qua
+  /// màn hình thư mục, tạo và chuyển thẳng tại đây.
+  Future<void> _taoTepMoiTuThanhCongCu() async {
+    if (_muonNghe) await _tatMicro();
+    if (!mounted) return;
+    await _luuVanBan();
+    if (!mounted) return;
+
+    final chaId = _ghiChuHienTai.chaId;
+    final goiY = widget.kho.tenGhiChuGoiY(chaId);
+    final ten = await _hoiTenTepMoi(goiY: goiY, chaId: chaId);
+    if (ten == null || !mounted) return;
+
+    final moi = widget.kho.taoGhiChuMoi(chaId);
+    widget.kho.doiTenGhiChu(moi.id, ten); // đã kiểm hợp lệ trong hộp thoại.
+    await widget.kho.luu();
+    if (!mounted) return;
+    _moGhiChu(moi.id);
+    _baoDangOTrongTep(moi.ten);
+  }
+
+  /// Y hệt `_hoiTenMoiTao` của màn hình thư mục — kiểm tên ngay khi bấm Lưu,
+  /// sai thì báo lỗi tại chỗ, không đóng hộp thoại.
+  Future<String?> _hoiTenTepMoi({required String goiY, required String chaId}) {
+    final bo = TextEditingController(text: goiY)
+      ..selection = TextSelection(baseOffset: 0, extentOffset: goiY.length);
+    String? loi;
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, capNhat) {
+          return AlertDialog(
+            title: const Text('Tạo tệp văn bản mới'),
+            content: TextField(
+              controller: bo,
+              autofocus: true,
+              maxLength: doDaiTenToiDa,
+              inputFormatters: [FilteringTextInputFormatter.deny(kyTuCamTrongTen)],
+              decoration: InputDecoration(errorText: loi),
+              onSubmitted: (_) {
+                final k = widget.kho.loiTenTrongThuMuc(bo.text, chaId);
+                if (k != null) {
+                  capNhat(() => loi = k);
+                  return;
+                }
+                Navigator.of(ctx).pop(bo.text.trim());
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(null),
+                child: const Text('Huỷ'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final k = widget.kho.loiTenTrongThuMuc(bo.text, chaId);
+                  if (k != null) {
+                    capNhat(() => loi = k);
+                    return;
+                  }
+                  Navigator.of(ctx).pop(bo.text.trim());
+                },
+                child: const Text('Tạo'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// "Xoá Tệp văn bản này" — hỏi xác nhận, xoá xong nhảy sang một tệp khác
+  /// còn lại trong CÙNG thư mục nếu còn, hoặc tự tạo "Ghi chú N" (hệt tên tự
+  /// gợi ý mặc định) nếu đây là tệp CUỐI CÙNG của thư mục — rồi làm việc
+  /// ngay ở tệp đó, kèm thông báo giữa màn hình.
+  Future<void> _xoaTepHienTaiTuThanhCongCu() async {
+    final dongY = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xoá tệp văn bản này?'),
+        content: Text('Ghi chú "${_ghiChuHienTai.ten}" sẽ bị xoá VĨNH VIỄN, '
+            'không thể phục hồi lại được. Bạn có chắc chắn muốn xoá không?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Không, giữ lại'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text('Xoá', style: TextStyle(color: Colors.red.shade600)),
+          ),
+        ],
+      ),
+    );
+    if (dongY != true || !mounted) return;
+
+    final chaId = _ghiChuHienTai.chaId;
+    widget.kho.xoaGhiChu(_ghiChuHienTai.id);
+
+    final conLai = widget.kho.noiDungThuMuc(chaId).ghiChuCon;
+    final laTuDongTao = conLai.isEmpty;
+    final ke = laTuDongTao ? widget.kho.taoGhiChuMoi(chaId) : conLai.first;
+    await widget.kho.luu();
+    if (!mounted) return;
+    _moGhiChu(ke.id);
+    if (laTuDongTao) {
+      _bao('Đã xoá tệp — đang ở trong tệp "${ke.ten}" do hệ thống tự tạo.');
+    } else {
+      _baoDangOTrongTep(ke.ten);
+    }
+  }
+
+  /// "Chọn màu Tên Tệp" ở nút "Mở rộng" — CÙNG bảng màu và CÙNG cách lưu với
+  /// menu ba chấm của màn hình thư mục (`mau_co_ban.dart`), chỉ khác chỗ mở
+  /// ra (từ thanh công cụ, cho tệp ĐANG MỞ) — tên tệp ở thanh công cụ tự
+  /// động lấy đúng màu này vì `_oTenField()` đọc `_ghiChuHienTai.mau` mỗi
+  /// lần dựng lại, không cần đồng bộ tay.
+  Future<void> _chonMauTenTepHienTai() async {
+    final mau = await hienThiChonMauCoBanChoTen(
+      context,
+      tieuDe: 'Chọn màu Tên Tệp',
+    );
+    if (mau == null || !mounted) return;
+    widget.kho.datMauGhiChu(_ghiChuHienTai.id, mau.value);
+    setState(() {});
+    await widget.kho.luu();
+  }
+
   void _moGhiChu(String id) {
     final g = widget.kho.timGhiChu(id);
     if (g == null) return;
@@ -3239,10 +3370,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         // mắt không cần thiết; các lỗi micro nghiêm trọng khác (mất quyền,
         // không có micro, mất mạng...) vẫn hiển thị bình thường qua nhánh
         // else bên dưới.
+        // 'error_aborted' CHỈ bỏ qua trên WEB: Web Speech API bắn lỗi này
+        // hầu như mỗi lần app tự dừng/bật lại micro (chuyện xảy ra liên
+        // tục, xem `_henBatLai()`), dù micro vẫn đang nghe/nhận chữ hoàn
+        // toàn bình thường — không phải sự cố thật, không đáng làm phiền
+        // người dùng bằng dòng "Micro gặp trục trặc". Android/iOS gốc
+        // không dùng Web Speech API nên KHÔNG áp dụng ngoại lệ này, giữ
+        // nguyên hiển thị nếu có xảy ra (chưa từng thấy xảy ra thật).
         final nhe = loi.errorMsg == 'error_no_match' ||
             loi.errorMsg == 'error_speech_timeout' ||
             loi.errorMsg == 'error_client' ||
-            loi.errorMsg == 'error_busy';
+            loi.errorMsg == 'error_busy' ||
+            (kIsWeb && loi.errorMsg == 'error_aborted');
         if (!nhe && mounted) {
           setState(() => _loi = _dichLoi(loi.errorMsg));
         }
@@ -7671,6 +7810,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         mainAxisSize: MainAxisSize.min,
         children: [
           _nutVuongDieuHuongTep(Icons.folder, 'Mở thư mục', _moManHinhThuMuc),
+          _nutMoRongTep(),
           _nutVuongDieuHuongTep(
             Icons.arrow_back,
             'Tệp trước',
@@ -7686,13 +7826,60 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
+  /// Nút "Mở rộng" — nằm giữa "Mở thư mục" và "Tệp trước". Icon ba chấm xếp
+  /// DỌC (`Icons.more_vert`, khác `Icons.more_horiz` của các menu ngang khác
+  /// trong app) cho đúng ý "ba chấm xếp chồng lên nhau thành một hàng dọc".
+  /// Ba lựa chọn đều gọi lại ĐÚNG hàm đã có (tạo/xoá/đổi màu tệp), không
+  /// viết logic mới — chỉ nối thêm một lối vào khác cho chúng.
+  Widget _nutMoRongTep() {
+    return Tooltip(
+      message: 'Mở rộng',
+      child: PopupMenuButton<String>(
+        tooltip: '',
+        onSelected: (v) {
+          switch (v) {
+            case 'taoMoi':
+              _taoTepMoiTuThanhCongCu();
+            case 'xoa':
+              _xoaTepHienTaiTuThanhCongCu();
+            case 'mau':
+              _chonMauTenTepHienTai();
+          }
+        },
+        itemBuilder: (ctx) => const [
+          PopupMenuItem(value: 'taoMoi', child: Text('Tạo Tệp văn bản mới')),
+          PopupMenuItem(value: 'xoa', child: Text('Xoá Tệp văn bản này')),
+          PopupMenuItem(value: 'mau', child: Text('Chọn màu Tên Tệp')),
+        ],
+        child: Container(
+          width: _canhNutDieuHuongTep,
+          height: _canhNutDieuHuongTep,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: const Color(0xFFDADCE0)),
+          ),
+          child: const Icon(Icons.more_vert, size: 18, color: Color(0xFF5F6368)),
+        ),
+      ),
+    );
+  }
+
   Widget _oTenField() {
+    // Đọc lại `_ghiChuHienTai.mau` mỗi lần dựng — không cache riêng, nên
+    // đổi màu ở màn hình thư mục (cùng tham chiếu `widget.kho`) hay ở nút
+    // "Mở rộng" đều tự hiện đúng ngay lần dựng kế tiếp, không cần đồng bộ
+    // tay giữa hai nơi.
+    final mauTen = _ghiChuHienTai.mau;
     return TextField(
       controller: _tenController,
       focusNode: _oTen,
       maxLength: doDaiTenToiDa,
       inputFormatters: [FilteringTextInputFormatter.deny(kyTuCamTrongTen)],
-      style: const TextStyle(fontSize: 18, color: Colors.black87),
+      style: TextStyle(
+        fontSize: 18,
+        color: mauTen != null ? Color(mauTen) : Colors.black87,
+      ),
       decoration: const InputDecoration(
         border: InputBorder.none,
         isDense: true,
@@ -8021,36 +8208,39 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // ngược lại công cụ bị ép chật tới mức khó bấm trúng.
     final appBar = manHinhHep
         ? AppBar(
-            leading: _nutDieuHuongTep(),
-            leadingWidth: _canhNutDieuHuongTep * 3 + 4,
+            // Màn hình hẹp: bốn nút thư mục/mở rộng/tệp trước/tệp sau KHÔNG
+            // còn nằm cùng dòng với tên tệp nữa — dồn hết xuống dòng dưới,
+            // sát mép trái, cùng dòng với Lùi/Tiến/Lưu/Ẩn-hiện-định-dạng.
+            // Tên tệp một mình đứng riêng một dòng phía trên (đủ chỗ đọc tên
+            // dài, không bị bốn nút kia chèn vào nữa).
             title: _oTenField(),
             backgroundColor: Colors.white,
             surfaceTintColor: Colors.white,
             elevation: 1,
             bottom: PreferredSize(
-              // Phần B: 40px trước đây còn dư khá nhiều quanh nút 36x36 mới
-              // (36 + một chút đệm trên/dưới cho viền chạm là đủ) — 38px sát
-              // hơn, không cắt icon.
               preferredSize: const Size.fromHeight(38),
               child: SizedBox(
                 height: 38,
-                // Chỉ còn 3 nút (Lùi/Tiến/Lưu) sau khi dời phần còn lại vào
-                // menu "+ Thêm lựa chọn" — Align đẩy cả cụm sát mép phải
-                // thay vì nằm lệch trái như một Row thường trong
-                // SingleChildScrollView.
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(children: _dsNutCongCu()),
-                  ),
+                child: Row(
+                  children: [
+                    _nutDieuHuongTep(),
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(children: _dsNutCongCu()),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           )
         : AppBar(
             leading: _nutDieuHuongTep(),
-            leadingWidth: _canhNutDieuHuongTep * 3 + 4,
+            leadingWidth: _canhNutDieuHuongTep * 4 + 4,
             title: _oTenField(),
             backgroundColor: Colors.white,
             surfaceTintColor: Colors.white,

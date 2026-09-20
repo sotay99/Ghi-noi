@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'kho_du_lieu.dart';
+import 'mau_co_ban.dart';
 import 'mo_hinh.dart';
 import 'tai_ve_ghi_chu.dart';
 
@@ -142,6 +143,23 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     if (loi != null) {
       _bao(loi);
       return;
+    }
+    setState(() {});
+    await _kho.luu();
+  }
+
+  /// "Chọn màu Tên Tệp"/"Chọn màu Tên Thư mục" trong menu ba chấm — chọn
+  /// xong là đổi màu ngay, không cần bấm thêm gì khác.
+  Future<void> _chonMau({required bool laThuMuc, required String id}) async {
+    final mau = await hienThiChonMauCoBanChoTen(
+      context,
+      tieuDe: laThuMuc ? 'Chọn màu Tên Thư mục' : 'Chọn màu Tên Tệp',
+    );
+    if (mau == null) return;
+    if (laThuMuc) {
+      _kho.datMauThuMuc(id, mau.value);
+    } else {
+      _kho.datMauGhiChu(id, mau.value);
     }
     setState(() {});
     await _kho.luu();
@@ -460,7 +478,12 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                             // Vàng rực để phân biệt ngay với icon ghi chú
                             // (xám) — liếc mắt là biết đâu là thư mục.
                             leading: Icon(Icons.folder, color: Colors.amber.shade700),
-                            title: Text(t.ten),
+                            title: Text(
+                              t.ten,
+                              style: t.mau != null
+                                  ? TextStyle(color: Color(t.mau!))
+                                  : null,
+                            ),
                             onTap: () => _moThuMuc(t.id),
                             trailing: PopupMenuButton<String>(
                               onSelected: (v) {
@@ -477,6 +500,9 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                     break;
                                   case 'chep':
                                     _dat(_LoaiChoDan.chepThuMuc, t.id, t.ten);
+                                    break;
+                                  case 'mau':
+                                    _chonMau(laThuMuc: true, id: t.id);
                                     break;
                                   case 'xoa':
                                     _xoaThuMuc(t);
@@ -497,6 +523,10 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                   child: Text('Sao chép'),
                                 ),
                                 PopupMenuItem(
+                                  value: 'mau',
+                                  child: Text('Chọn màu Tên Thư mục'),
+                                ),
+                                PopupMenuItem(
                                   value: 'xoa',
                                   child: Text('Xoá'),
                                 ),
@@ -506,7 +536,12 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                         for (final g in noiDung.ghiChuCon)
                           ListTile(
                             leading: const Icon(Icons.description_outlined),
-                            title: Text(g.ten),
+                            title: Text(
+                              g.ten,
+                              style: g.mau != null
+                                  ? TextStyle(color: Color(g.mau!))
+                                  : null,
+                            ),
                             selected: g.id == widget.idGhiChuDangMo,
                             selectedTileColor: const Color(0xFFE8F0FE),
                             onTap: () => Navigator.of(context).pop(g.id),
@@ -529,6 +564,9 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                   case 'tai_ve':
                                     _taiVeGhiChu(g);
                                     break;
+                                  case 'mau':
+                                    _chonMau(laThuMuc: false, id: g.id);
+                                    break;
                                   case 'xoa':
                                     _xoaGhiChu(g);
                                     break;
@@ -550,6 +588,10 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                 PopupMenuItem(
                                   value: 'tai_ve',
                                   child: Text('Tải về'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'mau',
+                                  child: Text('Chọn màu Tên Tệp'),
                                 ),
                                 PopupMenuItem(
                                   value: 'xoa',
