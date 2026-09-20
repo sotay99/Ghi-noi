@@ -3909,8 +3909,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// tại vị trí con trỏ hiện tại (đúng nơi thẻ vừa chốt để lại con trỏ),
   /// rồi bắt đầu một thẻ mới.
   Future<void> _taoPhienGhiAmMoiThe() async {
-    // ignore: avoid_print
-    print('[CHAN-DOAN-CHAM] _taoPhienGhiAmMoiThe() ĐÃ CHẠY TỚI ĐÂY');
     if (!_trinhGhiAmMo) return;
     await _chotTheGhiAmHienTaiThanhHoanChinh();
     if (!mounted || !_trinhGhiAmMo) return;
@@ -3928,8 +3926,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// trình ghi âm vẫn mở (người dùng có thể "Tạo phiên ghi âm mới" sau nếu
   /// muốn ghi tiếp, hoặc "Đóng trình ghi âm" luôn).
   Future<void> _dungVaHoanThanhGhiAmThe() async {
-    // ignore: avoid_print
-    print('[CHAN-DOAN-CHAM] _dungVaHoanThanhGhiAmThe() ĐÃ CHẠY TỚI ĐÂY');
     if (_soTheGhiAmDangGhi == null) return;
     await _chotTheGhiAmHienTaiThanhHoanChinh();
     if (mounted) setState(() {});
@@ -3938,8 +3934,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Nút "Đóng trình ghi âm": chốt thẻ đang ghi (nếu có) rồi đóng hẳn —
   /// giải phóng micro, ẩn 4 nút nhỏ, thanh công cụ trên hiện lại.
   Future<void> _dongTrinhGhiAmThe() async {
-    // ignore: avoid_print
-    print('[CHAN-DOAN-CHAM] _dongTrinhGhiAmThe() ĐÃ CHẠY TỚI ĐÂY');
     if (!_trinhGhiAmMo) return;
     await _chotTheGhiAmHienTaiThanhHoanChinh();
     await ghiAmTheDongHan();
@@ -8061,15 +8055,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final coChu = manHinhHep ? 12.0 : 17.0;
     final coIcon = manHinhHep ? 13.0 : 17.0;
     return InkWell(
-      onTap: () {
-        // ignore: avoid_print
-        print('[CHAN-DOAN-CHAM] onTap (nhấc tay) "$nhan"');
-      },
-      onTapDown: (_) {
-        // ignore: avoid_print
-        print('[CHAN-DOAN-CHAM] onTapDown (chạm xuống) "$nhan" -> gọi onBam()');
-        onBam();
-      },
+      onTap: () {},
+      onTapDown: (_) => onBam(),
       borderRadius: BorderRadius.circular(6),
       // Đệm co lại tối thiểu — chỉ đủ vùng chạm, để cả thanh không cao hơn
       // mức cần thiết.
