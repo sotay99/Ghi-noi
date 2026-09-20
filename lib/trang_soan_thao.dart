@@ -3796,7 +3796,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           _henLuu();
         }
       }
-      _bao('Ghi âm #$soThe thất bại (không có dữ liệu) — đã bỏ thẻ này.');
+      // Chưa chắc chắn nguyên nhân thật trên mọi máy/trình duyệt — kèm luôn
+      // dòng chẩn đoán kỹ thuật (xem `ghi_am_the_web.dart`) ngay trong
+      // thông báo, để nếu còn xảy ra thì có dữ liệu THẬT để sửa tiếp, không
+      // phải đoán mò lần nữa.
+      final chanDoan = ghiAmTheChanDoanCuoi;
+      _bao('Ghi âm #$soThe thất bại (không có dữ liệu) — đã bỏ thẻ này.'
+          '${chanDoan != null ? '\nChẩn đoán: $chanDoan' : ''}');
       return soThe;
     }
     _duLieuTheoTheGhiAm[soThe] = ketQua;

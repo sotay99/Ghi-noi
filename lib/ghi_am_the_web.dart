@@ -11,6 +11,14 @@ html.MediaRecorder? _boGhi;
 List<html.Blob> _doanHienTai = [];
 Completer<(Uint8List, String)?>? _dangChoKetThuc;
 
+/// Dòng chẩn đoán kỹ thuật của lần ghi âm GẦN NHẤT kết thúc — chỉ để hiện
+/// kèm thông báo lỗi "thất bại (không có dữ liệu)" ở `trang_soan_thao.dart`,
+/// KHÔNG phải log ẩn: người dùng đọc được ngay trên màn hình, không cần mở
+/// console — vì chưa chắc chắn nguyên nhân thật (đã thử đổi thứ tự định
+/// dạng ưu tiên nhưng vẫn còn lỗi), cần dữ liệu THẬT từ máy người dùng thay
+/// vì đoán tiếp trong bóng tối.
+String? ghiAmTheChanDoanCuoi;
+
 // GHI CHÚ: bản này CHƯA đọc được mức âm thật trên web để vẽ sóng âm nhấp
 // nhô — `dart:web_audio` (Web Audio API) đã bị Flutter/Dart gỡ khỏi bộ
 // thư viện web (build đỏ ngay khi thử dùng), và thay bằng `package:web`/
@@ -62,15 +70,28 @@ Future<void> ghiAmTheBatDauThe() async {
       : html.MediaRecorder(luong, {'mimeType': dinhDangDung});
   _doanHienTai = [];
   _boGhi = boGhi;
+  final trackDau = luong.getAudioTracks().isNotEmpty ? luong.getAudioTracks().first : null;
+  var soLanBanTinDoan = 0;
+  var soLanDoanRong = 0;
   boGhi.addEventListener('dataavailable', (suKien) {
+    soLanBanTinDoan++;
     final doan = (suKien as html.BlobEvent).data;
-    if (doan != null && doan.size > 0) _doanHienTai.add(doan);
+    if (doan != null && doan.size > 0) {
+      _doanHienTai.add(doan);
+    } else {
+      soLanDoanRong++;
+    }
   });
   boGhi.addEventListener('stop', (_) async {
     final loaiThuc = boGhi.mimeType;
     final mime = (loaiThuc == null || loaiThuc.isEmpty) ? 'audio/mp4' : loaiThuc;
     final blob = html.Blob(_doanHienTai, mime);
     final bytes = await _doiBlobSangBytes(blob);
+    ghiAmTheChanDoanCuoi = 'định dạng chọn=$dinhDangDung, mime lúc dừng=$loaiThuc, '
+        'số bản tin dữ liệu=$soLanBanTinDoan (rỗng=$soLanDoanRong), '
+        'số đoạn dùng được=${_doanHienTai.length}, tổng byte=${bytes.length}, '
+        'trạng thái track âm thanh=${trackDau?.readyState ?? "không có track"}, '
+        'trạng thái bộ ghi lúc dừng=${boGhi.state}';
     // Lưới an toàn cho ĐÚNG lỗi vừa nêu ở trên (định dạng "có hỗ trợ" theo
     // isTypeSupported nhưng ghi ra rỗng thật) — dù đã đổi thứ tự ưu tiên để
     // tránh gặp lại, vẫn coi 0 byte là ghi âm thất bại thay vì gửi lên một

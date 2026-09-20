@@ -11,6 +11,11 @@ import 'package:record/record.dart';
 final AudioRecorder _may = AudioRecorder();
 String? _duongDanHienTai;
 
+/// Cùng vai trò với biến cùng tên ở `ghi_am_the_web.dart` (đọc chú thích ở
+/// đó) — trên Android/iOS gốc CHƯA từng thấy lỗi "không có dữ liệu" thật
+/// nên chỉ ghi vắn tắt, không cần chi tiết như bên web.
+String? ghiAmTheChanDoanCuoi;
+
 Future<bool> ghiAmTheKhoiTao() => _may.hasPermission();
 
 Future<void> ghiAmTheBatDauThe() async {
@@ -33,11 +38,22 @@ Future<(Uint8List, String)?> ghiAmTheKetThucThe() async {
   final duongDanTuStop = await _may.stop();
   final duongDan = duongDanTuStop ?? _duongDanHienTai;
   _duongDanHienTai = null;
-  if (duongDan == null) return null;
+  if (duongDan == null) {
+    ghiAmTheChanDoanCuoi = 'record.stop() không trả đường dẫn tệp';
+    return null;
+  }
   final tep = File(duongDan);
-  if (!await tep.exists()) return null;
+  if (!await tep.exists()) {
+    ghiAmTheChanDoanCuoi = 'tệp tạm không tồn tại: $duongDan';
+    return null;
+  }
   final bytes = await tep.readAsBytes();
   await tep.delete().catchError((_) => tep);
+  if (bytes.isEmpty) {
+    ghiAmTheChanDoanCuoi = 'tệp tạm tồn tại nhưng rỗng (0 byte)';
+    return null;
+  }
+  ghiAmTheChanDoanCuoi = null;
   return (bytes, 'audio/mp4');
 }
 
