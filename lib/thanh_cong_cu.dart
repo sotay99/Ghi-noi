@@ -371,6 +371,10 @@ class _NutMicroTron extends StatelessWidget {
     final nen = !sanSang
         ? Colors.grey.shade400
         : (bat ? Colors.red.shade600 : Colors.green.shade100);
+    // Chụp vào biến local KHÔNG NULL — `khiBam` là field public nên Dart
+    // không tự "promote" kiểu của nó dù đã so sánh `!= null` (lỗi build:
+    // "potentially null"), phải gán ra biến riêng mới dùng gọn được.
+    final khiBamCu = khiBam;
 
     return Semantics(
       button: true,
@@ -383,8 +387,8 @@ class _NutMicroTron extends StatelessWidget {
           child: InkWell(
             customBorder: const CircleBorder(),
             // Xem chú thích "ĐÃ SỬA" ở `_NutMicroHoacGhiAmGop` — cùng lý do.
-            onTap: khiBam == null ? null : () {},
-            onTapDown: khiBam == null ? null : (_) => khiBam(),
+            onTap: khiBamCu == null ? null : () {},
+            onTapDown: khiBamCu == null ? null : (_) => khiBamCu(),
             child: Container(
               width: 40,
               height: 40,
