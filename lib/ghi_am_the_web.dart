@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:html' as html;
 import 'dart:typed_data';
 
+import 'ket_qua_ghi_am_the.dart';
+
 /// Đáy ghi âm cho web — `MediaRecorder` chuẩn của trình duyệt, nguyên văn
 /// cách dò định dạng/khởi tạo đã kiểm chứng trên cả Android, PC/Mac và
 /// iPhone ở `main_web_test.dart`. Dùng LẠI một `MediaStream` xin quyền một
@@ -9,7 +11,7 @@ import 'dart:typed_data';
 html.MediaStream? _luong;
 html.MediaRecorder? _boGhi;
 List<html.Blob> _doanHienTai = [];
-Completer<(Uint8List, String)?>? _dangChoKetThuc;
+Completer<KetQuaGhiAmThe?>? _dangChoKetThuc;
 
 /// Dòng chẩn đoán kỹ thuật của lần ghi âm GẦN NHẤT kết thúc — chỉ để hiện
 /// kèm thông báo lỗi "thất bại (không có dữ liệu)" ở `trang_soan_thao.dart`,
@@ -96,16 +98,17 @@ Future<void> ghiAmTheBatDauThe() async {
     // isTypeSupported nhưng ghi ra rỗng thật) — dù đã đổi thứ tự ưu tiên để
     // tránh gặp lại, vẫn coi 0 byte là ghi âm thất bại thay vì gửi lên một
     // file rỗng coi như bình thường.
-    _dangChoKetThuc?.complete(bytes.isEmpty ? null : (bytes, mime));
+    _dangChoKetThuc
+        ?.complete(bytes.isEmpty ? null : KetQuaGhiAmThe(bytes, mime));
     _dangChoKetThuc = null;
   });
   boGhi.start();
 }
 
-Future<(Uint8List, String)?> ghiAmTheKetThucThe() async {
+Future<KetQuaGhiAmThe?> ghiAmTheKetThucThe() async {
   final boGhi = _boGhi;
   if (boGhi == null) return null;
-  final cho = Completer<(Uint8List, String)?>();
+  final cho = Completer<KetQuaGhiAmThe?>();
   _dangChoKetThuc = cho;
   boGhi.stop();
   _boGhi = null;

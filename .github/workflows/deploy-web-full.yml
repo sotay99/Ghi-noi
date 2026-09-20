@@ -21,6 +21,7 @@ on:
       - 'lib/ghi_am_the_io.dart'
       - 'lib/ghi_am_the_web.dart'
       - 'lib/gui_ghi_am_gemini.dart'
+      - 'lib/ket_qua_ghi_am_the.dart'
       - 'lib/kho_du_lieu.dart'
       - 'lib/kiem_tra_chinh_ta.dart'
       - 'lib/kiem_tra_toan_van.dart'

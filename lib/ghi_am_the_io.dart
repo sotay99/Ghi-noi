@@ -1,8 +1,9 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+
+import 'ket_qua_ghi_am_the.dart';
 
 /// Đáy ghi âm cho Android/iOS gốc — dùng package `record` (đã chạy tốt
 /// trong `ghi_am_ai_io.dart` cũ, nay tái dùng cùng cấu hình encoder cho cơ
@@ -34,7 +35,7 @@ Future<void> ghiAmTheBatDauThe() async {
   );
 }
 
-Future<(Uint8List, String)?> ghiAmTheKetThucThe() async {
+Future<KetQuaGhiAmThe?> ghiAmTheKetThucThe() async {
   final duongDanTuStop = await _may.stop();
   final duongDan = duongDanTuStop ?? _duongDanHienTai;
   _duongDanHienTai = null;
@@ -54,7 +55,7 @@ Future<(Uint8List, String)?> ghiAmTheKetThucThe() async {
     return null;
   }
   ghiAmTheChanDoanCuoi = null;
-  return (bytes, 'audio/mp4');
+  return KetQuaGhiAmThe(bytes, 'audio/mp4');
 }
 
 Future<void> ghiAmTheDongHan() async {

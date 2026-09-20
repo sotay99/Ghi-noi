@@ -3642,7 +3642,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   bool _theGhiAmDangTamDung = false;
   StreamSubscription<double>? _dangKyMucAmTheGhiAm;
   final Map<int, Duration> _thoiLuongTheoTheGhiAm = {};
-  final Map<int, (Uint8List, String)> _duLieuTheoTheGhiAm = {};
+  final Map<int, KetQuaGhiAmThe> _duLieuTheoTheGhiAm = {};
   final Set<int> _theGhiAmDangGui = {};
 
   /// Bộ nhớ đệm văn bản AI đã trả về, theo số thẻ — sống suốt phiên làm
@@ -4060,7 +4060,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (_boDieuKhien.theGhiAmLoiTamThoi.remove(soThe)) _boDieuKhien.veLai();
 
     try {
-      final chu = await guiGhiAmChoGemini(duLieu.$1, duLieu.$2);
+      final chu = await guiGhiAmChoGemini(duLieu.bytes, duLieu.mime);
       if (!mounted) return;
       final viTri = _boDieuKhien.text.indexOf(nhanDangChuyen);
       if (viTri >= 0) {

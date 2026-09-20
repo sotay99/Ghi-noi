@@ -5,9 +5,10 @@
 // các hàm giống nhau — xem chữ ký ở ghi_am_the_web.dart/ghi_am_the_io.dart:
 //   Future<bool> ghiAmTheKhoiTao()
 //   Future<void> ghiAmTheBatDauThe()
-//   Future<(Uint8List, String)?> ghiAmTheKetThucThe()
+//   Future<KetQuaGhiAmThe?> ghiAmTheKetThucThe()
 //   Future<void> ghiAmTheDongHan()
 //   Future<void> ghiAmTheTamDung()
 //   Future<void> ghiAmTheTiepTuc()
 //   Stream<double> ghiAmTheMucAm() — mức âm 0..1 để vẽ sóng âm.
 export 'ghi_am_the_web.dart' if (dart.library.io) 'ghi_am_the_io.dart';
+export 'ket_qua_ghi_am_the.dart';
