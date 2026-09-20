@@ -34,7 +34,6 @@ on:
       - 'lib/thong_bao_giua.dart'
       - 'lib/trang_huong_dan.dart'
       - 'lib/ai_cau_hinh.dart'
-      - 'tool/va_web.py'
       - '.github/workflows/deploy-web-full.yml'
   workflow_dispatch:
 
@@ -79,14 +78,20 @@ jobs:
             /tmp/khung-web
           cp -r /tmp/khung-web/web ./web
 
-      - name: Vá web/index.html để F5 luôn lấy bản mới (vẫn giữ offline)
-        run: python3 tool/va_web.py .
-
-      - name: Dựng bản Web (entry point riêng cho bản đầy đủ)
+      # BỎ HẲN Service Worker/offline — sau nhiều lần vá cơ chế "F5 luôn lấy
+      # bản mới" cho chiến lược PWA mặc định (offline-first) mà vẫn không
+      # chắc chắn (không kiểm chứng được trên trình duyệt thật, không đọc
+      # được đúng những gì Flutter Web thực sự sinh ra), đổi hẳn sang
+      # --pwa-strategy=none: không có tầng cache Service Worker nào chen
+      # vào giữa nữa, F5 CHẮC CHẮN luôn lấy đúng bản mới nhất. Đánh đổi: mất
+      # khả năng chạy khi mất mạng hoàn toàn — chấp nhận được cho một app
+      # ghi chú dùng hằng ngày có mạng bình thường.
+      - name: Dựng bản Web (entry point riêng cho bản đầy đủ, KHÔNG offline)
         run: |
           flutter build web \
             --target=lib/main_web_full.dart \
-            --base-href /
+            --base-href / \
+            --pwa-strategy=none
 
       # Đưa thẳng lên channel "live" — địa chỉ chính flowrite219.web.app,
       # vĩnh viễn, không hết hạn (khác channel xem trước "day-du"/tên nhánh,
@@ -118,6 +123,12 @@ jobs:
                 },
                 {
                   "source": "/version.json",
+                  "headers": [
+                    { "key": "Cache-Control", "value": "no-cache" }
+                  ]
+                },
+                {
+                  "source": "**/*.js",
                   "headers": [
                     { "key": "Cache-Control", "value": "no-cache" }
                   ]
