@@ -3453,6 +3453,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   final Map<int, Duration> _thoiLuongTheoTheGhiAm = {};
   final Map<int, (Uint8List, String)> _duLieuTheoTheGhiAm = {};
   final Set<int> _theGhiAmDangGui = {};
+
+  /// Bộ nhớ đệm văn bản AI đã trả về, theo số thẻ — sống suốt phiên làm
+  /// việc, KHÔNG mất khi thẻ bị xoá khỏi văn bản (khác với 3 map/set ở
+  /// trên, chỉ giữ dữ liệu cho tới khi thẻ CHUYỂN HOÁ XONG hoặc bị xoá).
+  /// Nhờ vậy: hoàn tác (Ctrl+Z) đưa một thẻ ĐÃ chuyển hoá xong về lại dạng
+  /// "Ghi âm N", rồi bấm chuyển hoá lại, thì trả ngay văn bản cũ — không gọi
+  /// AI lần hai. Cũng là căn cứ để biết một thẻ "đã an toàn" (xoá không cần
+  /// hỏi, vì hoàn tác vẫn cứu được) hay "chưa an toàn" (xoá phải hỏi, vì mất
+  /// là mất luôn — xem `_hoiXoaTheGhiAm`/`_khiCanXoaTheTuBanPhim`). Chỉ ghi
+  /// vào đây văn bản, không ghi âm thanh/thời lượng — một khi đã có văn bản
+  /// thì không bao giờ cần gửi lại âm thanh nữa, xem `_guiVaXuLyMotThe`.
+  final Map<int, String> _vanBanDaTraVeTheoTheGhiAm = {};
   bool _tuDongGuiNgamTheGhiAm = true;
   bool _daCanhBaoGioiHanTheGhiAm = false;
   bool _hopThoaiCanhBaoTheGhiAmDangMo = false;
@@ -3786,10 +3798,31 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// luôn im lặng, đường tay luôn báo).
   Future<void> _guiVaXuLyMotThe(int soThe, {required bool baoLoi}) async {
     if (_theGhiAmDangGui.contains(soThe)) return;
-    final duLieu = _duLieuTheoTheGhiAm[soThe];
-    if (duLieu == null) return;
 
     final nhanGoc = _nhanTheGhiAmHoanChinh(soThe);
+
+    // Đã có sẵn trong bộ nhớ đệm (thẻ này từng chuyển hoá xong, rồi bị hoàn
+    // tác về lại dạng thẻ) — trả ngay, không gọi AI lần hai.
+    final chuCoSan = _vanBanDaTraVeTheoTheGhiAm[soThe];
+    if (chuCoSan != null) {
+      final viTri = _boDieuKhien.text.indexOf(nhanGoc);
+      if (viTri >= 0) {
+        _thayTheGhiAmBangChuAiTaiViTri(viTri, nhanGoc.length, chuCoSan);
+      }
+      return;
+    }
+
+    final duLieu = _duLieuTheoTheGhiAm[soThe];
+    if (duLieu == null) {
+      // Không còn dữ liệu (đã bị xoá vĩnh viễn từ trước) — báo rõ lý do,
+      // đừng im lặng làm người dùng tưởng app bị treo.
+      if (baoLoi) {
+        _bao('Thẻ ghi âm #$soThe: dữ liệu đã bị xoá vĩnh viễn trước đó, '
+            'không thể chuyển hoá được nữa.');
+      }
+      return;
+    }
+
     final viTriGoc = _boDieuKhien.text.indexOf(nhanGoc);
     if (viTriGoc < 0) return; // đã bị xoá/đổi — không có gì để gửi.
 
@@ -3805,6 +3838,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       final viTri = _boDieuKhien.text.indexOf(nhanDangChuyen);
       if (viTri >= 0) {
         _thayTheGhiAmBangChuAiTaiViTri(viTri, nhanDangChuyen.length, chu);
+        // Đã có chữ thật — lưu bộ nhớ đệm, và âm thanh/thời lượng từ giờ
+        // không cần giữ nữa (không bao giờ phải gửi lại âm thanh cho thẻ
+        // này nữa, mọi lần chuyển hoá sau đều lấy từ bộ nhớ đệm).
+        _vanBanDaTraVeTheoTheGhiAm[soThe] = chu;
+        _duLieuTheoTheGhiAm.remove(soThe);
+        _thoiLuongTheoTheGhiAm.remove(soThe);
       }
     } catch (e) {
       if (mounted) {
@@ -3949,32 +3988,46 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return; // đã đổi, bỏ qua.
     }
 
-    final dongY = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Xoá thẻ ghi âm?'),
-        content: Text(laDangGhi
-            ? 'Thẻ này ĐANG GHI ÂM — xoá sẽ HUỶ LUÔN bản ghi đang thu, không '
-                'thể phục hồi lại được. Bạn có chắc chắn muốn xoá không?'
-            : khopDangChuyen != null
-                ? 'Thẻ này ĐANG được gửi đi phiên âm — xoá sẽ bỏ luôn kết quả '
-                    'sắp về, không thể phục hồi lại được. Bạn có chắc chắn '
-                    'muốn xoá không?'
-                : 'Thẻ ghi âm này sẽ bị xoá VĨNH VIỄN, không thể phục hồi lại '
-                    'được. Bạn có chắc chắn muốn xoá không?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Không, giữ lại'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text('Xoá', style: TextStyle(color: Colors.red.shade600)),
-          ),
-        ],
-      ),
-    );
-    if (dongY != true || !mounted) return;
+    // "Đang chuyển" thì chưa bao giờ có trong bộ nhớ đệm (mới gửi lần đầu,
+    // còn đang bay) — luôn phải hỏi. "Ghi âm N" thì có thể đã có cache (do
+    // vừa được hoàn tác về lại dạng thẻ) — có cache thì xoá thẳng, không hỏi.
+    final soTheHoanChinh =
+        khopHoanChinh != null ? int.parse(khopHoanChinh.group(1)!) : null;
+    final coCache = soTheHoanChinh != null &&
+        _vanBanDaTraVeTheoTheGhiAm.containsKey(soTheHoanChinh);
+
+    var dongY = true;
+    if (!coCache) {
+      dongY = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Xoá thẻ ghi âm?'),
+              content: Text(laDangGhi
+                  ? 'Thẻ này ĐANG GHI ÂM — xoá sẽ HUỶ LUÔN bản ghi đang thu, '
+                      'không thể phục hồi lại được. Bạn có chắc chắn muốn '
+                      'xoá không?'
+                  : khopDangChuyen != null
+                      ? 'Thẻ này ĐANG được gửi đi phiên âm — xoá sẽ bỏ luôn '
+                          'kết quả sắp về, không thể phục hồi lại được. Bạn '
+                          'có chắc chắn muốn xoá không?'
+                      : 'Thẻ ghi âm này sẽ bị xoá VĨNH VIỄN, không thể phục '
+                          'hồi lại được. Bạn có chắc chắn muốn xoá không?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Không, giữ lại'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: Text('Xoá',
+                      style: TextStyle(color: Colors.red.shade600)),
+                ),
+              ],
+            ),
+          ) ??
+          false;
+    }
+    if (!dongY || !mounted) return;
 
     if (laDangGhi) {
       // Thẻ đang ghi dở — huỷ luôn bản ghi (không chốt thành thẻ xong).
@@ -3999,11 +4052,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _ghiVaoO(moi, batDau);
     _henLuu();
     if (khopHoanChinh != null) {
-      final soThe = int.parse(khopHoanChinh.group(1)!);
-      _duLieuTheoTheGhiAm.remove(soThe);
-      _thoiLuongTheoTheGhiAm.remove(soThe);
-      _theGhiAmDangGui.remove(soThe);
-      if (_boDieuKhien.theGhiAmLoiTamThoi.remove(soThe)) _boDieuKhien.veLai();
+      final soThe = soTheHoanChinh!;
+      if (!coCache) {
+        _duLieuTheoTheGhiAm.remove(soThe);
+        _thoiLuongTheoTheGhiAm.remove(soThe);
+        _theGhiAmDangGui.remove(soThe);
+        if (_boDieuKhien.theGhiAmLoiTamThoi.remove(soThe)) {
+          _boDieuKhien.veLai();
+        }
+      }
     } else if (khopDangChuyen != null) {
       final soThe = int.parse(khopDangChuyen.group(1)!);
       _duLieuTheoTheGhiAm.remove(soThe);
@@ -4016,25 +4073,31 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 
   Future<void> _hoiXoaTheGhiAm(int soThe) async {
-    final dongY = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Xoá thẻ ghi âm?'),
-        content: Text('Thẻ ghi âm #$soThe sẽ bị xoá VĨNH VIỄN, không thể '
-            'phục hồi lại được. Bạn có chắc chắn muốn xoá không?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Không, giữ lại'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text('Xoá', style: TextStyle(color: Colors.red.shade600)),
-          ),
-        ],
-      ),
-    );
-    if (dongY != true || !mounted) return;
+    // Đã có trong bộ nhớ đệm (đã chuyển hoá xong) — xoá là mất chữ trên màn
+    // hình nhưng hoàn tác (Ctrl+Z) vẫn lấy lại được, nên xoá luôn, không cần
+    // hỏi. Chưa có gì trong bộ nhớ đệm — mất là mất thật, phải hỏi trước.
+    final coCache = _vanBanDaTraVeTheoTheGhiAm.containsKey(soThe);
+    if (!coCache) {
+      final dongY = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Xoá thẻ ghi âm?'),
+          content: Text('Thẻ ghi âm #$soThe sẽ bị xoá VĨNH VIỄN, không thể '
+              'phục hồi lại được. Bạn có chắc chắn muốn xoá không?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Không, giữ lại'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text('Xoá', style: TextStyle(color: Colors.red.shade600)),
+            ),
+          ],
+        ),
+      );
+      if (dongY != true || !mounted) return;
+    }
     final theCanTim = _nhanTheGhiAmHoanChinh(soThe);
     final vb = _boDieuKhien.text;
     final viTri = vb.indexOf(theCanTim);
@@ -4044,10 +4107,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final moi = vb.replaceRange(viTri, viTri + theCanTim.length, '');
     _ghiVaoO(moi, viTri);
     _henLuu();
-    _duLieuTheoTheGhiAm.remove(soThe);
-    _thoiLuongTheoTheGhiAm.remove(soThe);
-    _theGhiAmDangGui.remove(soThe);
-    if (_boDieuKhien.theGhiAmLoiTamThoi.remove(soThe)) _boDieuKhien.veLai();
+    if (!coCache) {
+      _duLieuTheoTheGhiAm.remove(soThe);
+      _thoiLuongTheoTheGhiAm.remove(soThe);
+      _theGhiAmDangGui.remove(soThe);
+      if (_boDieuKhien.theGhiAmLoiTamThoi.remove(soThe)) _boDieuKhien.veLai();
+    }
   }
 
   bool get _microDungDuocTrenThietBiNay =>
@@ -7052,13 +7117,61 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     return chon.isValid ? chon.start : _boDieuKhien.text.length;
   }
 
+  /// Nhãn nguyên văn của mọi thẻ ghi âm CHƯA có trong bộ nhớ đệm (chưa từng
+  /// chuyển hoá thành công: đang ghi / ghi xong chưa gửi / đang chuyển / lỗi
+  /// tạm thời) — mất là mất thật, nên Ctrl+Z/Ctrl+Y không được phép làm
+  /// chúng biến mất. Thẻ đã có trong bộ nhớ đệm thì không cần giữ kiểu này,
+  /// vì mất thì hoàn tác/chuyển hoá lại vẫn lấy đúng chữ cũ ra được.
+  Set<String> _nhanTheChuaCoTrongBoNhoDem() {
+    final vb = _boDieuKhien.text;
+    final ds = <String>{};
+    for (final m in reTheGhiAmHoanChinh.allMatches(vb)) {
+      final soThe = int.parse(m.group(1)!);
+      if (!_vanBanDaTraVeTheoTheGhiAm.containsKey(soThe)) ds.add(m[0]!);
+    }
+    for (final m in reTheDangChuyen.allMatches(vb)) {
+      ds.add(m[0]!);
+    }
+    if (vb.contains(tenTokenDangGhiAm)) ds.add(tenTokenDangGhiAm);
+    return ds;
+  }
+
+  bool _conNguyenCacThePhaiGiu(String vanBan, Set<String> nhanPhaiGiu) {
+    for (final nhan in nhanPhaiGiu) {
+      if (!vanBan.contains(nhan)) return false;
+    }
+    return true;
+  }
+
   void _lui() {
     if (_lichSuLui.isEmpty) return;
+    // Hướng B đã bàn: KHÔNG tự chèn thẻ vào giữa chừng (sẽ làm thẻ trôi vị
+    // trí mỗi lần bấm) — chỉ NHẢY QUA những mốc lịch sử nào thiếu bất kỳ thẻ
+    // nào đang cần giữ, tới khi gặp mốc còn giữ nguyên văn TẤT CẢ các thẻ đó.
+    final nhanPhaiGiu = _nhanTheChuaCoTrongBoNhoDem();
+    final biNhayQua = <_TrangThaiVanBan>[];
+    _TrangThaiVanBan? truoc;
+    while (_lichSuLui.isNotEmpty) {
+      final ung = _lichSuLui.removeLast();
+      if (_conNguyenCacThePhaiGiu(ung.vanBan, nhanPhaiGiu)) {
+        truoc = ung;
+        break;
+      }
+      biNhayQua.add(ung);
+    }
+    if (truoc == null) {
+      _lichSuLui.addAll(biNhayQua.reversed); // trả lại đúng thứ tự cũ.
+      _bao('Không thể hoàn tác thêm khi còn thẻ ghi âm chưa xử lý xong.');
+      return;
+    }
     _lichSuToi.add(_chupTrangThai(
       vanBan: _boDieuKhien.text,
       viTriConTro: _viTriConTroHienTai(),
     ));
-    final truoc = _lichSuLui.removeLast();
+    // Các mốc bị nhảy qua cũng phải sang bên Tiến, đúng thứ tự, để bấm Tiến
+    // sau đó đi lại đúng đường vừa nhảy qua (xem chứng minh thứ tự ở lượt
+    // bàn bạc trước khi làm).
+    _lichSuToi.addAll(biNhayQua);
     // setState trần NGAY tại đây (không đợi _apDungTrangThai) — nút Lùi/Tiến
     // trên AppBar phải phản ánh đúng độ dài hai danh sách vừa đổi ngay lập
     // tức, kẻo bấm liên tiếp trước khi khung hình kịp vẽ lại sẽ tưởng nút
@@ -7069,11 +7182,27 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   void _toi() {
     if (_lichSuToi.isEmpty) return;
+    final nhanPhaiGiu = _nhanTheChuaCoTrongBoNhoDem();
+    final biNhayQua = <_TrangThaiVanBan>[];
+    _TrangThaiVanBan? sau;
+    while (_lichSuToi.isNotEmpty) {
+      final ung = _lichSuToi.removeLast();
+      if (_conNguyenCacThePhaiGiu(ung.vanBan, nhanPhaiGiu)) {
+        sau = ung;
+        break;
+      }
+      biNhayQua.add(ung);
+    }
+    if (sau == null) {
+      _lichSuToi.addAll(biNhayQua.reversed);
+      _bao('Không thể làm lại thêm khi còn thẻ ghi âm chưa xử lý xong.');
+      return;
+    }
     _lichSuLui.add(_chupTrangThai(
       vanBan: _boDieuKhien.text,
       viTriConTro: _viTriConTroHienTai(),
     ));
-    final sau = _lichSuToi.removeLast();
+    _lichSuLui.addAll(biNhayQua);
     setState(() {});
     _apDungTrangThai(sau);
   }
