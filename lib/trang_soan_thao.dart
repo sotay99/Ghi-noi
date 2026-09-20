@@ -26,6 +26,7 @@ import 'man_hinh_thu_muc.dart';
 import 'modal_cai_dat_kiem_tra_toan_van.dart';
 import 'mo_hinh.dart';
 import 'phien_ban_web_day_du.dart';
+import 'the_ghi_am.dart';
 import 'thanh_cong_cu.dart';
 import 'thong_bao_giua.dart';
 import 'trang_huong_dan.dart';
@@ -673,6 +674,23 @@ class _BoDieuKhienChinhTa extends TextEditingController {
     if (vb.isEmpty) return TextSpan(style: style, text: vb);
 
     final vung = <_VungVe>[];
+
+    // Thẻ ghi âm — xong (xanh lá) hay đang ghi dở (đỏ). Không chồng lấn với
+    // bất kỳ vùng nào khác trong `vung` NHỜ được chặn ngay từ nguồn
+    // (`_giaoVoiVungAi` từ chối mọi định dạng thủ công/AI đụng vào thẻ),
+    // nên thêm vào đây không cần lo tranh chấp thứ tự.
+    for (final (tb, tk) in timCacVungTheGhiAm(vb)) {
+      final laDangGhi =
+          tk - tb == tenTokenDangGhiAm.length && vb.substring(tb, tk) == tenTokenDangGhiAm;
+      vung.add(_VungVe(
+        batDau: tb,
+        ketThuc: tk,
+        style: TextStyle(
+          color: laDangGhi ? Colors.red.shade700 : Colors.green.shade700,
+          fontWeight: FontWeight.bold,
+        ),
+      ));
+    }
 
     for (final l in loi) {
       if (l.batDau < 0 || l.ketThuc > vb.length || l.batDau >= l.ketThuc) continue;
@@ -4487,6 +4505,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     for (final x in _boDieuKhien.canXoa) {
       if (batDau < x.ketThuc && ketThuc > x.batDau) return true;
     }
+    // Thẻ ghi âm cũng là một "vùng khoá" ngang hàng với vùng AI — định dạng
+    // thủ công không được chồng lên nó (xem thảo luận về xung đột màu sắc
+    // giữa thẻ ghi âm và định dạng văn bản).
+    for (final (tb, tk) in timCacVungTheGhiAm(_boDieuKhien.text)) {
+      if (batDau < tk && ketThuc > tb) return true;
+    }
     return false;
   }
 
@@ -4504,6 +4528,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       if (x.dangNhapNhay) continue;
       if (viTri > x.batDau && viTri < x.ketThuc) {
         return (viTri - x.batDau) <= (x.ketThuc - viTri) ? x.batDau : x.ketThuc;
+      }
+    }
+    for (final (tb, tk) in timCacVungTheGhiAm(_boDieuKhien.text)) {
+      if (viTri > tb && viTri < tk) {
+        return (viTri - tb) <= (tk - viTri) ? tb : tk;
       }
     }
     return viTri;
@@ -6912,6 +6941,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           autofocus: true,
                           textAlignVertical: TextAlignVertical.top,
                           keyboardType: TextInputType.multiline,
+                          // Chặn sửa/xoá từng-ký-tự-riêng-lẻ bên trong một
+                          // thẻ ghi âm — xem `ChanSuaGiuaThe`.
+                          inputFormatters: [ChanSuaGiuaThe()],
                           textCapitalization: TextCapitalization.sentences,
                           style: _kieuVanBan,
                           decoration: const InputDecoration(

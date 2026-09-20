@@ -25,6 +25,7 @@ on:
       - 'lib/modal_cai_dat_kiem_tra_toan_van.dart'
       - 'lib/mo_hinh.dart'
       - 'lib/phien_ban_web_day_du.dart'
+      - 'lib/the_ghi_am.dart'
       - 'lib/tai_ve_ghi_chu.dart'
       - 'lib/tai_ve_ghi_chu_io.dart'
       - 'lib/tai_ve_ghi_chu_web.dart'
