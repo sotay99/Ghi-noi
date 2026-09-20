@@ -861,8 +861,11 @@ class _BoDieuKhienChinhTa extends TextEditingController {
     // màu thường (hai vùng tách riêng của CÙNG một thẻ).
     for (final m in reTheDangChuyen.allMatches(vb)) {
       final soThe = int.parse(m.group(1)!);
-      final gioBatDau = m.start(2);
-      final gioKetThuc = m.end(2);
+      // `Match`/`RegExpMatch` không có start(group)/end(group) — tự tính vị
+      // trí của nhóm mm:ss bằng cách tìm lại nó trong chuỗi khớp toàn phần.
+      final mmSs = m.group(2)!;
+      final gioBatDau = m.start + m[0]!.lastIndexOf(mmSs);
+      final gioKetThuc = gioBatDau + mmSs.length;
       void Function(TapDownDetails) chamTapDown() =>
           (ct) => khiBamTheDangChuyen?.call(soThe, ct.globalPosition);
       vung.add(_VungVe(
