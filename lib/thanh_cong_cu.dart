@@ -317,7 +317,15 @@ class _NutMicroHoacGhiAmGop extends StatelessWidget {
           shape: const CircleBorder(),
           child: InkWell(
             customBorder: const CircleBorder(),
-            onTap: khiBam,
+            // ĐÃ SỬA (web: phải chạm 2 lần khi con trỏ văn bản đang có tiêu
+            // điểm) — bắt sự kiện ngay lúc CHẠM XUỐNG (`onTapDown`) thay vì
+            // đợi tới lúc NHẤC LÊN (`onTap`), vì trên web việc chuyển tiêu
+            // điểm DOM ra khỏi khung nhập (khi focus rời khỏi input ẩn phía
+            // sau) có thể "ăn" mất đúng sự kiện nhấc tay của lượt chạm đầu.
+            // `onTap` rỗng chỉ để giữ InkWell ở trạng thái "có thể chạm"
+            // (còn hiệu ứng loang màu).
+            onTap: () {},
+            onTapDown: (_) => khiBam(),
             child: Container(
               width: 40,
               height: 40,
@@ -374,7 +382,9 @@ class _NutMicroTron extends StatelessWidget {
           shape: const CircleBorder(),
           child: InkWell(
             customBorder: const CircleBorder(),
-            onTap: khiBam,
+            // Xem chú thích "ĐÃ SỬA" ở `_NutMicroHoacGhiAmGop` — cùng lý do.
+            onTap: khiBam == null ? null : () {},
+            onTapDown: khiBam == null ? null : (_) => khiBam(),
             child: Container(
               width: 40,
               height: 40,
@@ -428,7 +438,9 @@ class NutNho extends StatelessWidget {
       child: Tooltip(
         message: nhan,
         child: InkResponse(
-          onTap: khiBam,
+          // Xem chú thích "ĐÃ SỬA" ở `_NutMicroHoacGhiAmGop` — cùng lý do.
+          onTap: () {},
+          onTapDown: (_) => khiBam(),
           radius: 22,
           child: Container(
             width: 38,
@@ -514,7 +526,9 @@ class _NutRong extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: khiBam,
+          // Xem chú thích "ĐÃ SỬA" ở `_NutMicroHoacGhiAmGop` — cùng lý do.
+          onTap: () {},
+          onTapDown: (_) => khiBam(),
           borderRadius: BorderRadius.circular(16),
           child: _KhungNutRong(bieuTuong: bieuTuong, nhan: nhan, mau: mau),
         ),

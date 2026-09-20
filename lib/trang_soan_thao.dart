@@ -144,7 +144,7 @@ class _ChuLuonSongState extends State<_ChuLuonSong>
     super.initState();
     _dieuKhien = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 2400),
     )..repeat();
   }
 
@@ -180,6 +180,57 @@ class _ChuLuonSongState extends State<_ChuLuonSong>
           ],
         );
       },
+    );
+  }
+}
+
+/// Nút "X" xoá nội dung ô nhập (tìm kiếm/thay thế) — bấm xong tự đổi thành
+/// chữ "Đã xoá" trong 1,5 giây rồi quay lại thành nút X, xác nhận trực quan
+/// là đã xoá thật (không đổi gì về logic xoá, chỉ thêm hiệu ứng hiển thị).
+class _NutXoaCoThongBao extends StatefulWidget {
+  const _NutXoaCoThongBao({required this.tooltip, required this.onXoa});
+  final String tooltip;
+  final VoidCallback onXoa;
+
+  @override
+  State<_NutXoaCoThongBao> createState() => _NutXoaCoThongBaoState();
+}
+
+class _NutXoaCoThongBaoState extends State<_NutXoaCoThongBao> {
+  bool _vuaXoa = false;
+  Timer? _hen;
+
+  @override
+  void dispose() {
+    _hen?.cancel();
+    super.dispose();
+  }
+
+  void _bam() {
+    widget.onXoa();
+    setState(() => _vuaXoa = true);
+    _hen?.cancel();
+    _hen = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _vuaXoa = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_vuaXoa) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Text(
+          'Đã xoá',
+          style: TextStyle(
+              color: Colors.green.shade700, fontWeight: FontWeight.w600),
+        ),
+      );
+    }
+    return IconButton(
+      icon: Icon(Icons.close, color: Colors.green.shade700),
+      tooltip: widget.tooltip,
+      onPressed: _bam,
     );
   }
 }
@@ -2368,10 +2419,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             tooltip: 'Kết quả tiếp theo',
             onPressed: _ketQuaTimKiem.isEmpty ? null : () => _dieuHuongTimKiem(1),
           ),
-          IconButton(
-            icon: Icon(Icons.close, color: Colors.green.shade700),
+          _NutXoaCoThongBao(
             tooltip: 'Xoá nội dung tìm',
-            onPressed: () => _oTimKiem.clear(),
+            onXoa: () => _oTimKiem.clear(),
           ),
           TextButton(
             style: TextButton.styleFrom(
@@ -2420,10 +2470,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             onPressed: _ketQuaTimKiem.isEmpty ? null : _xacNhanThayTatCa,
             child: const Text('Tất cả'),
           ),
-          IconButton(
-            icon: Icon(Icons.close, color: Colors.green.shade700),
+          _NutXoaCoThongBao(
             tooltip: 'Xoá nội dung thay thế',
-            onPressed: () => _oThayThe.clear(),
+            onXoa: () => _oThayThe.clear(),
           ),
           IconButton(
             icon: const Icon(Icons.settings, size: 20),
@@ -7286,33 +7335,63 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   /// Bốn nút nhỏ của trình ghi âm + đồng hồ đếm giây — thay HẲN cho AppBar
   /// bình thường trong lúc trình ghi âm mở (xem nơi dùng ở `build`).
+  /// Nút chữ/icon của thanh công cụ trình ghi âm — bắt `onTapDown` (không
+  /// đợi `onTap`/nhấc tay) vì trên WEB, tiêu điểm DOM đang ở khung nhập
+  /// (input ẩn phía sau khung soạn thảo) chuyển đi lúc nhấc tay có thể "ăn"
+  /// mất đúng lượt chạm đầu, buộc phải chạm lần hai (không xảy ra ở app
+  /// Android/iOS gốc vì không có input DOM nào cả).
+  Widget _nutTrinhGhiAm(String nhan, VoidCallback onBam, {Color? mau}) {
+    return InkWell(
+      onTap: () {},
+      onTapDown: (_) => onBam(),
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        child: Text(
+          nhan,
+          style: TextStyle(
+            color: mau ?? Theme.of(context).colorScheme.primary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
   AppBar _xayAppBarTrinhGhiAmThe() {
     return AppBar(
       backgroundColor: Colors.red.shade50,
       surfaceTintColor: Colors.red.shade50,
       elevation: 1,
       automaticallyImplyLeading: false,
-      // Không có tiêu đề "Đang ghi âm" nữa — dòng đếm giờ đỏ ngay dưới đã
-      // đủ nói lên điều đó, tiêu đề riêng chỉ chiếm chỗ thừa.
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(64),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    Tooltip(
-                      message: _tuDongGuiNgamTheGhiAm
-                          ? 'Tự động gửi ngầm thẻ ≥20s: đang BẬT (bấm để tắt)'
-                          : 'Tự động gửi ngầm thẻ ≥20s: đang TẮT (bấm để bật)',
-                      child: IconButton(
-                        onPressed: () => setState(
-                            () => _tuDongGuiNgamTheGhiAm = !_tuDongGuiNgamTheGhiAm),
-                        icon: Icon(
+      titleSpacing: 4,
+      // Dồn cả hai hàng (nút bấm + trạng thái/đồng hồ) vào ĐÚNG vùng
+      // tiêu đề chính của AppBar — không còn hàng tiêu đề "Đang ghi âm"
+      // rỗng ở trên cùng chiếm chỗ thừa, và cũng không cần một `bottom`
+      // riêng nữa.
+      toolbarHeight: 76,
+      title: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  Tooltip(
+                    message: _tuDongGuiNgamTheGhiAm
+                        ? 'Tự động gửi ngầm thẻ ≥20s: đang BẬT (bấm để tắt)'
+                        : 'Tự động gửi ngầm thẻ ≥20s: đang TẮT (bấm để bật)',
+                    child: InkWell(
+                      onTap: () {},
+                      onTapDown: (_) => setState(() =>
+                          _tuDongGuiNgamTheGhiAm = !_tuDongGuiNgamTheGhiAm),
+                      customBorder: const CircleBorder(),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Icon(
                           _tuDongGuiNgamTheGhiAm
                               ? Icons.cloud_sync
                               : Icons.cloud_sync_outlined,
@@ -7320,72 +7399,86 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                               ? Colors.deepPurple
                               : Colors.grey,
                         ),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
-                    // Thay cho "Tạo văn bản" (từng thẻ đã có sẵn lựa chọn
-                    // này trong menu riêng của nó) — chỉ hiện khi có một
-                    // thẻ đang ghi (kể cả đang tạm dừng).
-                    if (_soTheGhiAmDangGhi != null)
-                      TextButton(
-                        onPressed: _dungVaHoanThanhGhiAmThe,
-                        child: const Text('Dừng và hoàn thành ghi âm'),
-                      ),
-                    TextButton(
-                      onPressed: _taoPhienGhiAmMoiThe,
-                      child: const Text('Tạo phiên ghi âm mới'),
-                    ),
-                    TextButton(
-                      onPressed: _dongTrinhGhiAmThe,
-                      child: const Text('Đóng trình ghi âm'),
-                    ),
-                  ],
-                ),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_soTheGhiAmDangGhi != null)
-                    _theGhiAmDangTamDung
-                        ? Text('Tạm dừng',
-                            style: TextStyle(
-                                color: Colors.red.shade700,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12))
-                        : _ChuLuonSong(chu: 'Đang ghi', mau: Colors.red.shade700),
-                  const SizedBox(width: 4),
-                  ValueListenableBuilder<Duration>(
-                    valueListenable: _thoiLuongTheGhiAmDangGhi,
-                    builder: (context, gia, _) => Text(
-                      '${dinhDangMmSs(gia)} / ${dinhDangMmSs(_gioiHanMoiTheGhiAm)}',
-                      style: TextStyle(
-                        color: Colors.red.shade700,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  // Thay cho "Tạo văn bản" (từng thẻ đã có sẵn lựa chọn
+                  // này trong menu riêng của nó) — chỉ hiện khi có một
+                  // thẻ đang ghi (kể cả đang tạm dừng).
                   if (_soTheGhiAmDangGhi != null)
-                    Tooltip(
-                      message: _theGhiAmDangTamDung ? 'Tiếp tục' : 'Tạm dừng',
-                      child: InkWell(
-                        onTap: _theGhiAmDangTamDung
-                            ? _tiepTucTheGhiAmHienTai
-                            : _tamDungTheGhiAmHienTai,
-                        child: Icon(
-                          _theGhiAmDangTamDung
-                              ? Icons.play_circle_outline
-                              : Icons.pause_circle_outline,
-                          color: Colors.red.shade700,
-                          size: 20,
-                        ),
-                      ),
-                    ),
+                    _nutTrinhGhiAm(
+                        'Dừng và hoàn thành ghi âm', _dungVaHoanThanhGhiAmThe),
+                  _nutTrinhGhiAm(
+                    'Tạo phiên ghi âm mới',
+                    _taoPhienGhiAmMoiThe,
+                    mau: Colors.green.shade700,
+                  ),
+                  _nutTrinhGhiAm(
+                    'Đóng trình ghi âm',
+                    _dongTrinhGhiAmThe,
+                    mau: Colors.red.shade700,
+                  ),
                 ],
               ),
-            ],
-          ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_soTheGhiAmDangGhi != null)
+                  _theGhiAmDangTamDung
+                      ? Text('Tạm dừng',
+                          style: TextStyle(
+                              color: Colors.red.shade700,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12))
+                      : _ChuLuonSong(chu: 'Đang ghi', mau: Colors.red.shade700),
+                const SizedBox(width: 4),
+                ValueListenableBuilder<Duration>(
+                  valueListenable: _thoiLuongTheGhiAmDangGhi,
+                  builder: (context, gia, _) => Text(
+                    '${dinhDangMmSs(gia)} / ${dinhDangMmSs(_gioiHanMoiTheGhiAm)}',
+                    style: TextStyle(
+                      color: Colors.red.shade700,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (_soTheGhiAmDangGhi != null)
+                  InkWell(
+                    onTap: () {},
+                    onTapDown: (_) => _theGhiAmDangTamDung
+                        ? _tiepTucTheGhiAmHienTai()
+                        : _tamDungTheGhiAmHienTai(),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _theGhiAmDangTamDung
+                                ? Icons.play_circle_outline
+                                : Icons.pause_circle_outline,
+                            color: Colors.red.shade700,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            _theGhiAmDangTamDung ? 'Tiếp tục' : 'Dừng lại',
+                            style: TextStyle(
+                              color: Colors.red.shade700,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
         ),
       ),
     );
