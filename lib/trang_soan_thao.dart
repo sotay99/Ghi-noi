@@ -19,6 +19,7 @@ import 'cai_dat.dart';
 import 'doan_thiet_bi.dart';
 import 'ghi_am_the.dart';
 import 'gui_ghi_am_gemini.dart';
+import 'canh_bao_roi_trang.dart';
 import 'kho_du_lieu.dart';
 import 'mau_co_ban.dart';
 import 'kiem_tra_chinh_ta.dart';
@@ -2129,6 +2130,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Mấy mức âm gần nhất, để vẽ sóng. Mới nhất nằm ở cuối.
   final List<double> _songAm = List<double>.filled(16, 0);
 
+  /// Chỉ để BÁO có sóng âm mới cho `ValueListenableBuilder` bọc riêng
+  /// `ThanhCongCu` — KHÔNG dùng `setState` trần ở `_khiDoiMucAm` (chạy tới
+  /// 5 lần/giây suốt lúc ghi âm/nghe) vì đó CHÍNH LÀ nguyên nhân lỗi "web
+  /// phải chạm 2 lần" ở các nút trình ghi âm: `setState` trần dựng lại
+  /// TOÀN BỘ cây, kể cả AppBar trình ghi âm phía trên — trên web, dựng lại
+  /// một `InkWell` đúng lúc ngón tay đang chạm xuống có thể làm gesture
+  /// arena của nó bị "reset" giữa chừng, khiến lượt chạm đầu bị nuốt mất
+  /// (không xảy ra trên Android vì không có input DOM nào để tranh tiêu
+  /// điểm). Y hệt lý do đã sửa cho con trỏ nhấp nháy và đồng hồ đếm giờ
+  /// trước đây — lần này tới lượt sóng âm, phần duy nhất còn sót.
+  final ValueNotifier<int> _songAmTick = ValueNotifier<int>(0);
+
   /// Vị trí bắt đầu của câu đang đọc dở, và ĐÚNG đoạn chữ tạm đã chèn ở đó.
   ///
   /// Giữ nguyên văn đoạn chữ chứ không chỉ giữ độ dài: trước mỗi lần ghi, ta
@@ -2768,6 +2781,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     super.initState();
     _ghiChuHienTai = widget.kho.timGhiChu(widget.ghiChuId)!;
     _thietBiHienTai = widget.caiDat.thietBiChonTay ?? doanThietBi();
+    // Chỉ có tác dụng trên web (no-op ở Android/iOS gốc) — hiện đúng cảnh
+    // báo CỦA CHÍNH TRÌNH DUYỆT (không tự đặt chữ được) khi bấm F5/đóng
+    // tab/đóng trình duyệt lúc còn thay đổi CHƯA kịp tự động lưu.
+    datCanhBaoRoiTrangNeuChuaLuu(() => _coThayDoiChuaLuu);
     _tenController = TextEditingController(text: _ghiChuHienTai.ten);
     _oTen.addListener(_khiOTenMatFocus);
     // (VIỆC 2) Bật/tắt nhấp nháy con trỏ tự vẽ theo đúng lúc `_oChu` được/mất
@@ -2854,6 +2871,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _bomDongHoTheGhiAm?.cancel();
     _dangKyMucAmTheGhiAm?.cancel();
     _thoiLuongTheGhiAmDangGhi.dispose();
+    _songAmTick.dispose();
     if (_trinhGhiAmMo) unawaited(ghiAmTheDongHan());
     _micro.cancel();
     _boDieuKhien.dispose();
@@ -2878,6 +2896,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   // ---------------------------------------------------------------- lưu trữ
 
+  /// `true` = có thay đổi CHƯA kịp tự động lưu — chỉ web mới dùng tới (xem
+  /// `canh_bao_roi_trang.dart`), nhưng đặt ở đây cho MỌI nền tảng cho đơn
+  /// giản, không cần bọc `kIsWeb` quanh một biến bool vô hại.
+  bool _coThayDoiChuaLuu = false;
+
   Future<void> _luuVanBan() async {
     final khoiDinhDang = _macDinhDangAi();
     final khoiDinhDangThuCong = _macDinhDangThuCong();
@@ -2888,6 +2911,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     widget.kho.suaNoiDungGhiChu(_ghiChuHienTai.id, noiDungLuu);
     await widget.kho.luu();
+    _coThayDoiChuaLuu = false;
   }
 
   /// Tách chuỗi lưu trữ thành (văn bản THẬT, khối AI mã hoá?, khối định dạng
@@ -3044,6 +3068,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 
   void _henLuu() {
+    _coThayDoiChuaLuu = true;
     _henLuuTru?.cancel();
     _henLuuTru = Timer(const Duration(milliseconds: 600), _luuVanBan);
   }
@@ -3715,7 +3740,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void _dungTheoDoiMucAmGhiAm() {
     _dangKyMucAmTheGhiAm?.cancel();
     _dangKyMucAmTheGhiAm = null;
-    if (mounted) setState(() => _songAm.fillRange(0, _songAm.length, 0));
+    _songAm.fillRange(0, _songAm.length, 0);
+    if (mounted) _songAmTick.value++;
   }
 
   Future<void> _tamDungTheGhiAmHienTai() async {
@@ -4395,12 +4421,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (!mounted) return;
     // Mức âm Android trả về nằm khoảng -2 đến 10. Ép về 0..1 cho dễ vẽ.
     final chuan = ((muc + 2) / 12).clamp(0.0, 1.0);
-    setState(() {
-      for (var i = 0; i < _songAm.length - 1; i++) {
-        _songAm[i] = _songAm[i + 1];
-      }
-      _songAm[_songAm.length - 1] = chuan;
-    });
+    for (var i = 0; i < _songAm.length - 1; i++) {
+      _songAm[i] = _songAm[i + 1];
+    }
+    _songAm[_songAm.length - 1] = chuan;
+    _songAmTick.value++; // chỉ báo riêng ThanhCongCu vẽ lại, xem chú thích.
   }
 
   // ------------------------------------------------------- chèn chữ vào chỗ
@@ -8596,55 +8621,62 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               ),
             ),
             if (_boPhimNhanhCamUngMo) _xayHangPhimNhanhCamUng(),
-            ThanhCongCu(
-              // Bê nguyên xi hiệu ứng "đang nghe" (nền hồng, đường kẻ đỏ,
-              // sóng âm) từ micro sang cho lúc một thẻ ghi âm đang ghi —
-              // cùng logic, chỉ thêm điều kiện.
-              bat: _muonNghe || _soTheGhiAmDangGhi != null,
-              dangNghe: _dangNghe ||
-                  (_soTheGhiAmDangGhi != null && !_theGhiAmDangTamDung),
-              songAm: _songAm,
-              sanSang: _sanSang &&
-                  _microDungDuocTrenThietBiNay &&
-                  !_ghiAmTheDangKhoaMicro,
-              hienChuThich: _hienChuThich,
-              khiBamChuThich: _khiBamChuThich,
-              nhanPhimTat: '${widget.caiDat.phimTatBoBienDoi} + ${widget.caiDat.phimTatPhim}',
-              // Bàn phím đóng thì còn phải né thanh điều hướng của máy; bàn
-              // phím mở thì nó che mất thanh đó rồi, né nữa là hở một dải
-              // trắng giữa thanh công cụ và bàn phím.
-              neThanhDieuHuong: caoBanPhim == 0,
-              khiBamMicro: _bamNutMicro,
-              khiBamThuMuc: _moManHinhThuMuc,
-              khiBamCaiDat: _moCaiDat,
-              khiBamHuongDan: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ManHinhHuongDan()),
+            // Bọc riêng bằng ValueListenableBuilder (xem chú thích ở
+            // `_songAmTick`) — CHỈ ThanhCongCu dựng lại mỗi lần sóng âm đổi
+            // (tới 5 lần/giây lúc ghi âm/nghe), không đụng tới AppBar trình
+            // ghi âm hay phần còn lại của trang.
+            ValueListenableBuilder<int>(
+              valueListenable: _songAmTick,
+              builder: (context, _, __) => ThanhCongCu(
+                // Bê nguyên xi hiệu ứng "đang nghe" (nền hồng, đường kẻ đỏ,
+                // sóng âm) từ micro sang cho lúc một thẻ ghi âm đang ghi —
+                // cùng logic, chỉ thêm điều kiện.
+                bat: _muonNghe || _soTheGhiAmDangGhi != null,
+                dangNghe: _dangNghe ||
+                    (_soTheGhiAmDangGhi != null && !_theGhiAmDangTamDung),
+                songAm: _songAm,
+                sanSang: _sanSang &&
+                    _microDungDuocTrenThietBiNay &&
+                    !_ghiAmTheDangKhoaMicro,
+                hienChuThich: _hienChuThich,
+                khiBamChuThich: _khiBamChuThich,
+                nhanPhimTat: '${widget.caiDat.phimTatBoBienDoi} + ${widget.caiDat.phimTatPhim}',
+                // Bàn phím đóng thì còn phải né thanh điều hướng của máy; bàn
+                // phím mở thì nó che mất thanh đó rồi, né nữa là hở một dải
+                // trắng giữa thanh công cụ và bàn phím.
+                neThanhDieuHuong: caoBanPhim == 0,
+                khiBamMicro: _bamNutMicro,
+                khiBamThuMuc: _moManHinhThuMuc,
+                khiBamCaiDat: _moCaiDat,
+                khiBamHuongDan: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ManHinhHuongDan()),
+                ),
+                khiBamCaiDatKiemTraToanVan: _moModalCaiDatKiemTraToanVan,
+                khiBamBanPhim: () => _moModalTam(
+                  'Bàn phím',
+                  Icons.keyboard_outlined,
+                  'Bàn phím riêng của Flowrite sẽ cho bạn tự chọn ngôn ngữ và '
+                      'kiểu gõ, tích hợp sẵn nhiều ngôn ngữ và kiểu gõ khác '
+                      'nhau trong cùng một nơi.\n\n'
+                      'Hữu ích nhất cho máy chưa cài sẵn bàn phím ngôn ngữ '
+                      'mình cần, hoặc khi bạn muốn dùng hẳn bàn phím và bộ gõ '
+                      'riêng của Flowrite thay vì bàn phím mặc định của máy.',
+                ),
+                khiBamBoPhimNhanh: _bamNutBoPhimNhanhCamUng,
+                boPhimNhanhDangMo: _boPhimNhanhCamUngMo,
+                khiBamKiemTraToanVan: _khiBamKiemTraToanVan,
+                dangGhiAmThe: _trinhGhiAmMo,
+                khiBamGhiAmThe: _bamNutGhiAmThe,
+                gopMicVaGhiAmThanhMotNut:
+                    kIsWeb && _thietBiHienTai == ThietBi.iphone,
+                khiBamChepTatCa: () => _chepTatCa(),
+                khiBamChepRoiXoaTatCa: _chepRoiXoaTatCa,
+                khiBamXoaTatCa: () => _xoaTatCa(),
+                khiBamDanhSachPhimTat: _moDanhSachPhimTat,
+                khiBamTimKiem: () => _hienThanhTimKiem ? _dongTimKiem() : _moTimKiem(),
+                khiBamTroChuyen: () {},
+                khiBamTaiKhoan: () {},
               ),
-              khiBamCaiDatKiemTraToanVan: _moModalCaiDatKiemTraToanVan,
-              khiBamBanPhim: () => _moModalTam(
-                'Bàn phím',
-                Icons.keyboard_outlined,
-                'Bàn phím riêng của Flowrite sẽ cho bạn tự chọn ngôn ngữ và '
-                    'kiểu gõ, tích hợp sẵn nhiều ngôn ngữ và kiểu gõ khác '
-                    'nhau trong cùng một nơi.\n\n'
-                    'Hữu ích nhất cho máy chưa cài sẵn bàn phím ngôn ngữ '
-                    'mình cần, hoặc khi bạn muốn dùng hẳn bàn phím và bộ gõ '
-                    'riêng của Flowrite thay vì bàn phím mặc định của máy.',
-              ),
-              khiBamBoPhimNhanh: _bamNutBoPhimNhanhCamUng,
-              boPhimNhanhDangMo: _boPhimNhanhCamUngMo,
-              khiBamKiemTraToanVan: _khiBamKiemTraToanVan,
-              dangGhiAmThe: _trinhGhiAmMo,
-              khiBamGhiAmThe: _bamNutGhiAmThe,
-              gopMicVaGhiAmThanhMotNut:
-                  kIsWeb && _thietBiHienTai == ThietBi.iphone,
-              khiBamChepTatCa: () => _chepTatCa(),
-              khiBamChepRoiXoaTatCa: _chepRoiXoaTatCa,
-              khiBamXoaTatCa: () => _xoaTatCa(),
-              khiBamDanhSachPhimTat: _moDanhSachPhimTat,
-              khiBamTimKiem: () => _hienThanhTimKiem ? _dongTimKiem() : _moTimKiem(),
-              khiBamTroChuyen: () {},
-              khiBamTaiKhoan: () {},
             ),
             SizedBox(height: caoBanPhim),
           ],
