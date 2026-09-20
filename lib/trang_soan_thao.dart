@@ -799,6 +799,12 @@ class _BoDieuKhienChinhTa extends TextEditingController {
   void Function(_VungKhongPhuHop vung, Offset viTriManHinh)? khiBamDoanKhongPhuHop;
   void Function(_VungCanXoa vung, Offset viTriManHinh)? khiBamDoanCanXoa;
   void Function(int soThe, Offset viTriManHinh)? khiBamTheGhiAmHoanChinh;
+  void Function(int soThe, Offset viTriManHinh)? khiBamTheDangChuyen;
+
+  /// Số thẻ đang ở trạng thái "lỗi tạm thời" (gửi thất bại, chờ gửi lại) —
+  /// chữ vẫn là `〔Ghi âm N 🎙️ mm:ss〕` như thẻ xong bình thường, chỉ khác
+  /// MÀU (cam đậm thay vì xanh lá) để phân biệt bằng mắt.
+  final Set<int> theGhiAmLoiTamThoi = {};
 
   /// `notifyListeners()` được đánh dấu @protected trong ChangeNotifier — bọc
   /// lại một hàm công khai để trang soạn thảo gọi vẽ lại sau khi tự tay sửa
@@ -839,12 +845,41 @@ class _BoDieuKhienChinhTa extends TextEditingController {
     // nên thêm vào đây không cần lo tranh chấp thứ tự.
     for (final m in reTheGhiAmHoanChinh.allMatches(vb)) {
       final soThe = int.parse(m.group(1)!);
+      final loi = theGhiAmLoiTamThoi.contains(soThe);
       vung.add(_VungVe(
         batDau: m.start,
         ketThuc: m.end,
-        style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold),
+        style: TextStyle(
+          color: loi ? Colors.orange.shade800 : Colors.green.shade700,
+          fontWeight: FontWeight.bold,
+        ),
         recognizer: TapGestureRecognizer()
           ..onTapDown = (ct) => khiBamTheGhiAmHoanChinh?.call(soThe, ct.globalPosition),
+      ));
+    }
+    // Thẻ ĐANG được gửi cho Gemini — "Đang chuyển N" cam đậm, mm:ss giữ
+    // màu thường (hai vùng tách riêng của CÙNG một thẻ).
+    for (final m in reTheDangChuyen.allMatches(vb)) {
+      final soThe = int.parse(m.group(1)!);
+      final gioBatDau = m.start(2);
+      final gioKetThuc = m.end(2);
+      void Function(TapDownDetails) chamTapDown() =>
+          (ct) => khiBamTheDangChuyen?.call(soThe, ct.globalPosition);
+      vung.add(_VungVe(
+        batDau: m.start,
+        ketThuc: gioBatDau,
+        style: TextStyle(color: Colors.orange.shade800, fontWeight: FontWeight.bold),
+        recognizer: TapGestureRecognizer()..onTapDown = chamTapDown(),
+      ));
+      vung.add(_VungVe(
+        batDau: gioBatDau,
+        ketThuc: gioKetThuc,
+        recognizer: TapGestureRecognizer()..onTapDown = chamTapDown(),
+      ));
+      vung.add(_VungVe(
+        batDau: gioKetThuc,
+        ketThuc: m.end,
+        recognizer: TapGestureRecognizer()..onTapDown = chamTapDown(),
       ));
     }
     {
@@ -1336,11 +1371,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       if (tuKhoa.isNotEmpty) {
         final vbHa = _chuanHoaTimKiem(vb);
         final tkHa = _chuanHoaTimKiem(tuKhoa);
+        // Không cho tìm kiếm/thay thế đụng vào bên trong thẻ ghi âm — thay
+        // thế một phần ký tự trong thẻ sẽ làm thẻ lập tức bị lỗi.
+        final vungThe = timCacVungTheGhiAm(vb);
         var vt = 0;
         while (true) {
           final i = vbHa.indexOf(tkHa, vt);
           if (i < 0) break;
-          ds.add(i);
+          if (!viTriNamGiuaThe(i, vungThe) &&
+              !viTriNamGiuaThe(i + tkHa.length, vungThe) &&
+              !vungThe.any((v) => i < v.$2 && i + tkHa.length > v.$1)) {
+            ds.add(i);
+          }
           vt = i + tkHa.length;
         }
       }
@@ -2720,6 +2762,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _boDieuKhien.khiBamDoanKhongPhuHop = _khiBamDoanKhongPhuHop;
     _boDieuKhien.khiBamDoanCanXoa = _khiBamDoanCanXoa;
     _boDieuKhien.khiBamTheGhiAmHoanChinh = _khiBamTheGhiAmHoanChinh;
+    _boDieuKhien.khiBamTheDangChuyen = _khiBamTheDangChuyen;
     _oTimKiem.addListener(_capNhatKetQuaTimKiem);
     _oTimKiem.addListener(_khiOTimKiemDoi);
     _oThayThe.addListener(_khiOThayTheDoi);
@@ -3689,32 +3732,22 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
     if (tongThoiLuong < _nguongTuDongGuiTheGhiAm) return;
     for (final soThe in soTheChuaGui) {
-      _guiMotTheGhiAmNgamRoiThayVaoVanBan(soThe);
+      _guiVaXuLyMotThe(soThe, baoLoi: false);
     }
   }
 
-  /// Gửi ngầm thẻ #[soThe] cho Gemini, rồi thay đúng token của nó bằng chữ
-  /// nhận được — tìm lại vị trí token NGAY LÚC NÀY (không phải lúc bắt đầu
-  /// gửi), vì văn bản có thể đã đổi trong lúc chờ mạng. Không tìm thấy nữa
-  /// (người dùng đã xoá thẻ đó) hoặc lỗi mạng/máy chủ đều âm thầm bỏ qua —
-  /// lượt kiểm tra sau (`_kiemTraVaGuiNgamTheGhiAmNeuDu`) sẽ tự thử lại.
-  Future<void> _guiMotTheGhiAmNgamRoiThayVaoVanBan(int soThe) async {
-    final duLieu = _duLieuTheoTheGhiAm[soThe];
-    if (duLieu == null) return;
-    _theGhiAmDangGui.add(soThe);
-    try {
-      final chu = await guiGhiAmChoGemini(duLieu.$1, duLieu.$2);
-      if (!mounted) return;
-      final vb = _boDieuKhien.text;
-      final theCanTim = _nhanTheGhiAmHoanChinh(soThe);
-      final viTri = vb.indexOf(theCanTim);
-      if (viTri < 0) return;
-      _thayTheGhiAmBangChuAiTaiViTri(viTri, theCanTim.length, chu);
-    } catch (_) {
-      // Âm thầm bỏ qua — xem chú thích ở đầu hàm.
-    } finally {
-      _theGhiAmDangGui.remove(soThe);
-    }
+  /// Đổi nhãn của MỘT thẻ tại [viTri] (đang là [doDaiCu] ký tự) thành
+  /// [nhanMoi] — dùng cho hai bước "đổi tên thành Đang chuyển N lúc bắt đầu
+  /// gửi" và "đổi lại thành Ghi âm N lúc gửi lỗi". KHÔNG có hiệu ứng nhấp
+  /// nháy (khác `_thayTheGhiAmBangChuAiTaiViTri`, dành riêng cho lúc thay
+  /// bằng chữ AI thật).
+  void _doiNhanTheGhiAm(int viTri, int doDaiCu, String nhanMoi) {
+    final vb = _boDieuKhien.text;
+    _dieuChinhVungToanVanSauKhiSua(viTri, doDaiCu, nhanMoi.length);
+    _dieuChinhLoiChinhTaSauKhiSua(viTri, doDaiCu, nhanMoi.length);
+    final moi = vb.replaceRange(viTri, viTri + doDaiCu, nhanMoi);
+    _ghiVaoO(moi, viTri + nhanMoi.length);
+    _henLuu();
   }
 
   /// Thay [doDaiCu] ký tự tại [viTri] (đúng một token thẻ ghi âm) bằng chữ
@@ -3740,6 +3773,51 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _batNhapNhayKhongPhuHop(v, 'xanh');
   }
 
+  /// Con đường DUY NHẤT gửi một thẻ cho Gemini — dùng chung cho CẢ BA
+  /// đường (tay "chỉ thẻ này"/"tất cả", và tự động gửi ngầm), đúng yêu cầu
+  /// "áp dụng bất kể trường hợp nào". Ngay khi bắt đầu gửi, đổi nhãn thành
+  /// "Đang chuyển N" (cam đậm); xong thì thay bằng chữ AI (nhấp nháy 4
+  /// giây); lỗi thì trả lại nhãn "Ghi âm N" gốc, tô cam đậm (khác màu xanh
+  /// lá của thẻ xong bình thường) — âm thầm chờ lượt gửi sau, [baoLoi]
+  /// quyết định có hiện thông báo lỗi ngay hay không (đường tự động ngầm
+  /// luôn im lặng, đường tay luôn báo).
+  Future<void> _guiVaXuLyMotThe(int soThe, {required bool baoLoi}) async {
+    if (_theGhiAmDangGui.contains(soThe)) return;
+    final duLieu = _duLieuTheoTheGhiAm[soThe];
+    if (duLieu == null) return;
+
+    final nhanGoc = _nhanTheGhiAmHoanChinh(soThe);
+    final viTriGoc = _boDieuKhien.text.indexOf(nhanGoc);
+    if (viTriGoc < 0) return; // đã bị xoá/đổi — không có gì để gửi.
+
+    _theGhiAmDangGui.add(soThe);
+    final nhanDangChuyen = nhanTheDangChuyen(
+        soThe, _thoiLuongTheoTheGhiAm[soThe] ?? Duration.zero);
+    _doiNhanTheGhiAm(viTriGoc, nhanGoc.length, nhanDangChuyen);
+    if (_boDieuKhien.theGhiAmLoiTamThoi.remove(soThe)) _boDieuKhien.veLai();
+
+    try {
+      final chu = await guiGhiAmChoGemini(duLieu.$1, duLieu.$2);
+      if (!mounted) return;
+      final viTri = _boDieuKhien.text.indexOf(nhanDangChuyen);
+      if (viTri >= 0) {
+        _thayTheGhiAmBangChuAiTaiViTri(viTri, nhanDangChuyen.length, chu);
+      }
+    } catch (e) {
+      if (mounted) {
+        final viTri = _boDieuKhien.text.indexOf(nhanDangChuyen);
+        if (viTri >= 0) {
+          _doiNhanTheGhiAm(viTri, nhanDangChuyen.length, nhanGoc);
+          _boDieuKhien.theGhiAmLoiTamThoi.add(soThe);
+          _boDieuKhien.veLai();
+        }
+      }
+      if (baoLoi) _bao('Thẻ ghi âm #$soThe: lỗi gửi — $e');
+    } finally {
+      _theGhiAmDangGui.remove(soThe);
+    }
+  }
+
   /// Nút "Tạo văn bản" (thủ công) trong trình ghi âm — gửi TẤT CẢ thẻ đã
   /// ghi xong mà chưa gửi (bỏ qua thẻ đang được gửi ngầm xử lý), thay từ
   /// CUỐI VĂN BẢN VỀ ĐẦU để vị trí các thẻ chưa xử lý luôn còn đúng.
@@ -3752,31 +3830,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     for (final khop in cacKhop.reversed) {
       final soThe = int.parse(khop.group(1)!);
-      if (_theGhiAmDangGui.contains(soThe)) continue;
-      final duLieu = _duLieuTheoTheGhiAm[soThe];
-      if (duLieu == null) continue;
-      _theGhiAmDangGui.add(soThe);
-      try {
-        final chu = await guiGhiAmChoGemini(duLieu.$1, duLieu.$2);
-        if (!mounted) return;
-        // Tìm lại đúng vị trí NGAY LÚC NÀY — các lượt thay trước (nếu có,
-        // luôn ở SAU vị trí của khớp này vì đi từ cuối lên) có thể đã đổi
-        // độ dài văn bản.
-        final theCanTim = _nhanTheGhiAmHoanChinh(soThe);
-        final viTri = _boDieuKhien.text.indexOf(theCanTim);
-        if (viTri >= 0) {
-          _thayTheGhiAmBangChuAiTaiViTri(viTri, theCanTim.length, chu);
-        }
-      } catch (e) {
-        _bao('Thẻ ghi âm #$soThe: lỗi gửi — $e');
-      } finally {
-        _theGhiAmDangGui.remove(soThe);
-      }
+      await _guiVaXuLyMotThe(soThe, baoLoi: true);
     }
   }
 
-  /// Bấm vào một thẻ ghi âm ĐÃ XONG — menu 3 lựa chọn, y hệt cơ chế menu
-  /// của lỗi chính tả (`_khiBamTuSai`).
+  /// Bấm vào một thẻ ghi âm ĐÃ XONG (hoặc đang lỗi tạm thời) — menu 3 lựa
+  /// chọn, y hệt cơ chế menu của lỗi chính tả (`_khiBamTuSai`).
   Future<void> _khiBamTheGhiAmHoanChinh(int soThe, Offset viTriManHinh) async {
     final chon = await showMenu<String>(
       context: context,
@@ -3807,26 +3866,68 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       case 'tatCa':
         await _taoVanBanTuTatCaTheGhiAm();
       case 'moiThe':
-        if (_theGhiAmDangGui.contains(soThe)) return;
-        final duLieu = _duLieuTheoTheGhiAm[soThe];
-        if (duLieu == null) return;
-        _theGhiAmDangGui.add(soThe);
-        try {
-          final chu = await guiGhiAmChoGemini(duLieu.$1, duLieu.$2);
-          if (!mounted) return;
-          final theCanTim = _nhanTheGhiAmHoanChinh(soThe);
-          final viTri = _boDieuKhien.text.indexOf(theCanTim);
-          if (viTri >= 0) {
-            _thayTheGhiAmBangChuAiTaiViTri(viTri, theCanTim.length, chu);
-          }
-        } catch (e) {
-          _bao('Thẻ ghi âm #$soThe: lỗi gửi — $e');
-        } finally {
-          _theGhiAmDangGui.remove(soThe);
-        }
+        await _guiVaXuLyMotThe(soThe, baoLoi: true);
       case 'xoa':
         await _hoiXoaTheGhiAm(soThe);
     }
+  }
+
+  /// Bấm vào một thẻ ĐANG GỬI ("Đang chuyển N") — chỉ còn một lựa chọn duy
+  /// nhất: xoá (có hỏi xác nhận). Yêu cầu gửi đang bay tới Gemini vẫn chạy
+  /// tiếp bình thường; khi nó trả lời (thành công hay lỗi), `_guiVaXuLyMotThe`
+  /// tìm lại nhãn "Đang chuyển N" không thấy nữa (đã xoá) thì tự bỏ qua —
+  /// không cần huỷ tay ở đây.
+  Future<void> _khiBamTheDangChuyen(int soThe, Offset viTriManHinh) async {
+    final chon = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        viTriManHinh.dx,
+        viTriManHinh.dy,
+        viTriManHinh.dx,
+        viTriManHinh.dy,
+      ),
+      items: [
+        PopupMenuItem(
+          value: 'xoa',
+          child: Text('Xoá thẻ ghi âm này',
+              style: TextStyle(color: Colors.red.shade600)),
+        ),
+      ],
+    );
+    if (chon != 'xoa' || !mounted) return;
+    final dongY = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xoá thẻ ghi âm?'),
+        content: const Text('Thẻ này ĐANG được gửi đi phiên âm — xoá sẽ bỏ '
+            'luôn kết quả sắp về, không thể phục hồi lại được. Bạn có chắc '
+            'chắn muốn xoá không?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Không, giữ lại'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text('Xoá', style: TextStyle(color: Colors.red.shade600)),
+          ),
+        ],
+      ),
+    );
+    if (dongY != true || !mounted) return;
+    final nhan = nhanTheDangChuyen(
+        soThe, _thoiLuongTheoTheGhiAm[soThe] ?? Duration.zero);
+    final vb = _boDieuKhien.text;
+    final viTri = vb.indexOf(nhan);
+    if (viTri < 0) return;
+    _dieuChinhVungToanVanSauKhiSua(viTri, nhan.length, 0);
+    _dieuChinhLoiChinhTaSauKhiSua(viTri, nhan.length, 0);
+    final moi = vb.replaceRange(viTri, viTri + nhan.length, '');
+    _ghiVaoO(moi, viTri);
+    _henLuu();
+    _duLieuTheoTheGhiAm.remove(soThe);
+    _thoiLuongTheoTheGhiAm.remove(soThe);
+    if (_boDieuKhien.theGhiAmLoiTamThoi.remove(soThe)) _boDieuKhien.veLai();
   }
 
   /// Bấm Backspace/Delete ngay cạnh một thẻ, đủ để xoá một phần thẻ đó —
@@ -3839,8 +3940,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (ketThuc > vb.length) return;
     final doanThe = vb.substring(batDau, ketThuc);
     final khopHoanChinh = reTheGhiAmHoanChinh.firstMatch(doanThe);
+    final khopDangChuyen = reTheDangChuyen.firstMatch(doanThe);
     final laDangGhi = doanThe == tenTokenDangGhiAm;
-    if (khopHoanChinh == null && !laDangGhi) return; // đã đổi, bỏ qua.
+    if (khopHoanChinh == null && khopDangChuyen == null && !laDangGhi) {
+      return; // đã đổi, bỏ qua.
+    }
 
     final dongY = await showDialog<bool>(
       context: context,
@@ -3849,8 +3953,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         content: Text(laDangGhi
             ? 'Thẻ này ĐANG GHI ÂM — xoá sẽ HUỶ LUÔN bản ghi đang thu, không '
                 'thể phục hồi lại được. Bạn có chắc chắn muốn xoá không?'
-            : 'Thẻ ghi âm này sẽ bị xoá VĨNH VIỄN, không thể phục hồi lại '
-                'được. Bạn có chắc chắn muốn xoá không?'),
+            : khopDangChuyen != null
+                ? 'Thẻ này ĐANG được gửi đi phiên âm — xoá sẽ bỏ luôn kết quả '
+                    'sắp về, không thể phục hồi lại được. Bạn có chắc chắn '
+                    'muốn xoá không?'
+                : 'Thẻ ghi âm này sẽ bị xoá VĨNH VIỄN, không thể phục hồi lại '
+                    'được. Bạn có chắc chắn muốn xoá không?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -3892,6 +4000,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _duLieuTheoTheGhiAm.remove(soThe);
       _thoiLuongTheoTheGhiAm.remove(soThe);
       _theGhiAmDangGui.remove(soThe);
+      if (_boDieuKhien.theGhiAmLoiTamThoi.remove(soThe)) _boDieuKhien.veLai();
+    } else if (khopDangChuyen != null) {
+      final soThe = int.parse(khopDangChuyen.group(1)!);
+      _duLieuTheoTheGhiAm.remove(soThe);
+      _thoiLuongTheoTheGhiAm.remove(soThe);
+      if (_boDieuKhien.theGhiAmLoiTamThoi.remove(soThe)) _boDieuKhien.veLai();
+      // KHÔNG xoá khỏi `_theGhiAmDangGui` — yêu cầu Gemini có thể vẫn đang
+      // bay; để nó tự no-op khi về (không còn tìm thấy nhãn "Đang chuyển").
     }
     if (mounted && _trinhGhiAmMo) setState(() {});
   }
@@ -3928,6 +4044,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _duLieuTheoTheGhiAm.remove(soThe);
     _thoiLuongTheoTheGhiAm.remove(soThe);
     _theGhiAmDangGui.remove(soThe);
+    if (_boDieuKhien.theGhiAmLoiTamThoi.remove(soThe)) _boDieuKhien.veLai();
   }
 
   bool get _microDungDuocTrenThietBiNay =>

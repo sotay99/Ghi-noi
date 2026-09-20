@@ -18,8 +18,19 @@ import 'package:flutter/services.dart';
 /// xanh lá).
 const tenTokenDangGhiAm = '〔🎙️ … đang ghi âm …〕';
 
-/// Thẻ đã ghi xong: `〔Ghi âm 3 🎙️ 01:25〕`.
+/// Thẻ đã ghi xong: `〔Ghi âm 3 🎙️ 01:25〕` — màu xanh lá (bình thường) hoặc
+/// cam đậm (đang lỗi tạm thời, chờ gửi lại — chữ giống nhau, chỉ khác màu,
+/// xem `_theGhiAmLoiTamThoi` trong `trang_soan_thao.dart`).
 final RegExp reTheGhiAmHoanChinh = RegExp('〔Ghi âm (\\d+) 🎙️ \\d+:\\d+〕');
+
+/// Thẻ ĐANG được gửi cho Gemini: `〔Đang chuyển 3 🎙️ 01:25〕` — giữ nguyên số
+/// N (khác thời điểm chưa gửi/gửi lỗi chỉ khác PHẦN CHỮ đầu, mm:ss không
+/// đổi) để vẫn tìm lại đúng bằng cách so khớp nguyên văn nhãn, không lẫn
+/// giữa nhiều thẻ đang gửi cùng lúc (auto gửi ngầm có thể gửi nhiều thẻ một
+/// lượt). Nhóm 2 (`\d+:\d+`) là phần mm:ss — tách riêng để tô màu khác
+/// phần "Đang chuyển N" (xem `_BoDieuKhienChinhTa.buildTextSpan`).
+final RegExp reTheDangChuyen =
+    RegExp('〔Đang chuyển (\\d+) 🎙️ (\\d+:\\d+)〕');
 
 /// "mm:ss" — dùng cho cả đồng hồ đang ghi và nhãn thẻ đã chốt.
 String dinhDangMmSs(Duration d) {
@@ -31,13 +42,20 @@ String dinhDangMmSs(Duration d) {
 String nhanTheHoanChinh(int soThe, Duration thoiLuong) =>
     '〔Ghi âm $soThe 🎙️ ${dinhDangMmSs(thoiLuong)}〕';
 
-/// Tìm TOÀN BỘ vùng thẻ ghi âm (đã xong VÀ đang ghi dở) trong [text] — dùng
-/// làm "vùng khoá" cho: formatter chặn sửa giữa thẻ, đẩy con trỏ ra ngoài,
-/// và loại trừ lẫn với định dạng thủ công/AI/tìm-kiếm (xem
-/// `_giaoVoiVungAi`/`_diemNgoaiVungKhoa` trong `trang_soan_thao.dart`).
+/// Nhãn "đang gửi cho Gemini" của thẻ số [soThe].
+String nhanTheDangChuyen(int soThe, Duration thoiLuong) =>
+    '〔Đang chuyển $soThe 🎙️ ${dinhDangMmSs(thoiLuong)}〕';
+
+/// Tìm TOÀN BỘ vùng thẻ ghi âm (đã xong, đang gửi, VÀ đang ghi dở) trong
+/// [text] — dùng làm "vùng khoá" cho: formatter chặn sửa giữa thẻ, đẩy con
+/// trỏ ra ngoài, và loại trừ lẫn với định dạng thủ công/AI/tìm-kiếm (xem
+/// `_giaoVoiVungAi`/`_diemNgoaiVungKhoa`/tìm-kiếm trong `trang_soan_thao.dart`).
 List<(int, int)> timCacVungTheGhiAm(String text) {
   final vung = <(int, int)>[];
   for (final m in reTheGhiAmHoanChinh.allMatches(text)) {
+    vung.add((m.start, m.end));
+  }
+  for (final m in reTheDangChuyen.allMatches(text)) {
     vung.add((m.start, m.end));
   }
   var timTu = 0;
