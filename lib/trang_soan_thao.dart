@@ -4540,7 +4540,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         ? _chuanHoaXungDotTreMuTreChan(_boNhoDem!)
         : _dinhDangHopTaiViTri(_neo, het, cu.length);
 
-    _dieuChinhLoiChinhTaSauKhiSua(_neo, het - _neo, chenVao.length);
+    _dieuChinhLoiChinhTaSauKhiSua(
+      _neo,
+      het - _neo,
+      chenVao.length,
+      vanBanCu: cu,
+      vanBanMoi: moi,
+    );
     _dieuChinhVungToanVanSauKhiSua(_neo, het - _neo, chenVao.length);
     if (chenVao.isNotEmpty) {
       _apDinhDangHopChoDoanMoiChen(_neo, _neo + chenVao.length, hopMoi);
@@ -4833,6 +4839,28 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // một bước.
       if (_chuTam.isEmpty) {
         _luuDiemMoc(vanBan: cu, viTriConTro: _neo);
+        // (SỬA LỖI thụt đầu dòng không áp dụng cho giọng nói) Y hệt đường gõ
+        // tay (`_apDungChinhSuaNguoiDung`): nếu đây là mẩu ĐẦU TIÊN của một
+        // đoạn nói mới, VÀ nó đang bắt đầu một dòng còn trống (toàn văn bản
+        // rỗng, hoặc ngay sau một dấu xuống dòng) — chèn thẳng số dấu cách
+        // thụt đầu dòng vào đúng vị trí con trỏ TRƯỚC khi chèn chữ giọng nói,
+        // rồi dời `_neo` qua khỏi nó — để vùng tạm `_chuTam` theo dõi ĐÚNG
+        // phần chữ do giọng nói tạo ra, không lẫn với khoảng thụt cố định.
+        final vbHienTai = _boDieuKhien.text;
+        final thut = _thutDauDongNeuCan(vbHienTai, _neo);
+        if (thut.isNotEmpty) {
+          final vbVoiThut = vbHienTai.replaceRange(_neo, _neo, thut);
+          _dieuChinhLoiChinhTaSauKhiSua(
+            _neo,
+            0,
+            thut.length,
+            vanBanCu: vbHienTai,
+            vanBanMoi: vbVoiThut,
+          );
+          _dieuChinhVungToanVanSauKhiSua(_neo, 0, thut.length);
+          _neo += thut.length;
+          _ghiVaoO(vbVoiThut, _neo);
+        }
       }
       _thayVungTamBangGiongNoi(chen);
     }
@@ -5234,30 +5262,62 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
   }
 
+  /// (LỖI 2 mở rộng) "Tự động thụt đầu dòng" phải áp dụng ở MỌI chỗ một dòng
+  /// mới BẮT ĐẦU nhận ký tự đầu tiên của nó — không riêng gì lúc vừa bấm
+  /// Enter (VIỆC 5b/5c tự chèn thụt ngay sau `\n` nó tạo ra) hay lúc văn bản
+  /// còn HOÀN TOÀN RỖNG. Cụ thể: nếu [vanBan] rỗng, HOẶC ký tự ngay TRƯỚC
+  /// [viTri] là `\n` (dòng đó đã có sẵn nhưng còn để trống — ví dụ do người
+  /// dùng tự tạo dòng trống, hoặc dời con trỏ tay tới đó) — trả về đúng số
+  /// dấu cách cần chèn NGAY TRƯỚC nội dung sắp tới, để dòng luôn được thụt
+  /// đầu dòng bất kể nội dung đó tới từ gõ tay hay giọng nói. Trả về chuỗi
+  /// rỗng nếu không rơi vào trường hợp nào hoặc tính năng đang tắt.
+  String _thutDauDongNeuCan(String vanBan, int viTri) {
+    if (!widget.caiDat.tuDongThutDauDong) return '';
+    final rong = vanBan.isEmpty;
+    final ngayTruocLaXuongDong =
+        !rong && viTri > 0 && viTri <= vanBan.length && vanBan[viTri - 1] == '\n';
+    if (!rong && !ngayTruocLaXuongDong) return '';
+    return ' ' * widget.caiDat.soDauCachThutDauDong;
+  }
+
   void _apDungChinhSuaNguoiDung(String chuMoi) {
     final cu = _chuGanNhat;
 
     // (VIỆC 1) Vị trí con trỏ CUỐI CÙNG override — dùng chung cho MỌI phép
-    // biến đổi [chuMoi] xảy ra TRƯỚC khi diff chính chạy bên dưới (chèn 5 dấu
+    // biến đổi [chuMoi] xảy ra TRƯỚC khi diff chính chạy bên dưới (chèn dấu
     // cách ở LỖI 2 ngay dưới đây, hoặc chèn "\n" + chấm câu + thụt đầu dòng ở
     // VIỆC 5b/5c xa hơn) — vì Flutter's `TextEditingValue.selection` (đọc ở
     // cuối hàm) được tính trên [chuMoi] GỐC (TRƯỚC biến đổi), không hề biết gì
     // về các ký tự vừa được chèn thêm, nên phải tự tính tay và ghi đè vào đây.
     int? viTriConTroXuongDongTuDong;
 
-    // (LỖI 2) Gõ ký tự ĐẦU TIÊN của một văn bản đang HOÀN TOÀN RỖNG, khi tự
-    // động thụt đầu dòng đang bật: chèn 5 dấu cách vào TRƯỚC ký tự đó — cùng
-    // kỹ thuật "biến đổi [chuMoi] trước khi diff chính chạy" như VIỆC 5b bên
-    // dưới đã làm cho trường hợp Enter. `cu.isEmpty` đảm bảo chỉ áp dụng
-    // đúng MỘT LẦN, ngay lần gõ đầu tiên (những lần gõ sau, `cu` không còn
-    // rỗng nữa). Con trỏ phải nằm SAU TOÀN BỘ (5 dấu cách + ký tự vừa gõ),
-    // tức cuối [chuMoi] đã biến đổi — [chuMoi] gốc trước biến đổi luôn chỉ
-    // đúng MỘT ký tự khi `cu` rỗng (bàn phím chỉ gửi từng ký tự một), nên
-    // "5 + độ dài chuMoi gốc" ở đây chính là `chuMoi.length` SAU khi đã thêm
-    // 5 dấu cách.
-    if (widget.caiDat.tuDongThutDauDong && cu.isEmpty && chuMoi.isNotEmpty) {
-      chuMoi = '${' ' * widget.caiDat.soDauCachThutDauDong}$chuMoi';
-      viTriConTroXuongDongTuDong = chuMoi.length;
+    // (LỖI 2) Gõ ký tự ĐẦU TIÊN của một văn bản đang HOÀN TOÀN RỖNG, HOẶC gõ
+    // đúng MỘT ký tự đơn giản ngay sau một dấu xuống dòng (dòng mới còn trống
+    // — xem `_thutDauDongNeuCan`): chèn số dấu cách đã cấu hình vào TRƯỚC ký
+    // tự đó — cùng kỹ thuật "biến đổi [chuMoi] trước khi diff chính chạy" như
+    // VIỆC 5b bên dưới đã làm cho trường hợp Enter.
+    if (cu.isEmpty) {
+      final thut = _thutDauDongNeuCan(cu, 0);
+      if (thut.isNotEmpty && chuMoi.isNotEmpty) {
+        chuMoi = '$thut$chuMoi';
+        viTriConTroXuongDongTuDong = chuMoi.length;
+      }
+    } else {
+      final viTriChenDon0 = _viTriChenMotKyTuDon(cu, chuMoi);
+      // `!= '\n'`: phím Enter cũng là một phép "chèn đúng một ký tự đơn
+      // giản" khớp `_viTriChenMotKyTuDon` — nhưng Enter đã có logic thụt đầu
+      // dòng RIÊNG của nó ở VIỆC 5b/5c bên dưới (thụt vào SAU dấu `\n` vừa
+      // tạo ra, không phải TRƯỚC nó) — phải loại trừ ở đây, không thì thụt
+      // nhầm vào trước cả dấu xuống dòng.
+      if (viTriChenDon0 != null && chuMoi[viTriChenDon0] != '\n') {
+        final thut = _thutDauDongNeuCan(cu, viTriChenDon0);
+        if (thut.isNotEmpty) {
+          chuMoi = chuMoi.substring(0, viTriChenDon0) +
+              thut +
+              chuMoi.substring(viTriChenDon0);
+          viTriConTroXuongDongTuDong = viTriChenDon0 + thut.length + 1;
+        }
+      }
     }
 
     // (VIỆC 4) Viết hoa đầu câu — CHẠY TRƯỚC MỌI thứ khác trong hàm này
@@ -5649,10 +5709,20 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // xoá/đổi thì coi như dòng đó không còn giữ nguyên nữa, bỏ khỏi danh
     // sách; offset nằm SAU vùng đó thì dịch theo [lech]; offset nằm TRƯỚC
     // giữ nguyên.
-    _cacViTriDuongKeChia.removeWhere((v) => v >= vitri && v < ketThucXoa);
+    // (SỬA LỖI "đường kẻ nhường chỗ từ từ") CHỈ coi offset là "nằm sau vùng
+    // sửa" khi nó THẬT SỰ lớn hơn [vitri] — không chỉ `>=`. Khi gõ/nói ĐÚNG
+    // TẠI vị trí bắt đầu dòng đang có đường kẻ (chèn thuần, `soXoa == 0` nên
+    // `ketThucXoa == vitri`), offset đó trước đây bị hiểu lầm là "nằm sau",
+    // bị dịch tới +lech theo TỪNG ký tự vừa gõ — trông như đường kẻ "nhường
+    // chỗ" dần cho chữ mới. Giữ offset ĐỨNG YÊN ở đúng [vitri] cho đúng
+    // trường hợp biên này (khớp quy ước `d.batDau <= vitri` đã dùng cho vùng
+    // định dạng thủ công ở trên) — khối "kiểm tra lại" ngay dưới sẽ tự đọc
+    // đúng nội dung dòng đó (giờ không còn rỗng) và bỏ nó khỏi danh sách.
+    _cacViTriDuongKeChia.removeWhere((v) => v > vitri && v < ketThucXoa);
     for (var i = 0; i < _cacViTriDuongKeChia.length; i++) {
-      if (_cacViTriDuongKeChia[i] >= ketThucXoa) {
-        _cacViTriDuongKeChia[i] += lech;
+      final v = _cacViTriDuongKeChia[i];
+      if (v > vitri && v >= ketThucXoa) {
+        _cacViTriDuongKeChia[i] = v + lech;
       }
     }
     // Kiểm tra lại các offset GẦN vị trí vừa sửa (không quét toàn danh
@@ -5672,6 +5742,27 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         final dong = vanBanMoi.substring(v, ketThucDong == -1 ? vanBanMoi.length : ketThucDong);
         return dong.trim().isNotEmpty;
       });
+    }
+
+    // (SỬA LỖI đường kẻ không hiện lại) Khối trên chỉ XOÁ offset cũ khi dòng
+    // không còn rỗng — chưa từng THÊM LẠI khi người dùng xoá ký tự làm một
+    // dòng trở về rỗng/toàn dấu cách. Chỉ xét đúng dòng chứa vị trí vừa sửa
+    // xong ([moc]) — đủ cho mọi lần xoá ký tự thực tế (Backspace/Delete
+    // từng ký tự hay chọn+xoá trong một dòng) — và vẫn giữ đúng ràng buộc
+    // dòng ĐẦU/CUỐI văn bản không bao giờ có đường kẻ (xem `_quetVaXayDungDuongKeChia`).
+    if (widget.caiDat.tuDongThemDuongKeChia && vanBanMoi != null) {
+      final moc = vitri + lech;
+      if (moc >= 0 && moc <= vanBanMoi.length) {
+        final batDauDong = moc <= 0 ? 0 : vanBanMoi.lastIndexOf('\n', moc - 1) + 1;
+        final ketThucDong0 = vanBanMoi.indexOf('\n', batDauDong);
+        final dong0 = vanBanMoi.substring(
+            batDauDong, ketThucDong0 == -1 ? vanBanMoi.length : ketThucDong0);
+        final laDongDauTien = batDauDong == 0;
+        final laDongCuoiCung = ketThucDong0 == -1;
+        if (dong0.trim().isEmpty && !laDongDauTien && !laDongCuoiCung) {
+          _themViTriDuongKeChia(batDauDong);
+        }
+      }
     }
 
     // scheduleMicrotask, KHÔNG gọi notifyListeners() ngay tại đây: hàm này
