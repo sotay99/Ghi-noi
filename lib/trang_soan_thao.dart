@@ -7829,11 +7829,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// (input ẩn phía sau khung soạn thảo) chuyển đi lúc nhấc tay có thể "ăn"
   /// mất đúng lượt chạm đầu, buộc phải chạm lần hai (không xảy ra ở app
   /// Android/iOS gốc vì không có input DOM nào cả).
-  /// Ngưỡng "màn hình hẹp" (trình duyệt thu nhỏ, điện thoại) — CHỈ ảnh hưởng
-  /// tới cỡ chữ/khoảng đệm của thanh công cụ trình ghi âm; màn hình rộng giữ
-  /// nguyên như cũ.
-  static const _nguongManHinhHep = 480.0;
-
   Widget _nutTrinhGhiAm(String nhan, VoidCallback onBam,
       {Color? mau, IconData? icon, bool manHinhHep = false}) {
     final mauThuc = mau ?? Theme.of(context).colorScheme.primary;
