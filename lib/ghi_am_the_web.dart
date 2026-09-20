@@ -141,12 +141,32 @@ Stream<double> ghiAmTheMucAm() {
   return bo.stream;
 }
 
+/// TÌM RA ĐÚNG CHỖ gây lỗi "web luôn phải chạm 2 lần" ở trình ghi âm (đọc
+/// thẳng từ file đã biên dịch người dùng gửi lại, không còn là suy đoán):
+/// `doc.result as ByteBuffer` ép CỨNG một kiểu duy nhất — lần gọi ĐẦU TIÊN
+/// của `FileReader.readAsArrayBuffer` trong suốt vòng đời trang, `result`
+/// không phải là `ByteBuffer` (rất có thể do lớp tương thích JS-Dart của
+/// `dart:html` với `FileReader` chưa kịp "vá" xong kiểu ở lần dùng đầu —
+/// một dạng khởi tạo trễ hiếm gặp), ném TypeError làm cả hàm hoàn thành
+/// thẻ dừng giữa chừng — bấm lại (lần dùng THỨ HAI) thì hết lỗi. Sửa: kiểm
+/// kiểu THẬT của `result` thay vì ép cứng, chấp nhận cả `ByteBuffer` lẫn
+/// `TypedData` — không phụ thuộc lớp tương thích đã "vá" xong hay chưa.
 Future<Uint8List> _doiBlobSangBytes(html.Blob blob) {
   final doc = html.FileReader();
   final xong = Completer<Uint8List>();
   doc.onLoadEnd.listen((_) {
-    final ketQua = doc.result as ByteBuffer;
-    xong.complete(ketQua.asUint8List());
+    final ketQua = doc.result;
+    if (ketQua is ByteBuffer) {
+      xong.complete(ketQua.asUint8List());
+    } else if (ketQua is TypedData) {
+      xong.complete(
+        ketQua.buffer.asUint8List(ketQua.offsetInBytes, ketQua.lengthInBytes),
+      );
+    } else {
+      xong.completeError(
+        'FileReader.result kiểu không mong đợi: ${ketQua.runtimeType}',
+      );
+    }
   });
   doc.onError.listen((e) => xong.completeError(e));
   doc.readAsArrayBuffer(blob);
