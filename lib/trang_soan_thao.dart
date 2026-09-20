@@ -28,6 +28,7 @@ import 'loai_thiet_bi.dart';
 import 'man_hinh_cai_dat.dart';
 import 'man_hinh_thu_muc.dart';
 import 'modal_cai_dat_kiem_tra_toan_van.dart';
+import 'modal_nghe_lai_ghi_am.dart';
 import 'mo_hinh.dart';
 import 'phien_ban_web_day_du.dart';
 import 'the_ghi_am.dart';
@@ -4117,6 +4118,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           value: 'moiThe',
           child: Text('Chỉ chuyển hoá thẻ này'),
         ),
+        const PopupMenuItem(
+          value: 'nghe',
+          child: Text('Nghe bản ghi âm này'),
+        ),
         PopupMenuItem(
           value: 'xoa',
           child: Text('Xoá thẻ ghi âm này',
@@ -4130,9 +4135,47 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         await _taoVanBanTuTatCaTheGhiAm();
       case 'moiThe':
         await _guiVaXuLyMotThe(soThe, baoLoi: true);
+      case 'nghe':
+        await _ngheLaiGhiAmThe(soThe);
       case 'xoa':
         await _hoiXoaTheGhiAm(soThe);
     }
+  }
+
+  /// Bấm "Nghe bản ghi âm này" — thẻ đã chuyển hoá rồi (đã trả về văn bản,
+  /// theo cơ chế giữ trí nhớ: `_vanBanDaTraVeTheoTheGhiAm` và
+  /// `_duLieuTheoTheGhiAm` LOẠI TRỪ NHAU, xem `_guiVaXuLyMotThe`) thì bytes
+  /// gốc đã bị giải phóng — không còn gì để phát, báo cho người dùng biết
+  /// thay vì mở modal trống/lỗi.
+  Future<void> _ngheLaiGhiAmThe(int soThe) async {
+    if (_vanBanDaTraVeTheoTheGhiAm.containsKey(soThe)) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Không còn bản ghi âm'),
+          content: const Text(
+            'Cái thẻ này đã được chuyển hoá rồi nên không còn bản ghi âm '
+            'nào nữa. Bạn chỉ có thể bấm nút Chuyển hoá thì có thể xem toàn '
+            'bộ văn bản.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Đã hiểu'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    final duLieu = _duLieuTheoTheGhiAm[soThe];
+    if (duLieu == null || !mounted) return;
+    await hienModalNgheLaiGhiAm(
+      context,
+      bytes: duLieu.bytes,
+      mime: duLieu.mime,
+    );
   }
 
   /// Bấm vào một thẻ ĐANG GỬI ("Đang chuyển N") — chỉ còn một lựa chọn duy
@@ -4150,6 +4193,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         viTriManHinh.dy,
       ),
       items: [
+        const PopupMenuItem(
+          value: 'nghe',
+          child: Text('Nghe bản ghi âm này'),
+        ),
         PopupMenuItem(
           value: 'xoa',
           child: Text('Xoá thẻ ghi âm này',
@@ -4157,6 +4204,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         ),
       ],
     );
+    if (chon == null || !mounted) return;
+    if (chon == 'nghe') {
+      await _ngheLaiGhiAmThe(soThe);
+      return;
+    }
     if (chon != 'xoa' || !mounted) return;
     final dongY = await showDialog<bool>(
       context: context,
@@ -5204,7 +5256,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // "5 + độ dài chuMoi gốc" ở đây chính là `chuMoi.length` SAU khi đã thêm
     // 5 dấu cách.
     if (widget.caiDat.tuDongThutDauDong && cu.isEmpty && chuMoi.isNotEmpty) {
-      chuMoi = '     $chuMoi';
+      chuMoi = '${' ' * widget.caiDat.soDauCachThutDauDong}$chuMoi';
       viTriConTroXuongDongTuDong = chuMoi.length;
     }
 
@@ -5264,9 +5316,37 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           dauXuongDongDon >= 2 &&
           cuChoEnter[dauXuongDongDon - 1] == ' ' &&
           cuChoEnter[dauXuongDongDon - 2] == ' ';
-      final themCham =
-          widget.caiDat.tuDongThemDauCham && !daCoChamRoi && !haiCachLienTiep;
-      final thut = widget.caiDat.tuDongThutDauDong ? '     ' : '';
+      // (VIỆC THÊM) Sáu trường hợp KHÔNG được thêm dấu chấm — chỉ xuống dòng
+      // ngay: (1) không có ký tự nào trước con trỏ, (2) ký tự trước con trỏ
+      // là xuống dòng, (3) ký tự trước con trỏ là dấu cách và trước dấu cách
+      // đó là xuống dòng, (4) ký tự trước con trỏ là dấu cách và trước dấu
+      // cách đó không có ký tự gì (dấu cách là ký tự đầu văn bản), (5) ký tự
+      // trước con trỏ là một ký tự đặc biệt, (6) ký tự trước con trỏ là dấu
+      // cách và trước dấu cách đó là một ký tự đặc biệt — riêng trường hợp 6
+      // còn phải XOÁ LUÔN dấu cách thừa đó trước khi xuống dòng.
+      const kyTuDacBiet = {
+        '.', ',', '!', '@', '#', '\$', '%', '^', '&', '*', '(', ')', '_', '+',
+        '=', '?', '/', '>', '<', '{', '}', ']', '[',
+      };
+      final ktTruocNua =
+          dauXuongDongDon >= 2 ? cuChoEnter[dauXuongDongDon - 2] : null;
+      final laTruongHop6 = ktNgayTruoc == ' ' &&
+          ktTruocNua != null &&
+          kyTuDacBiet.contains(ktTruocNua);
+      final khongThemDauChamThem = ktNgayTruoc == null ||
+          ktNgayTruoc == '\n' ||
+          (ktNgayTruoc == ' ' && ktTruocNua == '\n') ||
+          (ktNgayTruoc == ' ' && ktTruocNua == null) ||
+          kyTuDacBiet.contains(ktNgayTruoc) ||
+          laTruongHop6;
+
+      final themCham = widget.caiDat.tuDongThemDauCham &&
+          !daCoChamRoi &&
+          !haiCachLienTiep &&
+          !khongThemDauChamThem;
+      final thut = widget.caiDat.tuDongThutDauDong
+          ? ' ' * widget.caiDat.soDauCachThutDauDong
+          : '';
       var moiDau = dauXuongDongDon;
       String chenVao;
       if (themCham) {
@@ -5275,9 +5355,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         }
         chenVao = '.\n$thut';
       } else {
+        if (laTruongHop6) {
+          moiDau = dauXuongDongDon - 1;
+        }
         chenVao = '\n$thut';
       }
-      if (themCham || thut.isNotEmpty) {
+      if (themCham || thut.isNotEmpty || laTruongHop6) {
         chuMoi = cuChoEnter.substring(0, moiDau) + chenVao + cuChoEnter.substring(dauXuongDongDon);
         viTriConTroXuongDongTuDong = moiDau + chenVao.length;
       }

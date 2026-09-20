@@ -110,9 +110,15 @@ class CaiDat {
   bool tuDongThutDauDong = true;
   bool tuDongThemDuongKeChia = true;
 
+  /// Số dấu cách chèn vào khi thụt đầu dòng (tính năng "Tự động thụt đầu
+  /// dòng khi xuống dòng" ở trên) — người dùng chọn từ 1 tới 7 trong Menu
+  /// thả xuống ở màn hình Cài đặt. Mặc định 4 (trước đây ép cứng 5).
+  int soDauCachThutDauDong = 4;
+
   static const _khoaTuDongThemDauCham = 'ghi_noi_tu_dong_them_dau_cham';
   static const _khoaTuDongThutDauDong = 'ghi_noi_tu_dong_thut_dau_dong';
   static const _khoaTuDongThemDuongKeChia = 'ghi_noi_tu_dong_them_duong_ke_chia';
+  static const _khoaSoDauCachThutDauDong = 'ghi_noi_so_dau_cach_thut_dau_dong';
 
   /// Có tự viết hoa chữ cái đầu của một từ ngay sau dấu câu kết thúc câu
   /// (. , : ! ?) hay không. Mặc định BẬT.
@@ -151,6 +157,8 @@ class CaiDat {
         kho.getBool(_khoaTimKiemPhanBietDauThanh) ?? true;
     tuDongThemDauCham = kho.getBool(_khoaTuDongThemDauCham) ?? true;
     tuDongThutDauDong = kho.getBool(_khoaTuDongThutDauDong) ?? true;
+    soDauCachThutDauDong =
+        (kho.getInt(_khoaSoDauCachThutDauDong) ?? 4).clamp(1, 7);
     tuDongThemDuongKeChia = kho.getBool(_khoaTuDongThemDuongKeChia) ?? true;
     tuDongVietHoaDauCau = kho.getBool(_khoaTuDongVietHoaDauCau) ?? true;
     final tenThietBiDaLuu = kho.getString(_khoaThietBiChonTay);
@@ -183,6 +191,12 @@ class CaiDat {
     tuDongThutDauDong = bat;
     final kho = await SharedPreferences.getInstance();
     await kho.setBool(_khoaTuDongThutDauDong, bat);
+  }
+
+  Future<void> datSoDauCachThutDauDong(int soDauCach) async {
+    soDauCachThutDauDong = soDauCach.clamp(1, 7);
+    final kho = await SharedPreferences.getInstance();
+    await kho.setInt(_khoaSoDauCachThutDauDong, soDauCachThutDauDong);
   }
 
   Future<void> datTuDongThemDuongKeChia(bool bat) async {

@@ -67,6 +67,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
   late bool _tuDongChenDauCau;
   late bool _tuDongThemDauCham;
   late bool _tuDongThutDauDong;
+  late int _soDauCachThutDauDong;
   late bool _tuDongThemDuongKeChia;
   late bool _tuDongVietHoaDauCau;
   late String _phimTatBoBienDoi;
@@ -86,6 +87,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     _tuDongChenDauCau = widget.caiDat.tuDongChenDauCauBangAI;
     _tuDongThemDauCham = widget.caiDat.tuDongThemDauCham;
     _tuDongThutDauDong = widget.caiDat.tuDongThutDauDong;
+    _soDauCachThutDauDong = widget.caiDat.soDauCachThutDauDong;
     _tuDongThemDuongKeChia = widget.caiDat.tuDongThemDuongKeChia;
     _tuDongVietHoaDauCau = widget.caiDat.tuDongVietHoaDauCau;
     _phimTatBoBienDoi = widget.caiDat.phimTatBoBienDoi;
@@ -427,9 +429,11 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
           required String moTa,
           required bool dangChon,
           required VoidCallback onTap,
+          IconData? bieuTuong,
         }) {
           return ListTile(
             onTap: onTap,
+            leading: bieuTuong == null ? null : Icon(bieuTuong),
             title: Text(ten,
                 style: const TextStyle(fontWeight: FontWeight.w600)),
             subtitle: Text(moTa),
@@ -458,6 +462,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
                     '${doanThietBi().ten}.',
                 dangChon: widget.caiDat.thietBiChonTay == null,
                 onTap: () => Navigator.of(context).pop((true, null)),
+                bieuTuong: Icons.auto_awesome,
               ),
               for (final t in ThietBi.values)
                 dong(
@@ -465,6 +470,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
                   moTa: t.moTa,
                   dangChon: widget.caiDat.thietBiChonTay == t,
                   onTap: () => Navigator.of(context).pop((true, t)),
+                  bieuTuong: t.bieuTuong,
                 ),
               const SizedBox(height: 8),
             ],
@@ -721,6 +727,26 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
             ),
           ],
         ),
+        if (_tuDongThutDauDong) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Text('Số dấu cách chèn vào: '),
+              DropdownButton<int>(
+                value: _soDauCachThutDauDong,
+                items: [
+                  for (var n = 1; n <= 7; n++)
+                    DropdownMenuItem(value: n, child: Text('$n dấu cách')),
+                ],
+                onChanged: (n) async {
+                  if (n == null) return;
+                  setState(() => _soDauCachThutDauDong = n);
+                  await widget.caiDat.datSoDauCachThutDauDong(n);
+                },
+              ),
+            ],
+          ),
+        ],
         _nutTimHieuThem(() => _hienGiaiThich(
               'Tự động thụt đầu dòng',
               _giaiThichThutDauDongNgan,

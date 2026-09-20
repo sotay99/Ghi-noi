@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 // Ba "bản" hành vi micro trên web — chỉ có ý nghĩa khi chạy trên web
 // (`kIsWeb`). App Android/iOS gốc luôn nói thẳng với hệ điều hành qua
 // `speech_to_text`, không dùng tới khái niệm này.
@@ -14,5 +16,11 @@ extension ThongTinThietBi on ThietBi {
         ThietBi.android => 'Điện thoại/máy tính bảng Android.',
         ThietBi.pc => 'Windows, macOS hoặc Linux.',
         ThietBi.iphone => 'iPhone/iPad — micro tạm thời chưa dùng được.',
+      };
+
+  IconData get bieuTuong => switch (this) {
+        ThietBi.android => Icons.phone_android,
+        ThietBi.pc => Icons.computer,
+        ThietBi.iphone => Icons.phone_iphone,
       };
 }
