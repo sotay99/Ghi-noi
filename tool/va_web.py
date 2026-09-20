@@ -31,18 +31,32 @@ DOAN_VA = f'''{DAU_HIEU}
   // tải lại MỘT LẦN — để F5 luôn ra đúng bản mới nhất, không cần người dùng
   // tự xoá cache. Theo đúng cách Flutter tài liệu hoá:
   // https://docs.flutter.dev/platform-integration/web/initialization
+  //
+  // SỬA LẦN 2: bản đầu chỉ nghe sự kiện 'updatefound' — nhưng trình duyệt
+  // có thể đã âm thầm dò và cài xong bản mới (nằm sẵn ở `registration.
+  // waiting`) TRƯỚC KHI đoạn mã này kịp gắn người nghe vào (đúng lúc trang
+  // vừa tải xong) — bỏ lỡ sự kiện đó thì bản mới nằm chờ MÃI MÃI, không bao
+  // giờ được đẩy lên, y hệt lỗi ban đầu. Sửa: kiểm `registration.waiting`
+  // NGAY LẬP TỨC sau khi lấy được registration (bắt kịp trường hợp lỡ mất
+  // sự kiện), và tự gọi `update()` để buộc dò bản mới ngay lúc này thay vì
+  // trông chờ trình duyệt tự dò theo lịch riêng của nó.
   if ('serviceWorker' in navigator) {{
+    function baoBanMoiKichHoatNgay(dangKy) {{
+      if (dangKy.waiting) {{
+        dangKy.waiting.postMessage('skipWaiting');
+      }}
+    }}
     navigator.serviceWorker.getRegistration().then(function (dangKy) {{
       if (!dangKy) return;
+      baoBanMoiKichHoatNgay(dangKy);
       dangKy.addEventListener('updatefound', function () {{
         var moi = dangKy.installing;
         if (!moi) return;
         moi.addEventListener('statechange', function () {{
-          if (moi.state === 'installed' && dangKy.waiting) {{
-            moi.postMessage('skipWaiting');
-          }}
+          if (moi.state === 'installed') baoBanMoiKichHoatNgay(dangKy);
         }});
       }});
+      dangKy.update();
     }});
     var daTaiLaiRoi = false;
     navigator.serviceWorker.addEventListener('controllerchange', function () {{
