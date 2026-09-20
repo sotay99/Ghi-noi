@@ -90,12 +90,16 @@ jobs:
       # vào giữa nữa, F5 CHẮC CHẮN luôn lấy đúng bản mới nhất. Đánh đổi: mất
       # khả năng chạy khi mất mạng hoàn toàn — chấp nhận được cho một app
       # ghi chú dùng hằng ngày có mạng bình thường.
+      # --source-maps: để Chrome DevTools tự dịch lỗi từ tên rút gọn
+      # (minified:xx) ra đúng tên file/dòng Dart thật — không đổi gì hành vi
+      # chạy thật của app, chỉ giúp đọc lỗi trên Console dễ hơn khi cần.
       - name: Dựng bản Web (entry point riêng cho bản đầy đủ, KHÔNG offline)
         run: |
           flutter build web \
             --target=lib/main_web_full.dart \
             --base-href / \
-            --pwa-strategy=none
+            --pwa-strategy=none \
+            --source-maps
 
       # Đưa thẳng lên channel "live" — địa chỉ chính flowrite219.web.app,
       # vĩnh viễn, không hết hạn (khác channel xem trước "day-du"/tên nhánh,
