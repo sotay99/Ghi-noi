@@ -22,6 +22,8 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamHuongDan,
     required this.khiBamCaiDatKiemTraToanVan,
     required this.khiBamBanPhim,
+    required this.khiBamBoPhimNhanh,
+    required this.boPhimNhanhDangMo,
     required this.khiBamKiemTraToanVan,
     required this.dangGhiAmThe,
     required this.khiBamGhiAmThe,
@@ -61,6 +63,12 @@ class ThanhCongCu extends StatelessWidget {
   /// (trò chuyện, tóm tắt, mở rộng, viết lại) chỉ là chỗ đặt trước.
   final VoidCallback khiBamCaiDatKiemTraToanVan;
   final VoidCallback khiBamBanPhim;
+
+  /// "Bộ phím nhanh cho màn hình cảm ứng" (mục "Bật/Tắt..." trong "+ Thêm
+  /// lựa chọn") — [boPhimNhanhDangMo] quyết định tên hiển thị (Bật/Tắt).
+  final VoidCallback khiBamBoPhimNhanh;
+  final bool boPhimNhanhDangMo;
+
   final VoidCallback khiBamKiemTraToanVan;
 
   /// Trình ghi âm (thẻ ghi âm) đang mở hay không — đổi icon/màu nút Ghi âm
@@ -209,6 +217,8 @@ class ThanhCongCu extends StatelessWidget {
                             child: _NutThemMenu(
                               rong: rong,
                               khiBamBanPhim: khiBamBanPhim,
+                              khiBamBoPhimNhanh: khiBamBoPhimNhanh,
+                              boPhimNhanhDangMo: boPhimNhanhDangMo,
                               khiBamChepTatCa: khiBamChepTatCa,
                               khiBamChepRoiXoaTatCa: khiBamChepRoiXoaTatCa,
                               khiBamXoaTatCa: khiBamXoaTatCa,
@@ -951,6 +961,8 @@ class _NutThemMenu extends StatelessWidget {
   const _NutThemMenu({
     required this.rong,
     required this.khiBamBanPhim,
+    required this.khiBamBoPhimNhanh,
+    required this.boPhimNhanhDangMo,
     required this.khiBamChepTatCa,
     required this.khiBamChepRoiXoaTatCa,
     required this.khiBamXoaTatCa,
@@ -963,6 +975,10 @@ class _NutThemMenu extends StatelessWidget {
 
   /// Gắn với mục "Kiểu gõ bàn phím" trong danh sách.
   final VoidCallback khiBamBanPhim;
+
+  /// Gắn với mục "Bật/Tắt bộ phím nhanh cho màn hình cảm ứng".
+  final VoidCallback khiBamBoPhimNhanh;
+  final bool boPhimNhanhDangMo;
 
   final VoidCallback khiBamChepTatCa;
   final VoidCallback khiBamChepRoiXoaTatCa;
@@ -1005,6 +1021,9 @@ class _NutThemMenu extends StatelessWidget {
                 ),
           onSelected: (gia) {
             switch (gia) {
+              case 3:
+                khiBamBoPhimNhanh();
+                break;
               case 4:
                 khiBamBanPhim();
                 break;
@@ -1055,7 +1074,12 @@ class _NutThemMenu extends StatelessWidget {
                 _mucMenuThem(24, 'Cài đặt'),
                 _mucMenuThem(25, 'Tìm kiếm và thay thế'),
                 _dividerMenu(),
-                _mucMenuThem(3, 'Bật bộ điều hướng và phím nhanh'),
+                _mucMenuThem(
+                  3,
+                  boPhimNhanhDangMo
+                      ? 'Tắt Bộ phím nhanh cho màn hình cảm ứng'
+                      : 'Bật Bộ phím nhanh cho màn hình cảm ứng',
+                ),
                 _mucMenuThem(4, 'Kiểu gõ bàn phím'),
                 _mucMenuThem(23, 'Danh sách phím tắt'),
                 _mucMenuThem(5, 'Luyện gõ phím bằng 10 ngón tay'),

@@ -3,10 +3,6 @@ name: Dựng file APK
 on:
   push:
     branches: ['**']
-    # Bỏ qua các nhánh chỉ đổi phần web-test — app Android không dùng tới.
-    paths-ignore:
-      - 'lib/main_web_test.dart'
-      - '.github/workflows/deploy-web-test.yml'
   workflow_dispatch:
 
 permissions:
