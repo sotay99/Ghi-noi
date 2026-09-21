@@ -775,7 +775,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _tieuDeDong('Tự động thêm đường kẻ chia văn bản khi xuống dòng 2 lần'),
+        _tieuDeDong('Tự động thêm đường kẻ chia đoạn văn khi xuống dòng 2 lần'),
         const SizedBox(height: 6),
         Row(
           children: [
@@ -808,7 +808,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
                 onTap: () async {
                   final mau = await hienThiChonMauCoBanChoTen(
                     context,
-                    tieuDe: 'Chọn màu đường kẻ chia văn bản',
+                    tieuDe: 'Chọn màu đường kẻ chia đoạn văn',
                   );
                   if (mau == null) return;
                   setState(() => _mauDuongKeChia = mau.toARGB32());
@@ -851,7 +851,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
           ),
         ],
         _nutTimHieuThem(() => _hienGiaiThich(
-              'Đường kẻ chia văn bản',
+              'Đường kẻ chia đoạn văn',
               _giaiThichDuongKeChiaNgan,
               _giaiThichDuongKeChia,
             )),
@@ -1301,17 +1301,11 @@ Khi bạn gõ phím, ứng dụng **tắt hẳn micro** một lúc để khỏi 
 ''';
 
 const _giaiThichThoiGian = '''
-Khi bạn đang nói mà tay chạm vào bàn phím để gõ thêm chữ, ứng dụng sẽ **tắt hẳn micro** ngay lập tức trong một lúc — làm vậy để tiếng gõ phím, tiếng bạn lẩm bẩm khi suy nghĩ chữ cần gõ, hay bất cứ âm thanh nào trong lúc bạn đang bận tay gõ không bị micro nghe nhầm thành một câu nói mới.
+Khi tay bạn chạm bàn phím để gõ thêm chữ, ứng dụng **tắt hẳn micro** ngay lập tức, để tiếng gõ phím hay tiếng lẩm bẩm lúc nghĩ chữ không bị nghe nhầm thành lời nói. Cài đặt này quyết định ứng dụng chờ bao lâu, kể từ lúc bạn **ngừng gõ**, rồi mới tự bật micro nghe lại.
 
-Cài đặt này quyết định **ứng dụng sẽ chờ bao lâu**, kể từ lúc bạn **ngừng gõ** (không chạm bàn phím nữa), rồi mới tự động bật micro nghe lại.
+Chọn **ngắn** thì nói tiếp được gần như ngay, nhưng nếu bạn hay gõ ngắt quãng (gõ một chữ, dừng tay suy nghĩ, gõ tiếp), micro có thể bật sớm và nghe nhầm tiếng lẩm bẩm hay tiếng ồn xung quanh thành chữ chen ngang. Chọn **dài** thì an toàn hơn nhưng phải chờ lâu hơn mới nói tiếp được.
 
-Ví dụ dễ hình dung: bạn đang nói dở câu "Cuộc họp sáng mai lúc", rồi bạn ngừng nói, tự tay gõ thêm mấy chữ "9 giờ". Ngay khi ngón tay bạn chạm phím đầu tiên, micro tắt phụt. Gõ xong chữ cuối cùng, ứng dụng bắt đầu đếm — hết đúng khoảng thời gian bạn chọn ở đây thì micro mới bật trở lại, để bạn nói tiếp phần còn lại của câu.
-
-Chọn thời gian **ngắn** (ví dụ 0,5 giây): tiện vì nói tiếp được gần như ngay lập tức. Nhưng nếu thói quen gõ của bạn hay bị ngắt quãng — gõ một chữ, dừng tay một chút để suy nghĩ, rồi gõ tiếp — thì trong lúc bạn đang dừng tay suy nghĩ đó (chưa gõ xong hẳn), micro có thể đã bật lên và vô tình nghe được tiếng bạn lẩm bẩm, tiếng thở dài, hay tiếng ồn xung quanh, biến chúng thành chữ chen ngang vào bài mà bạn không muốn.
-
-Chọn thời gian **dài** (ví dụ 5 giây): an toàn hơn, gần như chắc chắn bạn đã gõ xong hẳn ứng dụng mới bật lại micro. Nhưng đổi lại, gõ xong mà muốn nói tiếp ngay, bạn sẽ phải chờ lâu hơn, cảm giác ứng dụng "đơ" một nhịp trước khi chịu nghe.
-
-Mức mặc định **1 giây** là khoảng vừa phải, hợp với cách gõ của phần lớn mọi người: đủ để gõ xong một từ hay một con số ngắn mà không bị ngắt giữa chừng, mà cũng không phải chờ quá lâu để nói tiếp.
+Mặc định **1 giây** là mức vừa phải, hợp với cách gõ của phần lớn mọi người.
 ''';
 
 const _giaiThichChenCachNgan = '''
@@ -1319,15 +1313,11 @@ Mỗi lần bạn nói xong một đoạn, ứng dụng tự thêm một **dấu
 ''';
 
 const _giaiThichChenCach = '''
-Khi giọng nói vừa dứt một câu, bộ nhận dạng của máy không phải lúc nào cũng tự thêm dấu cách vào cuối câu — có lúc câu vừa nói dừng lại đúng ngay sau chữ cuối, không có khoảng trắng nào theo sau cả.
+Bộ nhận dạng giọng nói không phải lúc nào cũng tự thêm dấu cách vào cuối câu — có lúc dừng lại đúng ngay sau chữ cuối, không có khoảng trắng theo sau. Nếu ngay đó bạn gõ tay tiếp hoặc nói tiếp, chữ mới sẽ bị **dính liền** vào chữ vừa nói. Ví dụ: nói ra "Thành đẹp trai ./.", rồi gõ tay tiếp "abc" — không có tính năng này sẽ dính thành "./.abc".
 
-Nếu ngay lúc đó bạn gõ tay tiếp vào (hoặc nói tiếp một câu khác), chữ mới sẽ bị **dính liền** vào chữ vừa nói, tạo ra một cụm chữ sai chính tả. Ví dụ: bạn nói ra được câu "Thành đẹp trai ./.", câu này kết thúc ngay sau dấu chấm cuối, không có dấu cách theo sau. Gõ tay tiếp chữ "abc" ngay sau đó — nếu không có tính năng này, kết quả sẽ là "./.abc" dính chùm lại với nhau.
+Bật tính năng này (mặc định **bật**), mỗi khi nói xong một đoạn, ứng dụng tự chèn một dấu cách vào cuối đoạn đó để chữ tiếp theo không bị dính. Tắt đi thì để nguyên như bộ nhận dạng trả về, không tự chèn gì thêm.
 
-Bật tính năng này (mặc định là **bật**), mỗi khi bạn nói xong một đoạn, ứng dụng tự chèn ngay một dấu cách vào cuối đoạn đó, cho ra kết quả đúng: "./. " sẵn sàng đón chữ tiếp theo, gõ tay hay nói tiếp đều không còn bị dính.
-
-Tắt tính năng này (chọn Không), ứng dụng để nguyên đúng như bộ nhận dạng giọng nói trả về, không tự thêm dấu cách nào cả — gõ hay nói tiếp ngay sau đó có thể bị dính liền như ví dụ ở trên.
-
-Việc chèn dấu cách này chỉ xảy ra ở cuối mỗi đoạn NÓI. Còn gõ tay ở bất kỳ đâu trong bài — kể cả ngay giữa một đoạn do nói tạo ra — luôn dính liền bình thường như một trang soạn thảo thường, không có gì tự động chèn thêm; ứng dụng không còn phân biệt chữ nào do nói, chữ nào do gõ tay nữa, mọi chữ trong bài đều bình đẳng như nhau.
+Chỉ áp dụng ở cuối mỗi đoạn NÓI — gõ tay ở bất kỳ đâu trong bài luôn dính liền bình thường như một trang soạn thảo thường, không có gì tự động chèn thêm.
 ''';
 
 const _giaiThichChinhTaNgan = '''
@@ -1380,11 +1370,11 @@ Mỗi lần bấm Enter để xuống dòng, ngay khi con trỏ vừa sang dòng
 ''';
 
 const _giaiThichDuongKeChiaNgan = '''
-Bấm Enter hai lần liên tiếp (tạo một dòng trống) sẽ vẽ một đường kẻ chia mờ ngay tại dòng trống đó, giúp nhìn ra ranh giới giữa các đoạn.
+Bấm Enter hai lần liên tiếp (tạo một dòng trống) sẽ vẽ một đường kẻ chia đoạn văn mờ ngay tại dòng trống đó, giúp nhìn ra ranh giới giữa các đoạn.
 ''';
 
 const _giaiThichDuongKeChia = '''
-Khi bạn xuống dòng và để lại một dòng TRỐNG (hoặc chỉ toàn dấu cách) — thường là do bấm Enter hai lần liên tiếp — ứng dụng tự vẽ một đường kẻ chia mờ ngay tại dòng trống đó, giúp phân biệt rõ các đoạn văn khác nhau trong bài.
+Khi bạn xuống dòng và để lại một dòng TRỐNG (hoặc chỉ toàn dấu cách) — thường là do bấm Enter hai lần liên tiếp — ứng dụng tự vẽ một đường kẻ chia đoạn văn mờ ngay tại dòng trống đó, giúp phân biệt rõ các đoạn văn khác nhau trong bài. Bạn chọn được màu và độ rõ của đường kẻ này ở ngay bên trên.
 
 Đường kẻ này chỉ là một nét vẽ hiển thị, KHÔNG phải ký tự thật chèn vào bài — nó tự bám đúng dòng trống dù màn hình xoay hay đổi kích thước. Nếu bạn gõ chữ vào đúng dòng trống đó (không còn trống nữa), đường kẻ tự biến mất; xoá hẳn dòng đó cũng vậy.
 ''';

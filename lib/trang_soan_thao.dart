@@ -3918,8 +3918,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _oChu.requestFocus();
       SystemChannels.textInput.invokeMethod<void>('TextInput.show');
     });
+    // (BỎ MẸO chèn+xoá dấu cách) Nút "Ẩn" đã tự ép bàn phím ảo hiện ra bằng
+    // `TextInput.show` ở trên rồi — không liên quan gì tới mẹo chèn+xoá
+    // dấu cách (mẹo đó chỉ để ép CON TRỎ NHÁY hiện lại sau khi TOÀN BỘ
+    // trạng thái soạn thảo đổi/dựng lại, dùng cho hai lối "bật"/"hiện lại").
+    // Giữ mẹo đó ở đây từng có tác dụng phụ KHÔNG mong muốn: nếu người dùng
+    // đang BÔI CHỌN một vùng văn bản rồi bấm "Ẩn", chèn dấu cách sẽ XOÁ
+    // MẤT vùng đang chọn đó (gõ đè lên selection) trước khi tự xoá lại dấu
+    // cách — vô tình phá nội dung người dùng đang chọn. Chỉ giữ
+    // `_batConTroNgay()` (khởi động lại nhịp nhấp nháy, không đụng gì tới
+    // nội dung) là đủ.
     _batConTroNgay();
-    _epConTroHienRaMatThuong();
   }
 
   /// Nút "Hiện lại Bộ phím nhanh" (xanh lá) — trả lại đúng trạng thái hiện
@@ -4017,8 +4026,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// lần" (chỉ nhảy tới đầu/cuối DÒNG hiện tại của con trỏ).
   DateTime? _lanBamHomeTruoc;
   DateTime? _lanBamEndTruoc;
-  DateTime? _lanBamAllTruoc;
   static const _nguongBamHaiLan = Duration(seconds: 1);
+
+  /// (RIÊNG cho nút "All") không còn là bấm-2-lần nhị phân như Home/End nữa
+  /// mà là ĐẾM tới 3 lần, nên cần một bộ đếm thật (`_demBamAll`) thay vì chỉ
+  /// một mốc thời gian — và ngưỡng thời gian giữa hai lần bấm liên tiếp cũng
+  /// riêng, 1,5 giây thay vì 1 giây như các nút khác.
+  DateTime? _lanBamAllTruoc;
+  int _demBamAll = 0;
+  static const _nguongBamAll = Duration(milliseconds: 1500);
 
   /// "Copy" — chỉ làm gì đó khi ĐANG CÓ vùng chọn (không collapsed); vùng
   /// chọn rỗng thì không có gì để chép, im lặng bỏ qua.
@@ -4078,32 +4094,146 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
-  /// "All" — bấm 1 lần: chọn ĐOẠN VĂN chứa con trỏ (ranh giới là dấu xuống
-  /// dòng gần nhất trước/sau con trỏ — hoặc đầu/cuối văn bản nếu đoạn đó
-  /// nằm ở trên cùng/dưới cùng, không có dấu xuống dòng ở phía đó). Bấm 2
-  /// lần liên tiếp trong 1 giây: chọn toàn bộ văn bản (logic cũ). Chỉ đổi
-  /// vùng chọn, không đụng nội dung.
+  /// "All" — 3 mức, đếm số lần bấm liên tiếp trong 1,5 giây (riêng nút này,
+  /// các nút khác vẫn 1 giây):
+  /// - 1 lần: chọn ĐOẠN VĂN chứa con trỏ (ranh giới là dấu xuống dòng gần
+  ///   nhất trước/sau con trỏ).
+  /// - 2 lần: chọn CỤM ĐOẠN VĂN chứa con trỏ (xem `_tinhVungCumDoanVan`).
+  /// - 3 lần: chọn toàn bộ văn bản.
+  /// Nếu 2 lần mà cụm đoạn văn đã trùng luôn toàn bộ văn bản (tài liệu chỉ
+  /// có đúng 1 cụm) thì coi như đã xong, không cần bấm lần 3 nữa — và thông
+  /// báo "Đã chọn tất cả" (được bấm SAU nên OverlayEntry của nó luôn chèn
+  /// SAU, tự động đè lên trên mọi thông báo gợi ý còn đang hiện từ lần bấm
+  /// trước, không cần logic ưu tiên riêng). Chỉ đổi vùng chọn, không đụng
+  /// nội dung.
   void _phimAoChonTatCa() {
     final vb = _boDieuKhien.text;
     final chon = _boDieuKhien.selection;
     _giuFocusOChuSauKhiBam();
     final bay = DateTime.now();
-    final laLanHai = _lanBamAllTruoc != null &&
-        bay.difference(_lanBamAllTruoc!) <= _nguongBamHaiLan;
-    _lanBamAllTruoc = laLanHai ? null : bay;
-    if (laLanHai) {
+    final conTrongNguong =
+        _lanBamAllTruoc != null && bay.difference(_lanBamAllTruoc!) <= _nguongBamAll;
+    _demBamAll = conTrongNguong ? _demBamAll + 1 : 1;
+    _lanBamAllTruoc = bay;
+
+    if (_demBamAll >= 3) {
+      _demBamAll = 0;
+      _lanBamAllTruoc = null;
       _boDieuKhien.selection = TextSelection(baseOffset: 0, extentOffset: vb.length);
+      if (mounted) hienThongBaoGiua(context, 'Đã chọn tất cả');
       return;
     }
+
     if (!chon.isValid) return;
     final vt = chon.extentOffset;
-    final batDauDoan = vt <= 0 ? 0 : vb.lastIndexOf('\n', vt - 1) + 1;
-    final ketThucDongTho = vb.indexOf('\n', vt);
-    final ketThucDoan = ketThucDongTho == -1 ? vb.length : ketThucDongTho;
-    _boDieuKhien.selection = TextSelection(baseOffset: batDauDoan, extentOffset: ketThucDoan);
-    if (mounted) {
-      hienThongBaoGiua(context, 'Bấm All 2 lần để chọn toàn bộ văn bản');
+
+    if (_demBamAll == 1) {
+      final batDauDoan = vt <= 0 ? 0 : vb.lastIndexOf('\n', vt - 1) + 1;
+      final ketThucDongTho = vb.indexOf('\n', vt);
+      final ketThucDoan = ketThucDongTho == -1 ? vb.length : ketThucDongTho;
+      _boDieuKhien.selection = TextSelection(baseOffset: batDauDoan, extentOffset: ketThucDoan);
+      if (mounted) {
+        hienThongBaoGiua(context, 'Bấm "All" 2-3 lần để chọn vùng rộng hơn');
+      }
+      return;
     }
+
+    // _demBamAll == 2: chọn cụm đoạn văn.
+    final vung = _tinhVungCumDoanVan(vb, vt);
+    _boDieuKhien.selection = TextSelection(baseOffset: vung.$1, extentOffset: vung.$2);
+    if (vung.$1 == 0 && vung.$2 == vb.length) {
+      _demBamAll = 0;
+      _lanBamAllTruoc = null;
+      if (mounted) hienThongBaoGiua(context, 'Đã chọn tất cả');
+    }
+  }
+
+  /// Tính vùng CỤM ĐOẠN VĂN chứa vị trí [vt] trong văn bản [vb]. "Cụm đoạn
+  /// văn" là một hoặc nhiều đoạn văn liên tiếp, ngăn cách nhau với cụm khác
+  /// bởi TỪ 2 DÒNG TRỐNG LIÊN TIẾP TRỞ LÊN — "dòng trống" dùng ĐÚNG định
+  /// nghĩa như đường kẻ chia đoạn văn (`_quetVaXayDungDuongKeChia`): không
+  /// có ký tự gì, hoặc chỉ toàn dấu cách. Luôn có ít nhất 1 cụm nếu văn bản
+  /// có ít nhất 1 ký tự.
+  ///
+  /// Nếu con trỏ đang nằm TRONG một dải "phân cách" (≥2 dòng trống liên
+  /// tiếp) giữa hai cụm, chọn cả dải trống đó CỘNG cả hai cụm liền kề (một
+  /// trong hai phía có thể không tồn tại nếu dải đó nằm ở đầu/cuối văn
+  /// bản — khi đó chỉ cộng cụm còn lại). Nếu con trỏ nằm trong một cụm (kể
+  /// cả dòng trống lẻ, đơn — không đủ 2 dòng trống liên tiếp nên không tách
+  /// cụm), chọn nguyên cụm đó.
+  (int, int) _tinhVungCumDoanVan(String vb, int vt) {
+    final cacDong = vb.split('\n');
+    final soDong = cacDong.length;
+    final laDongTrong = List<bool>.generate(soDong, (i) => cacDong[i].trim().isEmpty);
+    final dauDong = List<int>.filled(soDong, 0);
+    var acc = 0;
+    for (var i = 0; i < soDong; i++) {
+      dauDong[i] = acc;
+      acc += cacDong[i].length + 1;
+    }
+    int cuoiDong(int i) => dauDong[i] + cacDong[i].length;
+
+    // Các dải "phân cách" — dòng trống liên tiếp, dài từ 2 dòng trở lên.
+    final dsPhanCach = <List<int>>[];
+    var i = 0;
+    while (i < soDong) {
+      if (laDongTrong[i]) {
+        var j = i;
+        while (j < soDong && laDongTrong[j]) {
+          j++;
+        }
+        if (j - i >= 2) dsPhanCach.add([i, j - 1]);
+        i = j;
+      } else {
+        i++;
+      }
+    }
+
+    // Các cụm đoạn văn — phần bù của các dải phân cách.
+    final dsCum = <List<int>>[];
+    var dau = 0;
+    for (final pc in dsPhanCach) {
+      if (pc[0] > dau) dsCum.add([dau, pc[0] - 1]);
+      dau = pc[1] + 1;
+    }
+    if (dau < soDong) dsCum.add([dau, soDong - 1]);
+
+    // Dòng chứa vị trí con trỏ.
+    var dongCT = soDong - 1;
+    for (var k = 0; k < soDong; k++) {
+      if (vt <= cuoiDong(k)) {
+        dongCT = k;
+        break;
+      }
+    }
+
+    List<int>? phanCachChuaCT;
+    for (final pc in dsPhanCach) {
+      if (dongCT >= pc[0] && dongCT <= pc[1]) {
+        phanCachChuaCT = pc;
+        break;
+      }
+    }
+
+    List<int> phamViDong;
+    if (phanCachChuaCT != null) {
+      final cumTruoc = dsCum.where((g) => g[1] == phanCachChuaCT![0] - 1).firstOrNull;
+      final cumSau = dsCum.where((g) => g[0] == phanCachChuaCT![1] + 1).firstOrNull;
+      if (cumTruoc != null && cumSau != null) {
+        phamViDong = [cumTruoc[0], cumSau[1]];
+      } else if (cumTruoc != null) {
+        phamViDong = [cumTruoc[0], phanCachChuaCT[1]];
+      } else if (cumSau != null) {
+        phamViDong = [phanCachChuaCT[0], cumSau[1]];
+      } else {
+        phamViDong = phanCachChuaCT;
+      }
+    } else {
+      final cum = dsCum.where((g) => dongCT >= g[0] && dongCT <= g[1]).firstOrNull;
+      phamViDong = cum ?? [0, soDong - 1];
+    }
+
+    return (dauDong[phamViDong[0]], cuoiDong(phamViDong[1]));
   }
 
   /// "Home" — bấm 1 lần: đầu DÒNG hiện tại của con trỏ. Bấm 2 lần liên tiếp
@@ -4311,9 +4441,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     if (viTri < vb.length && !_laKhoangTrang(vb[viTri])) chen = '$chen ';
 
-    _dieuChinhVungToanVanSauKhiSua(viTri, 0, chen.length);
-    _dieuChinhLoiChinhTaSauKhiSua(viTri, 0, chen.length);
     final moi = vb.replaceRange(viTri, viTri, chen);
+    _dieuChinhVungToanVanSauKhiSua(viTri, 0, chen.length);
+    // (SỬA LỖI đường kẻ chia không biến mất khi chèn thẻ ghi âm vào dòng
+    // trống) Thiếu `vanBanCu`/`vanBanMoi` thì khối "kiểm tra lại nội dung
+    // dòng, bỏ khỏi danh sách nếu không còn rỗng" bên trong hàm này không
+    // chạy — dòng trống đang có đường kẻ chia mà vừa nhận token ghi âm vẫn
+    // bị coi là còn trống, đường kẻ ở lại sai chỗ.
+    _dieuChinhLoiChinhTaSauKhiSua(viTri, 0, chen.length, vanBanCu: vb, vanBanMoi: moi);
     _gioiHanTreMuSauKhiChen(viTri, chen.length, moi);
     _viTriTokenDangGhiThe = viTri + lechDauChen;
     final viTriConTro = viTri + chen.length;
@@ -4354,9 +4489,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         final ketThucToken = viTriToken + tenTokenDangGhiAm.length;
         if (ketThucToken <= vb.length &&
             vb.substring(viTriToken, ketThucToken) == tenTokenDangGhiAm) {
-          _dieuChinhVungToanVanSauKhiSua(viTriToken, tenTokenDangGhiAm.length, 0);
-          _dieuChinhLoiChinhTaSauKhiSua(viTriToken, tenTokenDangGhiAm.length, 0);
           final moi = vb.replaceRange(viTriToken, ketThucToken, '');
+          _dieuChinhVungToanVanSauKhiSua(viTriToken, tenTokenDangGhiAm.length, 0);
+          _dieuChinhLoiChinhTaSauKhiSua(viTriToken, tenTokenDangGhiAm.length, 0,
+              vanBanCu: vb, vanBanMoi: moi);
           _ghiVaoO(moi, viTriToken);
           _henLuu();
         }
@@ -4387,9 +4523,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return soThe;
     }
     final nhan = _nhanTheGhiAmHoanChinh(soThe);
-    _dieuChinhVungToanVanSauKhiSua(viTriToken, tenTokenDangGhiAm.length, nhan.length);
-    _dieuChinhLoiChinhTaSauKhiSua(viTriToken, tenTokenDangGhiAm.length, nhan.length);
     final moi = vb.replaceRange(viTriToken, ketThucToken, nhan);
+    _dieuChinhVungToanVanSauKhiSua(viTriToken, tenTokenDangGhiAm.length, nhan.length);
+    _dieuChinhLoiChinhTaSauKhiSua(viTriToken, tenTokenDangGhiAm.length, nhan.length,
+        vanBanCu: vb, vanBanMoi: moi);
     final viTriConTro = viTriToken + nhan.length;
     _neo = viTriConTro;
     _ghiVaoO(moi, viTriConTro);
