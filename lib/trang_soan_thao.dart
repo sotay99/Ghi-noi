@@ -725,6 +725,160 @@ class _ChamCuoiVanBanState extends State<_ChamCuoiVanBan>
   }
 }
 
+/// Ba nút "Hiện lại Bộ phím nhanh"/"Đóng lại"/con mắt thay chỗ tên tệp khi
+/// Bộ phím nhanh đang TẠM ẨN (xem `_hangNutBoPhimNhanhTamAn`). Có hiệu ứng
+/// mờ-tỏ tuần hoàn: rõ hẳn 3 giây, mờ dần trong 5 giây, mờ hẳn (im lặng)
+/// 1 giây, rõ dần trong 5 giây, rồi lặp lại — mỗi khi 3 nút mờ đi bao
+/// nhiêu phần trăm thì [oTenField] hiện rõ đúng bấy nhiêu phần trăm (bù
+/// trừ 1-1), để người dùng thấy lại tên tệp xen kẽ mà không cần thao tác
+/// gì. Bấm/rê chuột vào NGAY vùng đất của 3 nút vẫn LUÔN hoạt động bình
+/// thường bất kể đang mờ hay rõ tới đâu — `Opacity` (khác `Visibility`)
+/// không tắt hit-test theo độ mờ, nên không cần `IgnorePointer` riêng cho
+/// việc này.
+///
+/// Nút con mắt (ngoài cùng bên phải): bấm-giữ (di động) hoặc rê chuột vào
+/// (`MouseRegion`, máy tính) sẽ NGAY LẬP TỨC ép 3 nút mờ hẳn (0%) và tên
+/// tệp hiện rõ hẳn (100%), đồng thời TẠM DỪNG vòng lặp mờ-tỏ; thả tay/rê
+/// chuột ra thì vòng lặp khởi động lại TỪ ĐẦU (không tiếp tục dở dang).
+///
+/// Tách thành widget riêng (có `vsync` riêng) theo đúng lý do đã ghi ở
+/// `_ChamCuoiVanBan`: không phải thêm `TickerProviderStateMixin` cho cả
+/// màn hình soạn thảo khổng lồ chỉ vì một hiệu ứng nhỏ.
+class _HangNutBoPhimNhanhTamAn extends StatefulWidget {
+  const _HangNutBoPhimNhanhTamAn({
+    required this.onHienLai,
+    required this.onDong,
+    required this.oTenField,
+  });
+
+  final VoidCallback onHienLai;
+  final VoidCallback onDong;
+  final Widget oTenField;
+
+  @override
+  State<_HangNutBoPhimNhanhTamAn> createState() => _HangNutBoPhimNhanhTamAnState();
+}
+
+class _HangNutBoPhimNhanhTamAnState extends State<_HangNutBoPhimNhanhTamAn>
+    with SingleTickerProviderStateMixin {
+  static const _chuKy = Duration(seconds: 14);
+  late final AnimationController _dk;
+  bool _dangGiuNutConMat = false;
+  bool _dangDiChuotVaoNutConMat = false;
+
+  bool get _matDangMo => _dangGiuNutConMat || _dangDiChuotVaoNutConMat;
+
+  @override
+  void initState() {
+    super.initState();
+    _dk = AnimationController(vsync: this, duration: _chuKy)..repeat();
+  }
+
+  @override
+  void dispose() {
+    _dk.dispose();
+    super.dispose();
+  }
+
+  /// Độ rõ của 3 nút tại thời điểm [gia] (0..1, phần trăm đã đi hết chu kỳ
+  /// 14 giây): 0-3s rõ hẳn, 3-8s mờ dần, 8-9s mờ hẳn, 9-14s rõ dần.
+  double _doRoNutTaiThoiDiem(double gia) {
+    final t = gia * 14;
+    if (t < 3) return 1;
+    if (t < 8) return 1 - (t - 3) / 5;
+    if (t < 9) return 0;
+    return (t - 9) / 5;
+  }
+
+  void _kichHoatNutConMat() => setState(() => _dk.stop());
+
+  void _ngungKichHoatNutConMat() {
+    setState(() {});
+    if (!_matDangMo) {
+      _dk.value = 0;
+      _dk.repeat();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _dk,
+      builder: (context, _) {
+        final doRoNut = _matDangMo ? 0.0 : _doRoNutTaiThoiDiem(_dk.value);
+        final doRoTen = 1 - doRoNut;
+        return Stack(
+          alignment: Alignment.centerLeft,
+          children: [
+            Opacity(opacity: doRoTen, child: IgnorePointer(child: widget.oTenField)),
+            Opacity(
+              opacity: doRoNut,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: widget.onHienLai,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade600,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Hiện lại Bộ phím nhanh'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: widget.onDong,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.shade600,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Đóng lại'),
+                  ),
+                  const SizedBox(width: 8),
+                  MouseRegion(
+                    onEnter: (_) {
+                      _dangDiChuotVaoNutConMat = true;
+                      _kichHoatNutConMat();
+                    },
+                    onExit: (_) {
+                      _dangDiChuotVaoNutConMat = false;
+                      _ngungKichHoatNutConMat();
+                    },
+                    child: GestureDetector(
+                      onTapDown: (_) {
+                        _dangGiuNutConMat = true;
+                        _kichHoatNutConMat();
+                      },
+                      onTapUp: (_) {
+                        _dangGiuNutConMat = false;
+                        _ngungKichHoatNutConMat();
+                      },
+                      onTapCancel: () {
+                        _dangGiuNutConMat = false;
+                        _ngungKichHoatNutConMat();
+                      },
+                      child: Container(
+                        width: 48,
+                        height: 36,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade700,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Icon(Icons.visibility, color: Colors.white, size: 20),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 /// (VIỆC 2) Con trỏ nháy TỰ VẼ, đè lên TRÊN CÙNG mọi lớp khác — kể cả
 /// `backgroundColor` của một `TextSpan` (màu nền định dạng thủ công). Caret
 /// GỐC của `TextField`/`EditableText` vẽ CÙNG lớp với chữ (dưới nền của
@@ -4034,7 +4188,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// riêng, 1,5 giây thay vì 1 giây như các nút khác.
   DateTime? _lanBamAllTruoc;
   int _demBamAll = 0;
-  static const _nguongBamAll = Duration(milliseconds: 1500);
+  static const _nguongBamAll = Duration(seconds: 2);
 
   /// "Copy" — chỉ làm gì đó khi ĐANG CÓ vùng chọn (không collapsed); vùng
   /// chọn rỗng thì không có gì để chép, im lặng bỏ qua.
@@ -4094,16 +4248,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
-  /// "All" — 3 mức, đếm số lần bấm liên tiếp trong 1,5 giây (riêng nút này,
+  /// "All" — 4 mức, đếm số lần bấm liên tiếp trong 2 giây (riêng nút này,
   /// các nút khác vẫn 1 giây):
-  /// - 1 lần: chọn ĐOẠN VĂN chứa con trỏ (ranh giới là dấu xuống dòng gần
+  /// - 1 lần: chọn TỪ chứa con trỏ (xem `_tinhVungTu`).
+  /// - 2 lần: chọn ĐOẠN VĂN chứa con trỏ (ranh giới là dấu xuống dòng gần
   ///   nhất trước/sau con trỏ).
-  /// - 2 lần: chọn CỤM ĐOẠN VĂN chứa con trỏ (xem `_tinhVungCumDoanVan`).
-  /// - 3 lần: chọn toàn bộ văn bản.
-  /// Nếu 2 lần mà cụm đoạn văn đã trùng luôn toàn bộ văn bản (tài liệu chỉ
-  /// có đúng 1 cụm) thì coi như đã xong, không cần bấm lần 3 nữa — và thông
-  /// báo "Đã chọn tất cả" (được bấm SAU nên OverlayEntry của nó luôn chèn
-  /// SAU, tự động đè lên trên mọi thông báo gợi ý còn đang hiện từ lần bấm
+  /// - 3 lần: chọn CỤM ĐOẠN VĂN chứa con trỏ (xem `_tinhVungCumDoanVan`).
+  /// - 4 lần: chọn toàn bộ văn bản.
+  /// Nếu một trong các mức 2/3 mà vùng chọn đã trùng luôn toàn bộ văn bản
+  /// thì coi như đã xong, không cần bấm thêm lần nào nữa — và thông báo
+  /// "Đã chọn tất cả" (được bấm SAU nên OverlayEntry của nó luôn chèn SAU,
+  /// tự động đè lên trên mọi thông báo gợi ý còn đang hiện từ lần bấm
   /// trước, không cần logic ưu tiên riêng). Chỉ đổi vùng chọn, không đụng
   /// nội dung.
   void _phimAoChonTatCa() {
@@ -4116,7 +4271,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _demBamAll = conTrongNguong ? _demBamAll + 1 : 1;
     _lanBamAllTruoc = bay;
 
-    if (_demBamAll >= 3) {
+    if (_demBamAll >= 4) {
       _demBamAll = 0;
       _lanBamAllTruoc = null;
       _boDieuKhien.selection = TextSelection(baseOffset: 0, extentOffset: vb.length);
@@ -4127,25 +4282,72 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (!chon.isValid) return;
     final vt = chon.extentOffset;
 
-    if (_demBamAll == 1) {
-      final batDauDoan = vt <= 0 ? 0 : vb.lastIndexOf('\n', vt - 1) + 1;
-      final ketThucDongTho = vb.indexOf('\n', vt);
-      final ketThucDoan = ketThucDongTho == -1 ? vb.length : ketThucDongTho;
-      _boDieuKhien.selection = TextSelection(baseOffset: batDauDoan, extentOffset: ketThucDoan);
-      if (mounted) {
-        hienThongBaoGiua(context, 'Bấm "All" 2-3 lần để chọn vùng rộng hơn');
-      }
-      return;
-    }
-
-    // _demBamAll == 2: chọn cụm đoạn văn.
-    final vung = _tinhVungCumDoanVan(vb, vt);
+    final vung = switch (_demBamAll) {
+      1 => _tinhVungTu(vb, vt) ?? _tinhVungDoanVan(vb, vt),
+      2 => _tinhVungDoanVan(vb, vt),
+      _ => _tinhVungCumDoanVan(vb, vt), // 3
+    };
     _boDieuKhien.selection = TextSelection(baseOffset: vung.$1, extentOffset: vung.$2);
-    if (vung.$1 == 0 && vung.$2 == vb.length) {
+
+    if (_demBamAll >= 2 && vung.$1 == 0 && vung.$2 == vb.length) {
       _demBamAll = 0;
       _lanBamAllTruoc = null;
       if (mounted) hienThongBaoGiua(context, 'Đã chọn tất cả');
+    } else if (mounted) {
+      hienThongBaoGiua(context, 'Bấm "All" 2-4 lần để chọn vùng rộng hơn');
     }
+  }
+
+  /// Vùng ĐOẠN VĂN chứa vị trí [vt] — ranh giới là dấu xuống dòng gần nhất
+  /// trước/sau con trỏ (hoặc đầu/cuối văn bản nếu không có).
+  (int, int) _tinhVungDoanVan(String vb, int vt) {
+    final batDauDoan = vt <= 0 ? 0 : vb.lastIndexOf('\n', vt - 1) + 1;
+    final ketThucDongTho = vb.indexOf('\n', vt);
+    final ketThucDoan = ketThucDongTho == -1 ? vb.length : ketThucDongTho;
+    return (batDauDoan, ketThucDoan);
+  }
+
+  /// Vùng TỪ chứa vị trí [vt] trong văn bản [vb]. "Từ" chỉ tách nhau bởi
+  /// dấu CÁCH (không tách qua dấu xuống dòng — từ không bao giờ trải dài
+  /// qua 2 dòng), nên chỉ xét trong DÒNG chứa con trỏ.
+  ///
+  /// - Con trỏ ngay trước ký tự đầu, ngay sau ký tự cuối, hoặc giữa một từ:
+  ///   chọn từ đó.
+  /// - Con trỏ ở các dấu cách trước từ đầu tiên của dòng: chọn từ đầu tiên.
+  /// - Con trỏ ở các dấu cách sau từ cuối cùng của dòng: chọn từ cuối cùng.
+  /// - Con trỏ ở giữa các dấu cách nằm giữa 2 từ: chọn cả 2 từ đó và các
+  ///   dấu cách ở giữa.
+  ///
+  /// Trả về null nếu dòng đó không có từ nào (rỗng hoặc toàn dấu cách).
+  (int, int)? _tinhVungTu(String vb, int vt) {
+    final dauDong = vt <= 0 ? 0 : vb.lastIndexOf('\n', vt - 1) + 1;
+    final ketThucDongTho = vb.indexOf('\n', vt);
+    final ketThucDong = ketThucDongTho == -1 ? vb.length : ketThucDongTho;
+    final dong = vb.substring(dauDong, ketThucDong);
+    final vtTrongDong = vt - dauDong;
+
+    final cacTu = RegExp(r'[^ ]+').allMatches(dong).toList();
+    if (cacTu.isEmpty) return null;
+
+    for (final tu in cacTu) {
+      if (vtTrongDong >= tu.start && vtTrongDong <= tu.end) {
+        return (dauDong + tu.start, dauDong + tu.end);
+      }
+    }
+
+    RegExpMatch? truoc;
+    RegExpMatch? sau;
+    for (final tu in cacTu) {
+      if (tu.end < vtTrongDong) truoc = tu;
+      if (tu.start > vtTrongDong) {
+        sau = tu;
+        break;
+      }
+    }
+    if (truoc != null && sau != null) return (dauDong + truoc.start, dauDong + sau.end);
+    if (sau != null) return (dauDong + sau.start, dauDong + sau.end);
+    if (truoc != null) return (dauDong + truoc.start, dauDong + truoc.end);
+    return null;
   }
 
   /// Tính vùng CỤM ĐOẠN VĂN chứa vị trí [vt] trong văn bản [vb]. "Cụm đoạn
@@ -8802,32 +9004,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 
   /// Thay cho `_oTenField()` khi Bộ phím nhanh đang TẠM ẨN
-  /// (`_boPhimNhanhCamUngAn`) — hai nút "Hiện lại Bộ phím nhanh"/"Đóng lại"
-  /// chiếm đúng vùng tên tệp, để người dùng luôn thấy đường quay lại (hoặc
-  /// tắt hẳn) ngay trong lúc đang gõ bằng bàn phím ảo hệ thống.
+  /// (`_boPhimNhanhCamUngAn`) — ba nút "Hiện lại Bộ phím nhanh"/"Đóng
+  /// lại"/nút con mắt chiếm đúng vùng tên tệp, để người dùng luôn thấy
+  /// đường quay lại (hoặc tắt hẳn) ngay trong lúc đang gõ bằng bàn phím ảo
+  /// hệ thống. Bọc trong `_HangNutBoPhimNhanhTamAn` để có hiệu ứng mờ-tỏ
+  /// tuần hoàn kèm tên tệp hiện dần lên xen kẽ — xem widget đó.
   Widget _hangNutBoPhimNhanhTamAn() {
-    return Row(
-      children: [
-        Expanded(
-          child: ElevatedButton(
-            onPressed: _hienLaiBoPhimNhanhCamUng,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade600,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Hiện lại Bộ phím nhanh'),
-          ),
-        ),
-        const SizedBox(width: 8),
-        ElevatedButton(
-          onPressed: _bamNutBoPhimNhanhCamUng,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red.shade600,
-            foregroundColor: Colors.white,
-          ),
-          child: const Text('Đóng lại'),
-        ),
-      ],
+    return _HangNutBoPhimNhanhTamAn(
+      onHienLai: _hienLaiBoPhimNhanhCamUng,
+      onDong: _bamNutBoPhimNhanhCamUng,
+      oTenField: _oTenField(),
     );
   }
 
