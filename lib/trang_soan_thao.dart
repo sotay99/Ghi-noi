@@ -3876,40 +3876,32 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Timer? _henEpConTro;
 
   /// (SỬA LỖI TRIỆT ĐỂ con trỏ vẫn không hiện — `_batConTroNgay` một mình
-  /// không đủ) Chèn một dấu cách NGAY tại vị trí con trỏ rồi xoá nó ngay
-  /// sau đó — một mẹo buộc bàn phím ảo/engine soạn thảo phải đồng bộ lại
-  /// toàn bộ trạng thái con trỏ, dùng khi chỉ gọi lại `requestFocus()`/đổi
-  /// `readOnly` KHÔNG đủ để ép hiện ra.
+  /// không đủ) "Bấm hộ" đúng hai nút thật của hàng phím ảo — dấu cách
+  /// (`_chenKyTuTuPhimAo`) rồi Xoá (`_xoaKyTuTuPhimAo`) — thay vì tự ghi
+  /// thẳng qua `_ghiVaoO` như bản trước.
   ///
-  /// (SỬA LỖI vẫn không thấy con trỏ dù đã có mẹo) Bản đầu chạy mẹo ngay ở
-  /// `addPostFrameCallback` (khung hình KẾ TIẾP) — nhưng bàn phím ảo bật/
-  /// tắt kèm đổi `readOnly` kéo theo MỘT NHỊP layout/resize riêng của hệ
-  /// điều hành/trình duyệt (đúng cái "màn hình chớp nhẹ" quan sát được),
-  /// đến SAU khung hình kế tiếp đó — mẹo chạy xong trước, rồi nhịp resize
-  /// kia mới tới và tự nuốt mất con trỏ lần nữa. Trì hoãn cả cụm chèn+xoá
-  /// sau 300ms (đủ dài hơn mọi hiệu ứng resize bàn phím thường gặp) để nó
-  /// LUÔN là sự kiện cuối cùng, chạy sau khi màn hình đã ổn định hẳn.
+  /// (SỬA LỖI vẫn không thấy con trỏ dù đã có mẹo) Quan sát thực tế: tự tay
+  /// bấm nút dấu cách hay nút Xoá ở hàng phím ảo thì con trỏ LUÔN hiện ra
+  /// ngay lập tức — hai nút đó vốn đã tự đi qua đúng con đường khiến hệ
+  /// thống đồng bộ lại con trỏ (`_boDieuKhien.value =` rồi giành lại tiêu
+  /// điểm ở `addPostFrameCallback`, xem hai hàm đó). Bản trước tự ghi
+  /// thẳng qua `_ghiVaoO` — một con đường KHÁC, "êm" hơn (không dựng lại
+  /// UI qua listener), và đúng cái "êm" đó lại không đủ để ép con trỏ hiện
+  /// ra. Sửa: đừng tự làm nữa — nhờ THẲNG hai nút thật làm hộ, để chắc
+  /// chắn đi đúng con đường đã biết là hiệu quả.
   ///
-  /// Ghi thẳng qua `_ghiVaoO` (đường "máy tự ghi", có `_tuSua`) — KHÔNG đi
-  /// qua `_apDungChinhSuaNguoiDung` — để không tạo mốc Lùi lại/không đụng
-  /// gì tới lịch sử hay các vùng định dạng/đường kẻ chia, vì đây thuần tuý
-  /// là một mẹo hiển thị, không phải một lần gõ thật.
+  /// Vẫn giữ trì hoãn 300ms trước khi "bấm" — bàn phím ảo bật/tắt kèm đổi
+  /// `readOnly` kéo theo một nhịp layout/resize riêng của hệ điều hành/
+  /// trình duyệt đến sau khung hình kế tiếp; trì hoãn để cặp bấm-hộ này
+  /// luôn là sự kiện cuối cùng, chạy sau khi màn hình đã ổn định hẳn.
   void _epConTroHienRaMatThuong() {
     _henEpConTro?.cancel();
     _henEpConTro = Timer(const Duration(milliseconds: 300), () {
       if (!mounted) return;
-      final chon = _boDieuKhien.selection;
-      if (!chon.isValid) return;
-      final vb = _boDieuKhien.text;
-      final vt = chon.baseOffset.clamp(0, vb.length);
-      if (_theGhiAmChongLanMotPhan(vt, vt) != null) return;
-      _ghiVaoO(vb.replaceRange(vt, vt, ' '), vt + 1);
+      _chenKyTuTuPhimAo(' ');
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        final vbMoi = _boDieuKhien.text;
-        if (vt < vbMoi.length && vbMoi[vt] == ' ') {
-          _ghiVaoO(vbMoi.replaceRange(vt, vt + 1, ''), vt);
-        }
+        _xoaKyTuTuPhimAo();
       });
     });
   }
