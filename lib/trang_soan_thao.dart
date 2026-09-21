@@ -3599,8 +3599,40 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// máy/AI tự ghi).
   bool _boPhimNhanhCamUngMo = false;
 
+  /// TẠM ẨN (khác với TẮT hẳn) — cả hai thanh công cụ của Bộ phím nhanh ẩn
+  /// đi, TextField hết `readOnly` để bàn phím ảo hệ thống hiện ra ngay tại
+  /// con trỏ, và vùng tên tệp trên AppBar nhường chỗ cho hai nút "Hiện lại
+  /// Bộ phím nhanh"/"Đóng lại" (xem `_hangNutBoPhimNhanhTamAn`). Chỉ có ý
+  /// nghĩa khi `_boPhimNhanhCamUngMo` đang bật — TẮT hẳn (nút "Đóng") luôn
+  /// đặt lại `false`, để không "mồ côi" ở trạng thái ẩn khi mở lại từ đầu.
+  bool _boPhimNhanhCamUngAn = false;
+
   void _bamNutBoPhimNhanhCamUng() {
-    setState(() => _boPhimNhanhCamUngMo = !_boPhimNhanhCamUngMo);
+    setState(() {
+      _boPhimNhanhCamUngMo = !_boPhimNhanhCamUngMo;
+      _boPhimNhanhCamUngAn = false;
+    });
+  }
+
+  /// Nút "Ẩn" (cam) — xem giải thích ở `_boPhimNhanhCamUngAn`. Ép bàn phím
+  /// ảo hiện ra ngay bằng `TextInput.show` — chỉ đổi `readOnly` (qua
+  /// `setState`) có lúc KHÔNG đủ để hệ thống tự mở bàn phím ngay lập tức vì
+  /// tiêu điểm vốn đã nằm sẵn ở `_oChu` từ trước (không có sự kiện focus
+  /// MỚI để hệ thống tự nhận ra mà bật kèm).
+  void _anBoPhimNhanhCamUng() {
+    setState(() => _boPhimNhanhCamUngAn = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _oChu.requestFocus();
+      SystemChannels.textInput.invokeMethod<void>('TextInput.show');
+    });
+  }
+
+  /// Nút "Hiện lại Bộ phím nhanh" (xanh lá) — trả lại đúng trạng thái hiện
+  /// hành của Bộ phím nhanh, ẩn bàn phím ảo hệ thống đi.
+  void _hienLaiBoPhimNhanhCamUng() {
+    setState(() => _boPhimNhanhCamUngAn = false);
+    SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
   }
 
   /// [batDau, ketThuc) sắp bị gõ/xoá đè lên có chồng lấn MỘT PHẦN thẻ ghi
@@ -3770,6 +3802,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _lanBamHomeTruoc = laLanHai ? null : bay;
     if (laLanHai) {
       _boDieuKhien.selection = const TextSelection.collapsed(offset: 0);
+      _cuonToiDauVanBan();
       return;
     }
     final batDauDong = vt <= 0 ? 0 : vb.lastIndexOf('\n', vt - 1) + 1;
@@ -3793,6 +3826,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _lanBamEndTruoc = laLanHai ? null : bay;
     if (laLanHai) {
       _boDieuKhien.selection = TextSelection.collapsed(offset: vb.length);
+      _cuonXuongDuoi();
       return;
     }
     final ketThucDongTho = vb.indexOf('\n', vt);
@@ -5178,6 +5212,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       final day = _cuonVanBan.position.maxScrollExtent;
       if ((_cuonVanBan.offset - day).abs() < 1) return;
       _cuonVanBan.jumpTo(day);
+    });
+  }
+
+  /// Bấm "Home" 2 lần liên tiếp (về đầu TOÀN VĂN BẢN) — cuộn khung nhìn lên
+  /// hẳn đầu theo, cùng kỹ thuật `_cuonXuongDuoi` (đợi khung hình kế tiếp để
+  /// `selection` mới đã áp xong, tránh cuộn hụt vì layout chưa cập nhật).
+  void _cuonToiDauVanBan() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_cuonVanBan.hasClients) return;
+      if (_cuonVanBan.offset.abs() < 1) return;
+      _cuonVanBan.jumpTo(0);
     });
   }
 
@@ -8256,6 +8301,36 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
+  /// Thay cho `_oTenField()` khi Bộ phím nhanh đang TẠM ẨN
+  /// (`_boPhimNhanhCamUngAn`) — hai nút "Hiện lại Bộ phím nhanh"/"Đóng lại"
+  /// chiếm đúng vùng tên tệp, để người dùng luôn thấy đường quay lại (hoặc
+  /// tắt hẳn) ngay trong lúc đang gõ bằng bàn phím ảo hệ thống.
+  Widget _hangNutBoPhimNhanhTamAn() {
+    return Row(
+      children: [
+        Expanded(
+          child: ElevatedButton(
+            onPressed: _hienLaiBoPhimNhanhCamUng,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade600,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Hiện lại Bộ phím nhanh'),
+          ),
+        ),
+        const SizedBox(width: 8),
+        ElevatedButton(
+          onPressed: _bamNutBoPhimNhanhCamUng,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red.shade600,
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('Đóng lại'),
+        ),
+      ],
+    );
+  }
+
   Widget _oTenField() {
     // Đọc lại `_ghiChuHienTai.mau` mỗi lần dựng — không cache riêng, nên
     // đổi màu ở màn hình thư mục (cùng tham chiếu `widget.kho`) hay ở nút
@@ -8427,16 +8502,41 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               ),
             ),
             const SizedBox(width: 8),
-            Tooltip(
-              message: 'Đóng bộ phím nhanh cho màn hình cảm ứng',
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: () {},
-                onTapDown: (_) => _bamNutBoPhimNhanhCamUng(),
-                child: const Padding(
-                  padding: EdgeInsets.all(6),
-                  child: Icon(Icons.cancel, color: Colors.red, size: 24),
-                ),
+            // Hai nút sát nhau, không khoảng cách giữa: "Ẩn" (cam, tạm ẩn —
+            // xem `_anBoPhimNhanhCamUng`) bên trái, "Đóng" (đỏ, tắt hẳn) bên
+            // phải — cùng bo góc NGOÀI của cụm, góc giữa vuông để dính liền.
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Tooltip(
+                    message: 'Tạm ẩn Bộ phím nhanh, hiện bàn phím ảo',
+                    child: InkWell(
+                      onTap: () {},
+                      onTapDown: (_) => _anBoPhimNhanhCamUng(),
+                      child: Container(
+                        color: Colors.orange.shade600,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        child: const Text('Ẩn',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+                  ),
+                  Tooltip(
+                    message: 'Đóng bộ phím nhanh cho màn hình cảm ứng',
+                    child: InkWell(
+                      onTap: () {},
+                      onTapDown: (_) => _bamNutBoPhimNhanhCamUng(),
+                      child: Container(
+                        color: Colors.red.shade600,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        child: const Text('Đóng',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -8649,7 +8749,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             // sát mép trái, cùng dòng với Lùi/Tiến/Lưu/Ẩn-hiện-định-dạng.
             // Tên tệp một mình đứng riêng một dòng phía trên (đủ chỗ đọc tên
             // dài, không bị bốn nút kia chèn vào nữa).
-            title: _oTenField(),
+            title: (_boPhimNhanhCamUngMo && _boPhimNhanhCamUngAn) ? _hangNutBoPhimNhanhTamAn() : _oTenField(),
             backgroundColor: Colors.white,
             surfaceTintColor: Colors.white,
             elevation: 1,
@@ -8677,7 +8777,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         : AppBar(
             leading: _nutDieuHuongTep(),
             leadingWidth: _canhNutDieuHuongTep * 4 + 4,
-            title: _oTenField(),
+            title: (_boPhimNhanhCamUngMo && _boPhimNhanhCamUngAn) ? _hangNutBoPhimNhanhTamAn() : _oTenField(),
             backgroundColor: Colors.white,
             surfaceTintColor: Colors.white,
             elevation: 1,
@@ -8951,7 +9051,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           // và vẫn cho chạm để di chuyển con trỏ/chọn vùng
                           // bình thường như tài liệu Flutter đã ghi rõ.
                           keyboardType: TextInputType.multiline,
-                          readOnly: _boPhimNhanhCamUngMo,
+                          readOnly: _boPhimNhanhCamUngMo && !_boPhimNhanhCamUngAn,
                           // Chặn sửa/xoá từng-ký-tự-riêng-lẻ bên trong một
                           // thẻ ghi âm — xem `ChanSuaGiuaThe`.
                           inputFormatters: [
@@ -9042,8 +9142,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 ),
               ),
             ),
-            if (_boPhimNhanhCamUngMo) _xayHangCongCuVanBanCamUng(),
-            if (_boPhimNhanhCamUngMo) _xayHangPhimNhanhCamUng(),
+            if (_boPhimNhanhCamUngMo && !_boPhimNhanhCamUngAn) _xayHangCongCuVanBanCamUng(),
+            if (_boPhimNhanhCamUngMo && !_boPhimNhanhCamUngAn) _xayHangPhimNhanhCamUng(),
             // Bọc riêng bằng ValueListenableBuilder (xem chú thích ở
             // `_songAmTick`) — CHỈ ThanhCongCu dựng lại mỗi lần sóng âm đổi
             // (tới 5 lần/giây lúc ghi âm/nghe), không đụng tới AppBar trình
