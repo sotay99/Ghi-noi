@@ -112,8 +112,8 @@ class CaiDat {
 
   /// Số dấu cách chèn vào khi thụt đầu dòng (tính năng "Tự động thụt đầu
   /// dòng khi xuống dòng" ở trên) — người dùng chọn từ 1 tới 7 trong Menu
-  /// thả xuống ở màn hình Cài đặt. Mặc định 4 (trước đây ép cứng 5).
-  int soDauCachThutDauDong = 4;
+  /// thả xuống ở màn hình Cài đặt. Mặc định 3 (trước đây ép cứng 5, rồi 4).
+  int soDauCachThutDauDong = 3;
 
   static const _khoaTuDongThemDauCham = 'ghi_noi_tu_dong_them_dau_cham';
   static const _khoaTuDongThutDauDong = 'ghi_noi_tu_dong_thut_dau_dong';
@@ -158,7 +158,7 @@ class CaiDat {
     tuDongThemDauCham = kho.getBool(_khoaTuDongThemDauCham) ?? true;
     tuDongThutDauDong = kho.getBool(_khoaTuDongThutDauDong) ?? true;
     soDauCachThutDauDong =
-        (kho.getInt(_khoaSoDauCachThutDauDong) ?? 4).clamp(1, 7);
+        (kho.getInt(_khoaSoDauCachThutDauDong) ?? 3).clamp(1, 7);
     tuDongThemDuongKeChia = kho.getBool(_khoaTuDongThemDuongKeChia) ?? true;
     tuDongVietHoaDauCau = kho.getBool(_khoaTuDongVietHoaDauCau) ?? true;
     final tenThietBiDaLuu = kho.getString(_khoaThietBiChonTay);

@@ -1209,11 +1209,11 @@ Nhờ vậy mỗi dòng (đoạn) trong bài luôn kết thúc bằng dấu ch�
 ''';
 
 const _giaiThichThutDauDongNgan = '''
-Sau khi xuống dòng, ứng dụng tự chèn một số dấu cách (bạn chọn từ 1-7, mặc định 4) ở đầu dòng mới, con trỏ đứng ngay sau đó — giống thụt đầu dòng của một đoạn văn.
+Sau khi xuống dòng, ứng dụng tự chèn một số dấu cách (bạn chọn từ 1-7, mặc định 3) ở đầu dòng mới, con trỏ đứng ngay sau đó — giống thụt đầu dòng của một đoạn văn.
 ''';
 
 const _giaiThichThutDauDong = '''
-Mỗi lần bấm Enter để xuống dòng, ngay khi con trỏ vừa sang dòng mới, ứng dụng tự chèn thêm một số dấu cách vào đầu dòng đó — con trỏ đứng ngay sau các dấu cách này, sẵn sàng để bạn gõ hoặc nói tiếp. Số dấu cách do bạn chọn ở Menu thả xuống ngay dưới công tắc này (từ 1 đến 7, mặc định 4) — đổi lựa chọn thì áp dụng ngay cho lần xuống dòng kế tiếp. Đây là cách thụt đầu dòng quen thuộc của văn bản tiếng Việt. Tắt tính năng này thì dòng mới bắt đầu ngay từ cột đầu tiên, không có khoảng thụt nào.
+Mỗi lần bấm Enter để xuống dòng, ngay khi con trỏ vừa sang dòng mới, ứng dụng tự chèn thêm một số dấu cách vào đầu dòng đó — con trỏ đứng ngay sau các dấu cách này, sẵn sàng để bạn gõ hoặc nói tiếp. Số dấu cách do bạn chọn ở Menu thả xuống ngay dưới công tắc này (từ 1 đến 7, mặc định 3) — đổi lựa chọn thì áp dụng ngay cho lần xuống dòng kế tiếp. Đây là cách thụt đầu dòng quen thuộc của văn bản tiếng Việt. Tắt tính năng này thì dòng mới bắt đầu ngay từ cột đầu tiên, không có khoảng thụt nào.
 ''';
 
 const _giaiThichDuongKeChiaNgan = '''

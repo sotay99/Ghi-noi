@@ -190,9 +190,13 @@ class _ChuLuonSongState extends State<_ChuLuonSong>
 /// chữ "Đã xoá" trong 1,5 giây rồi quay lại thành nút X, xác nhận trực quan
 /// là đã xoá thật (không đổi gì về logic xoá, chỉ thêm hiệu ứng hiển thị).
 class _NutXoaCoThongBao extends StatefulWidget {
-  const _NutXoaCoThongBao({required this.tooltip, required this.onXoa});
+  const _NutXoaCoThongBao({required this.tooltip, required this.onXoa, this.nho = false});
   final String tooltip;
   final VoidCallback onXoa;
+
+  /// Màn hình hẹp: bó nhỏ lại (bỏ đệm 48x48 mặc định của IconButton) để các
+  /// nút cạnh nhau trên thanh tìm kiếm/thay thế sát vào nhau hơn.
+  final bool nho;
 
   @override
   State<_NutXoaCoThongBao> createState() => _NutXoaCoThongBaoState();
@@ -221,7 +225,7 @@ class _NutXoaCoThongBaoState extends State<_NutXoaCoThongBao> {
   Widget build(BuildContext context) {
     if (_vuaXoa) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: EdgeInsets.symmetric(horizontal: widget.nho ? 6 : 12),
         child: Text(
           'Đã xoá',
           style: TextStyle(
@@ -233,6 +237,9 @@ class _NutXoaCoThongBaoState extends State<_NutXoaCoThongBao> {
       icon: Icon(Icons.close, color: Colors.green.shade700),
       tooltip: widget.tooltip,
       onPressed: _bam,
+      visualDensity: widget.nho ? VisualDensity.compact : VisualDensity.standard,
+      constraints: widget.nho ? const BoxConstraints.tightFor(width: 36, height: 36) : null,
+      padding: widget.nho ? EdgeInsets.zero : const EdgeInsets.all(8),
     );
   }
 }
@@ -247,6 +254,7 @@ class _NutPhimAo extends StatelessWidget {
     this.moTa,
     this.mauNen,
     this.mauVien,
+    this.rong = 48,
   });
 
   final String nhan;
@@ -254,6 +262,10 @@ class _NutPhimAo extends StatelessWidget {
   final VoidCallback onTap;
   final Color? mauNen;
   final Color? mauVien;
+
+  /// Chiều rộng nút — mặc định 48, màn hình hẹp truyền hẹp hơn (xem nơi
+  /// gọi ở `_xayHangPhimNhanhCamUng`) để 5 nút cùng lọt vào khung nhìn.
+  final double rong;
 
   @override
   Widget build(BuildContext context) {
@@ -264,7 +276,7 @@ class _NutPhimAo extends StatelessWidget {
         onTap: () {},
         onTapDown: (_) => onTap(),
         child: Container(
-          width: 48,
+          width: rong,
           height: 40,
           decoration: BoxDecoration(
             color: mauNen ?? Colors.grey.shade100,
@@ -2546,6 +2558,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Thanh tìm kiếm nổi lên trên cùng khung soạn thảo — ô nhập, số kết quả,
   /// mũi tên lên/xuống, nút xoá và nút "Tắt" (đóng hẳn).
   Widget _thanhTimKiem() {
+    // Màn hình hẹp: bó sát các nút bên phải lại với nhau (bỏ đệm 48x48 mặc
+    // định của IconButton, khoảng cách giữa các nút về 0) để khung nhập
+    // "Tìm trong văn bản..." được giãn rộng ra tối đa — màn hình hẹp vốn đã
+    // ít chỗ ngang, chữ trong khung dễ bị khuất nếu không nhường thêm.
+    final manHinhHep = MediaQuery.sizeOf(context).width < _nguongManHinhHep;
+    const kichThuocNutNho = BoxConstraints.tightFor(width: 36, height: 36);
     return Container(
       key: const ValueKey('thanhTimKiem'),
       width: double.infinity,
@@ -2568,7 +2586,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: manHinhHep ? 4 : 8),
           Text(
             _ketQuaTimKiem.isEmpty
                 ? '0/0'
@@ -2579,20 +2597,31 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             icon: const Icon(Icons.keyboard_arrow_up),
             tooltip: 'Kết quả trước',
             onPressed: _ketQuaTimKiem.isEmpty ? null : () => _dieuHuongTimKiem(-1),
+            visualDensity: manHinhHep ? VisualDensity.compact : VisualDensity.standard,
+            constraints: manHinhHep ? kichThuocNutNho : null,
+            padding: manHinhHep ? EdgeInsets.zero : const EdgeInsets.all(8),
           ),
           IconButton(
             icon: const Icon(Icons.keyboard_arrow_down),
             tooltip: 'Kết quả tiếp theo',
             onPressed: _ketQuaTimKiem.isEmpty ? null : () => _dieuHuongTimKiem(1),
+            visualDensity: manHinhHep ? VisualDensity.compact : VisualDensity.standard,
+            constraints: manHinhHep ? kichThuocNutNho : null,
+            padding: manHinhHep ? EdgeInsets.zero : const EdgeInsets.all(8),
           ),
           _NutXoaCoThongBao(
             tooltip: 'Xoá nội dung tìm',
             onXoa: () => _oTimKiem.clear(),
+            nho: manHinhHep,
           ),
           TextButton(
             style: TextButton.styleFrom(
               backgroundColor: Colors.red.shade600,
               foregroundColor: Colors.white,
+              padding: manHinhHep
+                  ? const EdgeInsets.symmetric(horizontal: 8)
+                  : const EdgeInsets.symmetric(horizontal: 16),
+              minimumSize: manHinhHep ? const Size(0, 36) : null,
             ),
             onPressed: _dongTimKiem,
             child: const Text('Tắt'),
@@ -2606,6 +2635,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// nhất một kết quả tìm kiếm (`_ketQuaTimKiem.isNotEmpty`), tự ẩn ngay khi
   /// về 0 (B6).
   Widget _thanhThayThe() {
+    // Xem giải thích ở `_thanhTimKiem` — cùng lý do, cùng cách bó nhỏ trên
+    // màn hình hẹp.
+    final manHinhHep = MediaQuery.sizeOf(context).width < _nguongManHinhHep;
+    const kichThuocNutNho = BoxConstraints.tightFor(width: 36, height: 36);
+    final demNutChuHep = manHinhHep
+        ? const EdgeInsets.symmetric(horizontal: 6)
+        : const EdgeInsets.symmetric(horizontal: 16);
     return Container(
       key: const ValueKey('thanhThayThe'),
       width: double.infinity,
@@ -2627,23 +2663,35 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: manHinhHep ? 4 : 8),
           TextButton(
+            style: TextButton.styleFrom(
+              padding: demNutChuHep,
+              minimumSize: manHinhHep ? const Size(0, 36) : null,
+            ),
             onPressed: _ketQuaTimKiem.isEmpty ? null : _thayChoNay,
             child: const Text('Thay chỗ này'),
           ),
           TextButton(
+            style: TextButton.styleFrom(
+              padding: demNutChuHep,
+              minimumSize: manHinhHep ? const Size(0, 36) : null,
+            ),
             onPressed: _ketQuaTimKiem.isEmpty ? null : _xacNhanThayTatCa,
             child: const Text('Tất cả'),
           ),
           _NutXoaCoThongBao(
             tooltip: 'Xoá nội dung thay thế',
             onXoa: () => _oThayThe.clear(),
+            nho: manHinhHep,
           ),
           IconButton(
             icon: const Icon(Icons.settings, size: 20),
             tooltip: 'Cài đặt tìm kiếm và hướng dẫn thay thế',
             onPressed: _moCaiDatTimKiemVaHuongDanThayThe,
+            visualDensity: manHinhHep ? VisualDensity.compact : VisualDensity.standard,
+            constraints: manHinhHep ? kichThuocNutNho : null,
+            padding: manHinhHep ? EdgeInsets.zero : const EdgeInsets.all(8),
           ),
         ],
       ),
@@ -3721,6 +3769,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// lần" (chỉ nhảy tới đầu/cuối DÒNG hiện tại của con trỏ).
   DateTime? _lanBamHomeTruoc;
   DateTime? _lanBamEndTruoc;
+  DateTime? _lanBamAllTruoc;
   static const _nguongBamHaiLan = Duration(seconds: 1);
 
   /// "Copy" — chỉ làm gì đó khi ĐANG CÓ vùng chọn (không collapsed); vùng
@@ -3781,11 +3830,32 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
-  /// "All" — chọn toàn bộ văn bản. Chỉ đổi vùng chọn, không đụng nội dung.
+  /// "All" — bấm 1 lần: chọn ĐOẠN VĂN chứa con trỏ (ranh giới là dấu xuống
+  /// dòng gần nhất trước/sau con trỏ — hoặc đầu/cuối văn bản nếu đoạn đó
+  /// nằm ở trên cùng/dưới cùng, không có dấu xuống dòng ở phía đó). Bấm 2
+  /// lần liên tiếp trong 1 giây: chọn toàn bộ văn bản (logic cũ). Chỉ đổi
+  /// vùng chọn, không đụng nội dung.
   void _phimAoChonTatCa() {
-    final doDai = _boDieuKhien.text.length;
-    _boDieuKhien.selection = TextSelection(baseOffset: 0, extentOffset: doDai);
+    final vb = _boDieuKhien.text;
+    final chon = _boDieuKhien.selection;
     _giuFocusOChuSauKhiBam();
+    final bay = DateTime.now();
+    final laLanHai = _lanBamAllTruoc != null &&
+        bay.difference(_lanBamAllTruoc!) <= _nguongBamHaiLan;
+    _lanBamAllTruoc = laLanHai ? null : bay;
+    if (laLanHai) {
+      _boDieuKhien.selection = TextSelection(baseOffset: 0, extentOffset: vb.length);
+      return;
+    }
+    if (!chon.isValid) return;
+    final vt = chon.extentOffset;
+    final batDauDoan = vt <= 0 ? 0 : vb.lastIndexOf('\n', vt - 1) + 1;
+    final ketThucDongTho = vb.indexOf('\n', vt);
+    final ketThucDoan = ketThucDongTho == -1 ? vb.length : ketThucDongTho;
+    _boDieuKhien.selection = TextSelection(baseOffset: batDauDoan, extentOffset: ketThucDoan);
+    if (mounted) {
+      hienThongBaoGiua(context, 'Bấm All 2 lần để chọn toàn bộ văn bản');
+    }
   }
 
   /// "Home" — bấm 1 lần: đầu DÒNG hiện tại của con trỏ. Bấm 2 lần liên tiếp
@@ -8430,7 +8500,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _NutCongCuChu(nhan: 'Copy', onTap: _phimAoCopy),
       _NutCongCuChu(nhan: 'Cut', onTap: _phimAoCut),
       _NutCongCuChu(nhan: 'Paste', onTap: _phimAoPaste),
-      _NutCongCuChu(nhan: 'All', moTa: 'Chọn tất cả', onTap: _phimAoChonTatCa),
+      _NutCongCuChu(
+        nhan: 'All',
+        moTa: 'Chọn đoạn văn — bấm 2 lần: chọn tất cả',
+        onTap: _phimAoChonTatCa,
+      ),
       _NutCongCuChu(
         nhan: 'Home',
         moTa: 'Đầu dòng — bấm 2 lần: đầu văn bản',
@@ -8480,6 +8554,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // ở `_xayHangCongCuVanBanCamUng`.
     final manHinhHep = MediaQuery.sizeOf(context).width < _nguongManHinhHep;
     final khoangCach = manHinhHep ? 0.0 : 8.0;
+    // Màn hình hẹp: hẹp thêm 15% chiều rộng mặc định (48) mỗi nút, để cả 5
+    // nút cùng lọt vào khung nhìn mà không cần cuộn ngang.
+    final rongNutPhimAo = manHinhHep ? 48.0 * 0.85 : 48.0;
     return Material(
       color: Colors.white,
       elevation: 2,
@@ -8496,16 +8573,26 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     spacing: khoangCach,
                     runSpacing: khoangCach,
                     children: [
-                    _NutPhimAo(nhan: '.', onTap: () => _chenKyTuTuPhimAo('.')),
-                    _NutPhimAo(nhan: ',', onTap: () => _chenKyTuTuPhimAo(',')),
+                    _NutPhimAo(
+                      nhan: '.',
+                      rong: rongNutPhimAo,
+                      onTap: () => _chenKyTuTuPhimAo('.'),
+                    ),
+                    _NutPhimAo(
+                      nhan: ',',
+                      rong: rongNutPhimAo,
+                      onTap: () => _chenKyTuTuPhimAo(','),
+                    ),
                     _NutPhimAo(
                       nhan: '␣',
                       moTa: 'Dấu cách',
+                      rong: rongNutPhimAo,
                       onTap: () => _chenKyTuTuPhimAo(' '),
                     ),
                     _NutPhimAo(
                       nhan: '⏎',
                       moTa: 'Xuống dòng',
+                      rong: rongNutPhimAo,
                       onTap: () => _chenKyTuTuPhimAo('\n'),
                     ),
                     _NutPhimAo(
@@ -8513,6 +8600,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       moTa: 'Xoá',
                       mauNen: Colors.red.shade50,
                       mauVien: Colors.red.shade300,
+                      rong: rongNutPhimAo,
                       onTap: _xoaKyTuTuPhimAo,
                     ),
                     ],
