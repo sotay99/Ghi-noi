@@ -663,7 +663,7 @@ class _VeChamCuoiVanBan extends CustomPainter {
   bool shouldRepaint(covariant _VeChamCuoiVanBan cu) => true;
 }
 
-/// Bọc `_VeChamCuoiVanBan` cùng `AnimationController` riêng (2 giây một
+/// Bọc `_VeChamCuoiVanBan` cùng `AnimationController` riêng (5 giây một
 /// chiều, lặp lại vô tận, tự đảo chiều — `repeat(reverse: true)`) cho vòng
 /// tròn TRONG nhấp nháy mượt mà. Tách thành widget riêng (thay vì nhét
 /// thẳng vào `_TrangSoanThaoState`, vốn không có `vsync`) để không phải
@@ -697,7 +697,7 @@ class _ChamCuoiVanBanState extends State<_ChamCuoiVanBan>
   @override
   void initState() {
     super.initState();
-    _dk = AnimationController(vsync: this, duration: const Duration(seconds: 2))
+    _dk = AnimationController(vsync: this, duration: const Duration(seconds: 5))
       ..repeat(reverse: true);
   }
 
@@ -2385,7 +2385,75 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   /// Các dấu câu tự động "nhảy" qua trước một dấu cách có sẵn khi gõ tay —
   /// xem chỗ dùng trong `_apDungChinhSuaNguoiDung`.
-  static const _kyTuDacBiet = {'.', ',', ';', '?', '!', ':', ')'};
+  static const _kyTuDacBiet = {'.', ',', ';', '?', '!', ':'};
+
+  /// Bảy ký tự "Chuẩn hoá các cặp dấu đóng-mở ngoặc" theo dõi — xem
+  /// `_chuanHoaNgoacSauKhiGo`.
+  static const _kyTuNgoacCanChuanHoa = {'(', ')', '{', '}', '[', ']', '"'};
+
+  /// (Tính năng "Chuẩn hoá các cặp dấu đóng-mở ngoặc" — xem Cài đặt) Gọi
+  /// SAU MỖI lần gõ tay đúng một ký tự thuộc `_kyTuNgoacCanChuanHoa` — quét
+  /// lại các cặp (),{},[] và "" trong TOÀN VĂN BẢN, xoá dấu cách thừa ngay
+  /// SAU dấu mở / ngay TRƯỚC dấu đóng của mỗi cặp.
+  ///
+  /// (),{},[]: mỗi loại một ngăn xếp riêng — dấu mở luôn nhận diện được
+  /// ngay (không cần tính gì, đúng như yêu cầu), dấu đóng ghép với dấu mở
+  /// GẦN NHẤT còn "mồ côi" (ngăn xếp chuẩn); dấu đóng không có dấu mở nào
+  /// chờ sẵn (ngăn xếp rỗng) coi là mồ côi, bỏ qua — không chuẩn hoá gì.
+  ///
+  /// Ngoặc kép "": KHÔNG có hình dạng riêng để phân biệt mở/đóng như ba
+  /// loại trên — đây là bài toán không có lời giải chắc chắn 100% (chính
+  /// người yêu cầu tính năng này cũng xác nhận). Chọn quy ước ĐƠN GIẢN,
+  /// NHẤT QUÁN, quét trái→phải: dấu nháy kép thứ 1/3/5/... trong toàn văn
+  /// bản luôn là MỞ, thứ 2/4/6/... luôn là ĐÓNG — đúng tinh thần "ghép với
+  /// bạn gần nhất tính từ trái qua phải" đã bàn, tránh đoán ngữ nghĩa (đoán
+  /// sai theo ngữ cảnh còn tệ hơn không đoán, vì sẽ chuẩn hoá nhầm cặp).
+  void _chuanHoaNgoacSauKhiGo(String kyTuVuaGo) {
+    if (!widget.caiDat.tuDongChuanHoaNgoac) return;
+    if (!_kyTuNgoacCanChuanHoa.contains(kyTuVuaGo)) return;
+    final vb = _boDieuKhien.text;
+
+    // Gom hết offset dấu cách cần xoá (không xoá ngay, để mọi cặp đọc đúng
+    // toạ độ trên CÙNG một bản [vb] gốc) — xoá theo thứ tự GIẢM DẦN sau.
+    final canXoa = <int>{};
+    void chuanHoaMotCap(int moTai, int dongTai) {
+      if (moTai + 1 < dongTai && vb[moTai + 1] == ' ') canXoa.add(moTai + 1);
+      if (dongTai - 1 > moTai && vb[dongTai - 1] == ' ') canXoa.add(dongTai - 1);
+    }
+
+    for (final cap in const [('(', ')'), ('{', '}'), ('[', ']')]) {
+      final ngan = <int>[];
+      for (var i = 0; i < vb.length; i++) {
+        if (vb[i] == cap.$1) {
+          ngan.add(i);
+        } else if (vb[i] == cap.$2 && ngan.isNotEmpty) {
+          chuanHoaMotCap(ngan.removeLast(), i);
+        }
+      }
+    }
+
+    int? moDangCho;
+    for (var i = 0; i < vb.length; i++) {
+      if (vb[i] != '"') continue;
+      if (moDangCho == null) {
+        moDangCho = i;
+      } else {
+        chuanHoaMotCap(moDangCho, i);
+        moDangCho = null;
+      }
+    }
+
+    if (canXoa.isEmpty) return;
+    final ds = canXoa.toList()..sort((a, b) => b.compareTo(a));
+    var moi = vb;
+    for (final vt in ds) {
+      moi = moi.replaceRange(vt, vt + 1, '');
+      _dieuChinhLoiChinhTaSauKhiSua(vt, 1, 0);
+      _dieuChinhVungToanVanSauKhiSua(vt, 1, 0);
+      if (_neo > vt) _neo--;
+    }
+    _ghiVaoO(moi, _neo);
+  }
 
   /// Kiểu chữ của ô soạn thảo — dùng chung cho cả TextField thật lẫn
   /// TextPainter đo vị trí ký tự cuối (`_chamCuoiVanBan`).
@@ -3755,7 +3823,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _boPhimNhanhCamUngMo = dangBat;
       _boPhimNhanhCamUngAn = false;
     });
-    if (dangBat) _batConTroNgay();
+    if (dangBat) {
+      _batConTroNgay();
+      _epConTroHienRaMatThuong();
+    }
   }
 
   /// (SỬA LỖI con trỏ nháy có lúc "biến mất" khi vừa bật/hiện lại Bộ phím
@@ -3773,6 +3844,32 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     });
   }
 
+  /// (SỬA LỖI TRIỆT ĐỂ con trỏ vẫn không hiện — `_batConTroNgay` một mình
+  /// không đủ) Chèn một dấu cách NGAY tại vị trí con trỏ rồi xoá nó ngay ở
+  /// khung hình kế tiếp — một mẹo buộc bàn phím ảo/engine soạn thảo phải
+  /// đồng bộ lại toàn bộ trạng thái con trỏ, dùng khi chỉ gọi lại
+  /// `requestFocus()`/đổi `readOnly` KHÔNG đủ để ép hiện ra (ví dụ do một
+  /// khung hình bị lỡ ngay lúc bàn phím ảo/`readOnly` đổi cùng lúc). Ghi
+  /// thẳng qua `_ghiVaoO` (đường "máy tự ghi", có `_tuSua`) — KHÔNG đi qua
+  /// `_apDungChinhSuaNguoiDung` — để không tạo mốc Lùi lại/không đụng gì
+  /// tới lịch sử hay các vùng định dạng/đường kẻ chia, vì đây thuần tuý là
+  /// một mẹo hiển thị, không phải một lần gõ thật.
+  void _epConTroHienRaMatThuong() {
+    final chon = _boDieuKhien.selection;
+    if (!chon.isValid) return;
+    final vb = _boDieuKhien.text;
+    final vt = chon.baseOffset.clamp(0, vb.length);
+    if (_theGhiAmChongLanMotPhan(vt, vt) != null) return;
+    _ghiVaoO(vb.replaceRange(vt, vt, ' '), vt + 1);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final vbMoi = _boDieuKhien.text;
+      if (vt < vbMoi.length && vbMoi[vt] == ' ') {
+        _ghiVaoO(vbMoi.replaceRange(vt, vt + 1, ''), vt);
+      }
+    });
+  }
+
   /// Nút "Ẩn" (cam) — xem giải thích ở `_boPhimNhanhCamUngAn`. Ép bàn phím
   /// ảo hiện ra ngay bằng `TextInput.show` — chỉ đổi `readOnly` (qua
   /// `setState`) có lúc KHÔNG đủ để hệ thống tự mở bàn phím ngay lập tức vì
@@ -3785,6 +3882,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _oChu.requestFocus();
       SystemChannels.textInput.invokeMethod<void>('TextInput.show');
     });
+    _batConTroNgay();
+    _epConTroHienRaMatThuong();
   }
 
   /// Nút "Hiện lại Bộ phím nhanh" (xanh lá) — trả lại đúng trạng thái hiện
@@ -3793,6 +3892,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     setState(() => _boPhimNhanhCamUngAn = false);
     SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
     _batConTroNgay();
+    _epConTroHienRaMatThuong();
   }
 
   /// [batDau, ketThuc) sắp bị gõ/xoá đè lên có chồng lấn MỘT PHẦN thẻ ghi
@@ -6002,6 +6102,23 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _neo = viTriConTro;
     _nguoiDungVuaGo();
     _ghiVaoO(chuMoiCuoi, viTriConTro);
+    // (Tính năng "Chuẩn hoá các cặp dấu đóng-mở ngoặc") Chỉ áp dụng cho
+    // ĐÚNG một ký tự đơn giản vừa gõ tay (không áp dụng khi dán nhiều ký
+    // tự/autocorrect đổi cả cụm) — `dau` là vị trí ký tự đó trong [chuMoiCuoi].
+    if (soLuongXoa == 0 && doDaiChenVao == 1) {
+      _chuanHoaNgoacSauKhiGo(chuMoiCuoi[dau]);
+    }
+    // (SỬA LỖI đường kẻ chia thỉnh thoảng không hiện đúng chỗ quanh một lần
+    // Enter) Việc dời/thêm offset theo từng bước ở trên (VIỆC 5c) đôi khi
+    // vẫn lệch trong các trường hợp biên hiếm — ví dụ nhiều dòng trống liên
+    // tiếp cùng lúc đổi. Enter là lúc DUY NHẤT có thể sinh ra một dòng
+    // trống mới, nên quét lại TOÀN BỘ ngay sau mỗi lần Enter là đủ rẻ (chỉ
+    // chạy đúng lúc người dùng xuống dòng, không chạy mỗi ký tự) mà chắc
+    // chắn đúng — cùng kỹ thuật đã dùng cho Lùi lại/Tiến tới.
+    if (dauXuongDongDon != null && widget.caiDat.tuDongThemDuongKeChia) {
+      _cacViTriDuongKeChia.clear();
+      _quetVaXayDungDuongKeChia();
+    }
     _henLuu();
     _lenLichKiemTraChinhTa();
   }

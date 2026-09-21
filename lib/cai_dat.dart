@@ -144,6 +144,13 @@ class CaiDat {
 
   static const _khoaTuDongVietHoaDauCau = 'ghi_noi_tu_dong_viet_hoa_dau_cau';
 
+  /// "Chuẩn hoá các cặp dấu đóng-mở ngoặc" — (),{},[]," " — xoá dấu cách
+  /// thừa ngay sau dấu mở/ngay trước dấu đóng của mỗi cặp, ngay sau mỗi lần
+  /// gõ một trong bảy ký tự đó. Mặc định BẬT.
+  bool tuDongChuanHoaNgoac = true;
+
+  static const _khoaTuDongChuanHoaNgoac = 'ghi_noi_tu_dong_chuan_hoa_ngoac';
+
   /// Chỉ có ý nghĩa trên WEB (xem `loai_thiet_bi.dart`): người dùng tự chọn
   /// tay một trong ba "bản" thiết bị khi cơ chế tự đoán (User-Agent) đoán
   /// sai — mic bị trục trặc. `null` (mặc định) nghĩa là để tự đoán, không
@@ -184,6 +191,7 @@ class CaiDat {
     chamCuoiVanBanBat = kho.getBool(_khoaChamCuoiVanBanBat) ?? true;
     mauChamCuoiVanBan = kho.getInt(_khoaMauChamCuoiVanBan) ?? Colors.purple.toARGB32();
     tuDongVietHoaDauCau = kho.getBool(_khoaTuDongVietHoaDauCau) ?? true;
+    tuDongChuanHoaNgoac = kho.getBool(_khoaTuDongChuanHoaNgoac) ?? true;
     final tenThietBiDaLuu = kho.getString(_khoaThietBiChonTay);
     thietBiChonTay = tenThietBiDaLuu == null
         ? null
@@ -256,6 +264,12 @@ class CaiDat {
     tuDongVietHoaDauCau = bat;
     final kho = await SharedPreferences.getInstance();
     await kho.setBool(_khoaTuDongVietHoaDauCau, bat);
+  }
+
+  Future<void> datTuDongChuanHoaNgoac(bool bat) async {
+    tuDongChuanHoaNgoac = bat;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setBool(_khoaTuDongChuanHoaNgoac, bat);
   }
 
   Future<void> datTimKiemPhanBietHoaThuong(bool bat) async {

@@ -75,6 +75,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
   late bool _chamCuoiVanBanBat;
   late int _mauChamCuoiVanBan;
   late bool _tuDongVietHoaDauCau;
+  late bool _tuDongChuanHoaNgoac;
   late String _phimTatBoBienDoi;
   late String _phimTatPhim;
   PermissionStatus? _trangThaiMicro;
@@ -99,6 +100,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     _chamCuoiVanBanBat = widget.caiDat.chamCuoiVanBanBat;
     _mauChamCuoiVanBan = widget.caiDat.mauChamCuoiVanBan;
     _tuDongVietHoaDauCau = widget.caiDat.tuDongVietHoaDauCau;
+    _tuDongChuanHoaNgoac = widget.caiDat.tuDongChuanHoaNgoac;
     _phimTatBoBienDoi = widget.caiDat.phimTatBoBienDoi;
     _phimTatPhim = widget.caiDat.phimTatPhim;
     _oTuTatMicro = TextEditingController(text: '${widget.caiDat.thoiGianTuTatMicroGiay}');
@@ -262,6 +264,8 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
           _dong4gChamCuoiVanBan(),
           const Divider(height: 40),
           _dong4fTuDongVietHoaDauCau(),
+          const Divider(height: 40),
+          _dong4hTuDongChuanHoaNgoac(),
           const Divider(height: 40),
           _dong5PhimTat(),
           const Divider(height: 40),
@@ -954,6 +958,42 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     );
   }
 
+  Widget _dong4hTuDongChuanHoaNgoac() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _tieuDeDong('Chuẩn hoá các cặp dấu đóng-mở ngoặc'),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                _tuDongChuanHoaNgoac ? 'Đang bật (Có)' : 'Đang tắt (Không)',
+                style: TextStyle(
+                  color: _tuDongChuanHoaNgoac
+                      ? const Color(0xFF1A73E8)
+                      : const Color(0xFF9AA0A6),
+                ),
+              ),
+            ),
+            Switch(
+              value: _tuDongChuanHoaNgoac,
+              onChanged: (bat) async {
+                setState(() => _tuDongChuanHoaNgoac = bat);
+                await widget.caiDat.datTuDongChuanHoaNgoac(bat);
+              },
+            ),
+          ],
+        ),
+        _nutTimHieuThem(() => _hienGiaiThich(
+              'Chuẩn hoá các cặp dấu đóng-mở ngoặc',
+              _giaiThichChuanHoaNgoacNgan,
+              _giaiThichChuanHoaNgoac,
+            )),
+      ],
+    );
+  }
+
   Widget _oPhim(String nhan, VoidCallback khiBam) {
     return InkWell(
       onTap: khiBam,
@@ -1357,4 +1397,18 @@ const _giaiThichVietHoaDauCau = '''
 Sau khi bạn gõ một trong các dấu . , : ! ? rồi một dấu cách, ứng dụng ghi nhớ: từ tiếp theo cần viết Hoa chữ đầu. Khi bạn gõ xong từ đó (tới khi gặp dấu cách hoặc xuống dòng tiếp theo), ứng dụng mới viết Hoa chữ cái đầu tiên của từ — không đổi gì khác trong từ đó.
 
 Nếu ký tự đầu từ không phải chữ cái (ví dụ số), ứng dụng bỏ qua, không viết Hoa được thì thôi. Việc này áp dụng cho cả gõ tay và giọng nói. Tắt tính năng này thì chữ giữ nguyên như bạn gõ/nói, không tự viết Hoa gì cả.
+''';
+
+const _giaiThichChuanHoaNgoacNgan = '''
+Gõ một trong các dấu ( ) { } [ ] " thì ứng dụng tự xoá dấu cách thừa ngay sau dấu mở hoặc ngay trước dấu đóng của cặp đó.
+''';
+
+const _giaiThichChuanHoaNgoac = '''
+Áp dụng cho bốn cặp dấu: ngoặc đơn ( ), ngoặc nhọn { }, ngoặc vuông [ ] và ngoặc kép " ". Mỗi lần bạn gõ một trong bảy ký tự này, ứng dụng quét lại để tìm ra cặp mà ký tự đó vừa hoàn thành, rồi chuẩn hoá: nếu ngay sau dấu mở là một dấu cách, xoá nó đi; nếu ngay trước dấu đóng là một dấu cách, cũng xoá nó đi. Ví dụ "( chào )" tự thành "(chào)".
+
+Với ( ) { } [ ]: dấu mở và dấu đóng phân biệt rõ ràng, ứng dụng ghép mỗi dấu đóng với dấu mở gần nhất còn chưa có cặp. Dấu nào lẻ loi (mở mà chưa có đóng, hoặc đóng mà không có mở) thì bỏ qua, không đụng gì tới.
+
+Với " ": dấu nháy kép không phân biệt được mở/đóng qua hình dạng, nên ứng dụng dùng quy ước đơn giản — quét từ đầu bài, dấu nháy kép thứ nhất/ba/năm... luôn là dấu mở, thứ hai/tư/sáu... luôn là dấu đóng, ghép theo đúng thứ tự đó.
+
+Tắt tính năng này thì dấu cách quanh các dấu ngoặc/nháy kép giữ nguyên như bạn gõ, không tự xoá gì cả.
 ''';
