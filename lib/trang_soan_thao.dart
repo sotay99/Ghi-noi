@@ -8697,13 +8697,30 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           expands: true,
                           autofocus: true,
                           textAlignVertical: TextAlignVertical.top,
-                          // "Bộ phím nhanh cho màn hình cảm ứng" bật thì
-                          // báo hệ thống đừng bật bàn phím ảo cho ô này —
-                          // chạm để di chuyển con trỏ/chọn vùng vẫn hoạt
-                          // động bình thường, chỉ không tự bật bàn phím.
-                          keyboardType: _boPhimNhanhCamUngMo
-                              ? TextInputType.none
-                              : TextInputType.multiline,
+                          // (SỬA LỖI mất hết dấu xuống dòng khi chạm vào khung,
+                          // chỉ xảy ra lúc "Bộ phím nhanh cho màn hình cảm
+                          // ứng" đang bật) TRƯỚC ĐÂY dùng `keyboardType:
+                          // TextInputType.none` để báo hệ thống đừng bật bàn
+                          // phím ảo — nhưng trên WEB, đổi `keyboardType` đổi
+                          // luôn LOẠI phần tử DOM ẩn mà Flutter Web dùng để
+                          // đồng bộ nội dung/con trỏ với trình duyệt; với
+                          // `TextInputType.none`, phần tử đó không còn giữ
+                          // được `\n` như một `<textarea>` bình thường — hễ
+                          // chạm vào khung (kích hoạt đồng bộ lại từ DOM) là
+                          // Flutter đọc ngược nội dung ĐÃ MẤT hết dấu xuống
+                          // dòng đó rồi ghi đè lên văn bản thật.
+                          //
+                          // Sửa: GIỮ NGUYÊN `TextInputType.multiline` mọi lúc
+                          // (đúng loại phần tử DOM, không đổi hành vi đồng bộ)
+                          // và dùng `readOnly` để chặn bàn phím ảo thay thế —
+                          // `readOnly` chỉ chặn NGƯỜI DÙNG gõ qua bàn phím hệ
+                          // thống, KHÔNG chặn việc sửa văn bản bằng tay qua
+                          // `_boDieuKhien.value` (chính là cách hàng phím ảo
+                          // `_chenKyTuTuPhimAo`/`_xoaKyTuTuPhimAo` hoạt động),
+                          // và vẫn cho chạm để di chuyển con trỏ/chọn vùng
+                          // bình thường như tài liệu Flutter đã ghi rõ.
+                          keyboardType: TextInputType.multiline,
+                          readOnly: _boPhimNhanhCamUngMo,
                           // Chặn sửa/xoá từng-ký-tự-riêng-lẻ bên trong một
                           // thẻ ghi âm — xem `ChanSuaGiuaThe`.
                           inputFormatters: [
