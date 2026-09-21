@@ -24,6 +24,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamBanPhim,
     required this.khiBamBoPhimNhanh,
     required this.boPhimNhanhDangMo,
+    this.noiBatBoPhimNhanh = false,
     required this.khiBamKiemTraToanVan,
     required this.dangGhiAmThe,
     required this.khiBamGhiAmThe,
@@ -68,6 +69,10 @@ class ThanhCongCu extends StatelessWidget {
   /// lựa chọn") — [boPhimNhanhDangMo] quyết định tên hiển thị (Bật/Tắt).
   final VoidCallback khiBamBoPhimNhanh;
   final bool boPhimNhanhDangMo;
+
+  /// Thiết bị (tự đoán hoặc chọn tay) là Android/iPhone — truyền tiếp vào
+  /// `_NutThemMenu`, xem giải thích ở đó.
+  final bool noiBatBoPhimNhanh;
 
   final VoidCallback khiBamKiemTraToanVan;
 
@@ -219,6 +224,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamBanPhim: khiBamBanPhim,
                               khiBamBoPhimNhanh: khiBamBoPhimNhanh,
                               boPhimNhanhDangMo: boPhimNhanhDangMo,
+                              noiBatBoPhimNhanh: noiBatBoPhimNhanh,
                               khiBamChepTatCa: khiBamChepTatCa,
                               khiBamChepRoiXoaTatCa: khiBamChepRoiXoaTatCa,
                               khiBamXoaTatCa: khiBamXoaTatCa,
@@ -746,10 +752,20 @@ class _DongMenuCoTheBam extends StatelessWidget {
 
 /// Một dòng trong menu thả xuống của nút dấu cộng — cao vừa đủ chữ, viền sát
 /// chữ, không rộng thùng thình như PopupMenuItem mặc định (cao tối thiểu 48).
-Widget _mucMenuThem(int gia, String chu) {
+/// [noiBat]: chữ đậm + xanh dương — dùng đúng một chỗ, mục "Bật Bộ phím
+/// nhanh cho màn hình cảm ứng" khi thiết bị (tự đoán hoặc chọn tay) là
+/// Android/iPhone, xem `_NutThemMenu`.
+Widget _mucMenuThem(int gia, String chu, {bool noiBat = false}) {
   return _DongMenuCoTheBam(
     gia: gia,
-    child: Text(chu, style: const TextStyle(fontSize: 13)),
+    child: Text(
+      chu,
+      style: TextStyle(
+        fontSize: 13,
+        fontWeight: noiBat ? FontWeight.bold : null,
+        color: noiBat ? Colors.blue.shade700 : null,
+      ),
+    ),
   );
 }
 
@@ -963,6 +979,7 @@ class _NutThemMenu extends StatelessWidget {
     required this.khiBamBanPhim,
     required this.khiBamBoPhimNhanh,
     required this.boPhimNhanhDangMo,
+    this.noiBatBoPhimNhanh = false,
     required this.khiBamChepTatCa,
     required this.khiBamChepRoiXoaTatCa,
     required this.khiBamXoaTatCa,
@@ -979,6 +996,10 @@ class _NutThemMenu extends StatelessWidget {
   /// Gắn với mục "Bật/Tắt bộ phím nhanh cho màn hình cảm ứng".
   final VoidCallback khiBamBoPhimNhanh;
   final bool boPhimNhanhDangMo;
+
+  /// Thiết bị (tự đoán hoặc chọn tay) là Android/iPhone — tô đậm+xanh dương
+  /// mục này để gợi ý, xem `_mucMenuThem`.
+  final bool noiBatBoPhimNhanh;
 
   final VoidCallback khiBamChepTatCa;
   final VoidCallback khiBamChepRoiXoaTatCa;
@@ -1079,6 +1100,7 @@ class _NutThemMenu extends StatelessWidget {
                   boPhimNhanhDangMo
                       ? 'Tắt Bộ phím nhanh cho màn hình cảm ứng'
                       : 'Bật Bộ phím nhanh cho màn hình cảm ứng',
+                  noiBat: !boPhimNhanhDangMo && noiBatBoPhimNhanh,
                 ),
                 _mucMenuThem(4, 'Kiểu gõ bàn phím'),
                 _mucMenuThem(23, 'Danh sách phím tắt'),
