@@ -8420,39 +8420,45 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// không dịch — Home/End có thông báo gợi ý "bấm 2 lần" ngay trong nhãn
   /// nút để người dùng biết trước, không cần bấm thử.
   Widget _xayHangCongCuVanBanCamUng() {
+    // Màn hình hẹp: sát các nút vào nhau (không khoảng cách) và ép hẳn về
+    // bên trái — nhường tối đa chỗ ngang để càng nhiều nút lọt vào khung
+    // nhìn cùng lúc càng tốt, đỡ phải cuộn ngang mới thấy hết. Màn hình
+    // rộng giữ khoảng cách 8 như cũ.
+    final manHinhHep = MediaQuery.sizeOf(context).width < _nguongManHinhHep;
+    final khoangCach = manHinhHep ? 0.0 : 8.0;
+    final cacNut = <Widget>[
+      _NutCongCuChu(nhan: 'Copy', onTap: _phimAoCopy),
+      _NutCongCuChu(nhan: 'Cut', onTap: _phimAoCut),
+      _NutCongCuChu(nhan: 'Paste', onTap: _phimAoPaste),
+      _NutCongCuChu(nhan: 'All', moTa: 'Chọn tất cả', onTap: _phimAoChonTatCa),
+      _NutCongCuChu(
+        nhan: 'Home',
+        moTa: 'Đầu dòng — bấm 2 lần: đầu văn bản',
+        onTap: _phimAoHome,
+      ),
+      _NutCongCuChu(
+        nhan: 'End',
+        moTa: 'Cuối dòng — bấm 2 lần: cuối văn bản',
+        onTap: _phimAoEnd,
+      ),
+    ];
     return Material(
       color: Colors.white,
       elevation: 2,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              _NutCongCuChu(nhan: 'Copy', onTap: _phimAoCopy),
-              const SizedBox(width: 8),
-              _NutCongCuChu(nhan: 'Cut', onTap: _phimAoCut),
-              const SizedBox(width: 8),
-              _NutCongCuChu(nhan: 'Paste', onTap: _phimAoPaste),
-              const SizedBox(width: 8),
-              _NutCongCuChu(
-                nhan: 'All',
-                moTa: 'Chọn tất cả',
-                onTap: _phimAoChonTatCa,
-              ),
-              const SizedBox(width: 8),
-              _NutCongCuChu(
-                nhan: 'Home',
-                moTa: 'Đầu dòng — bấm 2 lần: đầu văn bản',
-                onTap: _phimAoHome,
-              ),
-              const SizedBox(width: 8),
-              _NutCongCuChu(
-                nhan: 'End',
-                moTa: 'Cuối dòng — bấm 2 lần: cuối văn bản',
-                onTap: _phimAoEnd,
-              ),
-            ],
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (var i = 0; i < cacNut.length; i++) ...[
+                  if (i > 0) SizedBox(width: khoangCach),
+                  cacNut[i],
+                ],
+              ],
+            ),
           ),
         ),
       ),
@@ -8463,7 +8469,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// trên `ThanhCongCu`, khi "Bộ phím nhanh cho màn hình cảm ứng" đang mở.
   /// Nút X đỏ sát mép phải tắt hẳn công cụ, trả lại bàn phím ảo bình
   /// thường.
+  /// "Ẩn" và "Đóng" luôn RỘNG BẰNG NHAU (áp dụng cả màn hình hẹp lẫn rộng)
+  /// — nhãn "Đóng" (4 chữ) tự nhiên rộng hơn "Ẩn" (2 chữ) nếu để tự co theo
+  /// nội dung, nên khoá cứng cùng một độ rộng, đo theo nhãn DÀI HƠN.
+  static const _rongNutAnDong = 64.0;
+
   Widget _xayHangPhimNhanhCamUng() {
+    // Màn hình hẹp: các nút phím ảo sát vào nhau (không khoảng cách), ép
+    // hẳn về bên trái — cùng lý do đã áp dụng cho hàng Copy/Cut/Paste/...
+    // ở `_xayHangCongCuVanBanCamUng`.
+    final manHinhHep = MediaQuery.sizeOf(context).width < _nguongManHinhHep;
+    final khoangCach = manHinhHep ? 0.0 : 8.0;
     return Material(
       color: Colors.white,
       elevation: 2,
@@ -8472,12 +8488,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         child: Row(
           children: [
             Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Wrap(
+                    spacing: khoangCach,
+                    runSpacing: khoangCach,
+                    children: [
                     _NutPhimAo(nhan: '.', onTap: () => _chenKyTuTuPhimAo('.')),
                     _NutPhimAo(nhan: ',', onTap: () => _chenKyTuTuPhimAo(',')),
                     _NutPhimAo(
@@ -8497,7 +8515,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       mauVien: Colors.red.shade300,
                       onTap: _xoaKyTuTuPhimAo,
                     ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -8516,8 +8535,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       onTap: () {},
                       onTapDown: (_) => _anBoPhimNhanhCamUng(),
                       child: Container(
+                        width: _rongNutAnDong,
                         color: Colors.orange.shade600,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        alignment: Alignment.center,
                         child: const Text('Ẩn',
                             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                       ),
@@ -8529,8 +8550,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       onTap: () {},
                       onTapDown: (_) => _bamNutBoPhimNhanhCamUng(),
                       child: Container(
+                        width: _rongNutAnDong,
                         color: Colors.red.shade600,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        alignment: Alignment.center,
                         child: const Text('Đóng',
                             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                       ),
