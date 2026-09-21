@@ -603,19 +603,29 @@ class _VeDanhDauAi extends CustomPainter {
 /// Chấm tròn tím cuối văn bản — cùng lý do đo trong `paint()` như
 /// `_VeDanhDauAi` ở trên, để không bao giờ lệch khỏi ký tự cuối khi bàn
 /// phím ảo bật/tắt làm khung soạn thảo đổi cao liên tục.
+/// Hai vòng tròn đồng tâm đánh dấu cuối văn bản: vòng NGOÀI (viền, đúng kích
+/// cỡ chấm tròn cũ) đứng yên, vòng TRONG (đặc ruột, nhỏ hơn) nhấp nháy mượt
+/// theo [moTrong] — 0 = ẩn hẳn, 1 = hiện rõ, do `AnimationController` bên
+/// ngoài (`_ChamCuoiVanBan`) điều khiển và truyền vào qua `repaint`, nên
+/// painter tự vẽ lại MỖI TICK mà không cần `setState`/dựng lại cây widget.
 class _VeChamCuoiVanBan extends CustomPainter {
   _VeChamCuoiVanBan({
     required this.re,
     required this.khungBox,
     required this.viTri,
-    required this.duongKinh,
+    required this.duongKinhNgoai,
+    required this.duongKinhTrong,
     required this.mau,
-  });
+    required this.moTrong,
+  }) : super(repaint: moTrong);
+
   final RenderEditable re;
   final RenderBox khungBox;
   final int viTri;
-  final double duongKinh;
+  final double duongKinhNgoai;
+  final double duongKinhTrong;
   final Color mau;
+  final Animation<double> moTrong;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -629,14 +639,90 @@ class _VeChamCuoiVanBan extends CustomPainter {
       return;
     }
     final tam = Offset(
-      diem.dx + 2 + duongKinh / 2,
+      diem.dx + 2 + duongKinhNgoai / 2,
       diem.dy + goc.height / 2,
     );
-    canvas.drawCircle(tam, duongKinh / 2, Paint()..color = mau);
+    // Vòng NGOÀI — viền, đứng yên, đúng kích cỡ chấm tròn cũ.
+    canvas.drawCircle(
+      tam,
+      duongKinhNgoai / 2,
+      Paint()
+        ..color = mau
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0,
+    );
+    // Vòng TRONG — đặc ruột, nhấp nháy mượt.
+    canvas.drawCircle(
+      tam,
+      duongKinhTrong / 2,
+      Paint()..color = mau.withValues(alpha: moTrong.value),
+    );
   }
 
   @override
   bool shouldRepaint(covariant _VeChamCuoiVanBan cu) => true;
+}
+
+/// Bọc `_VeChamCuoiVanBan` cùng `AnimationController` riêng (2 giây một
+/// chiều, lặp lại vô tận, tự đảo chiều — `repeat(reverse: true)`) cho vòng
+/// tròn TRONG nhấp nháy mượt mà. Tách thành widget riêng (thay vì nhét
+/// thẳng vào `_TrangSoanThaoState`, vốn không có `vsync`) để không phải
+/// thêm `TickerProviderStateMixin` cho cả màn hình soạn thảo khổng lồ chỉ
+/// vì một hiệu ứng nhỏ.
+class _ChamCuoiVanBan extends StatefulWidget {
+  const _ChamCuoiVanBan({
+    required this.re,
+    required this.khungBox,
+    required this.viTri,
+    required this.duongKinhNgoai,
+    required this.duongKinhTrong,
+    required this.mau,
+  });
+
+  final RenderEditable re;
+  final RenderBox khungBox;
+  final int viTri;
+  final double duongKinhNgoai;
+  final double duongKinhTrong;
+  final Color mau;
+
+  @override
+  State<_ChamCuoiVanBan> createState() => _ChamCuoiVanBanState();
+}
+
+class _ChamCuoiVanBanState extends State<_ChamCuoiVanBan>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _dk;
+
+  @override
+  void initState() {
+    super.initState();
+    _dk = AnimationController(vsync: this, duration: const Duration(seconds: 2))
+      ..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _dk.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.expand(
+      child: CustomPaint(
+        painter: _VeChamCuoiVanBan(
+          re: widget.re,
+          khungBox: widget.khungBox,
+          viTri: widget.viTri,
+          duongKinhNgoai: widget.duongKinhNgoai,
+          duongKinhTrong: widget.duongKinhTrong,
+          mau: widget.mau,
+          moTrong: _dk,
+        ),
+      ),
+    );
+  }
 }
 
 /// (VIỆC 2) Con trỏ nháy TỰ VẼ, đè lên TRÊN CÙNG mọi lớp khác — kể cả
@@ -700,12 +786,20 @@ class _VeConTro extends CustomPainter {
 /// không compile-test được, mà vẫn đạt đúng ý chính: có một đường kẻ chia
 /// rõ ràng, luôn bám đúng dòng.
 class _VeDuongKeChia extends CustomPainter {
-  _VeDuongKeChia({required this.re, required this.khungBox, required this.dsViTri});
+  _VeDuongKeChia({
+    required this.re,
+    required this.khungBox,
+    required this.dsViTri,
+    required this.mau,
+  });
   final RenderEditable re;
   final RenderBox khungBox;
   final List<int> dsViTri;
 
-  static final _mau = Colors.purple.withValues(alpha: 0.35);
+  /// Màu ĐÃ áp opacity theo Cài đặt (`mauDuongKeChia`/`phanTramMoDuongKeChia`)
+  /// — tính sẵn ở nơi gọi (`_veDuongKeChia`), painter chỉ vẽ, không tự đọc
+  /// Cài đặt.
+  final Color mau;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -729,7 +823,7 @@ class _VeDuongKeChia extends CustomPainter {
         Offset(trai, y),
         Offset(phai, y),
         Paint()
-          ..color = _mau
+          ..color = mau
           ..strokeWidth = _damGachChanLoi
           ..strokeCap = StrokeCap.round,
       );
@@ -2173,6 +2267,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           re: re,
           khungBox: khungBox,
           dsViTri: List<int>.of(_cacViTriDuongKeChia),
+          mau: Color(widget.caiDat.mauDuongKeChia)
+              .withValues(alpha: widget.caiDat.phanTramMoDuongKeChia / 100),
         ),
       ),
     );
@@ -2394,6 +2490,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// KHI bố cục khung hình đã xong hẳn, nên luôn đo đúng. Ở đây chỉ còn tìm
   /// `re`/`khungBox` (rẻ, không đọc bố cục) rồi giao painter tự đo lúc vẽ.
   Widget _chamCuoiVanBan() {
+    if (!widget.caiDat.chamCuoiVanBanBat) return const SizedBox.shrink();
     final chu = _boDieuKhien.text;
     if (chu.isEmpty) return const SizedBox.shrink();
 
@@ -2408,16 +2505,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     return AnimatedOpacity(
       opacity: _chamCuoiMoDam ? 0.35 : 1.0,
       duration: const Duration(milliseconds: 200),
-      child: SizedBox.expand(
-        child: CustomPaint(
-          painter: _VeChamCuoiVanBan(
-            re: re,
-            khungBox: khungBox,
-            viTri: chu.length,
-            duongKinh: 17.0,
-            mau: const Color(0xFF6A1B9A),
-          ),
-        ),
+      child: _ChamCuoiVanBan(
+        re: re,
+        khungBox: khungBox,
+        viTri: chu.length,
+        duongKinhNgoai: 17.0,
+        duongKinhTrong: 8.0,
+        mau: Color(widget.caiDat.mauChamCuoiVanBan),
       ),
     );
   }
@@ -3656,9 +3750,26 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   bool _boPhimNhanhCamUngAn = false;
 
   void _bamNutBoPhimNhanhCamUng() {
+    final dangBat = !_boPhimNhanhCamUngMo;
     setState(() {
-      _boPhimNhanhCamUngMo = !_boPhimNhanhCamUngMo;
+      _boPhimNhanhCamUngMo = dangBat;
       _boPhimNhanhCamUngAn = false;
+    });
+    if (dangBat) _batConTroNgay();
+  }
+
+  /// (SỬA LỖI con trỏ nháy có lúc "biến mất" khi vừa bật/hiện lại Bộ phím
+  /// nhanh) Bật/hiện các thanh công cụ của Bộ phím nhanh KHÔNG hề đổi tiêu
+  /// điểm của `_oChu` (đã giữ sẵn từ trước) nên nhịp nhấp nháy 500ms
+  /// (`_khiFocusConTroDoi`) không hề reset — nếu đúng lúc đó nhịp đang ở
+  /// pha "ẩn", con trỏ biến mất khỏi mắt người dùng ngay khi vừa bật, có
+  /// cảm giác như lỗi. Khởi động lại hẳn timer từ đầu, LUÔN bắt đầu ở pha
+  /// "hiện", để người dùng thấy được con trỏ ngay tại vị trí nó đang đứng.
+  void _batConTroNgay() {
+    _henNhapNhayConTro?.cancel();
+    _conTroDangHien.value = true;
+    _henNhapNhayConTro = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      _conTroDangHien.value = !_conTroDangHien.value;
     });
   }
 
@@ -3681,6 +3792,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void _hienLaiBoPhimNhanhCamUng() {
     setState(() => _boPhimNhanhCamUngAn = false);
     SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+    _batConTroNgay();
   }
 
   /// [batDau, ketThuc) sắp bị gõ/xoá đè lên có chồng lấn MỘT PHẦN thẻ ghi
@@ -5516,8 +5628,25 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// chèn, hoặc null nếu không khớp mẫu này (autocorrect, dán nhiều ký tự,
   /// xoá kèm gõ... đều bị loại, để tính năng chỉ chạy đúng lúc người dùng
   /// bấm Enter thật sự).
-  int? _viTriChenXuongDongDon(String cu, String chuMoi) {
+  ///
+  /// (SỬA LỖI "nhảy qua" các dấu xuống dòng có sẵn ngay sau con trỏ) Vòng
+  /// lặp so KHỚP TIỀN TỐ dài nhất bên dưới là nguồn gốc lỗi: nếu ngay sau vị
+  /// trí Enter thật sự có SẴN một hay nhiều dấu `\n` khác (ví dụ con trỏ
+  /// đứng ngay trước một dòng trống), dấu `\n` MỚI chèn vào trùng y hệt các
+  /// dấu `\n` đã có ngay sau nó — vòng lặp "khớp dài nhất có thể" cứ thế lấn
+  /// qua HẾT các dấu `\n` cũ rồi mới dừng, trả về vị trí chèn nằm SAU chúng
+  /// thay vì đúng tại con trỏ. `[goiY]` (vị trí con trỏ THẬT trước khi gõ,
+  /// truyền từ `_neo`) phá vỡ sự mập mờ này — kiểm tra và ưu tiên nó TRƯỚC,
+  /// chỉ rơi về vòng lặp khớp-dài-nhất khi gợi ý không hợp lệ (phòng hờ, ví
+  /// dụ gợi ý bị lệch vì một lý do nào khác).
+  int? _viTriChenXuongDongDon(String cu, String chuMoi, {int? goiY}) {
     if (chuMoi.length != cu.length + 1) return null;
+    if (goiY != null && goiY >= 0 && goiY <= cu.length && chuMoi[goiY] == '\n') {
+      if (cu.substring(0, goiY) == chuMoi.substring(0, goiY) &&
+          cu.substring(goiY) == chuMoi.substring(goiY + 1)) {
+        return goiY;
+      }
+    }
     var dau = 0;
     while (dau < cu.length && cu[dau] == chuMoi[dau]) {
       dau++;
@@ -5654,7 +5783,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // phần còn lại — coi cả cụm (chấm + \n + thụt) là MỘT phép chèn duy
     // nhất, y hệt cách các phép sửa khác trong hàm này vẫn làm.
     int? ungCuVienDuongKeChia;
-    final dauXuongDongDon = _viTriChenXuongDongDon(cuChoEnter, chuMoi);
+    final dauXuongDongDon = _viTriChenXuongDongDon(cuChoEnter, chuMoi, goiY: _neo);
     if (dauXuongDongDon != null) {
       // (VIỆC 2) Đã có sẵn dấu chấm ngay trước con trỏ rồi (kể cả có một dấu
       // cách xen giữa) — không thêm/thay chấm nữa, tránh thừa 2 dấu chấm liền
@@ -7955,6 +8084,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henChinhTa?.cancel();
     _viTriDaKiemTraChinhTa = tt.vanBan.length;
     _ghiVaoO(tt.vanBan, _neo);
+    // (SỬA LỖI đường kẻ chia không theo kịp Lùi lại/Tiến tới) Snapshot lịch
+    // sử (`_TrangThaiVanBan`) KHÔNG lưu `_cacViTriDuongKeChia` — danh sách
+    // offset đó vẫn còn nguyên giá trị CŨ (từ trước khi Lùi/Tiến), trong khi
+    // nội dung/toạ độ văn bản vừa đổi hẳn sang một trạng thái khác. Quét lại
+    // TỪ ĐẦU trên văn bản MỚI (giống hệt lúc mở một ghi chú) là cách chắc
+    // chắn đúng duy nhất — không thể "dời" danh sách cũ theo kiểu diff, vì
+    // Lùi/Tiến có thể nhảy xa qua nhiều bước cùng lúc.
+    _cacViTriDuongKeChia.clear();
+    if (widget.caiDat.tuDongThemDuongKeChia) {
+      _quetVaXayDungDuongKeChia();
+    }
     _henLuu();
   }
 

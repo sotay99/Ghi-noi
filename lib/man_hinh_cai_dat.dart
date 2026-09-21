@@ -12,6 +12,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'cai_dat.dart';
 import 'doan_thiet_bi.dart';
 import 'loai_thiet_bi.dart';
+import 'mau_co_ban.dart';
 
 /// Hai bộ biến đổi cho phép chọn làm phím tắt — bàn phím Android/desktop
 /// thường chỉ có hai phím này ở vị trí dễ bấm cùng lúc với một phím khác.
@@ -69,6 +70,10 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
   late bool _tuDongThutDauDong;
   late int _soDauCachThutDauDong;
   late bool _tuDongThemDuongKeChia;
+  late int _mauDuongKeChia;
+  late int _phanTramMoDuongKeChia;
+  late bool _chamCuoiVanBanBat;
+  late int _mauChamCuoiVanBan;
   late bool _tuDongVietHoaDauCau;
   late String _phimTatBoBienDoi;
   late String _phimTatPhim;
@@ -89,6 +94,10 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     _tuDongThutDauDong = widget.caiDat.tuDongThutDauDong;
     _soDauCachThutDauDong = widget.caiDat.soDauCachThutDauDong;
     _tuDongThemDuongKeChia = widget.caiDat.tuDongThemDuongKeChia;
+    _mauDuongKeChia = widget.caiDat.mauDuongKeChia;
+    _phanTramMoDuongKeChia = widget.caiDat.phanTramMoDuongKeChia;
+    _chamCuoiVanBanBat = widget.caiDat.chamCuoiVanBanBat;
+    _mauChamCuoiVanBan = widget.caiDat.mauChamCuoiVanBan;
     _tuDongVietHoaDauCau = widget.caiDat.tuDongVietHoaDauCau;
     _phimTatBoBienDoi = widget.caiDat.phimTatBoBienDoi;
     _phimTatPhim = widget.caiDat.phimTatPhim;
@@ -249,6 +258,8 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
           _dong4dTuDongThutDauDong(),
           const Divider(height: 40),
           _dong4eTuDongThemDuongKeChia(),
+          const Divider(height: 40),
+          _dong4gChamCuoiVanBan(),
           const Divider(height: 40),
           _dong4fTuDongVietHoaDauCau(),
           const Divider(height: 40),
@@ -774,7 +785,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
                 ),
               ),
             ),
-            Switch(
+    Switch(
               value: _tuDongThemDuongKeChia,
               onChanged: (bat) async {
                 setState(() => _tuDongThemDuongKeChia = bat);
@@ -784,11 +795,123 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
             ),
           ],
         ),
+        if (_tuDongThemDuongKeChia) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Text('Màu đường kẻ: '),
+              GestureDetector(
+                onTap: () async {
+                  final mau = await hienThiChonMauCoBanChoTen(
+                    context,
+                    tieuDe: 'Chọn màu đường kẻ chia văn bản',
+                  );
+                  if (mau == null) return;
+                  setState(() => _mauDuongKeChia = mau.toARGB32());
+                  await widget.caiDat.datMauDuongKeChia(mau);
+                },
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: Color(_mauDuongKeChia),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFBDBDBD)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Text('Độ rõ: '),
+              Expanded(
+                child: Slider(
+                  value: _phanTramMoDuongKeChia.toDouble(),
+                  min: 10,
+                  max: 100,
+                  divisions: 90,
+                  label: '$_phanTramMoDuongKeChia%',
+                  onChanged: (g) => setState(() => _phanTramMoDuongKeChia = g.round()),
+                  onChangeEnd: (g) async {
+                    await widget.caiDat.datPhanTramMoDuongKeChia(g.round());
+                  },
+                ),
+              ),
+              SizedBox(
+                width: 44,
+                child: Text('$_phanTramMoDuongKeChia%', textAlign: TextAlign.right),
+              ),
+            ],
+          ),
+        ],
         _nutTimHieuThem(() => _hienGiaiThich(
               'Đường kẻ chia văn bản',
               _giaiThichDuongKeChiaNgan,
               _giaiThichDuongKeChia,
             )),
+      ],
+    );
+  }
+
+  /// "Chấm tròn đánh dấu cuối văn bản" — bật/tắt và chọn màu (cả hai vòng
+  /// tròn đồng tâm cùng đổi màu theo lựa chọn này).
+  Widget _dong4gChamCuoiVanBan() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _tieuDeDong('Chấm tròn đánh dấu cuối văn bản'),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                _chamCuoiVanBanBat ? 'Đang bật (Có)' : 'Đang tắt (Không)',
+                style: TextStyle(
+                  color: _chamCuoiVanBanBat
+                      ? const Color(0xFF1A73E8)
+                      : const Color(0xFF9AA0A6),
+                ),
+              ),
+            ),
+            Switch(
+              value: _chamCuoiVanBanBat,
+              onChanged: (bat) async {
+                setState(() => _chamCuoiVanBanBat = bat);
+                await widget.caiDat.datChamCuoiVanBanBat(bat);
+              },
+            ),
+          ],
+        ),
+        if (_chamCuoiVanBanBat) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Text('Màu chấm tròn: '),
+              GestureDetector(
+                onTap: () async {
+                  final mau = await hienThiChonMauCoBanChoTen(
+                    context,
+                    tieuDe: 'Chọn màu chấm tròn cuối văn bản',
+                  );
+                  if (mau == null) return;
+                  setState(() => _mauChamCuoiVanBan = mau.toARGB32());
+                  await widget.caiDat.datMauChamCuoiVanBan(mau);
+                },
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: Color(_mauChamCuoiVanBan),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFBDBDBD)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }

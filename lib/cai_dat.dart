@@ -120,6 +120,24 @@ class CaiDat {
   static const _khoaTuDongThemDuongKeChia = 'ghi_noi_tu_dong_them_duong_ke_chia';
   static const _khoaSoDauCachThutDauDong = 'ghi_noi_so_dau_cach_thut_dau_dong';
 
+  /// Màu và độ mờ (opacity, %) của đường kẻ chia văn bản — chỉ có ý nghĩa
+  /// khi [tuDongThemDuongKeChia] đang bật. Mặc định tím 25%, giữ NGUYÊN
+  /// giao diện cũ (trước khi hai lựa chọn này tồn tại) cho người dùng chưa
+  /// từng đổi gì.
+  int mauDuongKeChia = Colors.purple.toARGB32();
+  int phanTramMoDuongKeChia = 25;
+
+  static const _khoaMauDuongKeChia = 'ghi_noi_mau_duong_ke_chia';
+  static const _khoaPhanTramMoDuongKeChia = 'ghi_noi_phan_tram_mo_duong_ke_chia';
+
+  /// Chấm tròn tím đánh dấu cuối văn bản — bật/tắt và màu. Mặc định BẬT,
+  /// màu tím, giữ nguyên giao diện cũ cho người dùng chưa từng đổi gì.
+  bool chamCuoiVanBanBat = true;
+  int mauChamCuoiVanBan = Colors.purple.toARGB32();
+
+  static const _khoaChamCuoiVanBanBat = 'ghi_noi_cham_cuoi_van_ban_bat';
+  static const _khoaMauChamCuoiVanBan = 'ghi_noi_mau_cham_cuoi_van_ban';
+
   /// Có tự viết hoa chữ cái đầu của một từ ngay sau dấu câu kết thúc câu
   /// (. , : ! ?) hay không. Mặc định BẬT.
   bool tuDongVietHoaDauCau = true;
@@ -160,6 +178,11 @@ class CaiDat {
     soDauCachThutDauDong =
         (kho.getInt(_khoaSoDauCachThutDauDong) ?? 3).clamp(1, 7);
     tuDongThemDuongKeChia = kho.getBool(_khoaTuDongThemDuongKeChia) ?? true;
+    mauDuongKeChia = kho.getInt(_khoaMauDuongKeChia) ?? Colors.purple.toARGB32();
+    phanTramMoDuongKeChia =
+        (kho.getInt(_khoaPhanTramMoDuongKeChia) ?? 25).clamp(10, 100);
+    chamCuoiVanBanBat = kho.getBool(_khoaChamCuoiVanBanBat) ?? true;
+    mauChamCuoiVanBan = kho.getInt(_khoaMauChamCuoiVanBan) ?? Colors.purple.toARGB32();
     tuDongVietHoaDauCau = kho.getBool(_khoaTuDongVietHoaDauCau) ?? true;
     final tenThietBiDaLuu = kho.getString(_khoaThietBiChonTay);
     thietBiChonTay = tenThietBiDaLuu == null
@@ -203,6 +226,30 @@ class CaiDat {
     tuDongThemDuongKeChia = bat;
     final kho = await SharedPreferences.getInstance();
     await kho.setBool(_khoaTuDongThemDuongKeChia, bat);
+  }
+
+  Future<void> datMauDuongKeChia(Color mau) async {
+    mauDuongKeChia = mau.toARGB32();
+    final kho = await SharedPreferences.getInstance();
+    await kho.setInt(_khoaMauDuongKeChia, mauDuongKeChia);
+  }
+
+  Future<void> datPhanTramMoDuongKeChia(int phanTram) async {
+    phanTramMoDuongKeChia = phanTram.clamp(10, 100);
+    final kho = await SharedPreferences.getInstance();
+    await kho.setInt(_khoaPhanTramMoDuongKeChia, phanTramMoDuongKeChia);
+  }
+
+  Future<void> datChamCuoiVanBanBat(bool bat) async {
+    chamCuoiVanBanBat = bat;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setBool(_khoaChamCuoiVanBanBat, bat);
+  }
+
+  Future<void> datMauChamCuoiVanBan(Color mau) async {
+    mauChamCuoiVanBan = mau.toARGB32();
+    final kho = await SharedPreferences.getInstance();
+    await kho.setInt(_khoaMauChamCuoiVanBan, mauChamCuoiVanBan);
   }
 
   Future<void> datTuDongVietHoaDauCau(bool bat) async {
