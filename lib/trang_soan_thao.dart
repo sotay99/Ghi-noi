@@ -279,6 +279,44 @@ class _NutPhimAo extends StatelessWidget {
   }
 }
 
+/// Nút chữ (Copy/Cut/Paste/All/Home/End) của hàng công cụ trên hàng phím
+/// nhanh cảm ứng — CÙNG kiểu dáng `_NutPhimAo` nhưng rộng theo chữ (đệm
+/// ngang) thay vì cỡ vuông cố định 48px, vì nhãn ở đây là CỤM CHỮ tiếng
+/// Anh (giữ nguyên văn theo yêu cầu), không phải MỘT ký tự/icon đơn.
+class _NutCongCuChu extends StatelessWidget {
+  const _NutCongCuChu({required this.nhan, required this.onTap, this.moTa});
+
+  final String nhan;
+  final String? moTa;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: moTa ?? nhan,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () {},
+        onTapDown: (_) => onTap(),
+        child: Container(
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade400),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            nhan,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _VungVe {
   _VungVe({required this.batDau, required this.ketThuc, this.style, this.recognizer});
   final int batDau;
@@ -3396,18 +3434,26 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         // mắt không cần thiết; các lỗi micro nghiêm trọng khác (mất quyền,
         // không có micro, mất mạng...) vẫn hiển thị bình thường qua nhánh
         // else bên dưới.
-        // 'error_aborted' CHỈ bỏ qua trên WEB: Web Speech API bắn lỗi này
-        // hầu như mỗi lần app tự dừng/bật lại micro (chuyện xảy ra liên
-        // tục, xem `_henBatLai()`), dù micro vẫn đang nghe/nhận chữ hoàn
-        // toàn bình thường — không phải sự cố thật, không đáng làm phiền
-        // người dùng bằng dòng "Micro gặp trục trặc". Android/iOS gốc
+        // 'error_aborted'/'aborted' CHỈ bỏ qua trên WEB: Web Speech API bắn
+        // lỗi này hầu như mỗi lần app tự dừng/bật lại micro (chuyện xảy ra
+        // liên tục, xem `_henBatLai()`), dù micro vẫn đang nghe/nhận chữ
+        // hoàn toàn bình thường — không phải sự cố thật, không đáng làm
+        // phiền người dùng bằng dòng "Micro gặp trục trặc". Android/iOS gốc
         // không dùng Web Speech API nên KHÔNG áp dụng ngoại lệ này, giữ
         // nguyên hiển thị nếu có xảy ra (chưa từng thấy xảy ra thật).
+        //
+        // (SỬA LỖI thông báo vẫn lọt qua) Lần trước chỉ loại `'error_aborted'`
+        // — nhưng dòng thông báo người dùng gửi lại đọc đúng nguyên văn
+        // "(aborted)" không có tiền tố "error_", nghĩa là chuỗi lỗi THẬT sự
+        // trình duyệt trả về (qua speech_to_text) là `'aborted'`, không khớp
+        // điều kiện cũ nên lọt qua thành thông báo hiển thị. Thêm cả hai dạng
+        // để chắc chắn khớp bất kể phiên bản/trình duyệt nào trả về dạng nào.
         final nhe = loi.errorMsg == 'error_no_match' ||
             loi.errorMsg == 'error_speech_timeout' ||
             loi.errorMsg == 'error_client' ||
             loi.errorMsg == 'error_busy' ||
-            (kIsWeb && loi.errorMsg == 'error_aborted');
+            (kIsWeb &&
+                (loi.errorMsg == 'error_aborted' || loi.errorMsg == 'aborted'));
         if (!nhe && mounted) {
           setState(() => _loi = _dichLoi(loi.errorMsg));
         }
@@ -3628,6 +3674,133 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _oChu.requestFocus();
     });
+  }
+
+  /// Giành lại tiêu điểm cho ô soạn thảo sau khi bấm một nút của hàng công
+  /// cụ (Copy/Cut/Paste/All/Home/End...) — xem giải thích ở `_chenKyTuTuPhimAo`.
+  void _giuFocusOChuSauKhiBam() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _oChu.requestFocus();
+    });
+  }
+
+  /// Lần bấm GẦN NHẤT của Home/End — dùng để nhận biết "bấm 2 lần liên tiếp
+  /// trong 1 giây" (nhảy lên/xuống hẳn đầu/cuối văn bản) khác với "bấm 1
+  /// lần" (chỉ nhảy tới đầu/cuối DÒNG hiện tại của con trỏ).
+  DateTime? _lanBamHomeTruoc;
+  DateTime? _lanBamEndTruoc;
+  static const _nguongBamHaiLan = Duration(seconds: 1);
+
+  /// "Copy" — chỉ làm gì đó khi ĐANG CÓ vùng chọn (không collapsed); vùng
+  /// chọn rỗng thì không có gì để chép, im lặng bỏ qua.
+  Future<void> _phimAoCopy() async {
+    final chon = _boDieuKhien.selection;
+    _giuFocusOChuSauKhiBam();
+    if (!chon.isValid || chon.isCollapsed) return;
+    final doan = _boDieuKhien.text.substring(chon.start, chon.end);
+    if (doan.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: doan));
+    if (mounted) hienThongBaoGiua(context, 'Đã copy vào bộ nhớ đệm');
+  }
+
+  /// "Cut" — y hệt Copy rồi xoá vùng vừa chép, ĐI QUA đúng con đường gõ tay
+  /// thật (xem giải thích ở `_chenKyTuTuPhimAo`) để mọi cơ chế đi kèm (lùi
+  /// lại, dời vùng định dạng/đường kẻ chia...) tự áp dụng đúng.
+  Future<void> _phimAoCut() async {
+    final vb = _boDieuKhien.text;
+    final chon = _boDieuKhien.selection;
+    _giuFocusOChuSauKhiBam();
+    if (!chon.isValid || chon.isCollapsed) return;
+    final batDau = chon.start, ketThuc = chon.end;
+    final doan = vb.substring(batDau, ketThuc);
+    if (doan.isEmpty) return;
+    final theChongLan = _theGhiAmChongLanMotPhan(batDau, ketThuc);
+    if (theChongLan != null) {
+      _khiCanXoaTheTuBanPhim(theChongLan.$1, theChongLan.$2);
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: doan));
+    final moi = vb.replaceRange(batDau, ketThuc, '');
+    _boDieuKhien.value =
+        TextEditingValue(text: moi, selection: TextSelection.collapsed(offset: batDau));
+    if (mounted) hienThongBaoGiua(context, 'Đã cắt và lưu vào bộ nhớ đệm');
+  }
+
+  /// "Paste" — không có thông báo nào theo yêu cầu (quá đơn giản, không cần
+  /// xác nhận). Rỗng bộ nhớ đệm hoặc không đọc được thì im lặng bỏ qua.
+  Future<void> _phimAoPaste() async {
+    final data = await Clipboard.getData('text/plain');
+    final chen = data?.text;
+    final chon = _boDieuKhien.selection;
+    _giuFocusOChuSauKhiBam();
+    if (chen == null || chen.isEmpty) return;
+    if (!chon.isValid) return;
+    final vb = _boDieuKhien.text;
+    final batDau = chon.start, ketThuc = chon.end;
+    final theChongLan = _theGhiAmChongLanMotPhan(batDau, ketThuc);
+    if (theChongLan != null) {
+      _khiCanXoaTheTuBanPhim(theChongLan.$1, theChongLan.$2);
+      return;
+    }
+    final moi = vb.replaceRange(batDau, ketThuc, chen);
+    _boDieuKhien.value = TextEditingValue(
+      text: moi,
+      selection: TextSelection.collapsed(offset: batDau + chen.length),
+    );
+  }
+
+  /// "All" — chọn toàn bộ văn bản. Chỉ đổi vùng chọn, không đụng nội dung.
+  void _phimAoChonTatCa() {
+    final doDai = _boDieuKhien.text.length;
+    _boDieuKhien.selection = TextSelection(baseOffset: 0, extentOffset: doDai);
+    _giuFocusOChuSauKhiBam();
+  }
+
+  /// "Home" — bấm 1 lần: đầu DÒNG hiện tại của con trỏ. Bấm 2 lần liên tiếp
+  /// trong 1 giây: đầu văn bản.
+  void _phimAoHome() {
+    final vb = _boDieuKhien.text;
+    final chon = _boDieuKhien.selection;
+    _giuFocusOChuSauKhiBam();
+    if (!chon.isValid) return;
+    final vt = chon.extentOffset;
+    final bay = DateTime.now();
+    final laLanHai = _lanBamHomeTruoc != null &&
+        bay.difference(_lanBamHomeTruoc!) <= _nguongBamHaiLan;
+    _lanBamHomeTruoc = laLanHai ? null : bay;
+    if (laLanHai) {
+      _boDieuKhien.selection = const TextSelection.collapsed(offset: 0);
+      return;
+    }
+    final batDauDong = vt <= 0 ? 0 : vb.lastIndexOf('\n', vt - 1) + 1;
+    _boDieuKhien.selection = TextSelection.collapsed(offset: batDauDong);
+    if (mounted) {
+      hienThongBaoGiua(context, 'Bấm Home 2 lần để lên trên cùng văn bản');
+    }
+  }
+
+  /// "End" — bấm 1 lần: cuối DÒNG hiện tại của con trỏ. Bấm 2 lần liên tiếp
+  /// trong 1 giây: cuối văn bản.
+  void _phimAoEnd() {
+    final vb = _boDieuKhien.text;
+    final chon = _boDieuKhien.selection;
+    _giuFocusOChuSauKhiBam();
+    if (!chon.isValid) return;
+    final vt = chon.extentOffset;
+    final bay = DateTime.now();
+    final laLanHai = _lanBamEndTruoc != null &&
+        bay.difference(_lanBamEndTruoc!) <= _nguongBamHaiLan;
+    _lanBamEndTruoc = laLanHai ? null : bay;
+    if (laLanHai) {
+      _boDieuKhien.selection = TextSelection.collapsed(offset: vb.length);
+      return;
+    }
+    final ketThucDongTho = vb.indexOf('\n', vt);
+    final vtMoi = ketThucDongTho == -1 ? vb.length : ketThucDongTho;
+    _boDieuKhien.selection = TextSelection.collapsed(offset: vtMoi);
+    if (mounted) {
+      hienThongBaoGiua(context, 'Bấm End 2 lần để xuống dưới cùng văn bản');
+    }
   }
 
   // ------------------------------------------------------------- thẻ ghi âm
@@ -8166,6 +8339,51 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         ),
       ];
 
+  /// Hàng công cụ Copy/Cut/Paste/All/Home/End — nằm NGAY TRÊN hàng phím
+  /// nhanh cảm ứng (`_xayHangPhimNhanhCamUng`), cùng bật/tắt theo
+  /// `_boPhimNhanhCamUngMo`. Giữ NGUYÊN VĂN nhãn tiếng Anh theo yêu cầu,
+  /// không dịch — Home/End có thông báo gợi ý "bấm 2 lần" ngay trong nhãn
+  /// nút để người dùng biết trước, không cần bấm thử.
+  Widget _xayHangCongCuVanBanCamUng() {
+    return Material(
+      color: Colors.white,
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _NutCongCuChu(nhan: 'Copy', onTap: _phimAoCopy),
+              const SizedBox(width: 8),
+              _NutCongCuChu(nhan: 'Cut', onTap: _phimAoCut),
+              const SizedBox(width: 8),
+              _NutCongCuChu(nhan: 'Paste', onTap: _phimAoPaste),
+              const SizedBox(width: 8),
+              _NutCongCuChu(
+                nhan: 'All',
+                moTa: 'Chọn tất cả',
+                onTap: _phimAoChonTatCa,
+              ),
+              const SizedBox(width: 8),
+              _NutCongCuChu(
+                nhan: 'Home',
+                moTa: 'Đầu dòng — bấm 2 lần: đầu văn bản',
+                onTap: _phimAoHome,
+              ),
+              const SizedBox(width: 8),
+              _NutCongCuChu(
+                nhan: 'End',
+                moTa: 'Cuối dòng — bấm 2 lần: cuối văn bản',
+                onTap: _phimAoEnd,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Hàng phím thay thế bàn phím hệ thống — nằm sát mép trên, ngay phía
   /// trên `ThanhCongCu`, khi "Bộ phím nhanh cho màn hình cảm ứng" đang mở.
   /// Nút X đỏ sát mép phải tắt hẳn công cụ, trả lại bàn phím ảo bình
@@ -8824,6 +9042,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 ),
               ),
             ),
+            if (_boPhimNhanhCamUngMo) _xayHangCongCuVanBanCamUng(),
             if (_boPhimNhanhCamUngMo) _xayHangPhimNhanhCamUng(),
             // Bọc riêng bằng ValueListenableBuilder (xem chú thích ở
             // `_songAmTick`) — CHỈ ThanhCongCu dựng lại mỗi lần sóng âm đổi
