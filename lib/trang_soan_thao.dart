@@ -3590,6 +3590,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       text: moi,
       selection: TextSelection.collapsed(offset: batDau + kyTu.length),
     );
+    // (SỬA LỖI con trỏ nháy biến mất) Nút hàng phím ảo cũng là một widget
+    // nhận focus được — bấm vào nó cướp mất tiêu điểm của `_oChu` NGAY SAU
+    // `onPressed`, làm `_veConTro()` (chỉ vẽ khi `_oChu.hasFocus`) ẩn con
+    // trỏ dù logic vẫn đúng. Cùng kỹ thuật đã dùng cho thanh định dạng thủ
+    // công (`_apDungDinhDang`): hoãn `requestFocus()` sang cuối khung hình
+    // để thắng focus của nút.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _oChu.requestFocus();
+    });
   }
 
   /// Phím "Xoá" (backspace) của hàng phím ảo — xoá vùng đang chọn, hoặc
@@ -3615,6 +3624,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final moi = vb.replaceRange(batDau, ketThuc, '');
     _boDieuKhien.value =
         TextEditingValue(text: moi, selection: TextSelection.collapsed(offset: batDau));
+    // Xem giải thích ở `_chenKyTuTuPhimAo` — cùng lý do, cùng cách sửa.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _oChu.requestFocus();
+    });
   }
 
   // ------------------------------------------------------------- thẻ ghi âm
