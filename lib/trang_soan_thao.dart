@@ -17,6 +17,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 
 import 'cai_dat.dart';
 import 'doan_thiet_bi.dart';
+import 'nghe_resize_trinh_duyet.dart';
 import 'ghi_am_the.dart';
 import 'gui_ghi_am_gemini.dart';
 import 'canh_bao_roi_trang.dart';
@@ -3440,6 +3441,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   bool _dangKiemTraToanVan = false;
   final _dichVuToanVan = DichVuKiemTraToanVan();
 
+  /// Đăng ký nghe resize trình duyệt (xem `nghe_resize_trinh_duyet.dart`)
+  /// — `null` trên Android/iOS/desktop gốc (không có ý nghĩa gì ở đó).
+  Object? _dangKyNgheResizeTrinhDuyet;
+
   @override
   void initState() {
     super.initState();
@@ -3461,6 +3466,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _oChu.addListener(_khiFocusConTroDoi);
 
     WidgetsBinding.instance.addObserver(this);
+    // (SỬA LỖI "bãi đất trống" kẹt lại sau khi ẩn bàn phím ảo) Xem giải
+    // thích đầy đủ ở `nghe_resize_trinh_duyet_web.dart` — nghe THẲNG sự
+    // kiện resize của trình duyệt, độc lập với `didChangeMetrics` (đã thử
+    // trước, không đủ vì có đường ẩn bàn phím ảo Flutter Engine không dịch
+    // lại được).
+    _dangKyNgheResizeTrinhDuyet = dangKyNgheResizeTrinhDuyet(() {
+      if (mounted) setState(() {});
+    });
     _boDieuKhien.addListener(_khiNguoiDungSua);
     _boDieuKhien.addListener(_capNhatTimKiemNeuDangMo);
     // TextField (Material) không có tham số `onSelectionChanged` — đó là
@@ -3521,6 +3534,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     HardwareKeyboard.instance.removeHandler(_khiPhimTatLuiTien);
     HardwareKeyboard.instance.removeHandler(_khiGoPhimBatKyTatChuThich);
     WidgetsBinding.instance.removeObserver(this);
+    huyNgheResizeTrinhDuyet(_dangKyNgheResizeTrinhDuyet);
     _hen?.cancel();
     _henLuuTru?.cancel();
     _henGoXong?.cancel();
