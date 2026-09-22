@@ -166,6 +166,13 @@ class CaiDat {
 
   static const _khoaTuDongDongBangKyTuDacBiet = 'ghi_noi_tu_dong_dong_bang_ky_tu_dac_biet';
 
+  /// Dải gợi ý "Tải app APK ổn định hơn" — chỉ hiện trên bản Web khi thiết
+  /// bị (tự đoán hoặc chọn tay) là Android. Người dùng bấm X đóng lại thì
+  /// nhớ luôn, không hiện lại nữa. Mặc định HIỆN (false = chưa đóng).
+  bool anGoiYTaiApk = false;
+
+  static const _khoaAnGoiYTaiApk = 'ghi_noi_an_goi_y_tai_apk';
+
   Future<void> tai() async {
     final kho = await SharedPreferences.getInstance();
     thoiGianBatLaiGiay = kho.getDouble(_khoaThoiGianBatLai) ?? 1.0;
@@ -199,6 +206,7 @@ class CaiDat {
     tuDongVietHoaDauCau = kho.getBool(_khoaTuDongVietHoaDauCau) ?? true;
     tuDongChuanHoaNgoac = kho.getBool(_khoaTuDongChuanHoaNgoac) ?? true;
     tuDongDongBangKyTuDacBiet = kho.getBool(_khoaTuDongDongBangKyTuDacBiet) ?? true;
+    anGoiYTaiApk = kho.getBool(_khoaAnGoiYTaiApk) ?? false;
     final tenThietBiDaLuu = kho.getString(_khoaThietBiChonTay);
     thietBiChonTay = tenThietBiDaLuu == null
         ? null
@@ -229,6 +237,12 @@ class CaiDat {
     tuDongDongBangKyTuDacBiet = bat;
     final kho = await SharedPreferences.getInstance();
     await kho.setBool(_khoaTuDongDongBangKyTuDacBiet, bat);
+  }
+
+  Future<void> datAnGoiYTaiApk(bool an) async {
+    anGoiYTaiApk = an;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setBool(_khoaAnGoiYTaiApk, an);
   }
 
   Future<void> datTuDongThutDauDong(bool bat) async {

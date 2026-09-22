@@ -35,3 +35,11 @@ sử các hướng đã thử ở trên. Hướng chưa thử: gắn `visualView
 `resizeToAvoidBottomInset: true` (để `Scaffold` tự lo, bỏ hẳn cơ chế tự đo
 `caoBanPhim` hiện tại) — rủi ro cao hơn vì có thể phá vỡ lý do ban đầu
 chọn `false`, cần đọc kỹ code trước khi đổi.
+
+**Né vấn đề thay vì sửa (2026-09-22):** lỗi này KHÔNG xảy ra ở bản APK
+(chỉ web). Đã thêm dải gợi ý "Tải app APK" (nền xanh dương nhạt, dưới dải
+lỗi `_loi`, trong `lib/trang_soan_thao.dart`) — chỉ hiện khi `kIsWeb` VÀ
+thiết bị là Android, dẫn tới
+`https://github.com/sotay99/ghi-noi/releases/latest`. Bấm X đóng thì nhớ
+luôn (`caiDat.anGoiYTaiApk`, không hiện lại). Xem thêm
+`lib/mo_lien_ket_ngoai*.dart` (mở tab mới trên web, no-op trên gốc).

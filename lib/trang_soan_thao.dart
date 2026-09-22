@@ -17,6 +17,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 
 import 'cai_dat.dart';
 import 'doan_thiet_bi.dart';
+import 'mo_lien_ket_ngoai.dart';
 import 'nghe_resize_trinh_duyet.dart';
 import 'ghi_am_the.dart';
 import 'gui_ghi_am_gemini.dart';
@@ -10287,6 +10288,42 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       icon: const Icon(Icons.close, size: 18),
                       color: const Color(0xFF8A5300),
                       onPressed: () => setState(() => _loi = ''),
+                    ),
+                  ],
+                ),
+              ),
+            // Dải gợi ý "Tải app APK" — CHỈ trên web VÀ khi thiết bị (tự
+            // đoán hoặc chọn tay) là Android: bản APK ổn định hơn hẳn bản
+            // web trên di động (không dính lỗi "bãi đất trống" của bàn
+            // phím ảo, xem CLAUDE.md). Web chỉ thật sự hợp với PC/Mac.
+            // Bấm X thì nhớ luôn, không hiện lại nữa (`caiDat.anGoiYTaiApk`).
+            if (kIsWeb && _thietBiHienTai == ThietBi.android && !widget.caiDat.anGoiYTaiApk)
+              Container(
+                width: double.infinity,
+                color: const Color(0xFFE3F2FD),
+                padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+                child: Row(
+                  children: [
+                    const Icon(Icons.android, size: 18, color: Color(0xFF1565C0)),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Bạn đang dùng Android — tải app APK sẽ ổn định hơn bản web.',
+                        style: TextStyle(fontSize: 13, color: Color(0xFF1565C0)),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () =>
+                          moLienKetNgoai('https://github.com/sotay99/ghi-noi/releases/latest'),
+                      child: const Text('Tải APK'),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      color: const Color(0xFF1565C0),
+                      onPressed: () {
+                        widget.caiDat.datAnGoiYTaiApk(true);
+                        setState(() {});
+                      },
                     ),
                   ],
                 ),
