@@ -4224,7 +4224,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     setState(() {
       _boPhimNhanhCamUngMo = dangBat;
       _boPhimNhanhCamUngAn = false;
-      if (!dangBat) _dieuHuongConTroAn = false;
+      if (!dangBat) {
+        _dieuHuongConTroAn = false;
+        _epHienBanPhimAoTrongBoPhimNhanh = false;
+        _thuGonTruocKhiEpBanPhimAo = null;
+      }
       // Bật Bộ phím nhanh lên thì tự ẩn luôn thanh định dạng thủ công (nếu
       // đang hiện) — nhường tối đa chỗ ngang cho các hàng công cụ mới của
       // Bộ phím nhanh; muốn xem lại thì tự bấm nút "abc" cạnh nút Lưu.
@@ -4322,6 +4326,49 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
     _batConTroNgay();
     _epConTroHienRaMatThuong();
+  }
+
+  /// Nút "bàn phím" (cạnh End, `_xayHangDieuHuongConTro`) — KHÁC HẲN
+  /// `_boPhimNhanhCamUngAn` ("Ẩn"): "Ẩn" nhường HẲN chỗ cho bàn phím ảo
+  /// (thay AppBar bằng 2 nút, ẩn mọi thanh Bộ phím nhanh); nút này thì
+  /// ngược lại — GIỮ NGUYÊN mọi thanh công cụ của Bộ phím nhanh đang hiện,
+  /// chỉ CHO PHÉP THÊM bàn phím ảo hệ thống hiện song song để gõ tay ngay
+  /// cạnh các nút bấm sẵn. `readOnly` của ô soạn thảo (xem `build`) phải
+  /// trừ thêm cờ này ra thì bàn phím ảo mới thật sự hiện được.
+  bool _epHienBanPhimAoTrongBoPhimNhanh = false;
+
+  /// Giá trị `_thuGonThanhCongCu` NGAY TRƯỚC lúc bấm nút bàn phím lần 1 —
+  /// bấm lần 2 (tắt bàn phím ảo) phải trả về ĐÚNG giá trị này (đang thu gọn
+  /// thì tiếp tục thu gọn, đang hiện thì tiếp tục hiện), không phải luôn
+  /// luôn mở thanh công cụ ra lại.
+  bool? _thuGonTruocKhiEpBanPhimAo;
+
+  void _bamNutBanPhimAoTrongBoPhimNhanh() {
+    if (_epHienBanPhimAoTrongBoPhimNhanh) {
+      // Lần 2: tắt bàn phím ảo lại, trả `_thuGonThanhCongCu` về đúng giá
+      // trị trước khi bấm lần 1 — mọi thanh công cụ của Bộ phím nhanh vẫn
+      // giữ nguyên như cũ suốt từ đầu, không đụng vào.
+      setState(() {
+        _epHienBanPhimAoTrongBoPhimNhanh = false;
+        _thuGonThanhCongCu = _thuGonTruocKhiEpBanPhimAo ?? _thuGonThanhCongCu;
+        _thuGonTruocKhiEpBanPhimAo = null;
+      });
+      SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+      return;
+    }
+    // Lần 1: nhớ lại trạng thái Thu gọn hiện tại trước khi ép nó bật lên
+    // (nhường chỗ cho bàn phím ảo) — chỉ ép khi CHƯA thu gọn sẵn.
+    _thuGonTruocKhiEpBanPhimAo = _thuGonThanhCongCu;
+    setState(() {
+      _epHienBanPhimAoTrongBoPhimNhanh = true;
+      _thuGonThanhCongCu = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _oChu.requestFocus();
+      SystemChannels.textInput.invokeMethod<void>('TextInput.show');
+    });
+    _batConTroNgay();
   }
 
   /// [batDau, ketThuc) sắp bị gõ/xoá đè lên có chồng lấn MỘT PHẦN thẻ ghi
@@ -9444,9 +9491,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Hàng 4 nút mũi tên điều hướng con trỏ (Lên/Xuống/Trái/Phải) — nằm
   /// NGAY TRÊN hàng Copy/Cut/Paste/All/Home/End (`_xayHangCongCuVanBanCamUng`),
   /// cùng bật/tắt theo `_boPhimNhanhCamUngMo`. CHỈ dựng khi
-  /// `!_dieuHuongConTroAn` — "rút gọn" thì ẩn HẲN cả hàng này (xem nơi gọi ở
-  /// `build`), nút ẩn/hiện tự "nhảy" sang chỗ khác (xem
-  /// `_NutAnHienDieuHuongConTro`).
+  /// `!_dieuHuongConTroAn` — "rút gọn" thì ẩn HẲN cả hàng này (sẽ ẩn theo
+  /// luôn Home/End, đứng cùng hàng) (xem nơi gọi ở `build`). Nút ẩn/hiện
+  /// KHÔNG còn nằm ở đây nữa — đã dời hẳn xuống hàng
+  /// `_xayHangCongCuVanBanCamUng` (bên phải nút Tiến tới), đứng yên một chỗ
+  /// dù 4 nút này đang hiện hay ẩn, xem `_NutAnHienDieuHuongConTro`.
   Widget _xayHangDieuHuongConTro() {
     final manHinhHep = MediaQuery.sizeOf(context).width < _nguongManHinhHep;
     final khoangCach = manHinhHep ? 0.0 : 8.0;
@@ -9522,9 +9571,25 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               ),
             ),
             const SizedBox(width: 8),
-            _NutAnHienDieuHuongConTro(
-              an: _dieuHuongConTroAn,
-              onTap: _bamNutAnHienDieuHuongConTro,
+            // Nút "bàn phím" — sát mép phải cùng, cạnh nút End. Bấm lần 1:
+            // ép bàn phím ảo hệ thống hiện ra CÙNG LÚC với mọi thanh công cụ
+            // của Bộ phím nhanh (xem `_bamNutBanPhimAoTrongBoPhimNhanh`).
+            // Bấm lần 2: tắt bàn phím ảo lại. Icon Material đã dùng sẵn ở
+            // nơi khác trong tệp này (menu "Bàn phím") nên chắc chắn không
+            // bị "tree-shake" mất (khác 4 nút mũi tên/nút Thu gọn mới thêm
+            // trước đây).
+            IconButton(
+              onPressed: _bamNutBanPhimAoTrongBoPhimNhanh,
+              icon: const Icon(Icons.keyboard_alt_outlined, size: 22),
+              tooltip: _epHienBanPhimAoTrongBoPhimNhanh
+                  ? 'Tắt bàn phím ảo'
+                  : 'Hiện bàn phím ảo cùng Bộ phím nhanh',
+              visualDensity: VisualDensity.compact,
+              constraints: _kichThuocNutTren,
+              style: IconButton.styleFrom(
+                backgroundColor:
+                    _epHienBanPhimAoTrongBoPhimNhanh ? Colors.blue.shade50 : null,
+              ),
             ),
           ],
         ),
@@ -9580,11 +9645,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         rong: 48 * 0.85,
         onTap: _lichSuToi.isEmpty ? () {} : _toi,
       ),
-      // Nút ẩn/hiện 4 nút điều hướng "nhảy" tới đây khi đang ẩn (cả màn
-      // hình hẹp lẫn rộng — không còn phân biệt nữa, luôn về đúng một chỗ
-      // này, sát bên phải cùng) — xem `_NutAnHienDieuHuongConTro`.
-      if (_dieuHuongConTroAn)
-        _NutAnHienDieuHuongConTro(an: true, onTap: _bamNutAnHienDieuHuongConTro),
+      // Nút ẩn/hiện 4 nút điều hướng — LUÔN ở đây, sát bên phải cùng của
+      // hàng này (bên phải nút Tiến tới), dù 4 nút điều hướng đang hiện hay
+      // đang ẩn — không còn "nhảy" theo trạng thái nữa, xem
+      // `_NutAnHienDieuHuongConTro`.
+      _NutAnHienDieuHuongConTro(an: _dieuHuongConTroAn, onTap: _bamNutAnHienDieuHuongConTro),
     ];
     return Material(
       color: Colors.white,
@@ -10240,7 +10305,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           // và vẫn cho chạm để di chuyển con trỏ/chọn vùng
                           // bình thường như tài liệu Flutter đã ghi rõ.
                           keyboardType: TextInputType.multiline,
-                          readOnly: _boPhimNhanhCamUngMo && !_boPhimNhanhCamUngAn,
+                          readOnly: _boPhimNhanhCamUngMo &&
+                              !_boPhimNhanhCamUngAn &&
+                              !_epHienBanPhimAoTrongBoPhimNhanh,
                           // Chặn sửa/xoá từng-ký-tự-riêng-lẻ bên trong một
                           // thẻ ghi âm — xem `ChanSuaGiuaThe`.
                           inputFormatters: [
