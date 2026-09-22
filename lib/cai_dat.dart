@@ -160,6 +160,12 @@ class CaiDat {
 
   static const _khoaThietBiChonTay = 'ghi_noi_thiet_bi_chon_tay';
 
+  /// Bảng ký tự đặc biệt (nút "*" ở Bộ phím nhanh) — bấm một ký tự có tự
+  /// đóng luôn bảng lại hay không. Mặc định BẬT.
+  bool tuDongDongBangKyTuDacBiet = true;
+
+  static const _khoaTuDongDongBangKyTuDacBiet = 'ghi_noi_tu_dong_dong_bang_ky_tu_dac_biet';
+
   Future<void> tai() async {
     final kho = await SharedPreferences.getInstance();
     thoiGianBatLaiGiay = kho.getDouble(_khoaThoiGianBatLai) ?? 1.0;
@@ -192,6 +198,7 @@ class CaiDat {
     mauChamCuoiVanBan = kho.getInt(_khoaMauChamCuoiVanBan) ?? Colors.purple.toARGB32();
     tuDongVietHoaDauCau = kho.getBool(_khoaTuDongVietHoaDauCau) ?? true;
     tuDongChuanHoaNgoac = kho.getBool(_khoaTuDongChuanHoaNgoac) ?? true;
+    tuDongDongBangKyTuDacBiet = kho.getBool(_khoaTuDongDongBangKyTuDacBiet) ?? true;
     final tenThietBiDaLuu = kho.getString(_khoaThietBiChonTay);
     thietBiChonTay = tenThietBiDaLuu == null
         ? null
@@ -216,6 +223,12 @@ class CaiDat {
     tuDongThemDauCham = bat;
     final kho = await SharedPreferences.getInstance();
     await kho.setBool(_khoaTuDongThemDauCham, bat);
+  }
+
+  Future<void> datTuDongDongBangKyTuDacBiet(bool bat) async {
+    tuDongDongBangKyTuDacBiet = bat;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setBool(_khoaTuDongDongBangKyTuDacBiet, bat);
   }
 
   Future<void> datTuDongThutDauDong(bool bat) async {

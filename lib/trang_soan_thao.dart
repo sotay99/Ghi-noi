@@ -517,34 +517,48 @@ class _NutNoiTuThoState extends State<_NutNoiTuTho> with SingleTickerProviderSta
 /// ngang) thay vì cỡ vuông cố định 48px, vì nhãn ở đây là CỤM CHỮ tiếng
 /// Anh (giữ nguyên văn theo yêu cầu), không phải MỘT ký tự/icon đơn.
 class _NutCongCuChu extends StatelessWidget {
-  const _NutCongCuChu({required this.nhan, required this.onTap, this.moTa});
+  const _NutCongCuChu({required this.nhan, required this.onTap, this.moTa, this.tyLeThuHep});
 
   final String nhan;
   final String? moTa;
   final VoidCallback onTap;
 
+  /// Nhân thêm vào bề rộng TỰ NHIÊN của nút (ví dụ 0.85 = hẹp bớt 15%) —
+  /// dùng cho Home/Paste khi hàng đã chật chỗ ngang. Chữ bên trong có thể
+  /// tràn ra ngoài viền nút (`overflow: visible`, không cắt) — chấp nhận
+  /// được, đã được yêu cầu rõ ràng.
+  final double? tyLeThuHep;
+
+  static const _kieuChu = TextStyle(fontSize: 14, fontWeight: FontWeight.w600);
+
   @override
   Widget build(BuildContext context) {
+    Widget khung = Container(
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade400),
+      ),
+      alignment: Alignment.center,
+      child: Text(nhan, style: _kieuChu, overflow: TextOverflow.visible, softWrap: false),
+    );
+    final tyLe = tyLeThuHep;
+    if (tyLe != null) {
+      final tp = TextPainter(
+        text: TextSpan(text: nhan, style: _kieuChu),
+        textDirection: Directionality.of(context),
+      )..layout();
+      khung = SizedBox(width: (tp.width + 24) * tyLe, child: khung);
+    }
     return Tooltip(
       message: moTa ?? nhan,
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
         onTap: () {},
         onTapDown: (_) => onTap(),
-        child: Container(
-          height: 36,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey.shade400),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            nhan,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-          ),
-        ),
+        child: khung,
       ),
     );
   }
@@ -4386,46 +4400,106 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   /// Bảng ký tự đặc biệt mở từ nút "*" cạnh nút bàn phím — mỗi ô một ký tự,
   /// bấm vào là chèn NGAY vào vị trí con trỏ/thay vùng đang chọn (đi qua
-  /// đúng `_chenKyTuTuPhimAo`, y hệt các nút của hàng phím ảo). Bảng KHÔNG
-  /// tự đóng sau mỗi lần bấm — người dùng thường cần chèn liên tiếp vài ký
-  /// tự đặc biệt liền nhau, tự bấm "Đóng" khi xong.
+  /// đúng `_chenKyTuTuPhimAo`, y hệt các nút của hàng phím ảo).
+  ///
+  /// "Tự động đóng bảng" (`caiDat.tuDongDongBangKyTuDacBiet`, mặc định BẬT,
+  /// lưu lại giữa các lần mở app) quyết định bấm MỘT ký tự có đóng bảng lại
+  /// ngay hay không — bật thì đóng ngay sau đúng một lần chèn, tắt thì cứ
+  /// chèn liên tục nhiều ký tự tuỳ ý, tự bấm "Đóng bảng" (hoặc nút X đỏ góc
+  /// trên-phải, cùng logic) khi xong. Dòng chữ trạng thái + nút Bật/Tắt tự
+  /// động đổi ngay khi bấm (dùng `StatefulBuilder` — dialog vốn không tự
+  /// dựng lại theo `setState` của trang chính).
   void _moBangKyTuDacBiet() {
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Ký tự đặc biệt'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: SingleChildScrollView(
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final kt in _dsKyTuDacBiet)
-                  InkWell(
-                    borderRadius: BorderRadius.circular(6),
-                    onTap: () {},
-                    onTapDown: (_) => _chenKyTuTuPhimAo(kt),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: Colors.grey.shade400),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, dungLai) {
+          final tuDong = widget.caiDat.tuDongDongBangKyTuDacBiet;
+          return Dialog(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text('Ký tự đặc biệt', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       ),
-                      child: Text(kt, style: const TextStyle(fontSize: 17)),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.red),
+                        tooltip: 'Đóng bảng',
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                    ],
+                  ),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          for (final kt in _dsKyTuDacBiet)
+                            InkWell(
+                              borderRadius: BorderRadius.circular(6),
+                              onTap: () {},
+                              onTapDown: (_) {
+                                _chenKyTuTuPhimAo(kt);
+                                if (widget.caiDat.tuDongDongBangKyTuDacBiet) {
+                                  Navigator.of(ctx).pop();
+                                }
+                              },
+                              child: Container(
+                                width: 40,
+                                height: 40,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: Colors.grey.shade400),
+                                ),
+                                child: Text(kt, style: const TextStyle(fontSize: 17)),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-              ],
+                  const SizedBox(height: 12),
+                  Text(
+                    tuDong ? 'Đang BẬT tự động Đóng bảng' : 'Đang TẮT tự động đóng bảng',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: tuDong ? Colors.red.shade600 : Colors.green.shade600,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () async {
+                            await widget.caiDat.datTuDongDongBangKyTuDacBiet(!tuDong);
+                            dungLai(() {});
+                          },
+                          child: Text(tuDong ? 'Tắt tự động' : 'Bật tự động'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          child: const Text('Đóng bảng'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Đóng')),
-        ],
+          );
+        },
       ),
     );
   }
@@ -9619,6 +9693,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                         nhan: 'Home',
                         moTa: 'Đầu dòng — bấm 2 lần: đầu văn bản',
                         onTap: _phimAoHome,
+                        tyLeThuHep: 0.85,
                       ),
                       SizedBox(width: khoangCach),
                       _NutCongCuChu(
@@ -9694,7 +9769,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final cacNut = <Widget>[
       _NutCongCuChu(nhan: 'Copy', onTap: _phimAoCopy),
       _NutCongCuChu(nhan: 'Cut', onTap: _phimAoCut),
-      _NutCongCuChu(nhan: 'Paste', onTap: _phimAoPaste),
+      _NutCongCuChu(nhan: 'Paste', onTap: _phimAoPaste, tyLeThuHep: 0.85),
       _NutCongCuChu(
         nhan: 'All',
         moTa: 'Chọn từ — bấm 2-4 lần: đoạn văn/cụm đoạn văn/tất cả',
