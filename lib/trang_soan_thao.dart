@@ -3559,6 +3559,25 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
   }
 
+  /// (SỬA LỖI "bãi đất trống" kẹt lại sau khi bàn phím ảo ẩn đi — đặc biệt
+  /// hay gặp khi ẩn bằng nút Back của thiết bị/trình duyệt thay vì tự blur
+  /// ô soạn thảo) `build()` tự đo chiều cao bàn phím
+  /// (`MediaQuery.viewInsetsOf(context).bottom`, xem `caoBanPhim`) rồi tự
+  /// chừa đúng khoảng đó ở cuối trang thay vì để `Scaffold` tự lo
+  /// (`resizeToAvoidBottomInset: false`) — về lý thuyết Flutter tự dựng lại
+  /// đúng lúc viewport đổi, nhưng có những đường ẩn bàn phím (nhất là qua
+  /// nút Back trên web) không kích lại kịp, khiến `caoBanPhim` đọc phải giá
+  /// trị CŨ, để lại một khoảng trống không ai lấp. Lớp này đã tự đăng ký
+  /// `WidgetsBindingObserver` sẵn rồi (cho `didChangeAppLifecycleState`) —
+  /// `didChangeMetrics` mới là đúng chỗ Flutter báo "viewport vừa đổi kích
+  /// thước" (bàn phím ảo ẩn/hiện là một dạng đổi viewport); ép dựng lại
+  /// ngay tại đó để luôn đọc đúng chiều cao bàn phím MỚI NHẤT, không phải
+  /// đợi một nút bấm nào khác tình cờ gọi `setState` mới lộ ra bản mới.
+  @override
+  void didChangeMetrics() {
+    if (mounted) setState(() {});
+  }
+
   // ---------------------------------------------------------------- lưu trữ
 
   /// `true` = có thay đổi CHƯA kịp tự động lưu — chỉ web mới dùng tới (xem
