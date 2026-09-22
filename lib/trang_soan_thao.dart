@@ -311,29 +311,36 @@ class _NutPhimAoState extends State<_NutPhimAo> {
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: widget.moTa ?? widget.nhan,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () {},
-        onTapDown: (_) => _batDau(),
-        onTapUp: (_) => _dung(),
-        onTapCancel: _dung,
-        child: Container(
-          width: widget.rong,
-          height: 40,
-          decoration: BoxDecoration(
-            color: widget.mauNen ?? Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: widget.mauVien ?? Colors.grey.shade400),
-          ),
-          alignment: Alignment.center,
-          child: widget.icon != null
-              ? Icon(widget.icon, size: 20)
-              : Text(widget.nhan, style: const TextStyle(fontSize: 18)),
+    final khung = InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () {},
+      onTapDown: (_) => _batDau(),
+      onTapUp: (_) => _dung(),
+      onTapCancel: _dung,
+      child: Container(
+        width: widget.rong,
+        height: 40,
+        decoration: BoxDecoration(
+          color: widget.mauNen ?? Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: widget.mauVien ?? Colors.grey.shade400),
         ),
+        alignment: Alignment.center,
+        child: widget.icon != null
+            ? Icon(widget.icon, size: 20)
+            : Text(widget.nhan, style: const TextStyle(fontSize: 18)),
       ),
     );
+    // (SỬA LỖI ở màn hình cảm ứng, bấm-GIỮ nút để kích hoạt lặp lại lại bị
+    // `Tooltip` giành mất cử chỉ — nó cũng nghe bấm-giữ để hiện dòng chữ chú
+    // thích, thắng trong đấu trường cử chỉ trước `onTapDown` của `InkWell`
+    // nên lặp lại không chạy, chỉ thấy mỗi dòng chữ chú thích hiện lên) Nút
+    // có `lapLai` thì bỏ hẳn `Tooltip`, dùng `Semantics` thay để vẫn có nhãn
+    // cho trình đọc màn hình mà không tranh cử chỉ.
+    if (widget.lapLai) {
+      return Semantics(button: true, label: widget.moTa ?? widget.nhan, child: khung);
+    }
+    return Tooltip(message: widget.moTa ?? widget.nhan, child: khung);
   }
 }
 
@@ -390,14 +397,26 @@ class _NutAnHienDieuHuongConTroState extends State<_NutAnHienDieuHuongConTro>
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
+                  // Đang ẩn 4 nút điều hướng: nền xanh lá nhạt để dễ nhận ra
+                  // ngay là bấm vào đây sẽ HIỆN LẠI (khác nền xám trung tính
+                  // lúc đang hiện, chỉ đơn thuần là nút RÚT GỌN).
+                  color: widget.an ? Colors.green.shade50 : Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade400),
+                  border: Border.all(
+                    color: widget.an ? Colors.green.shade300 : Colors.grey.shade400,
+                  ),
                 ),
                 alignment: Alignment.center,
-                child: Icon(
-                  widget.an ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                  size: 22,
+                // Emoji (Text) thay vì Icon Material — hai icon
+                // `keyboard_arrow_up`/`keyboard_arrow_down` từng bị RỖNG
+                // (không hiện gì) trên bản dựng thật dù code không lỗi, rất
+                // có thể do công cụ "tree-shake" icon của Flutter bỏ sót
+                // (chỉ giữ lại đúng những icon nó dò thấy được dùng) — emoji
+                // đi qua phông chữ hệ thống, không qua cơ chế đó nên chắc
+                // chắn luôn hiện ra.
+                child: Text(
+                  widget.an ? '🔼' : '🔽',
+                  style: const TextStyle(fontSize: 16),
                 ),
               ),
             ),
@@ -408,23 +427,36 @@ class _NutAnHienDieuHuongConTroState extends State<_NutAnHienDieuHuongConTro>
   }
 }
 
-/// Nút nổi "Mở rộng" — trả lại mọi thanh công cụ phía trên sau khi bấm "Thu
-/// gọn" (`_thuGonThanhCongCu`). Nổi TRÊN chữ đang soạn (không chiếm đất),
-/// độ rõ tự thở tuần hoàn: 20% → 100% (5 giây) → đứng im (1 giây) →
-/// 100% → 20% (5 giây) → đứng im (1 giây) → lặp lại mãi mãi (chu kỳ 12
-/// giây) — vẫn LUÔN bấm được dù đang mờ tới đâu, giống mọi nút `Opacity`
-/// khác trong tệp này (xem giải thích ở `_HangNutBoPhimNhanhTamAn`).
-class _NutMoRongThanhCongCu extends StatefulWidget {
-  const _NutMoRongThanhCongCu({required this.onTap});
+/// Nút nổi tự thở — dùng chung cho "Mở rộng" (trả lại thanh công cụ sau khi
+/// "Thu gọn", xem `_thuGonThanhCongCu`) VÀ "Hiện" (trả lại hai nút "Hiện lại
+/// Bộ phím nhanh"/"Đóng lại" khi chúng bị thanh công cụ thu gọn che khuất
+/// mất lối vào, xem `_boPhimNhanhCamUngAn`) — cả hai cùng một kiểu hiệu ứng
+/// và cùng công thức thời gian (12 giây một chu kỳ) nên tách chung một
+/// widget, chỉ khác màu/chữ/hành động. Nổi TRÊN chữ đang soạn (không chiếm
+/// đất), độ rõ tự thở tuần hoàn: 20% → 100% (5 giây) → đứng im (1 giây) →
+/// 100% → 20% (5 giây) → đứng im (1 giây) → lặp lại mãi mãi — vẫn LUÔN bấm
+/// được dù đang mờ tới đâu, giống mọi nút `Opacity` khác trong tệp này (xem
+/// giải thích ở `_HangNutBoPhimNhanhTamAn`).
+class _NutNoiTuTho extends StatefulWidget {
+  const _NutNoiTuTho({
+    required this.chu,
+    required this.mau,
+    required this.moTa,
+    required this.onTap,
+  });
 
+  /// Chữ/emoji hiện trong nút — dùng `Text` thay `Icon` Material để tránh
+  /// rủi ro icon bị "tree-shake" mất (xem `_NutAnHienDieuHuongConTro`).
+  final String chu;
+  final Color mau;
+  final String moTa;
   final VoidCallback onTap;
 
   @override
-  State<_NutMoRongThanhCongCu> createState() => _NutMoRongThanhCongCuState();
+  State<_NutNoiTuTho> createState() => _NutNoiTuThoState();
 }
 
-class _NutMoRongThanhCongCuState extends State<_NutMoRongThanhCongCu>
-    with SingleTickerProviderStateMixin {
+class _NutNoiTuThoState extends State<_NutNoiTuTho> with SingleTickerProviderStateMixin {
   static const _chuKy = Duration(seconds: 12);
   late final AnimationController _dk;
 
@@ -456,20 +488,21 @@ class _NutMoRongThanhCongCuState extends State<_NutMoRongThanhCongCu>
         return Opacity(
           opacity: _doRoTaiThoiDiem(_dk.value),
           child: Tooltip(
-            message: 'Mở rộng — hiện lại thanh công cụ',
+            message: widget.moTa,
             child: InkWell(
               borderRadius: BorderRadius.circular(20),
               onTap: () {},
               onTapDown: (_) => widget.onTap(),
+              // Đệm theo NỘI DUNG thay vì khoá cứng 40x40: một emoji đơn thì
+              // tự ra hình tròn nhỏ gọn (chữ "Hiện" 4 ký tự nếu khoá cứng
+              // 40x40 sẽ vỡ chữ), chữ dài hơn thì tự ra hình viên thuốc bo
+              // tròn — cả hai đều đạt chiều cao tối thiểu 40 nhờ `constraints`.
               child: Container(
-                width: 40,
-                height: 40,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF5F6368),
-                  shape: BoxShape.circle,
-                ),
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(color: widget.mau, borderRadius: BorderRadius.circular(20)),
                 alignment: Alignment.center,
-                child: const Icon(Icons.expand_more, color: Colors.white, size: 22),
+                child: Text(widget.chu, style: const TextStyle(fontSize: 15, color: Colors.white)),
               ),
             ),
           ),
@@ -4219,19 +4252,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Timer? _henEpConTro;
 
   /// (SỬA LỖI TRIỆT ĐỂ con trỏ vẫn không hiện — `_batConTroNgay` một mình
-  /// không đủ) "Bấm hộ" đúng hai nút thật của hàng phím ảo — dấu cách
-  /// (`_chenKyTuTuPhimAo`) rồi Xoá (`_xoaKyTuTuPhimAo`) — thay vì tự ghi
-  /// thẳng qua `_ghiVaoO` như bản trước.
+  /// không đủ) Bấm hộ nút "Trái" rồi "Phải" của hàng điều hướng
+  /// (`_diChuyenConTro`) — hai nút đó tự quan sát được là LUÔN ép con trỏ
+  /// nháy hiện ra ngay khi bấm. Đứng ở vị trí ĐẦU văn bản thì chỉ bấm hộ
+  /// đúng một nút "Trái" (không bấm tiếp "Phải") — bấm "Trái" lúc đó vốn đã
+  /// là no-op vị trí (không lùi được nữa) nên tự nó đủ để ép con trỏ hiện
+  /// ra rồi, bấm thêm "Phải" chỉ khiến con trỏ dịch sai đi 1 ký tự.
   ///
-  /// (SỬA LỖI vẫn không thấy con trỏ dù đã có mẹo) Quan sát thực tế: tự tay
-  /// bấm nút dấu cách hay nút Xoá ở hàng phím ảo thì con trỏ LUÔN hiện ra
-  /// ngay lập tức — hai nút đó vốn đã tự đi qua đúng con đường khiến hệ
-  /// thống đồng bộ lại con trỏ (`_boDieuKhien.value =` rồi giành lại tiêu
-  /// điểm ở `addPostFrameCallback`, xem hai hàm đó). Bản trước tự ghi
-  /// thẳng qua `_ghiVaoO` — một con đường KHÁC, "êm" hơn (không dựng lại
-  /// UI qua listener), và đúng cái "êm" đó lại không đủ để ép con trỏ hiện
-  /// ra. Sửa: đừng tự làm nữa — nhờ THẲNG hai nút thật làm hộ, để chắc
-  /// chắn đi đúng con đường đã biết là hiệu quả.
+  /// (BỎ mẹo chèn+xoá dấu cách) Mẹo cũ nhờ hộ nút dấu cách/Xoá — vẫn có rủi
+  /// ro XOÁ MẤT vùng đang được chọn (gõ đè lên selection) trước khi tự xoá
+  /// lại, y hệt lý do đã bỏ mẹo đó ở nút "Ẩn" (`_anBoPhimNhanhCamUng`). Nút
+  /// điều hướng Trái/Phải chỉ ĐỔI VỊ TRÍ con trỏ, không đụng nội dung, nên
+  /// an toàn tuyệt đối với vùng đang chọn.
   ///
   /// Vẫn giữ trì hoãn 300ms trước khi "bấm" — bàn phím ảo bật/tắt kèm đổi
   /// `readOnly` kéo theo một nhịp layout/resize riêng của hệ điều hành/
@@ -4241,10 +4273,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henEpConTro?.cancel();
     _henEpConTro = Timer(const Duration(milliseconds: 300), () {
       if (!mounted) return;
-      _chenKyTuTuPhimAo(' ');
+      final oDauVanBan = _boDieuKhien.selection.baseOffset <= 0;
+      _diChuyenConTro(dx: -1);
+      if (oDauVanBan) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        _xoaKyTuTuPhimAo();
+        _diChuyenConTro(dx: 1);
       });
     });
   }
@@ -9335,11 +9369,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         // sách này dùng làm `actions` của AppBar hoặc nằm trong một
         // `Align(alignment: centerRight)`, nên tự nhiên luôn ở sát mép phải
         // màn hình). Ẩn HẲN mọi thanh công cụ phía trên (xem `build`), nhả
-        // hết đất cho khung soạn thảo — nút "Mở rộng" nổi
-        // (`_NutMoRongThanhCongCu`) trả lại như cũ.
+        // hết đất cho khung soạn thảo — nút "Mở rộng" nổi (`_NutNoiTuTho`)
+        // trả lại như cũ. Emoji (Text) thay Icon Material — xem giải thích ở
+        // `_NutAnHienDieuHuongConTro` (icon Material mới thêm có thể bị
+        // "tree-shake" mất trên bản dựng thật dù code không lỗi).
         IconButton(
           onPressed: () => setState(() => _thuGonThanhCongCu = true),
-          icon: const Icon(Icons.expand_less, size: 22),
+          icon: const Text('🔼', style: TextStyle(fontSize: 18)),
           tooltip: 'Thu gọn — ẩn hết thanh công cụ phía trên',
           visualDensity: VisualDensity.compact,
           constraints: _kichThuocNutTren,
@@ -9377,9 +9413,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
+                      // (KHÔNG dùng `icon:`) 4 nút mũi tên chỉ hiện qua
+                      // [nhan] (ký tự mũi tên Unicode) — `icon:` (Icon
+                      // Material) từng khiến ↑/↓ hiện RỖNG trên bản dựng
+                      // thật, xem giải thích ở `_NutAnHienDieuHuongConTro`.
                       _NutPhimAo(
                         nhan: '↑',
-                        icon: Icons.arrow_upward,
                         moTa: 'Lên — bấm giữ để đi liên tục',
                         rong: rongNut,
                         lapLai: true,
@@ -9388,7 +9427,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       SizedBox(width: khoangCach),
                       _NutPhimAo(
                         nhan: '↓',
-                        icon: Icons.arrow_downward,
                         moTa: 'Xuống — bấm giữ để đi liên tục',
                         rong: rongNut,
                         lapLai: true,
@@ -9397,7 +9435,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       SizedBox(width: khoangCach),
                       _NutPhimAo(
                         nhan: '←',
-                        icon: Icons.arrow_back,
                         moTa: 'Trái — bấm giữ để đi liên tục',
                         rong: rongNut,
                         lapLai: true,
@@ -9406,11 +9443,26 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       SizedBox(width: khoangCach),
                       _NutPhimAo(
                         nhan: '→',
-                        icon: Icons.arrow_forward,
                         moTa: 'Phải — bấm giữ để đi liên tục',
                         rong: rongNut,
                         lapLai: true,
                         onTap: () => _diChuyenConTro(dx: 1),
+                      ),
+                      SizedBox(width: khoangCach),
+                      // Home/End "đổi chỗ" với Lùi lại/Tiến tới — xuống hàng
+                      // Copy/Cut/Paste/All (`_xayHangCongCuVanBanCamUng`),
+                      // sang đây thay chỗ, hình dạng/logic giữ NGUYÊN VĂN
+                      // (vẫn `_NutCongCuChu`, vẫn `_phimAoHome`/`_phimAoEnd`).
+                      _NutCongCuChu(
+                        nhan: 'Home',
+                        moTa: 'Đầu dòng — bấm 2 lần: đầu văn bản',
+                        onTap: _phimAoHome,
+                      ),
+                      SizedBox(width: khoangCach),
+                      _NutCongCuChu(
+                        nhan: 'End',
+                        moTa: 'Cuối dòng — bấm 2 lần: cuối văn bản',
+                        onTap: _phimAoEnd,
                       ),
                     ],
                   ),
@@ -9449,18 +9501,30 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         moTa: 'Chọn từ — bấm 2-4 lần: đoạn văn/cụm đoạn văn/tất cả',
         onTap: _phimAoChonTatCa,
       ),
-      _NutCongCuChu(
-        nhan: 'Home',
-        moTa: 'Đầu dòng — bấm 2 lần: đầu văn bản',
-        onTap: _phimAoHome,
+      // Home/End "đổi chỗ" sang hàng 4 nút điều hướng
+      // (`_xayHangDieuHuongConTro`) — Lùi lại/Tiến tới xuống thay chỗ ở
+      // đây, hình dạng/logic y hệt hai nút cùng tên ở thanh Lùi/Tiến/Lưu
+      // phía trên (`_lui`/`_toi`), chỉ đổi màu nền giống nút Xoá ký tự của
+      // Bộ phím nhanh (đỏ nhạt) để phân biệt đây là bản sao trong Bộ phím
+      // nhanh.
+      _NutPhimAo(
+        nhan: 'Lùi lại',
+        icon: Icons.undo,
+        moTa: 'Lùi lại (Ctrl + Z)',
+        mauNen: Colors.red.shade50,
+        mauVien: Colors.red.shade300,
+        onTap: _lichSuLui.isEmpty ? () {} : _lui,
       ),
-      _NutCongCuChu(
-        nhan: 'End',
-        moTa: 'Cuối dòng — bấm 2 lần: cuối văn bản',
-        onTap: _phimAoEnd,
+      _NutPhimAo(
+        nhan: 'Tiến tới',
+        icon: Icons.redo,
+        moTa: 'Tiến tới (Ctrl + Shift + Z)',
+        mauNen: Colors.red.shade50,
+        mauVien: Colors.red.shade300,
+        onTap: _lichSuToi.isEmpty ? () {} : _toi,
       ),
       // "Rút gọn" (màn hình rộng): nút ẩn/hiện 4 nút điều hướng "nhảy" tới
-      // đây, sát bên phải End — xem `_NutAnHienDieuHuongConTro`.
+      // đây, sát bên phải cùng — xem `_NutAnHienDieuHuongConTro`.
       if (_dieuHuongConTroAn && !manHinhHep)
         _NutAnHienDieuHuongConTro(an: true, onTap: _bamNutAnHienDieuHuongConTro),
     ];
@@ -10296,12 +10360,36 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         ),
         ),
           ),
-          if (_thuGonThanhCongCu)
+          // (SỬA LỖI đè lên nút "Tắt" đỏ của thanh tìm kiếm) Khi thanh tìm
+          // kiếm đang mở, nó đã tự có lối thoát riêng (nút Tắt đỏ) rồi — ẩn
+          // hẳn nút nổi "Mở rộng" trong lúc đó thay vì để hai nút chồng lên
+          // nhau tranh cử chỉ; đóng thanh tìm kiếm lại thì "Mở rộng" tự hiện
+          // lại ngay (vẫn còn `_thuGonThanhCongCu`).
+          if (_thuGonThanhCongCu && !_hienThanhTimKiem)
             Positioned(
               top: MediaQuery.paddingOf(context).top + 4,
               right: 8,
-              child: _NutMoRongThanhCongCu(
+              child: _NutNoiTuTho(
+                chu: '🔽',
+                mau: const Color(0xFF5F6368),
+                moTa: 'Mở rộng — hiện lại thanh công cụ',
                 onTap: () => setState(() => _thuGonThanhCongCu = false),
+              ),
+            ),
+          // (SỬA LỖI mất lối vào "Hiện lại Bộ phím nhanh"/"Đóng lại") Hai nút
+          // đó nằm trong AppBar (`_hangNutBoPhimNhanhTamAn`) — "Thu gọn" ẩn
+          // HẲN AppBar nên chúng biến mất theo, không còn cách quay lại Bộ
+          // phím nhanh. Nút nổi "Hiện" này thay thế đúng một việc: bấm vào
+          // là làm ĐÚNG NHƯ nút "Hiện lại Bộ phím nhanh" (xanh lá) đã ẩn.
+          if (_thuGonThanhCongCu && _boPhimNhanhCamUngMo && _boPhimNhanhCamUngAn)
+            Positioned(
+              right: 8,
+              bottom: caoBanPhim + 56,
+              child: _NutNoiTuTho(
+                chu: 'Hiện',
+                mau: Colors.green.shade600,
+                moTa: 'Hiện lại Bộ phím nhanh',
+                onTap: _hienLaiBoPhimNhanhCamUng,
               ),
             ),
         ],
