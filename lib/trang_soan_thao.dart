@@ -4225,6 +4225,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _boPhimNhanhCamUngMo = dangBat;
       _boPhimNhanhCamUngAn = false;
       if (!dangBat) _dieuHuongConTroAn = false;
+      // Bật Bộ phím nhanh lên thì tự ẩn luôn thanh định dạng thủ công (nếu
+      // đang hiện) — nhường tối đa chỗ ngang cho các hàng công cụ mới của
+      // Bộ phím nhanh; muốn xem lại thì tự bấm nút "abc" cạnh nút Lưu.
+      if (dangBat) _anThanhDinhDang = true;
     });
     if (dangBat) {
       _batConTroNgay();
@@ -4311,7 +4315,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Nút "Hiện lại Bộ phím nhanh" (xanh lá) — trả lại đúng trạng thái hiện
   /// hành của Bộ phím nhanh, ẩn bàn phím ảo hệ thống đi.
   void _hienLaiBoPhimNhanhCamUng() {
-    setState(() => _boPhimNhanhCamUngAn = false);
+    setState(() {
+      _boPhimNhanhCamUngAn = false;
+      _anThanhDinhDang = true;
+    });
     SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
     _batConTroNgay();
     _epConTroHienRaMatThuong();
@@ -4712,18 +4719,22 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   /// 4 nút mũi tên điều hướng (`_xayHangDieuHuongConTro`) — "rút gọn" ẩn cả
   /// hàng đó đi (xem nơi dựng ở `build`), TRỪ nút ẩn/hiện — nút đó "nhảy"
-  /// sang thanh Copy/Cut/.../End (màn hình rộng) hoặc đè lên nút "Hướng dẫn"
-  /// của `ThanhCongCu` (màn hình hẹp).
+  /// xuống thanh Copy/Cut/Paste/All ngay bên dưới, luôn về đúng một chỗ
+  /// (không còn phân biệt màn hình hẹp/rộng nữa).
   bool _dieuHuongConTroAn = false;
 
   void _bamNutAnHienDieuHuongConTro() {
     setState(() => _dieuHuongConTroAn = !_dieuHuongConTroAn);
   }
 
-  /// Trái/Phải: [dx] = ±1 ký tự. Lên/Xuống: [dy] = ±1 dòng, cố gắng giữ
-  /// nguyên CỘT (cột = số ký tự từ đầu dòng tới con trỏ) — đứng ở dòng đầu
-  /// mà bấm Lên (hoặc dòng cuối mà bấm Xuống) thì đứng yên, không phải lỗi:
-  /// nút bấm-giữ gọi lại no-op liên tục cũng vô hại.
+  /// Trái/Phải: [dx] = ±1 ký tự. Lên/Xuống: [dy] = ±1 DÒNG HIỂN THỊ (không
+  /// phải dòng logic/đoạn văn) — một đoạn văn dài tự động xuống dòng nhiều
+  /// lần khi bị 2 bên màn hình ép lại (đặc biệt rõ ở màn hình hẹp), Lên/
+  /// Xuống phải đi từng dòng NHÌN THẤY một, giống mọi trình soạn thảo khác,
+  /// không nhảy vọt qua nguyên một đoạn văn. Đo bằng PIXEL qua
+  /// `RenderEditable` (chính xác con trỏ đang ở toạ độ nào), không đếm dấu
+  /// `\n` — đây là cách DUY NHẤT biết được ranh giới dòng hiển thị, vì bản
+  /// thân văn bản không hề có ký tự nào đánh dấu chỗ tự động xuống dòng.
   void _diChuyenConTro({int dx = 0, int dy = 0}) {
     final chon = _boDieuKhien.selection;
     _giuFocusOChuSauKhiBam();
@@ -4732,26 +4743,67 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     var vt = chon.extentOffset;
     if (dx != 0) {
       vt = (vt + dx).clamp(0, vb.length);
-    } else if (dy < 0) {
-      final dauDongHienTai = vt <= 0 ? 0 : vb.lastIndexOf('\n', vt - 1) + 1;
-      if (dauDongHienTai > 0) {
-        final cot = vt - dauDongHienTai;
-        final dauDongTruoc = dauDongHienTai <= 1 ? 0 : vb.lastIndexOf('\n', dauDongHienTai - 2) + 1;
-        final doDaiDongTruoc = (dauDongHienTai - 1) - dauDongTruoc;
-        vt = dauDongTruoc + cot.clamp(0, doDaiDongTruoc);
-      }
-    } else if (dy > 0) {
-      final dauDongHienTai = vt <= 0 ? 0 : vb.lastIndexOf('\n', vt - 1) + 1;
-      final ketThucDongHienTaiTho = vb.indexOf('\n', vt);
-      if (ketThucDongHienTaiTho != -1) {
-        final cot = vt - dauDongHienTai;
-        final dauDongSau = ketThucDongHienTaiTho + 1;
-        final ketThucDongSauTho = vb.indexOf('\n', dauDongSau);
-        final doDaiDongSau = (ketThucDongSauTho == -1 ? vb.length : ketThucDongSauTho) - dauDongSau;
-        vt = dauDongSau + cot.clamp(0, doDaiDongSau);
-      }
+    } else if (dy != 0) {
+      vt = _viTriTheoDongHienThi(vt, dy) ?? vt;
     }
     _boDieuKhien.selection = TextSelection.collapsed(offset: vt);
+    _cuonToiConTroNeuCan();
+  }
+
+  /// Vị trí mới sau khi di chuyển [dy] DÒNG HIỂN THỊ (±1) kể từ [vt], giữ
+  /// nguyên toạ độ ngang (x) của con trỏ hiện tại — y hệt cách Lên/Xuống
+  /// hoạt động trong mọi ô soạn thảo khác. `null` nếu không tìm được
+  /// `RenderEditable` (chưa kịp dựng xong khung nhìn) — gọi lại vô hại.
+  int? _viTriTheoDongHienThi(int vt, int dy) {
+    final hopVanBan = _oVanBanKey.currentContext?.findRenderObject();
+    if (hopVanBan == null) return null;
+    final re = _timRenderEditable(hopVanBan);
+    if (re == null || !re.hasSize) return null;
+    Rect goc;
+    try {
+      goc = re.getLocalRectForCaret(TextPosition(offset: vt));
+    } catch (_) {
+      return null;
+    }
+    final caoDong = re.preferredLineHeight;
+    final diemNham = Offset(goc.left, goc.top + caoDong * (dy < 0 ? -0.5 : 1.5));
+    final vtMoi = re.getPositionForPoint(re.localToGlobal(diemNham)).offset;
+    return vtMoi.clamp(0, _boDieuKhien.text.length);
+  }
+
+  /// Cuộn khung soạn thảo tới đúng con trỏ NẾU nó đang nằm ngoài khung nhìn
+  /// — chỉ cuộn tối thiểu vừa đủ thấy lại (không canh giữa như
+  /// `_cuonToiKetQuaHienTai`, vì Lên/Xuống/Trái/Phải di chuyển từng chút
+  /// một, canh giữa mỗi lần bấm sẽ giật màn hình liên tục). Gọi sau MỖI lần
+  /// `_diChuyenConTro` đổi vị trí con trỏ, kể cả khi bấm-giữ lặp lại liên
+  /// tục.
+  void _cuonToiConTroNeuCan() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_cuonVanBan.hasClients) return;
+      final hopVanBan = _oVanBanKey.currentContext?.findRenderObject();
+      if (hopVanBan == null) return;
+      final re = _timRenderEditable(hopVanBan);
+      if (re == null || !re.hasSize) return;
+      final vt = _boDieuKhien.selection.extentOffset;
+      if (vt < 0) return;
+      Rect goc;
+      try {
+        goc = re.getLocalRectForCaret(TextPosition(offset: vt));
+      } catch (_) {
+        return;
+      }
+      final offset = _cuonVanBan.offset;
+      final vpCao = _cuonVanBan.position.viewportDimension;
+      double? dich;
+      if (goc.top < offset) {
+        dich = goc.top;
+      } else if (goc.bottom > offset + vpCao) {
+        dich = goc.bottom - vpCao;
+      }
+      if (dich == null) return;
+      dich = dich.clamp(0.0, _cuonVanBan.position.maxScrollExtent);
+      _cuonVanBan.animateTo(dich, duration: const Duration(milliseconds: 150), curve: Curves.easeOut);
+    });
   }
 
   // ------------------------------------------------------------- thẻ ghi âm
@@ -9507,12 +9559,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // phía trên (`_lui`/`_toi`), chỉ đổi màu nền giống nút Xoá ký tự của
       // Bộ phím nhanh (đỏ nhạt) để phân biệt đây là bản sao trong Bộ phím
       // nhanh.
+      // Rút hẹp 15% bề ngang (48 -> 40.8) so với các nút vuông mặc định —
+      // đỡ chiếm chỗ ngang hơn vì đây chỉ là bản sao phụ của hai nút chính
+      // ở thanh Lùi/Tiến/Lưu phía trên.
       _NutPhimAo(
         nhan: 'Lùi lại',
         icon: Icons.undo,
         moTa: 'Lùi lại (Ctrl + Z)',
         mauNen: Colors.red.shade50,
         mauVien: Colors.red.shade300,
+        rong: 48 * 0.85,
         onTap: _lichSuLui.isEmpty ? () {} : _lui,
       ),
       _NutPhimAo(
@@ -9521,11 +9577,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         moTa: 'Tiến tới (Ctrl + Shift + Z)',
         mauNen: Colors.red.shade50,
         mauVien: Colors.red.shade300,
+        rong: 48 * 0.85,
         onTap: _lichSuToi.isEmpty ? () {} : _toi,
       ),
-      // "Rút gọn" (màn hình rộng): nút ẩn/hiện 4 nút điều hướng "nhảy" tới
-      // đây, sát bên phải cùng — xem `_NutAnHienDieuHuongConTro`.
-      if (_dieuHuongConTroAn && !manHinhHep)
+      // Nút ẩn/hiện 4 nút điều hướng "nhảy" tới đây khi đang ẩn (cả màn
+      // hình hẹp lẫn rộng — không còn phân biệt nữa, luôn về đúng một chỗ
+      // này, sát bên phải cùng) — xem `_NutAnHienDieuHuongConTro`.
+      if (_dieuHuongConTroAn)
         _NutAnHienDieuHuongConTro(an: true, onTap: _bamNutAnHienDieuHuongConTro),
     ];
     return Material(
@@ -10338,21 +10396,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 khiBamTaiKhoan: () {},
                   ),
                 ),
-                // "Rút gọn" (màn hình hẹp): nút ẩn/hiện 4 nút điều hướng
-                // "nhảy" tới đây, đè lên đúng nút "Hướng dẫn" (luôn ở sát
-                // mép trái của `ThanhCongCu`) — widget này nằm TRÊN trong
-                // Stack nên tự nhận hết cử chỉ bấm tại đúng vùng đó, nút
-                // "Hướng dẫn" bên dưới vì vậy không bấm được nữa cho tới khi
-                // hiện lại 4 nút điều hướng.
-                if (_boPhimNhanhCamUngMo &&
-                    !_boPhimNhanhCamUngAn &&
-                    _dieuHuongConTroAn &&
-                    MediaQuery.sizeOf(context).width < _nguongManHinhHep)
-                  Positioned(
-                    left: 4,
-                    top: 4,
-                    child: _NutAnHienDieuHuongConTro(an: true, onTap: _bamNutAnHienDieuHuongConTro),
-                  ),
+                // (Nút ẩn/hiện 4 nút điều hướng không còn "nhảy" tới đè lên
+                // `ThanhCongCu` nữa — giờ LUÔN về đúng một chỗ, cuối hàng
+                // Copy/Cut/Paste/All, xem `_xayHangCongCuVanBanCamUng`.)
               ],
             ),
             SizedBox(height: caoBanPhim),
