@@ -4354,6 +4354,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         _thuGonTruocKhiEpBanPhimAo = null;
       });
       SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+      // Y hệt mẹo ép con trỏ hiện ra dùng khi bật/hiện Bộ phím nhanh — tắt
+      // bàn phím ảo đi cũng làm cả trang dựng lại (readOnly đổi), có cùng
+      // rủi ro con trỏ "biến mất" khỏi mắt người dùng.
+      _epConTroHienRaMatThuong();
       return;
     }
     // Lần 1: nhớ lại trạng thái Thu gọn hiện tại trước khi ép nó bật lên
@@ -4369,6 +4373,61 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       SystemChannels.textInput.invokeMethod<void>('TextInput.show');
     });
     _batConTroNgay();
+  }
+
+  /// Danh sách ký tự trong bảng "*" (`_moBangKyTuDacBiet`) — đúng nguyên
+  /// văn bộ ký tự đã yêu cầu, giữ nguyên thứ tự.
+  static const _dsKyTuDacBiet = [
+    '.', ',', '_', '~', '`', '|', '•', '√', 'π', '÷', '×', '¶', '∆', '@', '#',
+    '\$', '%', '&', '-', '+', '(', ')', '/', '*', '"', "'", ':', ';', '!', '?',
+    '£', '¢', '€', '¥', '^', '°', '=', '{', '}', '…', '\\', '©', '®', '™',
+    '℅', '[', ']', '<', '>',
+  ];
+
+  /// Bảng ký tự đặc biệt mở từ nút "*" cạnh nút bàn phím — mỗi ô một ký tự,
+  /// bấm vào là chèn NGAY vào vị trí con trỏ/thay vùng đang chọn (đi qua
+  /// đúng `_chenKyTuTuPhimAo`, y hệt các nút của hàng phím ảo). Bảng KHÔNG
+  /// tự đóng sau mỗi lần bấm — người dùng thường cần chèn liên tiếp vài ký
+  /// tự đặc biệt liền nhau, tự bấm "Đóng" khi xong.
+  void _moBangKyTuDacBiet() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ký tự đặc biệt'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final kt in _dsKyTuDacBiet)
+                  InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () {},
+                    onTapDown: (_) => _chenKyTuTuPhimAo(kt),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.grey.shade400),
+                      ),
+                      child: Text(kt, style: const TextStyle(fontSize: 17)),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Đóng')),
+        ],
+      ),
+    );
   }
 
   /// [batDau, ketThuc) sắp bị gõ/xoá đè lên có chồng lấn MỘT PHẦN thẻ ghi
@@ -6654,10 +6713,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // cách đó không có ký tự gì (dấu cách là ký tự đầu văn bản), (5) ký tự
       // trước con trỏ là một ký tự đặc biệt, (6) ký tự trước con trỏ là dấu
       // cách và trước dấu cách đó là một ký tự đặc biệt — riêng trường hợp 6
-      // còn phải XOÁ LUÔN dấu cách thừa đó trước khi xuống dòng.
+      // còn phải XOÁ LUÔN dấu cách thừa đó trước khi xuống dòng. Danh sách
+      // ký tự đặc biệt CHỈ dùng riêng ở đây (không đụng gì tới
+      // `_kyTuDacBiet` cấp lớp — bộ ký tự "nhảy qua dấu cách" của tính năng
+      // khác) — đúng nguyên văn bộ ký tự đã yêu cầu.
       const kyTuDacBiet = {
-        '.', ',', '!', '@', '#', '\$', '%', '^', '&', '*', '(', ')', '_', '+',
-        '=', '?', '/', '>', '<', '{', '}', ']', '[',
+        ';', '.', ',', '/', ')', '(', '"', "'", '*', ':', '!', '?', '•',
       };
       final ktTruocNua =
           dauXuongDongDon >= 2 ? cuChoEnter[dauXuongDongDon - 2] : null;
@@ -9571,6 +9632,27 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               ),
             ),
             const SizedBox(width: 8),
+            // Nút "*" — mở bảng ký tự đặc biệt (`_moBangKyTuDacBiet`). Dính
+            // liền (không khoảng cách) với nút "bàn phím" ngay bên phải, hẹp
+            // hết mức (chỉ vừa rộng bằng 4 dấu `*`) vì hết chỗ ngang rồi.
+            SizedBox(
+              width: 30,
+              height: 36,
+              child: Material(
+                color: Colors.grey.shade100,
+                shape: RoundedRectangleBorder(
+                  borderRadius: const BorderRadius.horizontal(left: Radius.circular(6)),
+                  side: BorderSide(color: Colors.grey.shade400),
+                ),
+                child: InkWell(
+                  onTap: () {},
+                  onTapDown: (_) => _moBangKyTuDacBiet(),
+                  child: const Center(
+                    child: Text('*', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ),
+            ),
             // Nút "bàn phím" — sát mép phải cùng, cạnh nút End. Bấm lần 1:
             // ép bàn phím ảo hệ thống hiện ra CÙNG LÚC với mọi thanh công cụ
             // của Bộ phím nhanh (xem `_bamNutBanPhimAoTrongBoPhimNhanh`).
