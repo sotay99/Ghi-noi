@@ -4234,6 +4234,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   bool _boPhimNhanhCamUngAn = false;
 
   void _bamNutBoPhimNhanhCamUng() {
+    // Bấm nút này (cả "Đóng" của Bộ phím nhanh lẫn "Đóng lại" khi đang tạm
+    // ẩn — dùng chung callback này) mà micro đang nghe thì tạm tắt-bật lại
+    // y hệt lúc gõ tay một ký tự bất kỳ (chữ đã hiện đứng yên, chữ chưa
+    // hiện bị chặn), tránh micro nghe nhầm lúc tay đang bận bấm nút.
+    _nguoiDungVuaGo();
     final dangBat = !_boPhimNhanhCamUngMo;
     setState(() {
       _boPhimNhanhCamUngMo = dangBat;
@@ -4311,6 +4316,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// tiêu điểm vốn đã nằm sẵn ở `_oChu` từ trước (không có sự kiện focus
   /// MỚI để hệ thống tự nhận ra mà bật kèm).
   void _anBoPhimNhanhCamUng() {
+    // Xem giải thích ở `_bamNutBoPhimNhanhCamUng` — cùng lý do.
+    _nguoiDungVuaGo();
     setState(() => _boPhimNhanhCamUngAn = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -4333,6 +4340,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Nút "Hiện lại Bộ phím nhanh" (xanh lá) — trả lại đúng trạng thái hiện
   /// hành của Bộ phím nhanh, ẩn bàn phím ảo hệ thống đi.
   void _hienLaiBoPhimNhanhCamUng() {
+    // Xem giải thích ở `_bamNutBoPhimNhanhCamUng` — cùng lý do. Dùng CHUNG
+    // cho cả hai nơi có nút "Hiện lại Bộ phím nhanh" (trong AppBar lúc tạm
+    // ẩn, và nút nổi "Hiện" cạnh micro lúc vừa thu gọn vừa tạm ẩn).
+    _nguoiDungVuaGo();
     setState(() {
       _boPhimNhanhCamUngAn = false;
       _anThanhDinhDang = true;
@@ -4358,6 +4369,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   bool? _thuGonTruocKhiEpBanPhimAo;
 
   void _bamNutBanPhimAoTrongBoPhimNhanh() {
+    // Xem giải thích ở `_bamNutBoPhimNhanhCamUng` — cùng lý do, áp dụng cho
+    // cả hai lần bấm (hiện lẫn tắt bàn phím ảo).
+    _nguoiDungVuaGo();
     if (_epHienBanPhimAoTrongBoPhimNhanh) {
       // Lần 2: tắt bàn phím ảo lại, trả `_thuGonThanhCongCu` về đúng giá
       // trị trước khi bấm lần 1 — mọi thanh công cụ của Bộ phím nhanh vẫn
@@ -4635,8 +4649,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (mounted) hienThongBaoGiua(context, 'Đã cắt và lưu vào bộ nhớ đệm');
   }
 
-  /// "Paste" — không có thông báo nào theo yêu cầu (quá đơn giản, không cần
-  /// xác nhận). Rỗng bộ nhớ đệm hoặc không đọc được thì im lặng bỏ qua.
+  /// "Paste" — rỗng bộ nhớ đệm hoặc không đọc được thì im lặng bỏ qua.
   Future<void> _phimAoPaste() async {
     final data = await Clipboard.getData('text/plain');
     final chen = data?.text;
@@ -4656,6 +4669,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       text: moi,
       selection: TextSelection.collapsed(offset: batDau + chen.length),
     );
+    if (mounted) hienThongBaoGiua(context, 'Đã dán văn bản vào từ bộ nhớ đệm');
   }
 
   /// "All" — 4 mức, đếm số lần bấm liên tiếp trong 2 giây (riêng nút này,
@@ -9737,15 +9751,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             // trước đây).
             IconButton(
               onPressed: _bamNutBanPhimAoTrongBoPhimNhanh,
-              icon: const Icon(Icons.keyboard_alt_outlined, size: 22),
+              icon: Icon(
+                Icons.keyboard_alt_outlined,
+                size: 22,
+                color: _epHienBanPhimAoTrongBoPhimNhanh ? Colors.white : null,
+              ),
               tooltip: _epHienBanPhimAoTrongBoPhimNhanh
                   ? 'Tắt bàn phím ảo'
                   : 'Hiện bàn phím ảo cùng Bộ phím nhanh',
               visualDensity: VisualDensity.compact,
               constraints: _kichThuocNutTren,
               style: IconButton.styleFrom(
-                backgroundColor:
-                    _epHienBanPhimAoTrongBoPhimNhanh ? Colors.blue.shade50 : null,
+                backgroundColor: _epHienBanPhimAoTrongBoPhimNhanh ? Colors.blue.shade600 : null,
               ),
             ),
           ],
