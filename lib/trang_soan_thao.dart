@@ -3446,6 +3446,94 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// — `null` trên Android/iOS/desktop gốc (không có ý nghĩa gì ở đó).
   Object? _dangKyNgheResizeTrinhDuyet;
 
+  // ------------------------------------------------- báo "Đoạn số" khi cuộn
+
+  /// Khoảng cách (pixel) từ ĐÁY khung nhìn ô soạn thảo tới "mốc" ảo đứng yên
+  /// — đoạn văn nào lướt ngang qua mốc này khi người dùng cuộn thì được báo
+  /// là "đang ở đó". Không vẽ mốc ra màn hình (không cần thiết, người dùng
+  /// chỉ cần thấy con số), chỉ dùng để tính toạ độ dò.
+  static const _khoangCachMocBaoDoanTuDay = 28.0;
+
+  /// Số đoạn (1-based, đoạn = văn bản giữa hai dấu `\n` liên tiếp) đang hiện
+  /// ở dòng chữ nổi "Đoạn số: N" — `null` = đang ẩn (chưa cuộn, hoặc đã hết
+  /// 1 giây kể từ lần cuộn cuối).
+  int? _doanSoDangHien;
+  Timer? _henAnDoanSo;
+
+  /// Đếm số đoạn TRƯỚC (không tính) vị trí ký tự [viTri] rồi +1 — "đoạn" ở
+  /// đây định nghĩa đúng như người dùng yêu cầu: mỗi dấu `\n` là một ranh
+  /// giới đoạn mới, không liên quan gì tới dòng HIỂN THỊ (word-wrap).
+  int _demSoDoanTaiViTri(String vanBan, int viTri) {
+    var soDoan = 1;
+    final gioiHan = viTri.clamp(0, vanBan.length);
+    for (var i = 0; i < gioiHan; i++) {
+      if (vanBan.codeUnitAt(i) == 0x0A) soDoan++;
+    }
+    return soDoan;
+  }
+
+  /// Gọi mỗi lần `_cuonVanBan` đổi offset (người dùng vuốt/kéo cuộn ô soạn
+  /// thảo) — dò xem đoạn văn nào đang nằm đúng tại "mốc" gần đáy khung nhìn
+  /// (xem `_khoangCachMocBaoDoanTuDay`), rồi hiện "Đoạn số: N" trong 1 giây.
+  /// Dùng lại đúng cách dò toạ độ ↔ vị trí ký tự đã có sẵn cho việc Lên/
+  /// Xuống theo dòng hiển thị (`_viTriTheoDongHienThi`) — `getPositionForPoint`
+  /// nhận toạ độ TOÀN CỤC, còn toạ độ CỤC BỘ của `RenderEditable` vốn đã
+  /// tính theo "không gian nội dung" (không đổi khi cuộn, xem
+  /// `_cuonToiKetQuaHienTai`), nên cứ cộng thẳng `_cuonVanBan.offset` vào là
+  /// ra đúng điểm cần dò, không cần quan tâm cuộn đã đi bao xa.
+  void _khiCuonVanBanBaoDoanSo() {
+    if (!mounted || !_cuonVanBan.hasClients) return;
+    final hopVanBan = _oVanBanKey.currentContext?.findRenderObject();
+    if (hopVanBan == null) return;
+    final re = _timRenderEditable(hopVanBan);
+    if (re == null || !re.hasSize) return;
+
+    final vpCao = _cuonVanBan.position.viewportDimension;
+    final yTrongKhungNhin = (vpCao - _khoangCachMocBaoDoanTuDay).clamp(0.0, vpCao);
+    final diemNham = Offset(re.size.width / 2, _cuonVanBan.offset + yTrongKhungNhin);
+    TextPosition vt;
+    try {
+      vt = re.getPositionForPoint(re.localToGlobal(diemNham));
+    } catch (_) {
+      return;
+    }
+
+    final soDoan = _demSoDoanTaiViTri(_boDieuKhien.text, vt.offset);
+    if (soDoan == _doanSoDangHien) return;
+    setState(() => _doanSoDangHien = soDoan);
+    _henAnDoanSo?.cancel();
+    _henAnDoanSo = Timer(const Duration(seconds: 1), () {
+      if (mounted) setState(() => _doanSoDangHien = null);
+    });
+  }
+
+  /// Dòng chữ nổi "Đoạn số: N" — sát mép trái, gần đáy màn hình, tự ẩn sau 1
+  /// giây (xem `_khiCuonVanBanBaoDoanSo`). Luôn có mặt trong app, không có
+  /// cài đặt bật/tắt.
+  Widget _nhanDoanSo(double caoBanPhim) {
+    return Positioned(
+      left: 12,
+      bottom: caoBanPhim + 12,
+      child: IgnorePointer(
+        child: AnimatedOpacity(
+          opacity: _doanSoDangHien == null ? 0.0 : 1.0,
+          duration: const Duration(milliseconds: 150),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.7),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              'Đoạn số: ${_doanSoDangHien ?? 1}',
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -3492,6 +3580,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _oTimKiem.addListener(_capNhatKetQuaTimKiem);
     _oTimKiem.addListener(_khiOTimKiemDoi);
     _oThayThe.addListener(_khiOThayTheDoi);
+    _cuonVanBan.addListener(_khiCuonVanBanBaoDoanSo);
 
     // Nội dung lưu trữ có thể mang thêm một khối định dạng AI mã hoá ở cuối
     // (xem `_macDinhDangAi`/`_apDungDinhDangAi`) — tách nó ra TRƯỚC khi đưa
@@ -3546,6 +3635,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henHetHanRanhGioiPhien?.cancel();
     _henNhapNhayConTro?.cancel();
     _henEpConTro?.cancel();
+    _henAnDoanSo?.cancel();
+    _cuonVanBan.removeListener(_khiCuonVanBanBaoDoanSo);
     _conTroDangHien.dispose();
     _oChu.removeListener(_khiFocusConTroDoi);
     _bomDongHoTheGhiAm?.cancel();
@@ -10763,6 +10854,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 onTap: _hienLaiBoPhimNhanhCamUng,
               ),
             ),
+          _nhanDoanSo(caoBanPhim),
         ],
       ),
     );
