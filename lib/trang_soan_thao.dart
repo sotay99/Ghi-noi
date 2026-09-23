@@ -131,9 +131,13 @@ bool _kyTuHopLeChoTreMu(String kyTu) {
 /// cho dòng trạng thái ghi âm (xem `_xayAppBarTrinhGhiAmThe`) — chỉ có ý
 /// nghĩa lúc ĐANG ghi (không dùng cho lúc tạm dừng, đứng yên).
 class _ChuLuonSong extends StatefulWidget {
-  const _ChuLuonSong({required this.chu, required this.mau});
+  const _ChuLuonSong({required this.chu, required this.mau, this.coChu = 12});
   final String chu;
   final Color mau;
+
+  /// Cỡ chữ — mặc định 12 (nhãn nhỏ cũ). Bảng nút trình ghi âm mới dùng cỡ
+  /// to hơn hẳn cho dòng "Đang Ghi âm mm:ss" (dễ nhìn hơn, theo yêu cầu).
+  final double coChu;
 
   @override
   State<_ChuLuonSong> createState() => _ChuLuonSongState();
@@ -163,7 +167,7 @@ class _ChuLuonSongState extends State<_ChuLuonSong>
     final style = TextStyle(
       color: widget.mau,
       fontWeight: FontWeight.bold,
-      fontSize: 12,
+      fontSize: widget.coChu,
     );
     return AnimatedBuilder(
       animation: _dieuKhien,
@@ -5455,12 +5459,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// đang tạm dừng) thành thẻ ghi âm XONG, nhưng KHÔNG tạo thẻ mới nào —
   /// trình ghi âm vẫn mở (người dùng có thể "Tạo phiên ghi âm mới" sau nếu
   /// muốn ghi tiếp, hoặc "Đóng trình ghi âm" luôn).
-  Future<void> _dungVaHoanThanhGhiAmThe() async {
-    if (_soTheGhiAmDangGhi == null) return;
-    await _chotTheGhiAmHienTaiThanhHoanChinh();
-    if (mounted) setState(() {});
-  }
-
   /// Nút "Đóng trình ghi âm": chốt thẻ đang ghi (nếu có) rồi đóng hẳn —
   /// giải phóng micro, ẩn 4 nút nhỏ, thanh công cụ trên hiện lại.
   Future<void> _dongTrinhGhiAmThe() async {
@@ -5468,6 +5466,99 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     await _chotTheGhiAmHienTaiThanhHoanChinh();
     await ghiAmTheDongHan();
     if (mounted) setState(() => _trinhGhiAmMo = false);
+  }
+
+  /// Nút "Hoàn thành-Chuyển thành văn bản": chốt thẻ đang ghi thành thẻ
+  /// hoàn chỉnh rồi GỬI NGAY cho AI chuyển hoá — y hệt bấm "Chỉ chuyển hoá
+  /// thẻ này" ở menu bấm-vào-thẻ-đã-xong (`_khiBamTheGhiAmHoanChinh`), chỉ
+  /// khác chỗ không cần bấm hai lần (chốt xong rồi tự bấm luôn).
+  Future<void> _hoanThanhChuyenThanhVanBan() async {
+    final soThe = await _chotTheGhiAmHienTaiThanhHoanChinh();
+    if (soThe == null || !mounted) return;
+    await _guiVaXuLyMotThe(soThe, baoLoi: true);
+  }
+
+  /// Nút "Hoàn thành-Phát để nghe lại": chốt thẻ đang ghi thành thẻ hoàn
+  /// chỉnh rồi mở NGAY modal nghe lại — y hệt bấm "Nghe bản ghi âm này" ở
+  /// menu bấm-vào-thẻ-đã-xong, gộp hai bước thành một.
+  Future<void> _hoanThanhPhatDeNgheLai() async {
+    final soThe = await _chotTheGhiAmHienTaiThanhHoanChinh();
+    if (soThe == null || !mounted) return;
+    await _ngheLaiGhiAmThe(soThe);
+  }
+
+  /// Nút "Hiện bảng điều khiển" — CHỈ dựng giao diện theo yêu cầu, logic
+  /// thật gắn sau. Cố tình để trống, không phải quên.
+  void _bamNutHienBangDieuKhienGhiAm() {}
+
+  /// Nút "Xoá bản này-Đóng trình ghi âm": HUỶ THẲNG bản ghi âm đang dở
+  /// dang — không chốt thành thẻ, không lưu bất cứ gì (khác hẳn 4 nút
+  /// "Hoàn thành-..." ở trên, luôn chốt trước khi hành động). Dưới 1 phút
+  /// thì huỷ ngay không hỏi (ghi dở vài giây, hỏi lại chỉ gây phiền); từ 1
+  /// phút trở lên thì hỏi xác nhận giữa màn hình — mất công ghi khá lâu
+  /// rồi, lỡ tay bấm nhầm nút mất trắng sẽ rất khó chịu.
+  Future<void> _huyBanGhiAmDangDoDangVaDong() async {
+    if (!_trinhGhiAmMo) return;
+    if (_soTheGhiAmDangGhi != null &&
+        _thoiLuongTheGhiAmDangGhi.value >= const Duration(minutes: 1)) {
+      final dongY = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Xoá bản ghi âm đang dở dang?'),
+          content: Text(
+            'Bản ghi âm đang dở dang này đã ghi được '
+            '${dinhDangMmSs(_thoiLuongTheGhiAmDangGhi.value)}. Xoá đi sẽ mất '
+            'VĨNH VIỄN, không thể phục hồi lại được (khác với thẻ ghi âm đã '
+            'chốt — không lưu tạm bất cứ gì để hoàn tác). Bạn có chắc chắn '
+            'muốn xoá không?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Không, giữ lại'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text('Xoá', style: TextStyle(color: Colors.red.shade600)),
+            ),
+          ],
+        ),
+      );
+      if (dongY != true || !mounted) return;
+    }
+    await _huyThangBanGhiDangDoDang();
+    await ghiAmTheDongHan();
+    if (mounted) setState(() => _trinhGhiAmMo = false);
+  }
+
+  /// Dừng đáy ghi âm nhưng KHÔNG dùng gì tới dữ liệu trả về, rồi gỡ token
+  /// "đang ghi âm N" khỏi văn bản — gần như sao y nhánh "ghi âm thất bại"
+  /// của `_chotTheGhiAmHienTaiThanhHoanChinh` (nơi ĐÃ có sẵn đúng logic
+  /// "bỏ token, không tạo thẻ ma"), chỉ khác là chủ động huỷ thay vì do lỗi.
+  Future<void> _huyThangBanGhiDangDoDang() async {
+    final soThe = _soTheGhiAmDangGhi;
+    final viTriToken = _viTriTokenDangGhiThe;
+    _bomDongHoTheGhiAm?.cancel();
+    _bomDongHoTheGhiAm = null;
+    _dungTheoDoiMucAmGhiAm();
+    if (soThe == null) return;
+    await ghiAmTheKetThucThe();
+    _soTheGhiAmDangGhi = null;
+    _viTriTokenDangGhiThe = null;
+    _theGhiAmDangTamDung = false;
+    _thoiLuongTheoTheGhiAm.remove(soThe);
+    if (!mounted || viTriToken == null) return;
+    final vb = _boDieuKhien.text;
+    final ketThucToken = viTriToken + tenTokenDangGhiAm.length;
+    if (ketThucToken <= vb.length &&
+        vb.substring(viTriToken, ketThucToken) == tenTokenDangGhiAm) {
+      final moi = vb.replaceRange(viTriToken, ketThucToken, '');
+      _dieuChinhVungToanVanSauKhiSua(viTriToken, tenTokenDangGhiAm.length, 0);
+      _dieuChinhLoiChinhTaSauKhiSua(viTriToken, tenTokenDangGhiAm.length, 0,
+          vanBanCu: vb, vanBanMoi: moi);
+      _ghiVaoO(moi, viTriToken);
+      _henLuu();
+    }
   }
 
   /// Ghi tạm — dùng `_bao` (thông báo giữa màn hình) thay cho nhật ký
@@ -10105,79 +10196,215 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
-  /// Bốn nút nhỏ của trình ghi âm + đồng hồ đếm giây — thay HẲN cho AppBar
-  /// bình thường trong lúc trình ghi âm mở (xem nơi dùng ở `build`).
-  /// Nút chữ/icon của thanh công cụ trình ghi âm — bắt `onTapDown` (không
-  /// đợi `onTap`/nhấc tay) vì trên WEB, tiêu điểm DOM đang ở khung nhập
-  /// (input ẩn phía sau khung soạn thảo) chuyển đi lúc nhấc tay có thể "ăn"
-  /// mất đúng lượt chạm đầu, buộc phải chạm lần hai (không xảy ra ở app
-  /// Android/iOS gốc vì không có input DOM nào cả).
-  Widget _nutTrinhGhiAm(String nhan, VoidCallback onBam,
-      {Color? mau, IconData? icon, bool manHinhHep = false}) {
-    final mauThuc = mau ?? Theme.of(context).colorScheme.primary;
-    // Màn hình hẹp: thu cỡ chữ/icon xuống bằng đúng cỡ "Đang ghi"/"Tạm dừng"
-    // (12) — trước đó cố định 17 nên trên màn hẹp các nút dễ vỡ dòng/tràn.
-    final coChu = manHinhHep ? 12.0 : 17.0;
-    final coIcon = manHinhHep ? 13.0 : 17.0;
-    return InkWell(
-      onTap: () {},
-      onTapDown: (_) => onBam(),
-      borderRadius: BorderRadius.circular(6),
-      // Đệm co lại tối thiểu — chỉ đủ vùng chạm, để cả thanh không cao hơn
-      // mức cần thiết.
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-            horizontal: manHinhHep ? 4 : 8, vertical: manHinhHep ? 2 : 4),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, color: mauThuc, size: coIcon),
-              SizedBox(width: manHinhHep ? 2 : 4),
+  /// Một ô trong bảng nút trình ghi âm — icon + nhãn (tự xuống hàng khi màn
+  /// hình hẹp, không cắt chữ), nền màu riêng theo nhóm chức năng, viền mảnh
+  /// xám để trông như một bảng lưới thật. Bắt `onTapDown` (không đợi
+  /// `onTap`/nhấc tay) — y hệt lý do cũ: trên WEB, tiêu điểm DOM đang ở
+  /// khung nhập ẩn phía sau khung soạn thảo chuyển đi lúc nhấc tay có thể
+  /// "ăn" mất đúng lượt chạm đầu.
+  Widget _oTrinhGhiAmMoi({
+    required String nhan,
+    required IconData icon,
+    required Color mauNen,
+    required Color mauChu,
+    required VoidCallback onBam,
+    required bool manHinhHep,
+  }) {
+    final coChu = manHinhHep ? 11.5 : 13.5;
+    final coIcon = manHinhHep ? 16.0 : 19.0;
+    return Container(
+      decoration: BoxDecoration(
+        color: mauNen,
+        border: Border.all(color: Colors.grey.shade400, width: 0.6),
+      ),
+      child: InkWell(
+        onTap: () {},
+        onTapDown: (_) => onBam(),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 6, vertical: manHinhHep ? 6 : 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: mauChu, size: coIcon),
+              const SizedBox(height: 3),
+              Text(
+                nhan,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: mauChu, fontWeight: FontWeight.w600, fontSize: coChu),
+              ),
             ],
-            Text(
-              nhan,
-              style: TextStyle(
-                  color: mauThuc, fontWeight: FontWeight.w600, fontSize: coChu),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
+  /// Ô lớn "Đang Ghi âm mm:ss" / "Tạm dừng mm:ss" — chữ to hơn hẳn các ô
+  /// nút khác (dễ nhìn, theo yêu cầu), chỉ lượn sóng lúc THẬT SỰ đang ghi
+  /// (tái dùng nguyên `_ChuLuonSong`, gộp luôn cả đồng hồ vào chung một
+  /// chuỗi lượn sóng — đơn giản hơn hẳn so với ghép hai widget so le nhau,
+  /// và trông vẫn đúng ý "dòng chữ Đang ghi âm lượn sóng"). Không phải nút
+  /// bấm — thuần hiển thị trạng thái.
+  Widget _oTrangThaiGhiAmLon(bool manHinhHep) {
+    final coChu = manHinhHep ? 16.0 : 21.0;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.grey.shade400, width: 0.6),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      alignment: Alignment.center,
+      child: _soTheGhiAmDangGhi == null
+          ? Text(
+              'Đang chuẩn bị…',
+              style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold, fontSize: coChu),
+            )
+          : ValueListenableBuilder<Duration>(
+              valueListenable: _thoiLuongTheGhiAmDangGhi,
+              builder: (context, gia, _) {
+                final nhan =
+                    '${_theGhiAmDangTamDung ? 'Tạm dừng' : 'Đang Ghi âm'} ${dinhDangMmSs(gia)}';
+                return _theGhiAmDangTamDung
+                    ? Text(
+                        nhan,
+                        style: TextStyle(
+                            color: Colors.red.shade700, fontWeight: FontWeight.bold, fontSize: coChu),
+                      )
+                    : _ChuLuonSong(chu: nhan, mau: Colors.red.shade700, coChu: coChu);
+              },
+            ),
+    );
+  }
+
+  /// Ô "Tạm dừng"/"Tiếp tục" — đối nghịch nhau, cái này hiện thì cái kia ẩn
+  /// (dùng chung MỘT ô, không phải hai ô cạnh nhau).
+  Widget _oTamDungTiepTuc(bool manHinhHep) {
+    return _theGhiAmDangTamDung
+        ? _oTrinhGhiAmMoi(
+            nhan: 'Tiếp Tục',
+            icon: Icons.play_circle_outline,
+            mauNen: Colors.green.shade100,
+            mauChu: Colors.green.shade800,
+            onBam: _tiepTucTheGhiAmHienTai,
+            manHinhHep: manHinhHep,
+          )
+        : _oTrinhGhiAmMoi(
+            nhan: 'Tạm dừng',
+            icon: Icons.pause_circle_outline,
+            mauNen: Colors.red.shade100,
+            mauChu: Colors.red.shade800,
+            onBam: _tamDungTheGhiAmHienTai,
+            manHinhHep: manHinhHep,
+          );
+  }
+
+  /// Bảng nút trình ghi âm — thay HẲN cho AppBar bình thường trong lúc
+  /// trình ghi âm mở (xem nơi dùng ở `build`). Màn hình rộng: 1 hàng 2 ô
+  /// (trạng thái to + Hiện bảng điều khiển) rồi 2 hàng 3 ô. Màn hình hẹp:
+  /// mọi hàng đều 2 ô, thêm một hàng — giữ các ô đủ rộng để chữ không vỡ
+  /// nát, đúng yêu cầu "sát vào nhau, ổn định, tự xuống hàng bên trong ô".
   AppBar _xayAppBarTrinhGhiAmThe() {
     final manHinhHep = MediaQuery.of(context).size.width < _nguongManHinhHep;
+
+    final oDangGhi = _oTrangThaiGhiAmLon(manHinhHep);
+    final oHienBang = _oTrinhGhiAmMoi(
+      nhan: 'Hiện bảng điều khiển',
+      icon: Icons.tune_rounded,
+      mauNen: Colors.amber.shade100,
+      mauChu: Colors.brown.shade800,
+      onBam: _bamNutHienBangDieuKhienGhiAm,
+      manHinhHep: manHinhHep,
+    );
+    final oTamTiep = _oTamDungTiepTuc(manHinhHep);
+    final oChuyenVanBan = _oTrinhGhiAmMoi(
+      nhan: 'Hoàn thành-Chuyển thành văn bản',
+      icon: Icons.text_snippet_outlined,
+      mauNen: Colors.green.shade100,
+      mauChu: Colors.green.shade900,
+      onBam: _hoanThanhChuyenThanhVanBan,
+      manHinhHep: manHinhHep,
+    );
+    final oTaoMoi = _oTrinhGhiAmMoi(
+      nhan: 'Hoàn thành-Tạo bản ghi âm mới',
+      icon: Icons.add_circle_outline,
+      mauNen: Colors.cyan.shade100,
+      mauChu: Colors.cyan.shade900,
+      onBam: _taoPhienGhiAmMoiThe,
+      manHinhHep: manHinhHep,
+    );
+    final oPhatLai = _oTrinhGhiAmMoi(
+      nhan: 'Hoàn thành-Phát để nghe lại',
+      icon: Icons.play_arrow_rounded,
+      mauNen: Colors.lightGreen.shade100,
+      mauChu: Colors.green.shade900,
+      onBam: _hoanThanhPhatDeNgheLai,
+      manHinhHep: manHinhHep,
+    );
+    final oDong = _oTrinhGhiAmMoi(
+      nhan: 'Hoàn thành-Đóng trình ghi âm',
+      icon: Icons.check_circle_outline,
+      mauNen: Colors.blue.shade100,
+      mauChu: Colors.blue.shade900,
+      onBam: _dongTrinhGhiAmThe,
+      manHinhHep: manHinhHep,
+    );
+    final oXoa = _oTrinhGhiAmMoi(
+      nhan: 'Xoá bản này-Đóng trình ghi âm',
+      icon: Icons.delete_outline,
+      mauNen: Colors.red.shade100,
+      mauChu: Colors.red.shade900,
+      onBam: _huyBanGhiAmDangDoDangVaDong,
+      manHinhHep: manHinhHep,
+    );
+
+    Widget hang(List<Widget> oCac, {List<int>? doRong}) {
+      return IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < oCac.length; i++)
+              Expanded(flex: doRong == null ? 1 : doRong[i], child: oCac[i]),
+          ],
+        ),
+      );
+    }
+
+    final luoi = manHinhHep
+        ? Column(mainAxisSize: MainAxisSize.min, children: [
+            hang([oDangGhi, oHienBang]),
+            hang([oTamTiep, oChuyenVanBan]),
+            hang([oTaoMoi, oPhatLai]),
+            hang([oDong, oXoa]),
+          ])
+        : Column(mainAxisSize: MainAxisSize.min, children: [
+            hang([oDangGhi, oHienBang], doRong: const [2, 1]),
+            hang([oTamTiep, oChuyenVanBan, oTaoMoi]),
+            hang([oPhatLai, oDong, oXoa]),
+          ]);
+
+    // Chiều cao ước lượng theo số hàng/cỡ chữ mỗi kiểu màn hình — bọc
+    // `SingleChildScrollView` làm lưới an toàn: lỡ ước lượng thiếu ở máy
+    // nào đó thì bảng tự cuộn dọc thay vì tràn/vỡ hình, không có cách nào
+    // để AppBar tự co đúng theo nội dung thật.
+    final caoBang = manHinhHep ? 300.0 : 210.0;
+
     return AppBar(
       backgroundColor: Colors.red.shade50,
       surfaceTintColor: Colors.red.shade50,
       elevation: 1,
       automaticallyImplyLeading: false,
-      // Màn hình hẹp: bớt đệm hai bên tiêu đề để nhường thêm chỗ cho các nút
-      // — màn hình rộng giữ 4 như cũ.
-      titleSpacing: manHinhHep ? 0 : 4,
-      // Dồn cả hai hàng (nút bấm + trạng thái/đồng hồ) vào ĐÚNG vùng
-      // tiêu đề chính của AppBar — không còn hàng tiêu đề "Đang ghi âm"
-      // rỗng ở trên cùng chiếm chỗ thừa, và cũng không cần một `bottom`
-      // riêng nữa. Chiều cao để `null` (tự co theo nội dung) — nội dung
-      // đã thu nhỏ hết mức (cỡ chữ thường, đệm tối thiểu) nên AppBar cũng
-      // thấp hơn trước (76 → 68) — AppBar không tự co theo nội dung được,
-      // phải khai số cụ thể; chọn dư một chút để phòng lúc `Wrap` phải
-      // xuống dòng thứ hai trên màn hình hẹp (không thì bị cắt nội dung).
-      toolbarHeight: 68,
-      title: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          // Căn GIỮA màn hình theo chiều ngang, không dạt về bên trái.
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // `Wrap` (không phải cuộn ngang) để cả cụm nút luôn nằm giữa
-            // — không vừa một dòng thì tự xuống dòng, không cần cuộn.
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: manHinhHep ? 2 : 4,
-              runSpacing: 2,
+      titleSpacing: 0,
+      toolbarHeight: caoBang + 30,
+      title: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Nút "tự động gửi ngầm" — vẫn cần giữ (tính năng có sẵn từ
+          // trước), nhưng không thuộc bảng 8 ô của thiết kế mới nên dồn
+          // riêng thành một dải mỏng bên trên, không chen vào lưới.
+          SizedBox(
+            height: 30,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Tooltip(
                   message: _tuDongGuiNgamTheGhiAm
@@ -10188,104 +10415,24 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     onTapDown: (_) => _bamNutTuDongGuiNgamTheGhiAm(),
                     customBorder: const CircleBorder(),
                     child: Padding(
-                      padding: const EdgeInsets.all(6),
+                      padding: const EdgeInsets.all(4),
                       child: Icon(
-                        _tuDongGuiNgamTheGhiAm
-                            ? Icons.cloud_sync
-                            : Icons.cloud_sync_outlined,
-                        color: _tuDongGuiNgamTheGhiAm
-                            ? Colors.deepPurple
-                            : Colors.grey,
+                        _tuDongGuiNgamTheGhiAm ? Icons.cloud_sync : Icons.cloud_sync_outlined,
+                        color: _tuDongGuiNgamTheGhiAm ? Colors.deepPurple : Colors.grey,
                         size: 20,
                       ),
                     ),
                   ),
                 ),
-                // Thay cho "Tạo văn bản" (từng thẻ đã có sẵn lựa chọn
-                // này trong menu riêng của nó) — chỉ hiện khi có một
-                // thẻ đang ghi (kể cả đang tạm dừng).
-                if (_soTheGhiAmDangGhi != null)
-                  _nutTrinhGhiAm(
-                    'Dừng và hoàn thành ghi âm',
-                    _dungVaHoanThanhGhiAmThe,
-                    manHinhHep: manHinhHep,
-                  ),
-                _nutTrinhGhiAm(
-                  'Tạo phiên ghi âm mới',
-                  _taoPhienGhiAmMoiThe,
-                  mau: Colors.green.shade700,
-                  manHinhHep: manHinhHep,
-                ),
-                _nutTrinhGhiAm(
-                  'Đóng trình ghi âm',
-                  _dongTrinhGhiAmThe,
-                  mau: Colors.red.shade700,
-                  icon: Icons.cancel,
-                  manHinhHep: manHinhHep,
-                ),
+                const SizedBox(width: 8),
               ],
             ),
-            Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_soTheGhiAmDangGhi != null)
-                    _theGhiAmDangTamDung
-                        ? Text('Tạm dừng',
-                            style: TextStyle(
-                                color: Colors.red.shade700,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12))
-                        : _ChuLuonSong(chu: 'Đang ghi', mau: Colors.red.shade700),
-                  const SizedBox(width: 4),
-                  ValueListenableBuilder<Duration>(
-                    valueListenable: _thoiLuongTheGhiAmDangGhi,
-                    builder: (context, gia, _) => Text(
-                      '${dinhDangMmSs(gia)} / ${dinhDangMmSs(_gioiHanMoiTheGhiAm)}',
-                      style: TextStyle(
-                        color: Colors.red.shade700,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (_soTheGhiAmDangGhi != null)
-                    InkWell(
-                      onTap: () {},
-                      onTapDown: (_) => _theGhiAmDangTamDung
-                          ? _tiepTucTheGhiAmHienTai()
-                          : _tamDungTheGhiAmHienTai(),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _theGhiAmDangTamDung
-                                  ? Icons.play_circle_outline
-                                  : Icons.pause_circle_outline,
-                              color: Colors.red.shade700,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              _theGhiAmDangTamDung ? 'Tiếp tục' : 'Dừng lại',
-                              style: TextStyle(
-                                color: Colors.red.shade700,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+          SizedBox(
+            height: caoBang,
+            child: SingleChildScrollView(child: luoi),
+          ),
+        ],
       ),
     );
   }
@@ -10827,7 +10974,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           // hẳn nút nổi "Mở rộng" trong lúc đó thay vì để hai nút chồng lên
           // nhau tranh cử chỉ; đóng thanh tìm kiếm lại thì "Mở rộng" tự hiện
           // lại ngay (vẫn còn `_thuGonThanhCongCu`).
-          if (_thuGonThanhCongCu && !_hienThanhTimKiem)
+          // Trình ghi âm mở thì AppBar của NÓ đã thay hẳn AppBar thường rồi
+          // (có lối thoát riêng "Hoàn thành-Đóng trình ghi âm"/"Xoá bản này")
+          // — ẩn luôn nút nổi này, không thì nó đè lên góc phải của bảng nút
+          // trình ghi âm mới.
+          if (_thuGonThanhCongCu && !_hienThanhTimKiem && !_trinhGhiAmMo)
             Positioned(
               top: MediaQuery.paddingOf(context).top + 4,
               right: 8,
