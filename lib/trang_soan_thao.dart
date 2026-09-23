@@ -4045,18 +4045,32 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _tenController.text = g.ten;
     });
 
-    if (g.noiDung.isEmpty) {
+    // (SỬA LỖI định dạng/khối mã hoá "dính" từ tệp cũ sang tệp mới) Trước
+    // đây hàm này ghi thẳng `g.noiDung` — có thể còn mang khối AI/định dạng
+    // thủ công mã hoá ở cuối (xem `_tachCacKhoiDinhDang`) — vào ô soạn thảo,
+    // và không xoá `_boDieuKhien.dinhDang` (vùng đậm/màu) của ghi chú VỪA
+    // RỜI ĐI. Kết quả: chuỗi mã hoá lộ ra thành text thấy được, rồi mỗi lần
+    // lưu lại bị mã hoá thêm một lớp mới chồng lên (phình dần); còn các vùng
+    // đậm/màu cũ thì áp nhầm offset lên văn bản ghi chú MỚI. Phải xử lý y
+    // hệt `initState`: tách khối trước, xoá sạch định dạng cũ, rồi mới áp
+    // định dạng của đúng ghi chú đang mở.
+    _boDieuKhien.dinhDang.clear();
+    final (banDau, khoiDinhDang, khoiDinhDangThuCong) = _tachCacKhoiDinhDang(g.noiDung);
+
+    if (banDau.isEmpty) {
       _ghiVaoO('', 0);
     } else {
-      _ghiVaoO(g.noiDung, g.noiDung.length);
+      _ghiVaoO(banDau, banDau.length);
     }
-    _neo = g.noiDung.length;
+    if (khoiDinhDang != null) _apDungDinhDangAi(khoiDinhDang);
+    if (khoiDinhDangThuCong != null) _apDungDinhDangThuCong(khoiDinhDangThuCong);
+    _neo = banDau.length;
     _chuTam = '';
     _tuDaChotTrongPhien = [];
     _partialTruocDo = [];
     _henChinhTa?.cancel();
     _boDieuKhien.loi.clear();
-    _viTriDaKiemTraChinhTa = g.noiDung.length;
+    _viTriDaKiemTraChinhTa = banDau.length;
     // (SỬA LỖI đường kẻ chia "bóng ma") Ghi chú KHÁC có thể mang toạ độ
     // đường kẻ chia hoàn toàn không liên quan tới ghi chú vừa mở — không xoá
     // thì offset cũ (ví dụ 0) vẫn "hợp lệ" trên văn bản mới (kể cả văn bản
