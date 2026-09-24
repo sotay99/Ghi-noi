@@ -73,7 +73,7 @@ jobs:
         with:
           name: Flowrite-apk-${{ github.run_number }}
           path: ban-giao/*.apk
-          retention-days: 30
+          retention-days: 3
 
       - name: Đưa lên mục Releases để tải bằng điện thoại
         uses: softprops/action-gh-release@v2
