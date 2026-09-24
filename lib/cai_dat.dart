@@ -17,6 +17,9 @@ class CaiDat {
   static const _khoaPhimTatGhiAmLoai = 'ghi_noi_phim_tat_ghi_am_loai';
   static const _khoaPhimTatGhiAmPhimCtrl = 'ghi_noi_phim_tat_ghi_am_phim_ctrl';
   static const _khoaThoiGianTuTatMicro = 'ghi_noi_thoi_gian_tu_tat_micro_giay';
+  static const _khoaTuDongGuiNgamTheGhiAm = 'ghi_noi_tu_dong_gui_ngam_the_ghi_am';
+  static const _khoaNguongTuDongGuiTheGhiAmGiay =
+      'ghi_noi_nguong_tu_dong_gui_the_ghi_am_giay';
   static const _khoaTuDongChenDauCau = 'ghi_noi_tu_dong_chen_dau_cau_ai';
   static const _khoaMucDoDaiDeXuat = 'ghi_noi_muc_do_dai_de_xuat';
   static const _khoaCauLenhTuyChinhKiemTraToanVan =
@@ -34,6 +37,18 @@ class CaiDat {
 
   static const gioiHanDuoiTuTatMicro = 10;
   static const gioiHanTrenTuTatMicro = 120;
+
+  /// Trình ghi âm: có tự động gửi ngầm một thẻ đi chuyển hoá thành văn bản
+  /// ngay khi nó tích đủ số giây (xem [nguongTuDongGuiTheGhiAmGiay]) hay
+  /// không, không cần người dùng tự bấm. Mặc định BẬT.
+  bool tuDongGuiNgamTheGhiAm = true;
+
+  /// Ngưỡng số giây — chỉ có ý nghĩa khi [tuDongGuiNgamTheGhiAm] bật. Mặc
+  /// định 20 giây, giới hạn 5-120.
+  int nguongTuDongGuiTheGhiAmGiay = 20;
+
+  static const gioiHanDuoiNguongTuDongGuiTheGhiAm = 5;
+  static const gioiHanTrenNguongTuDongGuiTheGhiAm = 120;
 
   /// Có tự chèn một dấu cách ngay sau đoạn chữ mỗi lần nói xong hay không.
   /// Mặc định bật.
@@ -196,6 +211,9 @@ class CaiDat {
     );
     thoiGianTuTatMicroGiay =
         (kho.getInt(_khoaThoiGianTuTatMicro) ?? 45).clamp(gioiHanDuoiTuTatMicro, gioiHanTrenTuTatMicro);
+    tuDongGuiNgamTheGhiAm = kho.getBool(_khoaTuDongGuiNgamTheGhiAm) ?? true;
+    nguongTuDongGuiTheGhiAmGiay = (kho.getInt(_khoaNguongTuDongGuiTheGhiAmGiay) ?? 20)
+        .clamp(gioiHanDuoiNguongTuDongGuiTheGhiAm, gioiHanTrenNguongTuDongGuiTheGhiAm);
     tuDongChenDauCauBangAI = kho.getBool(_khoaTuDongChenDauCau) ?? true;
     mucDoDaiDeXuat = (kho.getInt(_khoaMucDoDaiDeXuat) ?? 2).clamp(0, 4);
     cauLenhTuyChinhKiemTraToanVan = kho.getString(_khoaCauLenhTuyChinhKiemTraToanVan) ?? '';
@@ -416,6 +434,19 @@ class CaiDat {
     thoiGianTuTatMicroGiay = giay.clamp(gioiHanDuoiTuTatMicro, gioiHanTrenTuTatMicro);
     final kho = await SharedPreferences.getInstance();
     await kho.setInt(_khoaThoiGianTuTatMicro, thoiGianTuTatMicroGiay);
+  }
+
+  Future<void> datTuDongGuiNgamTheGhiAm(bool bat) async {
+    tuDongGuiNgamTheGhiAm = bat;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setBool(_khoaTuDongGuiNgamTheGhiAm, bat);
+  }
+
+  Future<void> datNguongTuDongGuiTheGhiAmGiay(int giay) async {
+    nguongTuDongGuiTheGhiAmGiay =
+        giay.clamp(gioiHanDuoiNguongTuDongGuiTheGhiAm, gioiHanTrenNguongTuDongGuiTheGhiAm);
+    final kho = await SharedPreferences.getInstance();
+    await kho.setInt(_khoaNguongTuDongGuiTheGhiAmGiay, nguongTuDongGuiTheGhiAmGiay);
   }
 
   Future<void> datTuDongChenDauCauBangAI(bool bat) async {
