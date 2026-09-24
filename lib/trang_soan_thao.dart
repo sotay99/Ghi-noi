@@ -3612,6 +3612,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // phím tắt phải hoạt động kể cả đang gõ dở trong ô văn bản.
     HardwareKeyboard.instance.addHandler(_khiPhimTatMicro);
     HardwareKeyboard.instance.addHandler(_khiPhimTatGhiAm);
+    HardwareKeyboard.instance.addHandler(_khiPhimTatTapDoi);
     HardwareKeyboard.instance.addHandler(_khiPhimTatLuiTien);
     HardwareKeyboard.instance.addHandler(_khiGoPhimBatKyTatChuThich);
   }
@@ -3628,6 +3629,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_khiPhimTatMicro);
     HardwareKeyboard.instance.removeHandler(_khiPhimTatGhiAm);
+    HardwareKeyboard.instance.removeHandler(_khiPhimTatTapDoi);
     HardwareKeyboard.instance.removeHandler(_khiPhimTatLuiTien);
     HardwareKeyboard.instance.removeHandler(_khiGoPhimBatKyTatChuThich);
     WidgetsBinding.instance.removeObserver(this);
@@ -6040,17 +6042,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
   }
 
-  /// Bàn phím vật lý bấm đúng phím tắt đang cài (Esc một mình, Tab một
-  /// mình, hoặc Ctrl + một phím) cho MỘT trong hai chức năng (Micro/Ghi âm)
-  /// — dùng chung cho cả `_khiPhimTatMicro` và `_khiPhimTatGhiAm`. Trả về
-  /// true để chặn phím này lan xuống ô văn bản/trình duyệt.
+  /// Bàn phím vật lý bấm đúng phím tắt đang cài (Tab một mình hoặc Ctrl +
+  /// một phím — HAI kiểu còn lại, bấm Ctrl/Shift 2 lần liên tiếp, được dò
+  /// riêng ở `_khiPhimTatTapDoi` vì cần theo dõi cả lúc BUÔNG phím, không
+  /// khớp được ngay lúc bấm xuống) cho MỘT trong hai chức năng (Micro/Ghi
+  /// âm) — dùng chung cho cả `_khiPhimTatMicro` và `_khiPhimTatGhiAm`. Trả
+  /// về true để chặn phím này lan xuống ô văn bản/trình duyệt.
   bool _khopPhimTat(LuaChonPhimTat lc, KeyEvent event) {
     switch (lc.loai) {
-      case 'esc':
-        return event.logicalKey == LogicalKeyboardKey.escape &&
-            !HardwareKeyboard.instance.isControlPressed &&
-            !HardwareKeyboard.instance.isAltPressed &&
-            !HardwareKeyboard.instance.isShiftPressed;
       case 'tab':
         return event.logicalKey == LogicalKeyboardKey.tab &&
             !HardwareKeyboard.instance.isControlPressed &&
@@ -6066,8 +6065,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
   }
 
-  /// Bàn phím vật lý bấm đúng phím tắt Micro (mặc định phím Esc một mình):
-  /// tắt/mở micro, y hệt bấm nút.
+  /// Bàn phím vật lý bấm đúng phím tắt Micro (Tab/Ctrl+phím — xem
+  /// `_khopPhimTat`; kiểu "bấm 2 lần liên tiếp" dò riêng ở
+  /// `_khiPhimTatTapDoi`): tắt/mở micro, y hệt bấm nút.
   bool _khiPhimTatMicro(KeyEvent event) {
     if (!mounted || event is! KeyDownEvent) return false;
 
@@ -6093,6 +6093,102 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (!_khopPhimTat(widget.caiDat.phimTatGhiAm, event)) return false;
     unawaited(_bamNutGhiAmThe());
     return true;
+  }
+
+  // ---------------------------------------- phím tắt "bấm 2 lần liên tiếp"
+
+  /// Đang giữ Ctrl/Shift mà CHƯA có phím nào khác chen vào — tức đây vẫn có
+  /// thể là một lượt bấm "sạch" (chỉ mỗi Ctrl/Shift, không kèm gì khác).
+  /// Hễ có phím khác bấm xuống trong lúc đang giữ thì tắt cờ này đi — lượt
+  /// bấm đó KHÔNG được tính (ví dụ Ctrl+Z, Ctrl+G, Shift+A gõ chữ hoa...
+  /// đều không được coi là "một lần bấm Ctrl/Shift").
+  bool _dangGiuSachCtrl = false;
+  bool _dangGiuSachShift = false;
+
+  /// Thời điểm HOÀN TẤT (buông phím) của lượt bấm "sạch" gần nhất còn đang
+  /// chờ lượt thứ hai — `null` nghĩa là không có lượt nào đang chờ (hoặc đã
+  /// quá hạn 1 giây, hoặc vừa mới dùng xong).
+  DateTime? _lanTapSachCtrl;
+  DateTime? _lanTapSachShift;
+
+  static const _nguongTapDoiPhimTat = Duration(seconds: 1);
+
+  /// Theo dõi CẢ lúc bấm xuống lẫn buông ra của Ctrl/Shift (và mọi phím
+  /// khác, chỉ để biết có "chen vào" hay không) để dò "bấm 2 lần liên
+  /// tiếp, sạch, trong 1 giây" — khác hẳn `_khopPhimTat` (chỉ cần đúng một
+  /// lần bấm xuống) vì kiểu phím tắt này cần nhớ trạng thái giữa nhiều sự
+  /// kiện phím. Không chặn phím nào cả (luôn trả về false) — chỉ quan sát,
+  /// rồi tự gọi thẳng `_bamNutMicro`/`_bamNutGhiAmThe` khi khớp, y hệt
+  /// hai hàm `_khiPhimTat...` kia làm.
+  bool _khiPhimTatTapDoi(KeyEvent event) {
+    if (!mounted) return false;
+
+    final laCtrl = event.logicalKey == LogicalKeyboardKey.controlLeft ||
+        event.logicalKey == LogicalKeyboardKey.controlRight;
+    final laShift = event.logicalKey == LogicalKeyboardKey.shiftLeft ||
+        event.logicalKey == LogicalKeyboardKey.shiftRight;
+
+    if (event is KeyDownEvent) {
+      if (laCtrl) {
+        _dangGiuSachCtrl = true;
+      } else if (HardwareKeyboard.instance.isControlPressed) {
+        _dangGiuSachCtrl = false;
+      }
+      if (laShift) {
+        _dangGiuSachShift = true;
+      } else if (HardwareKeyboard.instance.isShiftPressed) {
+        _dangGiuSachShift = false;
+      }
+      return false;
+    }
+
+    if (event is! KeyUpEvent) return false;
+
+    final route = ModalRoute.of(context);
+    final coManHinhKhacDeLen = route != null && !route.isCurrent;
+
+    if (laCtrl) {
+      final sach = _dangGiuSachCtrl;
+      _dangGiuSachCtrl = false;
+      if (!sach) {
+        _lanTapSachCtrl = null;
+      } else {
+        final gio = DateTime.now();
+        if (_lanTapSachCtrl != null && gio.difference(_lanTapSachCtrl!) <= _nguongTapDoiPhimTat) {
+          _lanTapSachCtrl = null;
+          if (!coManHinhKhacDeLen) _khiHoanTatTapDoiPhimTat('ctrlDup');
+        } else {
+          _lanTapSachCtrl = gio;
+        }
+      }
+    }
+    if (laShift) {
+      final sach = _dangGiuSachShift;
+      _dangGiuSachShift = false;
+      if (!sach) {
+        _lanTapSachShift = null;
+      } else {
+        final gio = DateTime.now();
+        if (_lanTapSachShift != null && gio.difference(_lanTapSachShift!) <= _nguongTapDoiPhimTat) {
+          _lanTapSachShift = null;
+          if (!coManHinhKhacDeLen) _khiHoanTatTapDoiPhimTat('shiftDup');
+        } else {
+          _lanTapSachShift = gio;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Vừa hoàn tất một lượt "bấm 2 lần liên tiếp" đúng [loai] ('ctrlDup' hoặc
+  /// 'shiftDup') — xem chức năng nào (Micro/Ghi âm) đang cài đúng kiểu này
+  /// thì kích hoạt, y hệt bấm nút.
+  void _khiHoanTatTapDoiPhimTat(String loai) {
+    if (widget.caiDat.phimTatMicro.loai == loai) {
+      _bamNutMicro();
+    } else if (widget.caiDat.phimTatGhiAm.loai == loai) {
+      unawaited(_bamNutGhiAmThe());
+    }
   }
 
   /// Ctrl + Z (Lùi lại) và Ctrl + Shift + Z (Tiến tới) — cố định, không cho
@@ -9446,6 +9542,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void _moDanhSachPhimTat() {
     String tim(String khoa) => CaiDat.phimTatCoDinh[khoa] ?? khoa;
 
+    // Hai kiểu "bấm 2 lần liên tiếp" không tự nói lên cách kích hoạt qua
+    // mỗi cái tên ngắn (`LuaChonPhimTat.nhan`) — ghi rõ thêm ở đây, đúng
+    // yêu cầu "phải giải thích rõ kích hoạt nó như thế nào".
+    String moTaThem(LuaChonPhimTat lc) => switch (lc.loai) {
+          'ctrlDup' => ' (bấm Ctrl rồi buông ra, bấm lại lần nữa trong 1 giây)',
+          'shiftDup' => ' (bấm Shift rồi buông ra, bấm lại lần nữa trong 1 giây)',
+          _ => '',
+        };
+
     Widget dong(String phim, String chuc) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 3),
           child: Row(
@@ -9480,11 +9585,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 deMuc('Micro và Ghi âm'),
                 dong(
                   widget.caiDat.phimTatMicro.nhan,
-                  'Bật/tắt Micro (vừa nói vừa ra chữ)',
+                  'Bật/tắt Micro (vừa nói vừa ra chữ)'
+                      '${moTaThem(widget.caiDat.phimTatMicro)}',
                 ),
                 dong(
                   widget.caiDat.phimTatGhiAm.nhan,
-                  'Mở/đóng trình Ghi âm (ghi âm xong mới ra chữ)',
+                  'Mở/đóng trình Ghi âm (ghi âm xong mới ra chữ)'
+                      '${moTaThem(widget.caiDat.phimTatGhiAm)}',
                 ),
                 deMuc('Điều hướng'),
                 dong('Ctrl + Z', tim('Ctrl+Z')),

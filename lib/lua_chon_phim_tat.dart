@@ -1,56 +1,65 @@
-// Một trong ba kiểu phím tắt người dùng có thể gán cho Micro (vừa nói vừa
-// ra chữ) hoặc Ghi âm (ghi âm xong mới ra chữ — tạo thẻ ghi âm): phím Esc
-// một mình, phím Tab một mình, hoặc Ctrl + một phím bất kỳ. Dùng chung cho
-// cả hai chức năng (`CaiDat.phimTatMicro`/`phimTatGhiAm`), tránh viết trùng
-// logic hiển thị/so khớp ở hai nơi.
+// Một trong bốn kiểu phím tắt người dùng có thể gán cho Micro (vừa nói vừa
+// ra chữ) hoặc Ghi âm (ghi âm xong mới ra chữ — tạo thẻ ghi âm): phím Tab
+// một mình, Ctrl + một phím bất kỳ, bấm Ctrl 2 lần liên tiếp, hoặc bấm Shift
+// 2 lần liên tiếp. Dùng chung cho cả hai chức năng (`CaiDat.phimTatMicro`/
+// `phimTatGhiAm`), tránh viết trùng logic hiển thị/so khớp ở hai nơi.
 //
-// (TỪNG có lựa chọn thứ tư "phím Windows/Cmd một mình" — bỏ hẳn vì hệ điều
-// hành Windows giành phím đó ở tầng hệ thống (mở Start Menu) TRƯỚC KHI trình
-// duyệt kịp nhận sự kiện, nên phím tắt không bao giờ hoạt động thật trên
-// Windows. Esc không có vấn đề này — trình duyệt luôn nhận được.)
+// (TỪNG có lựa chọn "phím Windows/Cmd một mình" rồi "phím Esc một mình" —
+// bỏ CẢ HAI: Windows giành phím Win ở tầng hệ thống (mở Start Menu) trước
+// khi trình duyệt kịp nhận; còn Esc thì trình duyệt/Flutter tự hiểu thành
+// "lùi trang" dù đã vá. Hai phím "bấm 2 lần liên tiếp" không đụng phải vấn
+// đề nào trong hai vấn đề trên — không phải tổ hợp/phím nào bị hệ thống
+// hay trình duyệt can thiệp sẵn.)
 
 class LuaChonPhimTat {
-  const LuaChonPhimTat.esc()
-      : loai = 'esc',
-        phim = null;
   const LuaChonPhimTat.tab()
       : loai = 'tab',
         phim = null;
   const LuaChonPhimTat.ctrl(String phimBamThem)
       : loai = 'ctrl',
         phim = phimBamThem;
+  const LuaChonPhimTat.ctrlDup()
+      : loai = 'ctrlDup',
+        phim = null;
+  const LuaChonPhimTat.shiftDup()
+      : loai = 'shiftDup',
+        phim = null;
 
-  /// 'esc' | 'tab' | 'ctrl'.
+  /// 'tab' | 'ctrl' | 'ctrlDup' | 'shiftDup'.
   final String loai;
 
   /// Chỉ có ý nghĩa khi [loai] == 'ctrl' — phím bấm thêm cùng Ctrl.
   final String? phim;
 
-  /// Đọc lại từ SharedPreferences. [loaiLuu] == 'win' là dữ liệu CŨ (từ hồi
-  /// còn lựa chọn "phím Windows/Cmd", nay đã bỏ) — coi là bí danh của 'esc',
-  /// đúng vị trí nó từng đóng vai trò mặc định. [phimLuu] rỗng/null khi
-  /// [loaiLuu] == 'ctrl' về lý thuyết không xảy ra (luôn lưu kèm nhau),
-  /// nhưng lỡ có thì rơi về 'G' cho khỏi vỡ thay vì ném lỗi.
+  /// Đọc lại từ SharedPreferences. [loaiLuu] == 'win'/'esc' là dữ liệu CŨ
+  /// (từ hồi còn hai lựa chọn đã bỏ) — coi là bí danh của 'ctrlDup', đúng
+  /// vị trí nó từng đóng vai trò MẶC ĐỊNH của Micro. [phimLuu] rỗng/null
+  /// khi [loaiLuu] == 'ctrl' về lý thuyết không xảy ra (luôn lưu kèm
+  /// nhau), nhưng lỡ có thì rơi về 'G' cho khỏi vỡ thay vì ném lỗi.
   factory LuaChonPhimTat.tuLuu(String? loaiLuu, String? phimLuu) {
     switch (loaiLuu) {
       case 'tab':
         return const LuaChonPhimTat.tab();
       case 'ctrl':
         return LuaChonPhimTat.ctrl((phimLuu == null || phimLuu.isEmpty) ? 'G' : phimLuu);
+      case 'shiftDup':
+        return const LuaChonPhimTat.shiftDup();
       default:
-        return const LuaChonPhimTat.esc();
+        return const LuaChonPhimTat.ctrlDup();
     }
   }
 
-  /// Nhãn hiển thị ngắn gọn, ví dụ 'Esc', 'Tab', 'Ctrl + G'.
+  /// Nhãn hiển thị ngắn gọn, ví dụ 'Tab', 'Ctrl + G', 'Bấm Ctrl 2 lần'.
   String get nhan {
     switch (loai) {
       case 'tab':
         return 'Tab';
       case 'ctrl':
         return 'Ctrl + ${phim ?? '?'}';
+      case 'shiftDup':
+        return 'Bấm Shift 2 lần';
       default:
-        return 'Esc';
+        return 'Bấm Ctrl 2 lần';
     }
   }
 
@@ -58,7 +67,8 @@ class LuaChonPhimTat {
   String get khoaSoSanh => switch (loai) {
         'tab' => 'TAB',
         'ctrl' => 'CTRL+${(phim ?? '').toUpperCase()}',
-        _ => 'ESC',
+        'shiftDup' => 'SHIFTDUP',
+        _ => 'CTRLDUP',
       };
 
   bool coBangVoi(LuaChonPhimTat kia) => khoaSoSanh == kia.khoaSoSanh;

@@ -1054,10 +1054,11 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
   String _tenChucNangPhimTat(bool laMicro) =>
       laMicro ? 'Micro (vừa nói vừa ra chữ)' : 'Ghi âm (Ghi âm xong mới ra chữ)';
 
-  /// Modal 3 lựa chọn phím tắt — DÙNG CHUNG cho cả Micro lẫn Ghi âm
-  /// ([laMicro] chọn cái nào đang sửa). Ba lựa chọn loại trừ lẫn nhau (radio
-  /// thật, không thể bỏ trống hay chọn nhiều): phím Esc một mình, phím Tab
-  /// một mình, hoặc Ctrl + một phím do người dùng tự bấm chọn.
+  /// Modal 4 lựa chọn phím tắt — DÙNG CHUNG cho cả Micro lẫn Ghi âm
+  /// ([laMicro] chọn cái nào đang sửa). Bốn lựa chọn loại trừ lẫn nhau
+  /// (radio thật, không thể bỏ trống hay chọn nhiều): phím Tab một mình,
+  /// Ctrl + một phím do người dùng tự bấm chọn, bấm Ctrl 2 lần liên tiếp,
+  /// hoặc bấm Shift 2 lần liên tiếp.
   Future<void> _moDialogChonPhimTat({required bool laMicro}) async {
     final banDau = laMicro ? _phimTatMicro : _phimTatGhiAm;
     var loaiTam = banDau.loai;
@@ -1110,13 +1111,6 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     oLuaChon(
-                      loai: 'esc',
-                      nhan: 'Esc',
-                      giaiThich: 'Phím Esc — ghi chữ "Esc", nằm riêng một góc, '
-                          'ở trên cùng bên trái bàn phím (phía trên phím số 1, '
-                          'tách hẳn khỏi cụm phím còn lại).',
-                    ),
-                    oLuaChon(
                       loai: 'tab',
                       nhan: 'Tab',
                       giaiThich: 'Phím Tab — hình mũi tên hai chiều (⇥). Nằm '
@@ -1128,6 +1122,20 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
                       nhan: 'Ctrl + ...',
                       giaiThich: 'Giữ phím Ctrl (góc dưới cùng bên trái bàn '
                           'phím) rồi bấm thêm một phím khác — ví dụ Ctrl + G.',
+                    ),
+                    oLuaChon(
+                      loai: 'ctrlDup',
+                      nhan: 'Bấm Ctrl 2 lần liên tiếp',
+                      giaiThich: 'Bấm phím Ctrl rồi BUÔNG RA NGAY (không giữ), '
+                          'sau đó bấm Ctrl thêm một lần nữa trong vòng 1 giây '
+                          '— giống bấm đúp chuột nhưng bằng phím Ctrl.',
+                    ),
+                    oLuaChon(
+                      loai: 'shiftDup',
+                      nhan: 'Bấm Shift 2 lần liên tiếp',
+                      giaiThich: 'Bấm phím Shift rồi buông ra ngay, bấm Shift '
+                          'thêm một lần nữa trong vòng 1 giây. Lưu ý: nếu gõ '
+                          'chữ hoa rất nhanh, đôi khi có thể vô tình kích hoạt.',
                     ),
                     if (loaiTam == 'ctrl') ...[
                       const SizedBox(height: 4),
@@ -1189,7 +1197,9 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
                       ? LuaChonPhimTat.ctrl(phimCtrlTam!)
                       : (loaiTam == 'tab'
                           ? const LuaChonPhimTat.tab()
-                          : const LuaChonPhimTat.esc());
+                          : (loaiTam == 'shiftDup'
+                              ? const LuaChonPhimTat.shiftDup()
+                              : const LuaChonPhimTat.ctrlDup()));
 
                   if (moi.loai == 'ctrl') {
                     final xungDotCoDinh = CaiDat.tenXungDot(moi);
@@ -1199,8 +1209,14 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
                           '(${moi.nhan}) — chọn phím khác nhé.');
                       return;
                     }
+                  }
+                  // Cặp Tab/CtrlDup có cơ chế TỰ ĐỔI hộ (xem
+                  // `datPhimTatVaTuHoanDoiNeuTrung`) nên không cần chặn ở
+                  // đây — chỉ 'ctrl'+phím và 'shiftDup' (không nằm trong
+                  // cặp tự đổi) mới cần chặn thủ công khi trùng.
+                  if (moi.loai == 'ctrl' || moi.loai == 'shiftDup') {
                     final kia = laMicro ? widget.caiDat.phimTatGhiAm : widget.caiDat.phimTatMicro;
-                    if (kia.loai == 'ctrl' && kia.coBangVoi(moi)) {
+                    if (kia.coBangVoi(moi)) {
                       capNhatModal(() => loiXungDot =
                           'Phím tắt này đang trùng với chức năng "${_tenChucNangPhimTat(!laMicro)}" '
                           '(${moi.nhan}) — chọn phím khác nhé.');

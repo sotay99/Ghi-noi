@@ -76,17 +76,17 @@ class CaiDat {
     'Rất dài',
   ];
 
-  /// Phím tắt tắt/mở "Micro vừa nói vừa ra chữ" — một trong ba kiểu (xem
-  /// `LuaChonPhimTat`): phím Esc một mình (MẶC ĐỊNH), phím Tab một mình,
-  /// hoặc Ctrl + một phím bất kỳ do người dùng chọn. Chỉ có tác dụng khi
-  /// máy có gắn bàn phím vật lý (bao gồm bàn phím rời cắm vào máy tính
-  /// bảng).
-  LuaChonPhimTat phimTatMicro = const LuaChonPhimTat.esc();
+  /// Phím tắt tắt/mở "Micro vừa nói vừa ra chữ" — một trong bốn kiểu (xem
+  /// `LuaChonPhimTat`): bấm Ctrl 2 lần liên tiếp (MẶC ĐỊNH), phím Tab một
+  /// mình, Ctrl + một phím bất kỳ do người dùng chọn, hoặc bấm Shift 2 lần
+  /// liên tiếp. Chỉ có tác dụng khi máy có gắn bàn phím vật lý (bao gồm
+  /// bàn phím rời cắm vào máy tính bảng).
+  LuaChonPhimTat phimTatMicro = const LuaChonPhimTat.ctrlDup();
 
   /// Phím tắt mở/đóng "trình ghi âm" (Ghi âm xong mới ra chữ — tạo thẻ ghi
-  /// âm) — cùng ba kiểu như trên, MẶC ĐỊNH phím Tab một mình. Không bao giờ
-  /// được phép trùng [phimTatMicro] khi cả hai đang ở cặp Tab/Esc — xem
-  /// `datPhimTatVaTuHoanDoiNeuTrung`.
+  /// âm) — cùng bốn kiểu như trên, MẶC ĐỊNH phím Tab một mình. Không bao
+  /// giờ được phép trùng [phimTatMicro] khi cả hai đang ở cặp Tab/bấm-Ctrl-
+  /// 2-lần — xem `datPhimTatVaTuHoanDoiNeuTrung`.
   LuaChonPhimTat phimTatGhiAm = const LuaChonPhimTat.tab();
 
   /// Màu chữ/màu nền gần nhất người dùng dùng ở công cụ định dạng thủ công —
@@ -371,18 +371,19 @@ class CaiDat {
 
   /// Lưu phím tắt MỚI cho Micro (nếu [laMicro]) hoặc Ghi âm (nếu không) —
   /// và nếu việc này khiến hai chức năng cùng dẫm chân lên nhau ở cặp
-  /// Tab/Esc (CHỈ cặp này, không áp dụng cho Ctrl+...), tự đổi luôn chức
-  /// năng CÒN LẠI sang giá trị kia của cặp (Tab↔Esc) để không bao giờ trùng
-  /// nhau. Trả về `true` nếu có xảy ra tự đổi hộ như vậy — màn Cài đặt dùng
-  /// giá trị này để quyết định có hiện thông báo hay không.
+  /// Tab/bấm-Ctrl-2-lần (CHỈ cặp này, không áp dụng cho Ctrl+.../bấm-Shift-
+  /// 2-lần), tự đổi luôn chức năng CÒN LẠI sang giá trị kia của cặp
+  /// (Tab↔CtrlDup) để không bao giờ trùng nhau. Trả về `true` nếu có xảy
+  /// ra tự đổi hộ như vậy — màn Cài đặt dùng giá trị này để quyết định có
+  /// hiện thông báo hay không.
   Future<bool> datPhimTatVaTuHoanDoiNeuTrung({
     required bool laMicro,
     required LuaChonPhimTat moi,
   }) async {
     final hienTaiCuaKia = laMicro ? phimTatGhiAm : phimTatMicro;
     LuaChonPhimTat? moiCuaKia;
-    if ((moi.loai == 'tab' || moi.loai == 'esc') && hienTaiCuaKia.coBangVoi(moi)) {
-      moiCuaKia = moi.loai == 'tab' ? const LuaChonPhimTat.esc() : const LuaChonPhimTat.tab();
+    if ((moi.loai == 'tab' || moi.loai == 'ctrlDup') && hienTaiCuaKia.coBangVoi(moi)) {
+      moiCuaKia = moi.loai == 'tab' ? const LuaChonPhimTat.ctrlDup() : const LuaChonPhimTat.tab();
     }
 
     if (laMicro) {
@@ -458,7 +459,7 @@ class CaiDat {
   /// Kiểm tra một lựa chọn Ctrl+<phim> có trùng phím tắt CỐ ĐỊNH nào của
   /// app không (Lùi lại, Tìm kiếm, Đậm...). Trả về mô tả chức năng đang
   /// trùng, hoặc null nếu không trùng. Chỉ có ý nghĩa cho [moi.loai] ==
-  /// 'ctrl' — Esc/Tab một mình không bao giờ trùng phím tắt cố định (toàn
+  /// 'ctrl' — Tab/CtrlDup/ShiftDup không bao giờ trùng phím tắt cố định (toàn
   /// bộ `phimTatCoDinh` đều là tổ hợp Ctrl+...).
   static String? tenXungDot(LuaChonPhimTat moi) {
     if (moi.loai != 'ctrl') return null;
