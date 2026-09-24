@@ -27,6 +27,7 @@ import 'mau_co_ban.dart';
 import 'kiem_tra_chinh_ta.dart';
 import 'kiem_tra_toan_van.dart';
 import 'loai_thiet_bi.dart';
+import 'lua_chon_phim_tat.dart';
 import 'man_hinh_cai_dat.dart';
 import 'man_hinh_thu_muc.dart';
 import 'modal_cai_dat_kiem_tra_toan_van.dart';
@@ -3610,6 +3611,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // Lắng nghe TOÀN CỤC (không phụ thuộc widget nào đang giữ tiêu điểm) —
     // phím tắt phải hoạt động kể cả đang gõ dở trong ô văn bản.
     HardwareKeyboard.instance.addHandler(_khiPhimTatMicro);
+    HardwareKeyboard.instance.addHandler(_khiPhimTatGhiAm);
     HardwareKeyboard.instance.addHandler(_khiPhimTatLuiTien);
     HardwareKeyboard.instance.addHandler(_khiGoPhimBatKyTatChuThich);
   }
@@ -3625,6 +3627,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_khiPhimTatMicro);
+    HardwareKeyboard.instance.removeHandler(_khiPhimTatGhiAm);
     HardwareKeyboard.instance.removeHandler(_khiPhimTatLuiTien);
     HardwareKeyboard.instance.removeHandler(_khiGoPhimBatKyTatChuThich);
     WidgetsBinding.instance.removeObserver(this);
@@ -6037,9 +6040,35 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
   }
 
-  /// Bàn phím vật lý bấm đúng tổ hợp phím tắt đang cài (mặc định Ctrl + G):
-  /// tắt/mở micro, y hệt bấm nút. Trả về true để chặn phím này lan xuống ô
-  /// văn bản (không thì gõ Ctrl+G trong lúc soạn thảo cũng gõ luôn chữ "g").
+  /// Bàn phím vật lý bấm đúng phím tắt đang cài (Win/Cmd một mình, Tab một
+  /// mình, hoặc Ctrl + một phím) cho MỘT trong hai chức năng (Micro/Ghi âm)
+  /// — dùng chung cho cả `_khiPhimTatMicro` và `_khiPhimTatGhiAm`. Trả về
+  /// true để chặn phím này lan xuống ô văn bản/trình duyệt.
+  bool _khopPhimTat(LuaChonPhimTat lc, KeyEvent event) {
+    switch (lc.loai) {
+      case 'win':
+        return (event.logicalKey == LogicalKeyboardKey.metaLeft ||
+                event.logicalKey == LogicalKeyboardKey.metaRight) &&
+            !HardwareKeyboard.instance.isControlPressed &&
+            !HardwareKeyboard.instance.isAltPressed &&
+            !HardwareKeyboard.instance.isShiftPressed;
+      case 'tab':
+        return event.logicalKey == LogicalKeyboardKey.tab &&
+            !HardwareKeyboard.instance.isControlPressed &&
+            !HardwareKeyboard.instance.isAltPressed &&
+            !HardwareKeyboard.instance.isShiftPressed &&
+            !HardwareKeyboard.instance.isMetaPressed;
+      case 'ctrl':
+        return HardwareKeyboard.instance.isControlPressed &&
+            !HardwareKeyboard.instance.isAltPressed &&
+            event.logicalKey.keyLabel.toUpperCase() == (lc.phim ?? '').toUpperCase();
+      default:
+        return false;
+    }
+  }
+
+  /// Bàn phím vật lý bấm đúng phím tắt Micro (mặc định phím Windows/Cmd một
+  /// mình): tắt/mở micro, y hệt bấm nút.
   bool _khiPhimTatMicro(KeyEvent event) {
     if (!mounted || event is! KeyDownEvent) return false;
 
@@ -6049,17 +6078,21 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final route = ModalRoute.of(context);
     if (route != null && !route.isCurrent) return false;
 
-    final dungBoBienDoi = widget.caiDat.phimTatBoBienDoi == 'Ctrl'
-        ? HardwareKeyboard.instance.isControlPressed
-        : HardwareKeyboard.instance.isAltPressed;
-    if (!dungBoBienDoi) return false;
-
-    if (event.logicalKey.keyLabel.toUpperCase() !=
-        widget.caiDat.phimTatPhim.toUpperCase()) {
-      return false;
-    }
-
+    if (!_khopPhimTat(widget.caiDat.phimTatMicro, event)) return false;
     _bamNutMicro();
+    return true;
+  }
+
+  /// Bàn phím vật lý bấm đúng phím tắt Ghi âm (mặc định phím Tab một mình):
+  /// mở/đóng trình ghi âm, y hệt bấm nút.
+  bool _khiPhimTatGhiAm(KeyEvent event) {
+    if (!mounted || event is! KeyDownEvent) return false;
+
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return false;
+
+    if (!_khopPhimTat(widget.caiDat.phimTatGhiAm, event)) return false;
+    unawaited(_bamNutGhiAmThe());
     return true;
   }
 
@@ -9408,8 +9441,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 
   /// Modal "Danh sách phím tắt" — đọc TRỰC TIẾP từ `CaiDat.phimTatCoDinh`
-  /// (nguồn động DUY NHẤT, xem B6), cộng thêm dòng riêng cho "Bật/tắt micro"
-  /// (đọc `widget.caiDat.phimTatBoBienDoi`/`phimTatPhim`, cũng động).
+  /// (nguồn động DUY NHẤT, xem B6), cộng thêm hai dòng riêng cho Micro và
+  /// Ghi âm (đọc `widget.caiDat.phimTatMicro`/`phimTatGhiAm`, cũng động —
+  /// luôn khớp với Cài đặt).
   void _moDanhSachPhimTat() {
     String tim(String khoa) => CaiDat.phimTatCoDinh[khoa] ?? khoa;
 
@@ -9444,10 +9478,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                deMuc('Micro'),
+                deMuc('Micro và Ghi âm'),
                 dong(
-                  '${widget.caiDat.phimTatBoBienDoi} + ${widget.caiDat.phimTatPhim}',
-                  'Bật/tắt micro',
+                  widget.caiDat.phimTatMicro.nhan,
+                  'Bật/tắt Micro (vừa nói vừa ra chữ)',
+                ),
+                dong(
+                  widget.caiDat.phimTatGhiAm.nhan,
+                  'Mở/đóng trình Ghi âm (ghi âm mới ra chữ)',
                 ),
                 deMuc('Điều hướng'),
                 dong('Ctrl + Z', tim('Ctrl+Z')),
@@ -10919,7 +10957,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     !_ghiAmTheDangKhoaMicro,
                 hienChuThich: _hienChuThich,
                 khiBamChuThich: _khiBamChuThich,
-                nhanPhimTat: '${widget.caiDat.phimTatBoBienDoi} + ${widget.caiDat.phimTatPhim}',
+                nhanPhimTat: widget.caiDat.phimTatMicro.nhan,
                 // Bàn phím đóng thì còn phải né thanh điều hướng của máy; bàn
                 // phím mở thì nó che mất thanh đó rồi, né nữa là hở một dải
                 // trắng giữa thanh công cụ và bàn phím.

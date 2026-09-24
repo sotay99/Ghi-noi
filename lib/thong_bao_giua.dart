@@ -4,7 +4,8 @@
 
 import 'package:flutter/material.dart';
 
-void hienThongBaoGiua(BuildContext context, String chu) {
+void hienThongBaoGiua(BuildContext context, String chu,
+    {Duration thoiGian = const Duration(seconds: 2)}) {
   final overlay = Overlay.of(context);
   late final OverlayEntry entry;
 
@@ -38,7 +39,7 @@ void hienThongBaoGiua(BuildContext context, String chu) {
   );
 
   overlay.insert(entry);
-  Future.delayed(const Duration(seconds: 2), () {
+  Future.delayed(thoiGian, () {
     if (entry.mounted) entry.remove();
   });
 }

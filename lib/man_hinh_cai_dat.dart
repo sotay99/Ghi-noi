@@ -12,11 +12,10 @@ import 'package:permission_handler/permission_handler.dart';
 import 'cai_dat.dart';
 import 'doan_thiet_bi.dart';
 import 'loai_thiet_bi.dart';
+import 'lua_chon_phim_tat.dart';
 import 'mau_co_ban.dart';
-
-/// Hai bộ biến đổi cho phép chọn làm phím tắt — bàn phím Android/desktop
-/// thường chỉ có hai phím này ở vị trí dễ bấm cùng lúc với một phím khác.
-const _cacBoBienDoi = ['Ctrl', 'Alt'];
+import 'ten_phim_win.dart';
+import 'thong_bao_giua.dart';
 
 const _cacMucThoiGian = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, _khongTuBatLai];
 
@@ -76,8 +75,8 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
   late int _mauChamCuoiVanBan;
   late bool _tuDongVietHoaDauCau;
   late bool _tuDongChuanHoaNgoac;
-  late String _phimTatBoBienDoi;
-  late String _phimTatPhim;
+  late LuaChonPhimTat _phimTatMicro;
+  late LuaChonPhimTat _phimTatGhiAm;
   PermissionStatus? _trangThaiMicro;
   bool _dangXuLyMicro = false;
 
@@ -101,8 +100,8 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     _mauChamCuoiVanBan = widget.caiDat.mauChamCuoiVanBan;
     _tuDongVietHoaDauCau = widget.caiDat.tuDongVietHoaDauCau;
     _tuDongChuanHoaNgoac = widget.caiDat.tuDongChuanHoaNgoac;
-    _phimTatBoBienDoi = widget.caiDat.phimTatBoBienDoi;
-    _phimTatPhim = widget.caiDat.phimTatPhim;
+    _phimTatMicro = widget.caiDat.phimTatMicro;
+    _phimTatGhiAm = widget.caiDat.phimTatGhiAm;
     _oTuTatMicro = TextEditingController(text: '${widget.caiDat.thoiGianTuTatMicroGiay}');
     _focusTuTatMicro.addListener(_khiMatTieuDiemTuTatMicro);
     _kiemTraQuyenMicro();
@@ -267,7 +266,17 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
           const Divider(height: 40),
           _dong4hTuDongChuanHoaNgoac(),
           const Divider(height: 40),
-          _dong5PhimTat(),
+          _dongPhimTat(
+            laMicro: true,
+            tieuDe: 'Phím tắt cho Micro (vừa nói vừa ra chữ)',
+            hienTai: _phimTatMicro,
+          ),
+          const Divider(height: 40),
+          _dongPhimTat(
+            laMicro: false,
+            tieuDe: 'Phím tắt cho Ghi âm (Ghi âm xong mới ra chữ — tạo thẻ ghi âm)',
+            hienTai: _phimTatGhiAm,
+          ),
           const Divider(height: 40),
           _dong6Micro(),
         ],
@@ -994,21 +1003,6 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     );
   }
 
-  Widget _oPhim(String nhan, VoidCallback khiBam) {
-    return InkWell(
-      onTap: khiBam,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          border: Border.all(color: const Color(0xFFDADCE0)),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(nhan, style: const TextStyle(fontWeight: FontWeight.w600)),
-      ),
-    );
-  }
-
   /// Modal chọn phím thứ hai: nghe phím vật lý kế tiếp, bỏ qua các phím biến
   /// đổi (Ctrl/Alt/Shift/Meta) — chính cách này đã tự bảo đảm phím thứ hai
   /// không bao giờ trùng với bộ biến đổi đang chọn (một phím biến đổi không
@@ -1055,72 +1049,132 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     return ketQua;
   }
 
-  Future<void> _moDialogSuaPhimTat() async {
-    var boBienDoiTam = _phimTatBoBienDoi;
-    var phimTam = _phimTatPhim;
-    var loiXungDot = false;
-    String? tenXungDot;
+  /// Tên chức năng, dùng cả trong thông báo hoán đổi lẫn thông báo xung đột
+  /// — luôn kèm chú thích phân biệt hai chức năng (theo đúng yêu cầu: đừng
+  /// để người dùng nhầm "Micro" với "Ghi âm").
+  String _tenChucNangPhimTat(bool laMicro) =>
+      laMicro ? 'Micro (vừa nói vừa ra chữ)' : 'Ghi âm (Ghi âm xong mới ra chữ)';
+
+  /// Modal 3 lựa chọn phím tắt — DÙNG CHUNG cho cả Micro lẫn Ghi âm
+  /// ([laMicro] chọn cái nào đang sửa). Ba lựa chọn loại trừ lẫn nhau (radio
+  /// thật, không thể bỏ trống hay chọn nhiều): phím Windows/Cmd một mình,
+  /// phím Tab một mình, hoặc Ctrl + một phím do người dùng tự bấm chọn.
+  Future<void> _moDialogChonPhimTat({required bool laMicro}) async {
+    final banDau = laMicro ? _phimTatMicro : _phimTatGhiAm;
+    var loaiTam = banDau.loai;
+    var phimCtrlTam = banDau.phim;
+    String? loiXungDot;
 
     await showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, capNhatModal) {
-          Future<void> chonBoBienDoi() async {
-            final chon = await showDialog<String>(
-              context: ctx,
-              builder: (ctx2) => SimpleDialog(
-                title: const Text('Chọn bộ biến đổi'),
-                children: [
-                  for (final bbd in _cacBoBienDoi)
-                    SimpleDialogOption(
-                      onPressed: () => Navigator.of(ctx2).pop(bbd),
-                      child: Text(bbd),
-                    ),
-                ],
-              ),
+          Widget oLuaChon({
+            required String loai,
+            required String nhan,
+            required String giaiThich,
+          }) {
+            return RadioListTile<String>(
+              value: loai,
+              groupValue: loaiTam,
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(nhan, style: const TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: Text(giaiThich, style: const TextStyle(fontSize: 12)),
+              onChanged: (v) {
+                if (v == null) return;
+                capNhatModal(() {
+                  loaiTam = v;
+                  loiXungDot = null;
+                });
+              },
             );
-            if (chon != null) {
-              capNhatModal(() {
-                boBienDoiTam = chon;
-                loiXungDot = false;
-              });
-            }
           }
 
-          Future<void> chonPhim() async {
+          Future<void> chonPhimCtrl() async {
             final chon = await _moDialogBatPhim(ctx);
             if (chon != null) {
               capNhatModal(() {
-                phimTam = chon;
-                loiXungDot = false;
+                phimCtrlTam = chon;
+                loiXungDot = null;
               });
             }
           }
 
           return AlertDialog(
-            title: const Text('Phím tắt tắt/mở Micro'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
+            title: Text('Phím tắt cho ${_tenChucNangPhimTat(laMicro)}'),
+            content: SizedBox(
+              width: 360,
+              child: SingleChildScrollView(
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _oPhim(boBienDoiTam, chonBoBienDoi),
-                    const SizedBox(width: 8),
-                    const Text('+', style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 8),
-                    _oPhim(phimTam, chonPhim),
+                    oLuaChon(
+                      loai: 'win',
+                      nhan: tenPhimWinTheoNenTang(),
+                      giaiThich: 'Phím Windows/Cmd — hình cửa sổ nhỏ (⊞) trên '
+                          'Windows hoặc phím Command (⌘) trên Mac. Nằm ở hàng '
+                          'phím dưới cùng, thường ngay cạnh phím Alt/Option, '
+                          'bên trái phím cách (Spacebar).',
+                    ),
+                    oLuaChon(
+                      loai: 'tab',
+                      nhan: 'Tab',
+                      giaiThich: 'Phím Tab — hình mũi tên hai chiều (⇥). Nằm '
+                          'ở góc trên bên trái bàn phím, ngay phía trên phím '
+                          'Caps Lock, bên trái chữ Q.',
+                    ),
+                    oLuaChon(
+                      loai: 'ctrl',
+                      nhan: 'Ctrl + ...',
+                      giaiThich: 'Giữ phím Ctrl (góc dưới cùng bên trái bàn '
+                          'phím) rồi bấm thêm một phím khác — ví dụ Ctrl + G.',
+                    ),
+                    if (loaiTam == 'ctrl') ...[
+                      const SizedBox(height: 4),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 32),
+                        child: InkWell(
+                          onTap: chonPhimCtrl,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: const Color(0xFFDADCE0)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  phimCtrlTam == null ? 'Bấm để chọn phím' : 'Ctrl + $phimCtrlTam',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: phimCtrlTam == null
+                                        ? const Color(0xFF5F6368)
+                                        : const Color(0xFF1A73E8),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                const Icon(Icons.edit_outlined,
+                                    size: 16, color: Color(0xFF5F6368)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (loiXungDot != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        loiXungDot!,
+                        style: TextStyle(color: Colors.red.shade600, fontSize: 13),
+                      ),
+                    ],
                   ],
                 ),
-                if (loiXungDot) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    'Phím tắt này đang trùng với chức năng "$tenXungDot" '
-                    '($boBienDoiTam + $phimTam) — chọn tổ hợp khác cho micro nhé.',
-                    style: TextStyle(color: Colors.red.shade600, fontSize: 13),
-                  ),
-                ],
-              ],
+              ),
             ),
             actions: [
               TextButton(
@@ -1129,22 +1183,53 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
               ),
               FilledButton(
                 onPressed: () async {
-                  final xungDot = CaiDat.tenXungDot(boBienDoiTam, phimTam);
-                  if (xungDot != null) {
-                    capNhatModal(() {
-                      loiXungDot = true;
-                      tenXungDot = xungDot;
-                    });
+                  if (loaiTam == 'ctrl' && phimCtrlTam == null) {
+                    capNhatModal(() => loiXungDot = 'Hãy bấm chọn một phím trước khi lưu.');
                     return;
                   }
-                  await widget.caiDat.datPhimTat(boBienDoiTam, phimTam);
-                  if (mounted) {
-                    setState(() {
-                      _phimTatBoBienDoi = boBienDoiTam;
-                      _phimTatPhim = phimTam;
-                    });
+                  final moi = loaiTam == 'ctrl'
+                      ? LuaChonPhimTat.ctrl(phimCtrlTam!)
+                      : (loaiTam == 'tab'
+                          ? const LuaChonPhimTat.tab()
+                          : const LuaChonPhimTat.win());
+
+                  if (moi.loai == 'ctrl') {
+                    final xungDotCoDinh = CaiDat.tenXungDot(moi);
+                    if (xungDotCoDinh != null) {
+                      capNhatModal(() => loiXungDot =
+                          'Phím tắt này đang trùng với chức năng "$xungDotCoDinh" '
+                          '(${moi.nhan}) — chọn phím khác nhé.');
+                      return;
+                    }
+                    final kia = laMicro ? widget.caiDat.phimTatGhiAm : widget.caiDat.phimTatMicro;
+                    if (kia.loai == 'ctrl' && kia.coBangVoi(moi)) {
+                      capNhatModal(() => loiXungDot =
+                          'Phím tắt này đang trùng với chức năng "${_tenChucNangPhimTat(!laMicro)}" '
+                          '(${moi.nhan}) — chọn phím khác nhé.');
+                      return;
+                    }
                   }
+
+                  final coHoanDoi = await widget.caiDat.datPhimTatVaTuHoanDoiNeuTrung(
+                    laMicro: laMicro,
+                    moi: moi,
+                  );
+                  if (!mounted) return;
+                  setState(() {
+                    _phimTatMicro = widget.caiDat.phimTatMicro;
+                    _phimTatGhiAm = widget.caiDat.phimTatGhiAm;
+                  });
                   if (ctx.mounted) Navigator.of(ctx).pop();
+                  if (coHoanDoi && mounted) {
+                    hienThongBaoGiua(
+                      context,
+                      'Đã chọn phím ${laMicro ? _phimTatMicro.nhan : _phimTatGhiAm.nhan} cho '
+                      'chức năng ${_tenChucNangPhimTat(laMicro)}\n'
+                      'Đã chọn phím ${laMicro ? _phimTatGhiAm.nhan : _phimTatMicro.nhan} cho '
+                      'chức năng ${_tenChucNangPhimTat(!laMicro)}',
+                      thoiGian: const Duration(seconds: 4),
+                    );
+                  }
                 },
                 child: const Text('Lưu'),
               ),
@@ -1155,14 +1240,18 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     );
   }
 
-  Widget _dong5PhimTat() {
+  Widget _dongPhimTat({
+    required bool laMicro,
+    required String tieuDe,
+    required LuaChonPhimTat hienTai,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _tieuDeDong('Phím tắt để tắt/mở Nút Micro'),
+        _tieuDeDong(tieuDe),
         const SizedBox(height: 6),
         InkWell(
-          onTap: _moDialogSuaPhimTat,
+          onTap: () => _moDialogChonPhimTat(laMicro: laMicro),
           borderRadius: BorderRadius.circular(8),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1174,7 +1263,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '$_phimTatBoBienDoi + $_phimTatPhim',
+                  hienTai.nhan,
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF1A73E8),

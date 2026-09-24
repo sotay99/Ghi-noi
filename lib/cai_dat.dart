@@ -6,13 +6,16 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'loai_thiet_bi.dart';
+import 'lua_chon_phim_tat.dart';
 
 class CaiDat {
   static const _khoaThoiGianBatLai = 'ghi_noi_thoi_gian_bat_lai_micro_giay';
   static const _khoaTuDongChenCach = 'ghi_noi_tu_dong_chen_khoang_cach';
   static const _khoaKiemTraChinhTaAI = 'ghi_noi_kiem_tra_chinh_ta_ai';
-  static const _khoaPhimTatBoBienDoi = 'ghi_noi_phim_tat_bo_bien_doi';
-  static const _khoaPhimTatPhim = 'ghi_noi_phim_tat_phim';
+  static const _khoaPhimTatMicroLoai = 'ghi_noi_phim_tat_micro_loai';
+  static const _khoaPhimTatMicroPhimCtrl = 'ghi_noi_phim_tat_micro_phim_ctrl';
+  static const _khoaPhimTatGhiAmLoai = 'ghi_noi_phim_tat_ghi_am_loai';
+  static const _khoaPhimTatGhiAmPhimCtrl = 'ghi_noi_phim_tat_ghi_am_phim_ctrl';
   static const _khoaThoiGianTuTatMicro = 'ghi_noi_thoi_gian_tu_tat_micro_giay';
   static const _khoaTuDongChenDauCau = 'ghi_noi_tu_dong_chen_dau_cau_ai';
   static const _khoaMucDoDaiDeXuat = 'ghi_noi_muc_do_dai_de_xuat';
@@ -73,13 +76,18 @@ class CaiDat {
     'Rất dài',
   ];
 
-  /// Phím tắt tắt/mở micro: một tổ hợp bộ biến đổi ('Ctrl' hoặc 'Alt') và
-  /// một phím khác đi kèm. Mặc định Ctrl + G (trước đây là Ctrl + F, đã đổi
-  /// vì Ctrl+F nay là phím tắt cố định của chức năng Tìm kiếm). Chỉ có tác
-  /// dụng khi máy có gắn bàn phím vật lý (bao gồm bàn phím rời cắm vào máy
-  /// tính bảng).
-  String phimTatBoBienDoi = 'Ctrl';
-  String phimTatPhim = 'G';
+  /// Phím tắt tắt/mở "Micro vừa nói vừa ra chữ" — một trong ba kiểu (xem
+  /// `LuaChonPhimTat`): phím Windows/Cmd một mình (MẶC ĐỊNH), phím Tab một
+  /// mình, hoặc Ctrl + một phím bất kỳ do người dùng chọn. Chỉ có tác dụng
+  /// khi máy có gắn bàn phím vật lý (bao gồm bàn phím rời cắm vào máy tính
+  /// bảng).
+  LuaChonPhimTat phimTatMicro = const LuaChonPhimTat.win();
+
+  /// Phím tắt mở/đóng "trình ghi âm" (Ghi âm xong mới ra chữ — tạo thẻ ghi
+  /// âm) — cùng ba kiểu như trên, MẶC ĐỊNH phím Tab một mình. Không bao giờ
+  /// được phép trùng [phimTatMicro] khi cả hai đang ở cặp Tab/Win — xem
+  /// `datPhimTatVaTuHoanDoiNeuTrung`.
+  LuaChonPhimTat phimTatGhiAm = const LuaChonPhimTat.tab();
 
   /// Màu chữ/màu nền gần nhất người dùng dùng ở công cụ định dạng thủ công —
   /// nút màu chữ/màu nền trên thanh công cụ và phím tắt Ctrl+Shift+C /
@@ -178,8 +186,14 @@ class CaiDat {
     thoiGianBatLaiGiay = kho.getDouble(_khoaThoiGianBatLai) ?? 1.0;
     tuDongChenKhoangCach = kho.getBool(_khoaTuDongChenCach) ?? true;
     kiemTraChinhTaBangAI = kho.getBool(_khoaKiemTraChinhTaAI) ?? true;
-    phimTatBoBienDoi = kho.getString(_khoaPhimTatBoBienDoi) ?? 'Ctrl';
-    phimTatPhim = kho.getString(_khoaPhimTatPhim) ?? 'G';
+    phimTatMicro = LuaChonPhimTat.tuLuu(
+      kho.getString(_khoaPhimTatMicroLoai),
+      kho.getString(_khoaPhimTatMicroPhimCtrl),
+    );
+    phimTatGhiAm = LuaChonPhimTat.tuLuu(
+      kho.getString(_khoaPhimTatGhiAmLoai) ?? 'tab',
+      kho.getString(_khoaPhimTatGhiAmPhimCtrl),
+    );
     thoiGianTuTatMicroGiay =
         (kho.getInt(_khoaThoiGianTuTatMicro) ?? 45).clamp(gioiHanDuoiTuTatMicro, gioiHanTrenTuTatMicro);
     tuDongChenDauCauBangAI = kho.getBool(_khoaTuDongChenDauCau) ?? true;
@@ -341,12 +355,49 @@ class CaiDat {
     await kho.setBool(_khoaKiemTraChinhTaAI, bat);
   }
 
-  Future<void> datPhimTat(String boBienDoi, String phim) async {
-    phimTatBoBienDoi = boBienDoi;
-    phimTatPhim = phim;
+  Future<void> _datPhimTatMicro(LuaChonPhimTat moi) async {
+    phimTatMicro = moi;
     final kho = await SharedPreferences.getInstance();
-    await kho.setString(_khoaPhimTatBoBienDoi, boBienDoi);
-    await kho.setString(_khoaPhimTatPhim, phim);
+    await kho.setString(_khoaPhimTatMicroLoai, moi.loai);
+    if (moi.phim != null) await kho.setString(_khoaPhimTatMicroPhimCtrl, moi.phim!);
+  }
+
+  Future<void> _datPhimTatGhiAm(LuaChonPhimTat moi) async {
+    phimTatGhiAm = moi;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setString(_khoaPhimTatGhiAmLoai, moi.loai);
+    if (moi.phim != null) await kho.setString(_khoaPhimTatGhiAmPhimCtrl, moi.phim!);
+  }
+
+  /// Lưu phím tắt MỚI cho Micro (nếu [laMicro]) hoặc Ghi âm (nếu không) —
+  /// và nếu việc này khiến hai chức năng cùng dẫm chân lên nhau ở cặp
+  /// Tab/Win (CHỈ cặp này, không áp dụng cho Ctrl+...), tự đổi luôn chức
+  /// năng CÒN LẠI sang giá trị kia của cặp (Tab↔Win) để không bao giờ trùng
+  /// nhau. Trả về `true` nếu có xảy ra tự đổi hộ như vậy — màn Cài đặt dùng
+  /// giá trị này để quyết định có hiện thông báo hay không.
+  Future<bool> datPhimTatVaTuHoanDoiNeuTrung({
+    required bool laMicro,
+    required LuaChonPhimTat moi,
+  }) async {
+    final hienTaiCuaKia = laMicro ? phimTatGhiAm : phimTatMicro;
+    LuaChonPhimTat? moiCuaKia;
+    if ((moi.loai == 'tab' || moi.loai == 'win') && hienTaiCuaKia.coBangVoi(moi)) {
+      moiCuaKia = moi.loai == 'tab' ? const LuaChonPhimTat.win() : const LuaChonPhimTat.tab();
+    }
+
+    if (laMicro) {
+      await _datPhimTatMicro(moi);
+    } else {
+      await _datPhimTatGhiAm(moi);
+    }
+    if (moiCuaKia != null) {
+      if (laMicro) {
+        await _datPhimTatGhiAm(moiCuaKia);
+      } else {
+        await _datPhimTatMicro(moiCuaKia);
+      }
+    }
+    return moiCuaKia != null;
   }
 
   Future<void> datThoiGianTuTatMicro(int giay) async {
@@ -404,10 +455,13 @@ class CaiDat {
     'Ctrl+Q': 'Xoá định dạng văn bản',
   };
 
-  /// Kiểm tra một tổ hợp (boBienDoi, phim) có trùng phím tắt cố định nào
-  /// không. Trả về mô tả chức năng đang trùng, hoặc null nếu không trùng.
-  static String? tenXungDot(String boBienDoi, String phim) {
-    final khoa = '$boBienDoi+$phim';
-    return phimTatCoDinh[khoa];
+  /// Kiểm tra một lựa chọn Ctrl+<phim> có trùng phím tắt CỐ ĐỊNH nào của
+  /// app không (Lùi lại, Tìm kiếm, Đậm...). Trả về mô tả chức năng đang
+  /// trùng, hoặc null nếu không trùng. Chỉ có ý nghĩa cho [moi.loai] ==
+  /// 'ctrl' — Win/Tab một mình không bao giờ trùng phím tắt cố định (toàn
+  /// bộ `phimTatCoDinh` đều là tổ hợp Ctrl+...).
+  static String? tenXungDot(LuaChonPhimTat moi) {
+    if (moi.loai != 'ctrl') return null;
+    return phimTatCoDinh['Ctrl+${moi.phim}'];
   }
 }
