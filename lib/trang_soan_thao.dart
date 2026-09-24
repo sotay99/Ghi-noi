@@ -9485,7 +9485,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 ),
                 dong(
                   widget.caiDat.phimTatGhiAm.nhan,
-                  'Mở/đóng trình Ghi âm (ghi âm mới ra chữ)',
+                  'Mở/đóng trình Ghi âm (ghi âm xong mới ra chữ)',
                 ),
                 deMuc('Điều hướng'),
                 dong('Ctrl + Z', tim('Ctrl+Z')),
