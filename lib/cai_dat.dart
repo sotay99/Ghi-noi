@@ -85,8 +85,8 @@ class CaiDat {
 
   /// Phím tắt mở/đóng "trình ghi âm" (Ghi âm xong mới ra chữ — tạo thẻ ghi
   /// âm) — cùng bốn kiểu như trên, MẶC ĐỊNH phím Tab một mình. Không bao
-  /// giờ được phép trùng [phimTatMicro] khi cả hai đang ở cặp Tab/bấm-Ctrl-
-  /// 2-lần — xem `datPhimTatVaTuHoanDoiNeuTrung`.
+  /// giờ được phép trùng [phimTatMicro] ở BẤT KỲ lựa chọn không tham số
+  /// nào (Tab/CtrlDup/ShiftDup) — xem `datPhimTatVaTuHoanDoiNeuTrung`.
   LuaChonPhimTat phimTatGhiAm = const LuaChonPhimTat.tab();
 
   /// Màu chữ/màu nền gần nhất người dùng dùng ở công cụ định dạng thủ công —
@@ -369,21 +369,32 @@ class CaiDat {
     if (moi.phim != null) await kho.setString(_khoaPhimTatGhiAmPhimCtrl, moi.phim!);
   }
 
+  /// Ba lựa chọn "không cần tham số" (Tab, bấm Ctrl 2 lần, bấm Shift 2 lần)
+  /// tạo thành một vòng tự đổi hộ khi trùng — xem `datPhimTatVaTuHoanDoiNeuTrung`.
+  /// Xếp thành vòng tròn 3 phần tử để LUÔN có đúng một hướng đổi tới, không
+  /// mơ hồ: Tab → CtrlDup → ShiftDup → Tab. `Ctrl + một phím` (có tham số)
+  /// KHÔNG nằm trong vòng này — trùng thì chặn lưu, bắt tự chọn phím khác.
+  static const Map<String, LuaChonPhimTat> _vongTuDoiPhimTat = {
+    'tab': LuaChonPhimTat.ctrlDup(),
+    'ctrlDup': LuaChonPhimTat.shiftDup(),
+    'shiftDup': LuaChonPhimTat.tab(),
+  };
+
   /// Lưu phím tắt MỚI cho Micro (nếu [laMicro]) hoặc Ghi âm (nếu không) —
-  /// và nếu việc này khiến hai chức năng cùng dẫm chân lên nhau ở cặp
-  /// Tab/bấm-Ctrl-2-lần (CHỈ cặp này, không áp dụng cho Ctrl+.../bấm-Shift-
-  /// 2-lần), tự đổi luôn chức năng CÒN LẠI sang giá trị kia của cặp
-  /// (Tab↔CtrlDup) để không bao giờ trùng nhau. Trả về `true` nếu có xảy
-  /// ra tự đổi hộ như vậy — màn Cài đặt dùng giá trị này để quyết định có
-  /// hiện thông báo hay không.
+  /// và nếu việc này khiến hai chức năng cùng dẫm chân lên nhau ở MỘT
+  /// TRONG BA lựa chọn không tham số (xem `_vongTuDoiPhimTat`), tự đổi
+  /// luôn chức năng CÒN LẠI sang lựa chọn tiếp theo trong vòng để không
+  /// bao giờ trùng nhau. Trả về `true` nếu có xảy ra tự đổi hộ như vậy —
+  /// màn Cài đặt dùng giá trị này để quyết định có hiện thông báo hay
+  /// không.
   Future<bool> datPhimTatVaTuHoanDoiNeuTrung({
     required bool laMicro,
     required LuaChonPhimTat moi,
   }) async {
     final hienTaiCuaKia = laMicro ? phimTatGhiAm : phimTatMicro;
     LuaChonPhimTat? moiCuaKia;
-    if ((moi.loai == 'tab' || moi.loai == 'ctrlDup') && hienTaiCuaKia.coBangVoi(moi)) {
-      moiCuaKia = moi.loai == 'tab' ? const LuaChonPhimTat.ctrlDup() : const LuaChonPhimTat.tab();
+    if (_vongTuDoiPhimTat.containsKey(moi.loai) && hienTaiCuaKia.coBangVoi(moi)) {
+      moiCuaKia = _vongTuDoiPhimTat[moi.loai];
     }
 
     if (laMicro) {

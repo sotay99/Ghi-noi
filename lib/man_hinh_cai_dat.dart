@@ -1210,11 +1210,12 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
                       return;
                     }
                   }
-                  // Cặp Tab/CtrlDup có cơ chế TỰ ĐỔI hộ (xem
+                  // Ba lựa chọn không tham số (Tab/CtrlDup/ShiftDup) có cơ
+                  // chế TỰ ĐỔI hộ theo vòng tròn (xem
                   // `datPhimTatVaTuHoanDoiNeuTrung`) nên không cần chặn ở
-                  // đây — chỉ 'ctrl'+phím và 'shiftDup' (không nằm trong
-                  // cặp tự đổi) mới cần chặn thủ công khi trùng.
-                  if (moi.loai == 'ctrl' || moi.loai == 'shiftDup') {
+                  // đây — chỉ 'ctrl'+phím (có tham số, không nằm trong
+                  // vòng tự đổi) mới cần chặn thủ công khi trùng.
+                  if (moi.loai == 'ctrl') {
                     final kia = laMicro ? widget.caiDat.phimTatGhiAm : widget.caiDat.phimTatMicro;
                     if (kia.coBangVoi(moi)) {
                       capNhatModal(() => loiXungDot =
