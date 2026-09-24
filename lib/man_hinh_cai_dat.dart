@@ -14,7 +14,6 @@ import 'doan_thiet_bi.dart';
 import 'loai_thiet_bi.dart';
 import 'lua_chon_phim_tat.dart';
 import 'mau_co_ban.dart';
-import 'ten_phim_win.dart';
 import 'thong_bao_giua.dart';
 
 const _cacMucThoiGian = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, _khongTuBatLai];
@@ -1057,8 +1056,8 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
 
   /// Modal 3 lựa chọn phím tắt — DÙNG CHUNG cho cả Micro lẫn Ghi âm
   /// ([laMicro] chọn cái nào đang sửa). Ba lựa chọn loại trừ lẫn nhau (radio
-  /// thật, không thể bỏ trống hay chọn nhiều): phím Windows/Cmd một mình,
-  /// phím Tab một mình, hoặc Ctrl + một phím do người dùng tự bấm chọn.
+  /// thật, không thể bỏ trống hay chọn nhiều): phím Esc một mình, phím Tab
+  /// một mình, hoặc Ctrl + một phím do người dùng tự bấm chọn.
   Future<void> _moDialogChonPhimTat({required bool laMicro}) async {
     final banDau = laMicro ? _phimTatMicro : _phimTatGhiAm;
     var loaiTam = banDau.loai;
@@ -1111,12 +1110,11 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     oLuaChon(
-                      loai: 'win',
-                      nhan: tenPhimWinTheoNenTang(),
-                      giaiThich: 'Phím Windows/Cmd — hình cửa sổ nhỏ (⊞) trên '
-                          'Windows hoặc phím Command (⌘) trên Mac. Nằm ở hàng '
-                          'phím dưới cùng, thường ngay cạnh phím Alt/Option, '
-                          'bên trái phím cách (Spacebar).',
+                      loai: 'esc',
+                      nhan: 'Esc',
+                      giaiThich: 'Phím Esc — ghi chữ "Esc", nằm riêng một góc, '
+                          'ở trên cùng bên trái bàn phím (phía trên phím số 1, '
+                          'tách hẳn khỏi cụm phím còn lại).',
                     ),
                     oLuaChon(
                       loai: 'tab',
@@ -1191,7 +1189,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
                       ? LuaChonPhimTat.ctrl(phimCtrlTam!)
                       : (loaiTam == 'tab'
                           ? const LuaChonPhimTat.tab()
-                          : const LuaChonPhimTat.win());
+                          : const LuaChonPhimTat.esc());
 
                   if (moi.loai == 'ctrl') {
                     final xungDotCoDinh = CaiDat.tenXungDot(moi);

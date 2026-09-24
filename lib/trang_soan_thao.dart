@@ -6040,15 +6040,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
   }
 
-  /// Bàn phím vật lý bấm đúng phím tắt đang cài (Win/Cmd một mình, Tab một
+  /// Bàn phím vật lý bấm đúng phím tắt đang cài (Esc một mình, Tab một
   /// mình, hoặc Ctrl + một phím) cho MỘT trong hai chức năng (Micro/Ghi âm)
   /// — dùng chung cho cả `_khiPhimTatMicro` và `_khiPhimTatGhiAm`. Trả về
   /// true để chặn phím này lan xuống ô văn bản/trình duyệt.
   bool _khopPhimTat(LuaChonPhimTat lc, KeyEvent event) {
     switch (lc.loai) {
-      case 'win':
-        return (event.logicalKey == LogicalKeyboardKey.metaLeft ||
-                event.logicalKey == LogicalKeyboardKey.metaRight) &&
+      case 'esc':
+        return event.logicalKey == LogicalKeyboardKey.escape &&
             !HardwareKeyboard.instance.isControlPressed &&
             !HardwareKeyboard.instance.isAltPressed &&
             !HardwareKeyboard.instance.isShiftPressed;
@@ -6067,8 +6066,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
   }
 
-  /// Bàn phím vật lý bấm đúng phím tắt Micro (mặc định phím Windows/Cmd một
-  /// mình): tắt/mở micro, y hệt bấm nút.
+  /// Bàn phím vật lý bấm đúng phím tắt Micro (mặc định phím Esc một mình):
+  /// tắt/mở micro, y hệt bấm nút.
   bool _khiPhimTatMicro(KeyEvent event) {
     if (!mounted || event is! KeyDownEvent) return false;
 
