@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 
 import 'cai_dat.dart';
+import 'chan_esc_lui_trang.dart';
 import 'kho_du_lieu.dart';
 import 'trang_soan_thao.dart';
 
@@ -49,16 +50,18 @@ class _UngDungFlowriteState extends State<UngDungFlowrite> {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1A73E8)),
         scaffoldBackgroundColor: Colors.white,
       ),
-      home: _idGhiChuMoDau == null
-          ? const Scaffold(
-              backgroundColor: Colors.white,
-              body: Center(child: CircularProgressIndicator()),
-            )
-          : TrangSoanThao(
-              kho: _kho,
-              caiDat: _caiDat,
-              ghiChuId: _idGhiChuMoDau!,
-            ),
+      home: ChanEscLuiTrang(
+        child: _idGhiChuMoDau == null
+            ? const Scaffold(
+                backgroundColor: Colors.white,
+                body: Center(child: CircularProgressIndicator()),
+              )
+            : TrangSoanThao(
+                kho: _kho,
+                caiDat: _caiDat,
+                ghiChuId: _idGhiChuMoDau!,
+              ),
+      ),
     );
   }
 }
