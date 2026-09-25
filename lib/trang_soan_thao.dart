@@ -5156,6 +5156,25 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// chung một cờ cho cả việc hiện overlay VÀ việc có một thẻ đang ghi hay
   /// không, vì theo thiết kế đã chốt, mở trình ghi âm là lập tức ghi luôn.
   bool _trinhGhiAmMo = false;
+
+  /// AppBar của trình ghi âm (`_xayAppBarTrinhGhiAmThe`) tự đo chiều cao
+  /// THẬT của lưới nút sau mỗi khung hình, rồi dùng đúng số đo đó làm
+  /// `toolbarHeight` — không còn đoán một số cố định dư ra ("bãi đất
+  /// trống" phía dưới các nút) hay thiếu (phải cuộn) nữa. `null` = chưa đo
+  /// được lần nào (khung hình đầu tiên), dùng tạm số ước lượng cũ.
+  final _khoaLuoiTrinhGhiAmThe = GlobalKey();
+  double? _caoLuoiTrinhGhiAmThe;
+
+  void _doLaiCaoLuoiTrinhGhiAmThe() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final hop = _khoaLuoiTrinhGhiAmThe.currentContext?.findRenderObject() as RenderBox?;
+      final cao = hop?.size.height;
+      if (cao == null || cao <= 0) return;
+      if (_caoLuoiTrinhGhiAmThe != null && (_caoLuoiTrinhGhiAmThe! - cao).abs() < 0.5) return;
+      setState(() => _caoLuoiTrinhGhiAmThe = cao);
+    });
+  }
   int _soThuTuTheGhiAmTiepTheo = 1;
   int? _soTheGhiAmDangGhi;
 
@@ -5194,7 +5213,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   bool _hopThoaiCanhBaoTheGhiAmDangMo = false;
 
   static const _gioiHanMoiTheGhiAm = Duration(minutes: 5);
-  static const _canhBaoGioiHanTheGhiAm = Duration(minutes: 4, seconds: 30);
+  static const _canhBaoGioiHanTheGhiAm = Duration(minutes: 4);
 
   /// Ghi âm và micro-vừa-nói-vừa-ra-chữ không được cùng chạy — cả hai đều
   /// cần độc chiếm microphone của máy. Áp dụng cho MỌI nền tảng (kể cả
@@ -5318,7 +5337,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   onChanged: (v) => capNhatModal(() => chonTam = true),
                   title: RichText(
                     text: TextSpan(
-                      style: DefaultTextStyle.of(ctx).style,
+                      // Kiểu chữ THƯỜNG, khai rõ ràng — không lấy
+                      // `DefaultTextStyle.of(ctx)` nữa: modal này mở từ bên
+                      // trong trang soạn thảo nên nó vô tình thừa hưởng đúng
+                      // kiểu định dạng (đỏ/đậm/gạch dưới...) đang áp cho văn
+                      // bản ghi chú tại vị trí con trỏ, chứ không phải lỗi cố ý.
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.normal,
+                        color: Colors.black87,
+                        decoration: TextDecoration.none,
+                      ),
                       children: [
                         const TextSpan(text: 'Mỗi lần ghi âm: Tự động '),
                         TextSpan(
@@ -5340,7 +5369,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   onChanged: (v) => capNhatModal(() => chonTam = false),
                   title: RichText(
                     text: TextSpan(
-                      style: DefaultTextStyle.of(ctx).style,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.normal,
+                        color: Colors.black87,
+                        decoration: TextDecoration.none,
+                      ),
                       children: [
                         const TextSpan(text: 'Mỗi lần ghi âm: Tự động '),
                         TextSpan(
@@ -10694,11 +10728,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             hang([oPhatLai, oDong, oXoa]),
           ]);
 
-    // Chiều cao ước lượng theo số hàng/cỡ chữ mỗi kiểu màn hình — bọc
-    // `SingleChildScrollView` làm lưới an toàn: lỡ ước lượng thiếu ở máy
-    // nào đó thì bảng tự cuộn dọc thay vì tràn/vỡ hình, không có cách nào
-    // để AppBar tự co đúng theo nội dung thật.
-    final caoBang = manHinhHep ? 300.0 : 210.0;
+    // Số ước lượng CHỈ dùng cho khung hình đầu tiên (trước khi đo được
+    // chiều cao thật) — ngay sau đó `_doLaiCaoLuoiTrinhGhiAmThe` đo lại
+    // đúng chiều cao lưới nút thật rồi tự setState, AppBar co khít theo,
+    // không còn dư khoảng trống lẫn phải cuộn.
+    final caoUocLuong = manHinhHep ? 300.0 : 210.0;
+    final caoBang = _caoLuoiTrinhGhiAmThe ?? caoUocLuong;
+    _doLaiCaoLuoiTrinhGhiAmThe();
 
     return AppBar(
       backgroundColor: Colors.red.shade50,
@@ -10710,10 +10746,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // Nút "tự động gửi ngầm" đã bị xoá khỏi dải này — cài đặt đó nay chỉ
       // còn ở "phím 7" trong Bảng điều khiển ghi âm (nhiều chức năng hơn,
       // xem `_moModalCaiDatTuDongChuyenHoa`), tránh trùng lặp hai chỗ.
-      title: SizedBox(
-        height: caoBang,
-        child: SingleChildScrollView(child: luoi),
-      ),
+      title: Container(key: _khoaLuoiTrinhGhiAmThe, child: luoi),
     );
   }
 
@@ -11396,6 +11429,13 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
     _theoDoiTapDoi.xuLy(event);
     if (event is! KeyDownEvent) return false;
 
+    // Có màn hình khác đè lên bảng này (ví dụ hộp thoại "Sắp chạm giới hạn
+    // 5 phút" — ừ thì 4 phút — hiện ra ngay trên nó) thì bỏ qua, không
+    // giành phím Tab/1-8 của hộp thoại đó nữa — y hệt lý do `_khiPhimTatMicro`/
+    // `_khiPhimTatGhiAm` ở `_TrangSoanThaoState` đã làm.
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return false;
+
     if (_khopPhimTatGhiAmCucBo(event)) {
       _bamTamDungTiepTuc();
       return true;
@@ -11602,7 +11642,7 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
   Widget build(BuildContext context) {
     final manHinhHep = MediaQuery.sizeOf(context).width < 420;
 
-    return Stack(
+    Widget noiDung = Stack(
       children: [
         Center(
           child: Padding(
@@ -11725,6 +11765,22 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
         ),
       ],
     );
+
+    // Tab mặc định của Flutter còn tự làm việc riêng của nó: chuyển tiêu
+    // điểm bàn phím qua các nút — chạy CÙNG LÚC với `_khiPhimCucBo` ở trên
+    // (hai cơ chế độc lập, `HardwareKeyboard.addHandler` không chặn được
+    // việc này). Chỉ khi Tab đang là phím tắt Ghi âm mới cần chặn hẳn tác
+    // dụng "chuyển tiêu điểm" đó lại — nó chỉ gây rối mắt chứ không hỏng gì.
+    if (widget.phimTatGhiAm.loai == 'tab') {
+      noiDung = Shortcuts(
+        shortcuts: const <ShortcutActivator, Intent>{
+          SingleActivator(LogicalKeyboardKey.tab): DoNothingAndStopPropagationIntent(),
+          SingleActivator(LogicalKeyboardKey.tab, shift: true): DoNothingAndStopPropagationIntent(),
+        },
+        child: noiDung,
+      );
+    }
+    return noiDung;
   }
 }
 
