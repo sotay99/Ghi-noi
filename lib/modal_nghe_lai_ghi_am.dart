@@ -11,15 +11,19 @@ import 'nguon_am_thanh_the_ghi_am.dart';
 /// `taoNguonPhatGhiAm` — TRÊN WEB là một Blob URL thật (không phải
 /// `BytesSource`/`setSourceBytes`, vốn từng làm trình duyệt từ chối phát với
 /// lỗi "content type (Code: 4)" — xem giải thích ở `nguon_am_thanh_the_ghi_am.dart`).
-Future<void> hienModalNgheLaiGhiAm(
+/// Trả về `true` nếu người dùng bấm nút "Chuyển hoá thẻ ghi âm này thành văn
+/// bản" ở dưới modal — bên gọi tự lo việc chuyển hoá thật (đóng luôn Bảng
+/// điều khiển nếu đang mở, rồi gọi logic gửi AI), modal này chỉ báo Ý ĐỊNH.
+Future<bool> hienModalNgheLaiGhiAm(
   BuildContext context, {
   required Uint8List bytes,
   required String mime,
-}) {
-  return showDialog<void>(
+}) async {
+  final ketQua = await showDialog<bool>(
     context: context,
     builder: (context) => _ModalNgheLaiGhiAm(bytes: bytes, mime: mime),
   );
+  return ketQua ?? false;
 }
 
 class _ModalNgheLaiGhiAm extends StatefulWidget {
@@ -155,9 +159,17 @@ class _ModalNgheLaiGhiAmState extends State<_ModalNgheLaiGhiAm> {
         TextButton(
           onPressed: () async {
             await _player.stop();
-            if (context.mounted) Navigator.of(context).pop();
+            if (context.mounted) Navigator.of(context).pop(false);
           },
           child: const Text('Đóng'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: Colors.blue.shade700),
+          onPressed: () async {
+            await _player.stop();
+            if (context.mounted) Navigator.of(context).pop(true);
+          },
+          child: const Text('Chuyển hoá thẻ ghi âm này thành văn bản'),
         ),
       ],
     );

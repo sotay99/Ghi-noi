@@ -5281,6 +5281,103 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
   }
 
+  /// Nút "phím 8" trong Bảng điều khiển — mở modal cài đặt HIỆN/ẨN tự động
+  /// bảng đó mỗi lần ghi âm mới. Mở modal thì tạm dừng bản đang ghi (nếu
+  /// đang ghi), đóng modal thì trả lại ĐÚNG trạng thái trước đó — giống
+  /// nút "Xoá bản ghi âm", KHÁC nút "Cài đặt Tự động chuyển hoá văn bản"
+  /// (nơi luôn ép tiếp tục khi đóng, không nhớ trạng thái cũ).
+  Future<void> _moModalCaiDatTuDongMoBangDieuKhien() async {
+    final dangGhiTruocDo = _soTheGhiAmDangGhi != null && !_theGhiAmDangTamDung;
+    if (dangGhiTruocDo) await _tamDungTheGhiAmHienTai();
+
+    var chonTam = widget.caiDat.tuDongMoBangDieuKhienGhiAm ??
+        (_thietBiHienTai == ThietBi.pc);
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, capNhatModal) => AlertDialog(
+          title: const Text('Cài đặt chế độ tự động Mở bảng điều khiển trình ghi âm'),
+          content: SizedBox(
+            width: 360,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Mỗi lần bấm nút ghi âm (hoặc dùng phím tắt) để bắt đầu ghi '
+                  'âm một thẻ mới, chọn xem Bảng điều khiển này có tự mở ra '
+                  'ngay không, hay chỉ hiện dải thanh công cụ ghim ở đầu màn hình.',
+                  style: TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                RadioListTile<bool>(
+                  contentPadding: EdgeInsets.zero,
+                  value: true,
+                  groupValue: chonTam,
+                  onChanged: (v) => capNhatModal(() => chonTam = true),
+                  title: RichText(
+                    text: TextSpan(
+                      style: DefaultTextStyle.of(ctx).style,
+                      children: [
+                        const TextSpan(text: 'Mỗi lần ghi âm: Tự động '),
+                        TextSpan(
+                          text: 'HIỆN',
+                          style: TextStyle(
+                            backgroundColor: Colors.green.shade200,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const TextSpan(text: ' bảng điều khiển này.'),
+                      ],
+                    ),
+                  ),
+                ),
+                RadioListTile<bool>(
+                  contentPadding: EdgeInsets.zero,
+                  value: false,
+                  groupValue: chonTam,
+                  onChanged: (v) => capNhatModal(() => chonTam = false),
+                  title: RichText(
+                    text: TextSpan(
+                      style: DefaultTextStyle.of(ctx).style,
+                      children: [
+                        const TextSpan(text: 'Mỗi lần ghi âm: Tự động '),
+                        TextSpan(
+                          text: 'ẨN',
+                          style: TextStyle(
+                            backgroundColor: Colors.orange.shade200,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const TextSpan(text: ' bảng điều khiển này.'),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Huỷ')),
+            FilledButton(
+              onPressed: () async {
+                await widget.caiDat.datTuDongMoBangDieuKhienGhiAm(chonTam);
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              },
+              child: const Text('Lưu'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+    if (dangGhiTruocDo && _soTheGhiAmDangGhi != null && _theGhiAmDangTamDung) {
+      await _tiepTucTheGhiAmHienTai();
+    }
+  }
+
   String _nhanTheGhiAmHoanChinh(int soThe) =>
       nhanTheHoanChinh(soThe, _thoiLuongTheoTheGhiAm[soThe] ?? Duration.zero);
 
@@ -5303,6 +5400,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     setState(() => _trinhGhiAmMo = true);
     await _batDauMotTheGhiAmMoi();
+    if (!mounted) return;
+    final tuMoBang = widget.caiDat.tuDongMoBangDieuKhienGhiAm ??
+        (_thietBiHienTai == ThietBi.pc);
+    if (tuMoBang) _bamNutHienBangDieuKhienGhiAm();
   }
 
   Future<void> _batDauMotTheGhiAmMoi() async {
@@ -5565,6 +5666,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// phím 1-7 cho 7 nút còn lại), chỉ hoạt động khi modal này đang mở.
   void _bamNutHienBangDieuKhienGhiAm() {
     if (!_trinhGhiAmMo || _soTheGhiAmDangGhi == null) return;
+    _bangDieuKhienGhiAmDangMo = true;
     showGeneralDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -5586,8 +5688,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         khiDong: _dongTrinhGhiAmThe,
         khiXoaVaDong: _huyBanGhiAmDangDoDangVaDong,
         khiCaiDatTuDongChuyenHoa: _moModalCaiDatTuDongChuyenHoa,
+        khiCaiDatTuDongMoBang: _moModalCaiDatTuDongMoBangDieuKhien,
       ),
-    );
+    ).then((_) {
+      _bangDieuKhienGhiAmDangMo = false;
+    });
   }
 
   /// Nút "Xoá bản này-Đóng trình ghi âm": HUỶ THẲNG bản ghi âm đang dở
@@ -5906,12 +6011,26 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     final duLieu = _duLieuTheoTheGhiAm[soThe];
     if (duLieu == null || !mounted) return;
-    await hienModalNgheLaiGhiAm(
+    final chuyenHoa = await hienModalNgheLaiGhiAm(
       context,
       bytes: duLieu.bytes,
       mime: duLieu.mime,
     );
+    if (!chuyenHoa || !mounted) return;
+    // Bấm "Chuyển hoá..." ngay trong modal nghe lại: đóng luôn Bảng điều
+    // khiển ghi âm nếu đang mở bên dưới (nó đứng cùng Navigator, modal
+    // nghe lại vừa đóng chỉ lộ ra bảng đó, không lộ ra màn hình soạn thảo).
+    if (_bangDieuKhienGhiAmDangMo) {
+      Navigator.of(context).pop();
+      _bangDieuKhienGhiAmDangMo = false;
+    }
+    if (mounted) await _guiVaXuLyMotThe(soThe, baoLoi: true);
   }
+
+  /// Bảng điều khiển ghi âm đang mở hay không — chỉ để nút "Chuyển hoá..."
+  /// trong modal nghe lại (mở từ TRONG bảng điều khiển, qua phím 3) biết có
+  /// cần đóng thêm route nào bên dưới hay không.
+  bool _bangDieuKhienGhiAmDangMo = false;
 
   /// Bấm vào một thẻ ĐANG GỬI ("Đang chuyển N") — chỉ còn một lựa chọn duy
   /// nhất: xoá (có hỏi xác nhận). Yêu cầu gửi đang bay tới Gemini vẫn chạy
@@ -9967,6 +10086,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       inputFormatters: [FilteringTextInputFormatter.deny(kyTuCamTrongTen)],
       style: TextStyle(
         fontSize: 18,
+        fontWeight: FontWeight.bold,
         color: mauTen != null ? Color(mauTen) : Colors.black87,
       ),
       decoration: const InputDecoration(
@@ -10586,52 +10706,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       elevation: 1,
       automaticallyImplyLeading: false,
       titleSpacing: 0,
-      toolbarHeight: caoBang + 30,
-      title: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Nút "tự động gửi ngầm" — vẫn cần giữ (tính năng có sẵn từ
-          // trước), nhưng không thuộc bảng 8 ô của thiết kế mới nên dồn
-          // riêng thành một dải mỏng bên trên, không chen vào lưới. Bấm
-          // vào giờ MỞ MODAL cài đặt (bật/tắt + số giây) thay vì tự bật/tắt
-          // trực tiếp như trước — xem `_moModalCaiDatTuDongChuyenHoa`.
-          SizedBox(
-            height: 30,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Tooltip(
-                  message: widget.caiDat.tuDongGuiNgamTheGhiAm
-                      ? 'Tự động gửi ngầm thẻ ≥${widget.caiDat.nguongTuDongGuiTheGhiAmGiay}s: '
-                          'đang BẬT (bấm để cài đặt)'
-                      : 'Tự động gửi ngầm thẻ: đang TẮT (bấm để cài đặt)',
-                  child: InkWell(
-                    onTap: () {},
-                    onTapDown: (_) => _moModalCaiDatTuDongChuyenHoa(),
-                    customBorder: const CircleBorder(),
-                    child: Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: Icon(
-                        widget.caiDat.tuDongGuiNgamTheGhiAm
-                            ? Icons.cloud_sync
-                            : Icons.cloud_sync_outlined,
-                        color: widget.caiDat.tuDongGuiNgamTheGhiAm
-                            ? Colors.deepPurple
-                            : Colors.grey,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
-            ),
-          ),
-          SizedBox(
-            height: caoBang,
-            child: SingleChildScrollView(child: luoi),
-          ),
-        ],
+      toolbarHeight: caoBang,
+      // Nút "tự động gửi ngầm" đã bị xoá khỏi dải này — cài đặt đó nay chỉ
+      // còn ở "phím 7" trong Bảng điều khiển ghi âm (nhiều chức năng hơn,
+      // xem `_moModalCaiDatTuDongChuyenHoa`), tránh trùng lặp hai chỗ.
+      title: SizedBox(
+        height: caoBang,
+        child: SingleChildScrollView(child: luoi),
       ),
     );
   }
@@ -11235,6 +11316,7 @@ class _BangDieuKhienGhiAm extends StatefulWidget {
     required this.khiDong,
     required this.khiXoaVaDong,
     required this.khiCaiDatTuDongChuyenHoa,
+    required this.khiCaiDatTuDongMoBang,
   });
 
   final int soThe;
@@ -11252,6 +11334,7 @@ class _BangDieuKhienGhiAm extends StatefulWidget {
   final Future<void> Function() khiDong;
   final Future<void> Function() khiXoaVaDong;
   final Future<void> Function() khiCaiDatTuDongChuyenHoa;
+  final Future<void> Function() khiCaiDatTuDongMoBang;
 
   @override
   State<_BangDieuKhienGhiAm> createState() => _BangDieuKhienGhiAmState();
@@ -11305,6 +11388,7 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
     LogicalKeyboardKey.digit5,
     LogicalKeyboardKey.digit6,
     LogicalKeyboardKey.digit7,
+    LogicalKeyboardKey.digit8,
   ];
 
   bool _khiPhimCucBo(KeyEvent event) {
@@ -11350,6 +11434,17 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
     if (mounted) setState(() => _dangTamDung = false);
   }
 
+  /// Phím 8: modal trả lại ĐÚNG trạng thái trước đó khi đóng (khác phím 7,
+  /// nơi luôn ép tiếp tục) — nên đọc lại `_dangTamDung` từ chính state của
+  /// bản ghi (qua `widget.dangTamDungBanDau` không dùng được vì đã cũ; dùng
+  /// biến cục bộ ghi lại NGAY TRƯỚC khi gọi).
+  Future<void> _moCaiDatTuDongMoBang() async {
+    final truoc = _dangTamDung;
+    setState(() => _dangTamDung = true);
+    await widget.khiCaiDatTuDongMoBang();
+    if (mounted) setState(() => _dangTamDung = truoc);
+  }
+
   late final List<Future<void> Function()> _cacHanhDongPhimSo = [
     () => _goiRoiDong(widget.khiChuyenThanhVanBan),
     () => _goiRoiDong(widget.khiTaoBanMoi),
@@ -11358,6 +11453,7 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
     () => _dongRoiGoi(widget.khiXoaVaDong),
     () async => Navigator.of(context).pop(),
     _moCaiDatTuDongChuyenHoa,
+    _moCaiDatTuDongMoBang,
   ];
 
   Widget _oHang({
@@ -11410,6 +11506,78 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
     );
   }
 
+  /// Dòng 1 ("Bản Ghi âm số N") và dòng 2 (trạng thái/thời lượng) đứng
+  /// CHUNG một cột full-width, mỗi dòng cao xấp xỉ các dòng phím 1-8 khác
+  /// (cùng padding dọc 10). Vòng sóng âm KHÔNG nằm trong luồng bố cục của
+  /// hai dòng đó — nó là một lớp `Positioned` riêng đè lên, canh giữa
+  /// đúng ranh giới giữa dòng 1 và dòng 2 — nên dù kích cỡ vòng sóng âm
+  /// lớn cỡ nào cũng không bao giờ làm hai dòng kia giãn cao ra.
+  Widget _oKhoiTieuDeVaTrangThai(bool manHinhHep) {
+    const duongVien = BoxDecoration(border: Border.all(color: Color(0xFFDADCE0)));
+    final choDot = manHinhHep ? 40.0 : 48.0;
+    final coChu = manHinhHep ? 13.0 : 14.0;
+    return Stack(
+      children: [
+        Column(
+          children: [
+            Container(
+              width: double.infinity,
+              decoration: duongVien,
+              padding: EdgeInsets.fromLTRB(choDot + 14, 10, 12, 10),
+              child: Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text('Bản Ghi âm số ',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: coChu)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    color: Colors.cyanAccent,
+                    child: Text('${widget.soThe}',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: coChu)),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              width: double.infinity,
+              decoration: duongVien,
+              padding: EdgeInsets.fromLTRB(choDot + 14, 10, 12, 10),
+              child: ValueListenableBuilder<Duration>(
+                valueListenable: widget.thoiLuong,
+                builder: (context, gia, _) => Text(
+                  '${_dangTamDung ? 'Tạm dừng' : 'Đang Ghi âm'} ${dinhDangMmSs(gia)}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.red.shade700,
+                    fontWeight: FontWeight.bold,
+                    fontSize: coChu,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        Positioned(
+          left: 8,
+          top: 0,
+          bottom: 0,
+          child: Center(
+            child: ValueListenableBuilder<int>(
+              valueListenable: widget.songAmTick,
+              builder: (context, _, __) => VongSongAm(
+                muc: widget.songAm,
+                dangNghe: !_dangTamDung,
+                mau: Colors.red.shade600,
+                kichThuoc: choDot,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _oTamDungTiepTucHang(bool manHinhHep) {
     return _dangTamDung
         ? _oHang(
@@ -11448,62 +11616,7 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        decoration: const BoxDecoration(
-                          border: Border(bottom: BorderSide(color: Color(0xFFDADCE0))),
-                        ),
-                        child: Center(
-                          child: Wrap(
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              const Text('Bản Ghi âm số ',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                color: Colors.cyanAccent,
-                                child: Text('${widget.soThe}',
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold, fontSize: 18)),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-                        decoration: const BoxDecoration(
-                          border: Border(bottom: BorderSide(color: Color(0xFFDADCE0))),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            ValueListenableBuilder<int>(
-                              valueListenable: widget.songAmTick,
-                              builder: (context, _, __) => VongSongAm(
-                                muc: widget.songAm,
-                                dangNghe: !_dangTamDung,
-                                mau: Colors.red.shade600,
-                                kichThuoc: 56,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            ValueListenableBuilder<Duration>(
-                              valueListenable: widget.thoiLuong,
-                              builder: (context, gia, _) => Text(
-                                '${_dangTamDung ? 'Tạm dừng' : 'Đang Ghi âm'} ${dinhDangMmSs(gia)}',
-                                style: TextStyle(
-                                  color: Colors.red.shade700,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: manHinhHep ? 17 : 20,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      _oKhoiTieuDeVaTrangThai(manHinhHep),
                       _oTamDungTiepTucHang(manHinhHep),
                       _oHang(
                         nhanPhim: 'phím 1',
@@ -11559,6 +11672,14 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
                         mau: Colors.deepPurple,
                         nhan: 'Cài đặt chế độ Tự động chuyển hoá văn bản',
                         onBam: _cacHanhDongPhimSo[6],
+                        manHinhHep: manHinhHep,
+                      ),
+                      _oHang(
+                        nhanPhim: 'phím 8',
+                        icon: Icons.tune_rounded,
+                        mau: Colors.brown.shade800,
+                        nhan: 'Cài đặt tự động Mở bảng điều khiển này',
+                        onBam: _cacHanhDongPhimSo[7],
                         manHinhHep: manHinhHep,
                       ),
                       const SizedBox(height: 8),

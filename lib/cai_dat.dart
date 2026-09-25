@@ -26,6 +26,8 @@ class CaiDat {
       'ghi_noi_cau_lenh_tuy_chinh_kiem_tra_toan_van';
   static const _khoaMauChuGanNhat = 'ghi_noi_mau_chu_gan_nhat';
   static const _khoaMauNenGanNhat = 'ghi_noi_mau_nen_gan_nhat';
+  static const _khoaTuDongMoBangDieuKhienGhiAm =
+      'ghi_noi_tu_dong_mo_bang_dieu_khien_ghi_am';
 
   /// Số giây chờ, kể từ lúc người dùng ngừng gõ phím, tới khi micro tự bật
   /// lại. Mặc định 1 giây.
@@ -49,6 +51,12 @@ class CaiDat {
 
   static const gioiHanDuoiNguongTuDongGuiTheGhiAm = 5;
   static const gioiHanTrenNguongTuDongGuiTheGhiAm = 120;
+
+  /// Mỗi lần bắt đầu ghi âm, Bảng điều khiển trình ghi âm có tự mở ra ngay
+  /// hay không. `null` = CHƯA từng lưu — nơi gọi tự suy ra mặc định theo
+  /// thiết bị (PC/Mac → HIỆN; Android/iPhone → ẨN, xem `ThietBi`), KHÔNG
+  /// suy ở đây vì `CaiDat` không tự biết thiết bị hiện tại.
+  bool? tuDongMoBangDieuKhienGhiAm;
 
   /// Có tự chèn một dấu cách ngay sau đoạn chữ mỗi lần nói xong hay không.
   /// Mặc định bật.
@@ -214,6 +222,7 @@ class CaiDat {
     tuDongGuiNgamTheGhiAm = kho.getBool(_khoaTuDongGuiNgamTheGhiAm) ?? true;
     nguongTuDongGuiTheGhiAmGiay = (kho.getInt(_khoaNguongTuDongGuiTheGhiAmGiay) ?? 20)
         .clamp(gioiHanDuoiNguongTuDongGuiTheGhiAm, gioiHanTrenNguongTuDongGuiTheGhiAm);
+    tuDongMoBangDieuKhienGhiAm = kho.getBool(_khoaTuDongMoBangDieuKhienGhiAm);
     tuDongChenDauCauBangAI = kho.getBool(_khoaTuDongChenDauCau) ?? true;
     mucDoDaiDeXuat = (kho.getInt(_khoaMucDoDaiDeXuat) ?? 2).clamp(0, 4);
     cauLenhTuyChinhKiemTraToanVan = kho.getString(_khoaCauLenhTuyChinhKiemTraToanVan) ?? '';
@@ -440,6 +449,12 @@ class CaiDat {
     tuDongGuiNgamTheGhiAm = bat;
     final kho = await SharedPreferences.getInstance();
     await kho.setBool(_khoaTuDongGuiNgamTheGhiAm, bat);
+  }
+
+  Future<void> datTuDongMoBangDieuKhienGhiAm(bool bat) async {
+    tuDongMoBangDieuKhienGhiAm = bat;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setBool(_khoaTuDongMoBangDieuKhienGhiAm, bat);
   }
 
   Future<void> datNguongTuDongGuiTheGhiAmGiay(int giay) async {
