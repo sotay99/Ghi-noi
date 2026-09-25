@@ -11513,7 +11513,7 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
   /// đúng ranh giới giữa dòng 1 và dòng 2 — nên dù kích cỡ vòng sóng âm
   /// lớn cỡ nào cũng không bao giờ làm hai dòng kia giãn cao ra.
   Widget _oKhoiTieuDeVaTrangThai(bool manHinhHep) {
-    const duongVien = BoxDecoration(border: Border.all(color: Color(0xFFDADCE0)));
+    final duongVien = BoxDecoration(border: Border.all(color: const Color(0xFFDADCE0)));
     final choDot = manHinhHep ? 40.0 : 48.0;
     final coChu = manHinhHep ? 13.0 : 14.0;
     return Stack(
