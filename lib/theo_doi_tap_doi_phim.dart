@@ -52,6 +52,20 @@ class TheoDoiTapDoiPhim {
   Timer? _henMoKhoaCtrl;
   Timer? _henMoKhoaShift;
 
+  /// Chốt chặn thứ BA (quyết định nhất): ngay cả khi vừa dò đủ "2 lần bấm
+  /// sạch, ngắn" — CHỜ một nhịp ngắn rồi kiểm tra lại phím đó có THẬT SỰ
+  /// đang được nhả ra hay không, qua `HardwareKeyboard.instance.isXxxPressed`
+  /// (trạng thái phím THẬT của hệ thống, không phải suy từ chuỗi sự kiện đã
+  /// nhận). Nếu lúc kiểm tra phím đó VẪN đang bị giữ thật, chứng tỏ cặp
+  /// "nhả-xuống" vừa dò được chỉ là thiết bị/trình duyệt tự mô phỏng việc
+  /// GIỮ (một số nơi làm vậy: gửi liên tục cặp xuống-nhả rời rạc thay vì
+  /// một lượt xuống rồi giữ nguyên) — huỷ kích hoạt, không phải một cú bấm
+  /// 2 lần thật của người dùng.
+  static const _nguongXacMinhNha = Duration(milliseconds: 80);
+  Timer? _henXacMinhCtrl;
+  Timer? _henXacMinhShift;
+  bool _daHuy = false;
+
   /// Gọi ở MỌI sự kiện phím (không lọc trước) — tự lọc bên trong, không
   /// bao giờ chặn phím lan đi tiếp (không phải việc của lớp này).
   void xuLy(KeyEvent event) {
@@ -93,8 +107,7 @@ class TheoDoiTapDoiPhim {
         final gio = DateTime.now();
         if (_lanTapSachCtrl != null && gio.difference(_lanTapSachCtrl!) <= _nguong) {
           _lanTapSachCtrl = null;
-          _khoaLaiSauKichHoat(laCtrl: true);
-          khiTapDoi('ctrlDup');
+          _xacMinhRoiKichHoat(laCtrl: true);
         } else {
           _lanTapSachCtrl = gio;
         }
@@ -111,12 +124,34 @@ class TheoDoiTapDoiPhim {
         final gio = DateTime.now();
         if (_lanTapSachShift != null && gio.difference(_lanTapSachShift!) <= _nguong) {
           _lanTapSachShift = null;
-          _khoaLaiSauKichHoat(laCtrl: false);
-          khiTapDoi('shiftDup');
+          _xacMinhRoiKichHoat(laCtrl: false);
         } else {
           _lanTapSachShift = gio;
         }
       }
+    }
+  }
+
+  /// Đã dò đủ "2 lần bấm sạch, ngắn" — nhưng chưa vội tin, chờ một nhịp rồi
+  /// hỏi lại hệ thống xem phím đó có thật sự đang buông ra hay không (xem
+  /// giải thích ở `_nguongXacMinhNha`) trước khi gọi [khiTapDoi].
+  void _xacMinhRoiKichHoat({required bool laCtrl}) {
+    void chay() {
+      if (_daHuy) return;
+      final dangGiuThat = laCtrl
+          ? HardwareKeyboard.instance.isControlPressed
+          : HardwareKeyboard.instance.isShiftPressed;
+      if (dangGiuThat) return; // "nhả" vừa dò được là giả — bỏ qua, không kích hoạt.
+      _khoaLaiSauKichHoat(laCtrl: laCtrl);
+      khiTapDoi(laCtrl ? 'ctrlDup' : 'shiftDup');
+    }
+
+    if (laCtrl) {
+      _henXacMinhCtrl?.cancel();
+      _henXacMinhCtrl = Timer(_nguongXacMinhNha, chay);
+    } else {
+      _henXacMinhShift?.cancel();
+      _henXacMinhShift = Timer(_nguongXacMinhNha, chay);
     }
   }
 
@@ -142,7 +177,10 @@ class TheoDoiTapDoiPhim {
   /// Huỷ hai bộ đếm giờ nội bộ — gọi trong `dispose()` của nơi giữ instance
   /// này, tránh callback chạy sau khi widget đã bị huỷ.
   void dispose() {
+    _daHuy = true;
     _henMoKhoaCtrl?.cancel();
     _henMoKhoaShift?.cancel();
+    _henXacMinhCtrl?.cancel();
+    _henXacMinhShift?.cancel();
   }
 }
