@@ -19,7 +19,6 @@ class ThanhCongCu extends StatelessWidget {
     required this.neThanhDieuHuong,
     required this.nhanPhimTat,
     required this.khiBamMicro,
-    required this.khiBamThuMuc,
     required this.khiBamCaiDat,
     required this.khiBamHuongDan,
     required this.khiBamCaiDatKiemTraToanVan,
@@ -57,7 +56,6 @@ class ThanhCongCu extends StatelessWidget {
   final String nhanPhimTat;
 
   final VoidCallback khiBamMicro;
-  final VoidCallback khiBamThuMuc;
   final VoidCallback khiBamCaiDat;
   final VoidCallback khiBamHuongDan;
 
@@ -187,21 +185,18 @@ class ThanhCongCu extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.start,
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                          // Thứ tự mới (mục 10): Hướng dẫn, Thư mục, Làm
-                          // việc với AI, Trò chuyện, Thêm lựa chọn, Tài
-                          // khoản — "Cài đặt" và "Kiểm tra toàn văn" đã dời
-                          // vào trong hai menu (mục 8b/8c).
+                          // Thứ tự mới (mục 10): Hướng dẫn, Làm việc với AI,
+                          // Trò chuyện, Thêm lựa chọn, Tài khoản — "Cài đặt"
+                          // và "Kiểm tra toàn văn" đã dời vào trong hai menu
+                          // (mục 8b/8c). Nút "Thư mục" đã bỏ khỏi đây — trùng
+                          // với nút Thư mục ở thanh trên gần tên tệp
+                          // (`_nutDieuHuongTep` trong `trang_soan_thao.dart`),
+                          // giữ lại đúng một nút duy nhất.
                           _NutCoChuThich(
                             hien: hienChuThich,
                             chu: 'Hướng dẫn sử dụng',
                             child: _nut(rong, Icons.help_outline_rounded,
                                 'Hướng dẫn', 'Hướng dẫn', khiBamHuongDan),
-                          ),
-                          _NutCoChuThich(
-                            hien: hienChuThich,
-                            chu: 'Thư mục và Tệp tin',
-                            child: _nut(rong, Icons.folder_outlined,
-                                'Thư mục', 'Thư mục', khiBamThuMuc),
                           ),
                           _NutCoChuThich(
                             hien: hienChuThich,

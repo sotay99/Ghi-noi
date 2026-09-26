@@ -526,11 +526,22 @@ class _NutNoiTuThoState extends State<_NutNoiTuTho> with SingleTickerProviderSta
 /// ngang) thay vì cỡ vuông cố định 48px, vì nhãn ở đây là CỤM CHỮ tiếng
 /// Anh (giữ nguyên văn theo yêu cầu), không phải MỘT ký tự/icon đơn.
 class _NutCongCuChu extends StatelessWidget {
-  const _NutCongCuChu({required this.nhan, required this.onTap, this.moTa, this.tyLeThuHep});
+  const _NutCongCuChu({
+    required this.nhan,
+    required this.onTap,
+    this.moTa,
+    this.tyLeThuHep,
+    this.bLiet = false,
+  });
 
   final String nhan;
   final String? moTa;
   final VoidCallback onTap;
+
+  /// Chỉ để DIM màu (báo mắt thấy đang tạm khoá) — bấm vào lúc này vẫn gọi
+  /// [onTap] bình thường, chỗ gọi (`_phimAoPasteCoLiet`) tự lo việc bỏ qua
+  /// hay không, widget này không quyết định.
+  final bool bLiet;
 
   /// Nhân thêm vào bề rộng TỰ NHIÊN của nút (ví dụ 0.85 = hẹp bớt 15%) —
   /// dùng cho Home/Paste khi hàng đã chật chỗ ngang. Chữ bên trong có thể
@@ -546,12 +557,15 @@ class _NutCongCuChu extends StatelessWidget {
       height: 36,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: bLiet ? Colors.grey.shade200 : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade400),
+        border: Border.all(color: bLiet ? Colors.grey.shade300 : Colors.grey.shade400),
       ),
       alignment: Alignment.center,
-      child: Text(nhan, style: _kieuChu, overflow: TextOverflow.visible, softWrap: false),
+      child: Text(nhan,
+          style: bLiet ? _kieuChu.copyWith(color: Colors.grey.shade400) : _kieuChu,
+          overflow: TextOverflow.visible,
+          softWrap: false),
     );
     final tyLe = tyLeThuHep;
     if (tyLe != null) {
@@ -3647,6 +3661,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henNhapNhayConTro?.cancel();
     _henEpConTro?.cancel();
     _henAnDoanSo?.cancel();
+    _henHetLietPastePhimAo?.cancel();
     _cuonVanBan.removeListener(_khiCuonVanBanBaoDoanSo);
     _conTroDangHien.dispose();
     _oChu.removeListener(_khiFocusConTroDoi);
@@ -4799,6 +4814,25 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (mounted) hienThongBaoGiua(context, 'Đã cắt và lưu vào bộ nhớ đệm');
   }
 
+  /// Bấm liên tiếp quá nhanh vào "Paste" dễ dán trùng lặp (chạm hai lần
+  /// trong lúc ngón tay chưa kịp rời màn hình cảm ứng) — sau mỗi lần bấm,
+  /// tự "liệt" nút 1,5 giây (chỉ để mắt thấy, xem `_NutCongCuChu.bLiet`) rồi
+  /// mới bấm lại được. Logic dán bên trong vẫn y hệt `_phimAoPaste`, không
+  /// đổi gì — chỉ bọc thêm lớp khoá tạm này ở ngoài.
+  bool _phimPasteDangLiet = false;
+  Timer? _henHetLietPastePhimAo;
+
+  Future<void> _phimAoPasteCoLiet() async {
+    if (_phimPasteDangLiet) return;
+    await _phimAoPaste();
+    if (!mounted) return;
+    setState(() => _phimPasteDangLiet = true);
+    _henHetLietPastePhimAo?.cancel();
+    _henHetLietPastePhimAo = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _phimPasteDangLiet = false);
+    });
+  }
+
   /// "Paste" — rỗng bộ nhớ đệm hoặc không đọc được thì im lặng bỏ qua.
   Future<void> _phimAoPaste() async {
     final data = await Clipboard.getData('text/plain');
@@ -5220,12 +5254,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Android/iOS gốc), không riêng web.
   bool get _ghiAmTheDangKhoaMicro => _trinhGhiAmMo;
 
-  /// Nút mây (thanh trên trình ghi âm) VÀ nút "phím 7" trong bảng điều
-  /// khiển đều gọi hàm này — không còn tự bật/tắt trực tiếp như trước nữa,
-  /// mà mở modal cài đặt (bật/tắt + số giây). Modal mở ra thì tạm dừng bản
-  /// đang ghi (nếu có), đóng modal thì tự tiếp tục ghi lại — theo đúng yêu
-  /// cầu, KHÔNG xét trạng thái tạm dừng từ trước (khác hẳn nút "Xoá bản
-  /// ghi âm", nơi phải nhớ đúng trạng thái cũ).
+  /// Nút "phím 7" trong Bảng điều khiển gọi hàm này — mở modal cài đặt
+  /// (bật/tắt + số giây). Modal mở ra thì tạm dừng bản đang ghi (nếu đang
+  /// ghi thật), đóng modal thì trả lại ĐÚNG trạng thái trước đó — y hệt
+  /// nút "Xoá bản ghi âm" và "phím 8": trước đây hàm này LUÔN ép tiếp tục
+  /// khi đóng, nên nếu người dùng đã chủ động tạm dừng RỒI mới mở modal
+  /// này, đóng modal lại vô tình tự ghi tiếp — sai, đã sửa.
   Future<void> _moModalCaiDatTuDongChuyenHoa() async {
     final dangGhiTruocDo = _soTheGhiAmDangGhi != null && !_theGhiAmDangTamDung;
     if (dangGhiTruocDo) await _tamDungTheGhiAmHienTai();
@@ -5295,7 +5329,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
 
     if (!mounted) return;
-    if (_soTheGhiAmDangGhi != null && _theGhiAmDangTamDung) {
+    if (dangGhiTruocDo && _soTheGhiAmDangGhi != null && _theGhiAmDangTamDung) {
       await _tiepTucTheGhiAmHienTai();
     }
   }
@@ -10027,7 +10061,47 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
-  Widget _nutDieuHuongTep() {
+  /// Chiều rộng nút "Thư mục" khi dài ra có chữ (màn hình rộng) — thay cho
+  /// ô vuông `_canhNutDieuHuongTep` bình thường. Dùng để tính `leadingWidth`
+  /// của AppBar ở nhánh màn rộng.
+  static const _rongNutThuMucCoChu = 108.0;
+
+  /// Nút "Mở thư mục" — hai kiểu: ô VUÔNG chỉ icon (màn hẹp, giữ nguyên như
+  /// cũ) hoặc DÀI RA có thêm chữ "Thư mục" cạnh icon (màn rộng). Đây giờ là
+  /// LỐI VÀO DUY NHẤT của màn Thư mục — nút cùng tên ở thanh công cụ ngang
+  /// phía dưới (`ThanhCongCu`) đã bỏ, tránh trùng hai nút một chức năng.
+  Widget _nutThuMuc({required bool coChu}) {
+    if (!coChu) {
+      return _nutVuongDieuHuongTep(Icons.folder, 'Mở thư mục', _moManHinhThuMuc);
+    }
+    return Tooltip(
+      message: 'Mở thư mục',
+      child: InkWell(
+        onTap: _moManHinhThuMuc,
+        child: Container(
+          width: _rongNutThuMucCoChu,
+          height: _canhNutDieuHuongTep,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: const Color(0xFFDADCE0)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.folder, size: 18, color: Color(0xFF5F6368)),
+              SizedBox(width: 6),
+              Text('Thư mục',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF5F6368))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _nutDieuHuongTep({bool nutThuMucCoChu = false}) {
     final ds = _dsGhiChuCungThuMuc();
     final viTriHienTai = ds.indexWhere((g) => g.id == _ghiChuHienTai.id);
     final coTruoc = viTriHienTai > 0;
@@ -10037,7 +10111,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _nutVuongDieuHuongTep(Icons.folder, 'Mở thư mục', _moManHinhThuMuc),
+          _nutThuMuc(coChu: nutThuMucCoChu),
           _nutMoRongTep(),
           _nutVuongDieuHuongTep(
             Icons.arrow_back,
@@ -10362,7 +10436,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final cacNut = <Widget>[
       _NutCongCuChu(nhan: 'Copy', onTap: _phimAoCopy),
       _NutCongCuChu(nhan: 'Cut', onTap: _phimAoCut),
-      _NutCongCuChu(nhan: 'Paste', onTap: _phimAoPaste, tyLeThuHep: 0.85),
+      _NutCongCuChu(
+        nhan: 'Paste',
+        onTap: _phimAoPasteCoLiet,
+        tyLeThuHep: 0.85,
+        bLiet: _phimPasteDangLiet,
+      ),
       _NutCongCuChu(
         nhan: 'All',
         moTa: 'Chọn từ — bấm 2-4 lần: đoạn văn/cụm đoạn văn/tất cả',
@@ -10795,8 +10874,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             ),
           )
         : AppBar(
-            leading: _nutDieuHuongTep(),
-            leadingWidth: _canhNutDieuHuongTep * 4 + 4,
+            leading: _nutDieuHuongTep(nutThuMucCoChu: true),
+            leadingWidth: _rongNutThuMucCoChu + _canhNutDieuHuongTep * 3 + 4,
             title: (_boPhimNhanhCamUngMo && _boPhimNhanhCamUngAn) ? _hangNutBoPhimNhanhTamAn() : _oTenField(),
             backgroundColor: Colors.white,
             surfaceTintColor: Colors.white,
@@ -11238,7 +11317,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 // trắng giữa thanh công cụ và bàn phím.
                 neThanhDieuHuong: caoBanPhim == 0,
                 khiBamMicro: _bamNutMicro,
-                khiBamThuMuc: _moManHinhThuMuc,
                 khiBamCaiDat: _moCaiDat,
                 khiBamHuongDan: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const ManHinhHuongDan()),
@@ -11307,7 +11385,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           // HẲN AppBar nên chúng biến mất theo, không còn cách quay lại Bộ
           // phím nhanh. Nút nổi "Hiện" này thay thế đúng một việc: bấm vào
           // là làm ĐÚNG NHƯ nút "Hiện lại Bộ phím nhanh" (xanh lá) đã ẩn.
-          if (_thuGonThanhCongCu && _boPhimNhanhCamUngMo && _boPhimNhanhCamUngAn)
+          // `_trinhGhiAmMo` cũng phải tính vào đây y hệt `_thuGonThanhCongCu`
+          // — AppBar của trình ghi âm CŨNG thay hẳn AppBar thường (không có
+          // `_hangNutBoPhimNhanhTamAn`), nên nút "Hiện" ở đó cũng bị che mất
+          // y hệt, cần đúng lối thoát nổi này.
+          if ((_thuGonThanhCongCu || _trinhGhiAmMo) &&
+              _boPhimNhanhCamUngMo &&
+              _boPhimNhanhCamUngAn)
             Positioned(
               right: 8,
               bottom: caoBanPhim + 56,
@@ -11468,16 +11552,17 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
     if (mounted) Navigator.of(context).pop();
   }
 
+  /// Cả phím 7 lẫn phím 8 đều trả lại ĐÚNG trạng thái trước đó khi đóng
+  /// modal (khác trước đây, phím 7 từng luôn ép tiếp tục) — dùng biến cục
+  /// bộ ghi lại NGAY TRƯỚC khi gọi, không dựa vào `widget.dangTamDungBanDau`
+  /// (đã cũ, chụp tại lúc MỞ Bảng điều khiển, không phải lúc mở modal con).
   Future<void> _moCaiDatTuDongChuyenHoa() async {
+    final truoc = _dangTamDung;
     setState(() => _dangTamDung = true);
     await widget.khiCaiDatTuDongChuyenHoa();
-    if (mounted) setState(() => _dangTamDung = false);
+    if (mounted) setState(() => _dangTamDung = truoc);
   }
 
-  /// Phím 8: modal trả lại ĐÚNG trạng thái trước đó khi đóng (khác phím 7,
-  /// nơi luôn ép tiếp tục) — nên đọc lại `_dangTamDung` từ chính state của
-  /// bản ghi (qua `widget.dangTamDungBanDau` không dùng được vì đã cũ; dùng
-  /// biến cục bộ ghi lại NGAY TRƯỚC khi gọi).
   Future<void> _moCaiDatTuDongMoBang() async {
     final truoc = _dangTamDung;
     setState(() => _dangTamDung = true);
