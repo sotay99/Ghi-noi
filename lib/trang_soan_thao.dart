@@ -3662,6 +3662,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henEpConTro?.cancel();
     _henAnDoanSo?.cancel();
     _henHetLietPastePhimAo?.cancel();
+    _theoDoiTapDoi.dispose();
     _cuonVanBan.removeListener(_khiCuonVanBanBaoDoanSo);
     _conTroDangHien.dispose();
     _oChu.removeListener(_khiFocusConTroDoi);
@@ -11470,6 +11471,7 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_khiPhimCucBo);
+    _theoDoiTapDoi.dispose();
     super.dispose();
   }
 

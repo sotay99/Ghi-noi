@@ -4,6 +4,8 @@
 // điều khiển ghi âm) đều cần đúng một cơ chế này, mỗi nơi một trạng thái
 // riêng, độc lập với nhau.
 
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 
 class TheoDoiTapDoiPhim {
@@ -27,7 +29,28 @@ class TheoDoiTapDoiPhim {
   /// khác để tạo một tổ hợp phím tắt hoàn toàn khác, không phải đang gõ
   /// "bấm 2 lần liên tiếp". Chỉ tính là một lần bấm hợp lệ nếu từ lúc
   /// xuống tới lúc nhả ra KHÔNG QUÁ ngưỡng này.
+  ///
+  /// KHÔNG ĐỦ một mình: một số thiết bị/trình duyệt mô phỏng việc GIỮ một
+  /// phím bằng cách tự gửi hàng loạt cặp xuống-nhả RỜI RẠC lặp lại đều đặn
+  /// (mỗi cặp rất ngắn, chỉ khác nhau ở NHỊP LẶP, không phải một lượt xuống
+  /// rồi giữ nguyên tới khi nhả thật) — mỗi cặp riêng lẻ vẫn "ngắn" nên qua
+  /// được ngưỡng trên, và hai cặp liên tiếp lại lọt đúng vào cửa sổ 1 giây
+  /// nên bị hiểu nhầm là "bấm 2 lần", kích hoạt lặp đi lặp lại suốt lúc giữ.
+  /// Xem `_khoaCtrl`/`_khoaShift` bên dưới — chốt chặn thứ hai xử lý đúng
+  /// trường hợp này.
   static const _nguongBamNgan = Duration(milliseconds: 350);
+
+  /// Khoá SAU KHI vừa kích hoạt — mọi hoạt động (xuống HAY nhả) của đúng
+  /// phím đó trong lúc khoá sẽ TỰ GIA HẠN khoá thêm một nhịp, nên khoá chỉ
+  /// tự mở khi phím đó THẬT SỰ im hẳn (không còn xuống/nhả gì nữa) liên tục
+  /// trong khoảng lặng này — một lượt giữ (hay một chuỗi bấm lặp do thiết
+  /// bị tự mô phỏng, xem giải thích ở `_nguongBamNgan`) nhờ vậy chỉ kích
+  /// hoạt được ĐÚNG MỘT LẦN, dù kéo dài bao lâu.
+  static const _nguongImLangSauKichHoat = Duration(milliseconds: 700);
+  bool _khoaCtrl = false;
+  bool _khoaShift = false;
+  Timer? _henMoKhoaCtrl;
+  Timer? _henMoKhoaShift;
 
   /// Gọi ở MỌI sự kiện phím (không lọc trước) — tự lọc bên trong, không
   /// bao giờ chặn phím lan đi tiếp (không phải việc của lớp này).
@@ -36,6 +59,11 @@ class TheoDoiTapDoiPhim {
         event.logicalKey == LogicalKeyboardKey.controlRight;
     final laShift = event.logicalKey == LogicalKeyboardKey.shiftLeft ||
         event.logicalKey == LogicalKeyboardKey.shiftRight;
+
+    // Còn đang khoá mà phím đó lại vừa có động tĩnh (xuống hay nhả đều
+    // tính) — gia hạn khoá thêm một nhịp, CHƯA cho mở ra.
+    if (laCtrl && _khoaCtrl) _giaHanKhoa(laCtrl: true);
+    if (laShift && _khoaShift) _giaHanKhoa(laCtrl: false);
 
     if (event is KeyDownEvent) {
       if (laCtrl) {
@@ -59,12 +87,13 @@ class TheoDoiTapDoiPhim {
       final ngan = xuong != null && DateTime.now().difference(xuong) <= _nguongBamNgan;
       final sach = _dangGiuSachCtrl && ngan;
       _dangGiuSachCtrl = false;
-      if (!sach) {
+      if (_khoaCtrl || !sach) {
         _lanTapSachCtrl = null;
       } else {
         final gio = DateTime.now();
         if (_lanTapSachCtrl != null && gio.difference(_lanTapSachCtrl!) <= _nguong) {
           _lanTapSachCtrl = null;
+          _khoaLaiSauKichHoat(laCtrl: true);
           khiTapDoi('ctrlDup');
         } else {
           _lanTapSachCtrl = gio;
@@ -76,17 +105,44 @@ class TheoDoiTapDoiPhim {
       final ngan = xuong != null && DateTime.now().difference(xuong) <= _nguongBamNgan;
       final sach = _dangGiuSachShift && ngan;
       _dangGiuSachShift = false;
-      if (!sach) {
+      if (_khoaShift || !sach) {
         _lanTapSachShift = null;
       } else {
         final gio = DateTime.now();
         if (_lanTapSachShift != null && gio.difference(_lanTapSachShift!) <= _nguong) {
           _lanTapSachShift = null;
+          _khoaLaiSauKichHoat(laCtrl: false);
           khiTapDoi('shiftDup');
         } else {
           _lanTapSachShift = gio;
         }
       }
     }
+  }
+
+  void _khoaLaiSauKichHoat({required bool laCtrl}) {
+    if (laCtrl) {
+      _khoaCtrl = true;
+    } else {
+      _khoaShift = true;
+    }
+    _giaHanKhoa(laCtrl: laCtrl);
+  }
+
+  void _giaHanKhoa({required bool laCtrl}) {
+    if (laCtrl) {
+      _henMoKhoaCtrl?.cancel();
+      _henMoKhoaCtrl = Timer(_nguongImLangSauKichHoat, () => _khoaCtrl = false);
+    } else {
+      _henMoKhoaShift?.cancel();
+      _henMoKhoaShift = Timer(_nguongImLangSauKichHoat, () => _khoaShift = false);
+    }
+  }
+
+  /// Huỷ hai bộ đếm giờ nội bộ — gọi trong `dispose()` của nơi giữ instance
+  /// này, tránh callback chạy sau khi widget đã bị huỷ.
+  void dispose() {
+    _henMoKhoaCtrl?.cancel();
+    _henMoKhoaShift?.cancel();
   }
 }
