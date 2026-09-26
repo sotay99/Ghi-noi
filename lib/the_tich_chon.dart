@@ -5,6 +5,7 @@
 // nguyên cả token — nhưng KHÔNG hỏi xác nhận trước khi xoá (không phải dữ
 // liệu quý như bản ghi âm; xoá nhầm thì bấm lại nút Tích chọn là có ngay).
 
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 const bieuTuongTichChonChuaXong = '🔲';
@@ -33,6 +34,16 @@ List<(int, int)> timCacVungTheTichChon(String text) {
 /// khi chỉ di chuyển (không gõ gì). KHÁC `ChanSuaGiuaThe`: không có đường
 /// hỏi xác nhận — chồng lấn một phần luôn được xoá thẳng cả token, không hỏi.
 class ChanSuaGiuaTheTichChon extends TextInputFormatter {
+  ChanSuaGiuaTheTichChon({this.khiDaXoaThe});
+
+  /// Gọi (một khung hình SAU, qua `addPostFrameCallback` — không gọi ngay
+  /// trong lúc formatter còn chạy, cùng lý do với `ChanSuaGiuaThe`) ngay sau
+  /// khi một token bị xoá NGUYÊN CẢ (dù do gõ/xoá bàn phím chồng lấn một
+  /// phần, hay chọn/xoá trọn) — [viTri] là vị trí nó từng đứng, [iconDaXoa]
+  /// là biểu tượng của nó lúc bị xoá. Nơi gọi dùng để áp side-effect "bỏ
+  /// gạch ngang cả đoạn" khi token bị xoá là ✅.
+  final void Function(int viTri, String iconDaXoa)? khiDaXoaThe;
+
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
@@ -81,6 +92,11 @@ class ChanSuaGiuaTheTichChon extends TextInputFormatter {
     for (final (batDau, ketThuc) in vungCu) {
       final chongLan = dau < ketThuc && cuoiCu > batDau;
       if (!chongLan) continue;
+      final icon = reTheTichChon.firstMatch(oldText.substring(batDau, ketThuc))?.group(1);
+      final goi = khiDaXoaThe;
+      if (goi != null && icon != null) {
+        SchedulerBinding.instance.addPostFrameCallback((_) => goi(batDau, icon));
+      }
       final vanBanKetQua = oldText.replaceRange(batDau, ketThuc, '');
       return TextEditingValue(
         text: vanBanKetQua,

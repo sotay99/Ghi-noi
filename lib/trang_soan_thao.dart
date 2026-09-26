@@ -7745,6 +7745,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _cacViTriDuongKeChia.clear();
       _quetVaXayDungDuongKeChia();
     }
+    // Thẻ Tích chọn ở đoạn vừa sửa có thể vừa trở thành rỗng (xoá hết chữ
+    // xung quanh) — tự dọn ngay, xem `_donDepTheTichChonRongQuanhViTri`.
+    _donDepTheTichChonRongQuanhViTri(dau, dau + doDaiChenVao);
     _henLuu();
     _lenLichKiemTraChinhTa();
   }
@@ -9058,14 +9061,27 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     return (s, e);
   }
 
-  /// Nút "Tích chọn" (✅) ở thanh định dạng thủ công — chèn thẻ ` (🔲) ` vào
-  /// đầu MỖI đoạn văn mà con trỏ/vùng chọn hiện đang chạm tới (vùng chọn
-  /// trải nhiều đoạn thì áp dụng cho cả — kể cả đoạn đầu/cuối chưa được
-  /// chọn hết), rồi ép cả đoạn đó (trừ 5 ký tự thẻ) về KHÔNG gạch ngang thân
-  /// (biểu tượng mới luôn là 🔲 — "chưa hoàn thành"). Bỏ qua (không thêm
-  /// thẻ thứ hai) những đoạn ĐÃ có sẵn thẻ, và bỏ qua những đoạn đang bị
-  /// khoá bởi AI hoặc là một thẻ ghi âm (`_giaoVoiVungAi`) — mỗi đoạn xét
-  /// riêng, không phải chặn cả thao tác.
+  /// Đoạn văn [s, e) coi là RỖNG (tính năng Tích chọn "không thấy" để áp
+  /// dụng) nếu bỏ token (nếu có) đi mà phần còn lại chỉ toàn dấu cách hoặc
+  /// không còn gì — dùng chung cho cả nút Tích chọn lẫn dọn-tự-động.
+  bool _doanRongChoTichChon(String noiDungDoan) {
+    final khop = reTheTichChon.firstMatch(noiDungDoan);
+    final phanChu =
+        khop == null ? noiDungDoan : noiDungDoan.replaceRange(khop.start, khop.end, '');
+    return phanChu.trim().isEmpty;
+  }
+
+  /// Nút "Tích chọn" (✅) ở thanh định dạng thủ công — TOGGLE theo từng đoạn
+  /// văn mà con trỏ/vùng chọn hiện đang chạm tới (vùng chọn trải nhiều đoạn
+  /// thì áp dụng độc lập cho từng đoạn — kể cả đoạn đầu/cuối chưa được chọn
+  /// hết): đoạn đã có sẵn thẻ (dùng đúng thẻ ĐẦU TIÊN nếu có nhiều thẻ do
+  /// người dùng tự gõ/dán — thẻ thừa phía sau giữ nguyên, không đụng tới) —
+  /// XOÁ thẻ đó, kèm bỏ gạch ngang cả đoạn nếu thẻ vừa xoá là ✅ (giống hệt
+  /// side-effect của việc 🔲 xuất hiện); đoạn CHƯA có thẻ — THÊM ` (🔲) `
+  /// vào đầu đoạn, ép cả đoạn (trừ thẻ) về KHÔNG gạch ngang. Bỏ qua (coi
+  /// như không thấy) đoạn RỖNG (`_doanRongChoTichChon`) hoặc đang bị khoá
+  /// bởi AI/thẻ ghi âm (`_giaoVoiVungAi`) — mỗi đoạn xét riêng, không chặn
+  /// cả thao tác.
   void _bamNutTichChon() {
     final chon = _boDieuKhien.selection;
     if (!chon.isValid) {
@@ -9088,47 +9104,71 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     if (danhSachDoan.isEmpty) return;
 
-    final dsApDung = <(int, int)>[];
+    final dsHopLe = <(int, int)>[];
     for (final (s, e) in danhSachDoan) {
-      if (reTheTichChon.hasMatch(vb.substring(s, e))) continue;
       if (_giaoVoiVungAi(s, e)) continue;
-      dsApDung.add((s, e));
+      if (_doanRongChoTichChon(vb.substring(s, e))) continue;
+      dsHopLe.add((s, e));
     }
-    if (dsApDung.isEmpty) {
-      _bao('Không có đoạn văn nào hợp lệ để thêm ô tích chọn (đã có sẵn, '
-          'hoặc đang bị khoá bởi AI/thẻ ghi âm).');
+    if (dsHopLe.isEmpty) {
+      _bao('Không có đoạn văn nào hợp lệ để bật/tắt ô tích chọn (đoạn '
+          'trống, hoặc đang bị khoá bởi AI/thẻ ghi âm).');
       return;
     }
 
     _luuDiemMoc();
-    final chen = nhanTheTichChon(bieuTuongTichChonChuaXong);
     var moi = vb;
     var viTriConTroMoi = diemCuoi;
 
-    // Xử lý từ đoạn CUỐI (offset lớn nhất) lùi về đầu — chèn ở một đoạn
+    // Xử lý từ đoạn CUỐI (offset lớn nhất) lùi về đầu — sửa ở một đoạn
     // không làm lệch offset của các đoạn đứng trước nó, nên không cần dồn
     // tính độ lệch qua từng bước.
-    for (final (s, e) in dsApDung.reversed) {
-      final vbTruoc = moi;
-      moi = moi.replaceRange(s, s, chen);
-      _dieuChinhVungToanVanSauKhiSua(s, 0, chen.length);
-      _dieuChinhLoiChinhTaSauKhiSua(s, 0, chen.length, vanBanCu: vbTruoc, vanBanMoi: moi);
-      _datCoDinhDangTrongVung(s + chen.length, e + chen.length, 'gachNgang', false);
-      if (s <= viTriConTroMoi) viTriConTroMoi += chen.length;
+    for (final (s, e) in dsHopLe.reversed) {
+      final khopDau = reTheTichChon.firstMatch(moi.substring(s, e));
+      int lech;
+      int viTriSua;
+      if (khopDau != null) {
+        // Đã có thẻ ĐẦU — xoá nó (toggle tắt).
+        final batDauT = s + khopDau.start, ketThucT = s + khopDau.end;
+        final doDaiXoa = ketThucT - batDauT;
+        final iconCu = khopDau.group(1)!;
+        final vbTruoc = moi;
+        moi = moi.replaceRange(batDauT, ketThucT, '');
+        _dieuChinhVungToanVanSauKhiSua(batDauT, doDaiXoa, 0);
+        _dieuChinhLoiChinhTaSauKhiSua(batDauT, doDaiXoa, 0,
+            vanBanCu: vbTruoc, vanBanMoi: moi);
+        if (iconCu == bieuTuongTichChonDaXong) {
+          _datCoDinhDangTrongVung(s, e - doDaiXoa, 'gachNgang', false);
+        }
+        lech = -doDaiXoa;
+        viTriSua = batDauT;
+      } else {
+        // Chưa có thẻ — thêm 🔲 vào đầu đoạn (toggle bật).
+        final chen = nhanTheTichChon(bieuTuongTichChonChuaXong);
+        final vbTruoc = moi;
+        moi = moi.replaceRange(s, s, chen);
+        _dieuChinhVungToanVanSauKhiSua(s, 0, chen.length);
+        _dieuChinhLoiChinhTaSauKhiSua(s, 0, chen.length, vanBanCu: vbTruoc, vanBanMoi: moi);
+        _datCoDinhDangTrongVung(s + chen.length, e + chen.length, 'gachNgang', false);
+        lech = chen.length;
+        viTriSua = s;
+      }
+      if (viTriSua <= viTriConTroMoi) viTriConTroMoi += lech;
     }
-    _ghiVaoO(moi, viTriConTroMoi);
+    _ghiVaoO(moi, viTriConTroMoi.clamp(0, moi.length));
     _boDieuKhien.veLai();
     _henLuu();
   }
 
   /// Bấm vào một thẻ Tích chọn đã có (` (🔲) ` hoặc ` (✅) `, tại đúng
-  /// [batDau, ketThuc) trong văn bản HIỆN TẠI) — đổi biểu tượng, rồi ép cả
-  /// đoạn văn chứa nó (trừ 5 ký tự thẻ) về ĐÚNG MỘT trạng thái gạch ngang
-  /// thân tương ứng: ✅ → gạch ngang cả đoạn (đã xong); 🔲 → bỏ gạch ngang cả
-  /// đoạn (chưa xong) — bất kể trước đó đoạn đang ở trạng thái gạch ngang
-  /// nào. Không giả định thẻ luôn nằm ĐÚNG đầu đoạn (gõ thêm chữ ngay trước
-  /// thẻ theo thời gian có thể làm nó trôi khỏi vị trí đầu), nên tìm lại
-  /// ranh giới đoạn thật bằng `_ranhGioiDoanTaiViTri`.
+  /// [batDau, ketThuc) trong văn bản HIỆN TẠI) — đổi biểu tượng của ĐÚNG thẻ
+  /// vừa bấm (dù nó có phải thẻ đầu tiên của đoạn hay không), rồi áp lại
+  /// side-effect gạch ngang theo thẻ ĐẦU TIÊN của đoạn (sau khi đổi) — nếu
+  /// thẻ vừa bấm không phải thẻ đầu, trạng thái đoạn coi như không đổi
+  /// (nhưng vẫn áp lại cho chắc, vô hại). Không giả định thẻ luôn nằm ĐÚNG
+  /// đầu đoạn (gõ thêm chữ ngay trước thẻ theo thời gian có thể làm nó trôi
+  /// khỏi vị trí đầu), nên tìm lại ranh giới đoạn thật bằng
+  /// `_ranhGioiDoanTaiViTri`.
   void _khiBamTheTichChon(int batDau, int ketThuc) {
     if (!mounted) return;
     final vb = _boDieuKhien.text;
@@ -9138,8 +9178,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (khop == null || khop.start != 0 || khop.end != doan.length) return;
 
     final iconCu = khop.group(1)!;
-    final daXongCu = iconCu == bieuTuongTichChonDaXong;
-    final iconMoi = daXongCu ? bieuTuongTichChonChuaXong : bieuTuongTichChonDaXong;
+    final iconMoi =
+        iconCu == bieuTuongTichChonDaXong ? bieuTuongTichChonChuaXong : bieuTuongTichChonDaXong;
     final tokenMoi = nhanTheTichChon(iconMoi);
     final (s, e) = _ranhGioiDoanTaiViTri(vb, batDau);
 
@@ -9149,17 +9189,69 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _dieuChinhLoiChinhTaSauKhiSua(batDau, doan.length, tokenMoi.length,
         vanBanCu: vb, vanBanMoi: vbSau);
 
-    final lech = tokenMoi.length - doan.length;
-    final eSau = e + lech;
-    final apGachNgang = !daXongCu; // sắp thành ✅ ("đã xong") thì gạch ngang.
-    // Cả đoạn TRỪ 5 ký tự thẻ — gồm phần TRƯỚC thẻ (nếu có, do trôi khỏi
-    // đầu đoạn) và phần SAU thẻ.
-    _datCoDinhDangTrongVung(s, batDau, 'gachNgang', apGachNgang);
-    _datCoDinhDangTrongVung(batDau + tokenMoi.length, eSau, 'gachNgang', apGachNgang);
+    final eSau = e + (tokenMoi.length - doan.length);
+    final khopDauMoi = reTheTichChon.firstMatch(vbSau.substring(s, eSau));
+    if (khopDauMoi != null) {
+      final batDauTokDau = s + khopDauMoi.start, ketThucTokDau = s + khopDauMoi.end;
+      final apGachNgang = khopDauMoi.group(1)! == bieuTuongTichChonDaXong;
+      _datCoDinhDangTrongVung(s, batDauTokDau, 'gachNgang', apGachNgang);
+      _datCoDinhDangTrongVung(ketThucTokDau, eSau, 'gachNgang', apGachNgang);
+    }
 
     _ghiVaoO(vbSau, batDau + tokenMoi.length);
     _boDieuKhien.veLai();
     _henLuu();
+  }
+
+  /// Xoá một thẻ Tích chọn ✅ bằng bàn phím (Backspace/Delete chạm vào nó,
+  /// tự "phóng to" xoá cả 5 ký tự — xem `ChanSuaGiuaTheTichChon`) — cùng
+  /// side-effect "bỏ gạch ngang cả đoạn" như khi 🔲 xuất hiện, dù người
+  /// dùng không hề bấm nút hay chạm vào thẻ. 🔲 bị xoá kiểu này thì không
+  /// cần làm gì (đoạn vốn đã không gạch ngang).
+  void _khiDaXoaTheTichChon(int viTri, String iconDaXoa) {
+    if (!mounted || iconDaXoa != bieuTuongTichChonDaXong) return;
+    final vb = _boDieuKhien.text;
+    final (s, e) = _ranhGioiDoanTaiViTri(vb, viTri.clamp(0, vb.length));
+    if (s >= e) return;
+    if (vb.substring(s, e).trim().isEmpty) return; // đoạn đã rỗng — vô nghĩa.
+    _luuDiemMocDinhDang();
+    _datCoDinhDangTrongVung(s, e, 'gachNgang', false);
+    _boDieuKhien.veLai();
+    _henLuu();
+  }
+
+  /// Quét quanh hai vị trí [a]/[b] (thường là điểm bắt đầu/kết thúc của một
+  /// lần sửa văn bản vừa xong) — đoạn văn nào ở đó đang có thẻ Tích chọn mà
+  /// đã trở thành RỖNG (`_doanRongChoTichChon`, do người dùng xoá hết chữ
+  /// xung quanh) thì tự xoá luôn thẻ đó, vì nó không còn ý nghĩa gì. Gọi sau
+  /// MỌI lần đổi văn bản (gõ tay, Lùi lại/Tiến tới...) — chỉ quét quanh chỗ
+  /// vừa đổi, không quét lại toàn bài, nên rất rẻ.
+  void _donDepTheTichChonRongQuanhViTri(int a, int b) {
+    for (final diem in {a, b}) {
+      final vb = _boDieuKhien.text;
+      if (diem < 0 || diem > vb.length) continue;
+      final (s, e) = _ranhGioiDoanTaiViTri(vb, diem);
+      if (s >= e) continue;
+      final noiDung = vb.substring(s, e);
+      if (!_doanRongChoTichChon(noiDung)) continue;
+      final khop = reTheTichChon.firstMatch(noiDung);
+      if (khop == null) continue; // đoạn rỗng nhưng vốn không có thẻ, bỏ qua.
+      final batDauT = s + khop.start, ketThucT = s + khop.end;
+
+      _luuDiemMoc();
+      final vbSau = vb.replaceRange(batDauT, ketThucT, '');
+      _dieuChinhVungToanVanSauKhiSua(batDauT, ketThucT - batDauT, 0);
+      _dieuChinhLoiChinhTaSauKhiSua(batDauT, ketThucT - batDauT, 0,
+          vanBanCu: vb, vanBanMoi: vbSau);
+      final conTro = _boDieuKhien.selection.isValid
+          ? _boDieuKhien.selection.start
+          : vbSau.length;
+      final conTroMoi =
+          (conTro > batDauT ? conTro - (ketThucT - batDauT) : conTro).clamp(0, vbSau.length);
+      _ghiVaoO(vbSau, conTroMoi);
+      _boDieuKhien.veLai();
+      _henLuu();
+    }
   }
 
   /// D1 cho màu chữ/màu nền: đặt mauChu/mauNen thành [mau] (null = xoá) cho
@@ -9957,6 +10049,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (widget.caiDat.tuDongThemDuongKeChia) {
       _quetVaXayDungDuongKeChia();
     }
+    // Lưới an toàn — bản thân các mốc lịch sử vốn đã sạch (mỗi lần lưu mốc
+    // đều chạy qua bước dọn này rồi), nhưng dọn lại cho chắc, cùng lý do
+    // với `_apDungChinhSuaNguoiDung`.
+    _donDepTheTichChonRongQuanhViTri(_neo, _neo);
     _henLuu();
   }
 
@@ -11462,7 +11558,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           // thẻ ghi âm — xem `ChanSuaGiuaThe`.
                           inputFormatters: [
                             ChanSuaGiuaThe(khiCanXoaThe: _khiCanXoaTheTuBanPhim),
-                            ChanSuaGiuaTheTichChon(),
+                            ChanSuaGiuaTheTichChon(khiDaXoaThe: _khiDaXoaTheTichChon),
                           ],
                           textCapitalization: TextCapitalization.sentences,
                           style: _kieuVanBan,
