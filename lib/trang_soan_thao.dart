@@ -3491,11 +3491,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// `_tiLeMocTraiDoanSo`) — phần tử `null` = mốc đó đang ẩn.
   List<int?> _doanSoMocTrai = List<int?>.filled(_tiLeMocTraiDoanSo.length, null);
 
-  /// Toạ độ (đo trong hệ toạ độ CỤC BỘ của `_khungVanBanKey` — Stack bọc
-  /// ngay ngoài `TextField`, xem `_veMocPhuDoanSo`) của từng mốc phụ — dùng
-  /// để ĐẶT ĐÚNG VỊ TRÍ hiển thị. `null` = chưa đo được lần nào.
-  List<Offset?> _diemMocTraiDoanSo = List<Offset?>.filled(_tiLeMocTraiDoanSo.length, null);
-
   Timer? _henAnDoanSo;
 
   /// Đếm số đoạn TRƯỚC (không tính) vị trí ký tự [viTri] rồi +1 — "đoạn" ở
@@ -3536,40 +3531,34 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// cuộn, xem `_cuonToiKetQuaHienTai`), nên cứ cộng thẳng `_cuonVanBan.offset`
   /// vào là ra đúng điểm cần dò, không cần quan tâm cuộn đã đi bao xa.
   ///
-  /// Vị trí để ĐẶT nhãn của 5 mốc phụ lại tính RIÊNG, bằng
-  /// `RenderEditable.localToGlobal(point, ancestor: khungBox)` — y hệt cách
-  /// `_veConTro()` định vị con trỏ — quy đổi THẲNG một bước sang toạ độ cục
-  /// bộ của `_khungVanBanKey` (Stack bọc ngay ngoài ô chữ), KHÔNG đi vòng
-  /// qua toạ độ toàn cục thật của màn hình. Từng đi vòng qua toạ độ toàn cục
-  /// (gọi `localToGlobal` không tham số rồi tự `globalToLocal` lại bằng một
-  /// `RenderBox` khác ở Stack NGOÀI CÙNG) — sai số cộng dồn theo độ sâu cuộn
-  /// khiến các mốc phía trên trôi dần ra ngoài màn hình, biến mất, càng cuộn
-  /// sâu càng mất nhiều mốc — lỗi đã được người dùng phát hiện và báo lại.
+  /// CHỈ dùng `RenderEditable` để tìm SỐ ĐOẠN — không còn dùng để tính VỊ
+  /// TRÍ hiển thị của mốc phụ nữa (hai lần thử trước, cả hai đường quy đổi
+  /// toạ độ qua `RenderEditable` — toàn cục lẫn có `ancestor:` — đều bị lỗi
+  /// mốc phía trên biến mất dần khi cuộn sâu, người dùng xác nhận cả hai
+  /// lần). Vị trí một mốc phụ vốn là một điểm CỐ ĐỊNH theo TỈ LỆ chiều cao
+  /// khung nhìn, không phụ thuộc nội dung hay đã cuộn bao xa — tính thẳng
+  /// bằng `vpCao * tỉ lệ` (xem `_veMocPhuDoanSo`), không cần quy đổi gì cả.
   void _khiCuonVanBanBaoDoanSo() {
     if (!mounted || !_cuonVanBan.hasClients) return;
     final hopVanBan = _oVanBanKey.currentContext?.findRenderObject();
     if (hopVanBan == null) return;
     final re = _timRenderEditable(hopVanBan);
     if (re == null || !re.hasSize) return;
-    final khungBox = _khungVanBanKey.currentContext?.findRenderObject();
 
     final vpCao = _cuonVanBan.position.viewportDimension;
 
-    (int, Offset?)? doTaiY(double yTrongKhungNhin) {
+    int? doTaiY(double yTrongKhungNhin) {
       final diemNham = Offset(re.size.width / 2, _cuonVanBan.offset + yTrongKhungNhin);
       try {
         final vt = re.getPositionForPoint(re.localToGlobal(diemNham));
-        final diemCucBo = khungBox is RenderBox
-            ? re.localToGlobal(diemNham, ancestor: khungBox)
-            : null;
-        return (_demSoDoanTaiViTri(_boDieuKhien.text, vt.offset), diemCucBo);
+        return _demSoDoanTaiViTri(_boDieuKhien.text, vt.offset);
       } catch (_) {
         return null;
       }
     }
 
     final yDay = (vpCao - _khoangCachMocBaoDoanTuDay).clamp(0.0, vpCao);
-    final soDoanDay = doTaiY(yDay)?.$1;
+    final soDoanDay = doTaiY(yDay);
 
     var doiGi = false;
     if (soDoanDay != null && soDoanDay != _doanSoDangHien) {
@@ -3578,10 +3567,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
 
     for (var i = 0; i < _tiLeMocTraiDoanSo.length; i++) {
-      final kq = doTaiY(vpCao * _tiLeMocTraiDoanSo[i]);
-      if (kq == null) continue;
-      final (soDoan, diemCucBo) = kq;
-      _diemMocTraiDoanSo[i] = diemCucBo ?? _diemMocTraiDoanSo[i];
+      final soDoan = doTaiY(vpCao * _tiLeMocTraiDoanSo[i]);
+      if (soDoan == null) continue;
       if (soDoan != _doanSoMocTrai[i]) {
         _doanSoMocTrai[i] = soDoan;
         doiGi = true;
@@ -3602,19 +3589,22 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   /// 5 nhãn PHỤ báo "Đoạn số" chỉ hiện mỗi số "N" (đổi màu TOÀN BỘ chữ theo
   /// mốc), rải dọc mép trái ô soạn thảo — vẽ NGAY TRONG Stack bọc ô chữ
-  /// (`_khungVanBanKey`), dùng toạ độ CỤC BỘ đã tính sẵn ở
-  /// `_khiCuonVanBanBaoDoanSo` (`_diemMocTraiDoanSo`, đã quy đổi qua đúng
-  /// Stack này bằng `RenderEditable.localToGlobal(point, ancestor: ...)`).
+  /// (`_khungVanBanKey`, cùng lớp với con trỏ/đường kẻ chia). Vị trí tính
+  /// THẲNG bằng `vpCao * tỉ lệ` — một mốc phụ là điểm CỐ ĐỊNH theo tỉ lệ
+  /// chiều cao khung nhìn, không phụ thuộc nội dung hay đã cuộn bao xa,
+  /// nên KHÔNG cần quy đổi gì qua `RenderEditable` cả (hai lần thử trước
+  /// đều quy đổi qua đó và đều lỗi mốc trên biến mất dần khi cuộn sâu).
   Widget _veMocPhuDoanSo() {
+    final vpCao = _cuonVanBan.hasClients ? _cuonVanBan.position.viewportDimension : null;
     return Positioned.fill(
       child: IgnorePointer(
         child: Stack(
           children: [
             for (var i = 0; i < _tiLeMocTraiDoanSo.length; i++)
-              if (_doanSoMocTrai[i] != null && _diemMocTraiDoanSo[i] != null)
+              if (_doanSoMocTrai[i] != null && vpCao != null)
                 Positioned(
                   left: 12,
-                  top: _diemMocTraiDoanSo[i]!.dy - 13,
+                  top: vpCao * _tiLeMocTraiDoanSo[i] - 13,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
