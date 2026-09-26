@@ -20,6 +20,7 @@ import 'doan_thiet_bi.dart';
 import 'mo_lien_ket_ngoai.dart';
 import 'nghe_resize_trinh_duyet.dart';
 import 'ghi_am_the.dart';
+import 'the_tich_chon.dart';
 import 'gui_ghi_am_gemini.dart';
 import 'canh_bao_roi_trang.dart';
 import 'kho_du_lieu.dart';
@@ -1359,6 +1360,7 @@ class _BoDieuKhienChinhTa extends TextEditingController {
   void Function(_VungCanXoa vung, Offset viTriManHinh)? khiBamDoanCanXoa;
   void Function(int soThe, Offset viTriManHinh)? khiBamTheGhiAmHoanChinh;
   void Function(int soThe, Offset viTriManHinh)? khiBamTheDangChuyen;
+  void Function(int batDau, int ketThuc)? khiBamTheTichChon;
 
   /// Số thẻ đang ở trạng thái "lỗi tạm thời" (gửi thất bại, chờ gửi lại) —
   /// chữ vẫn là `〔Ghi âm N 🎙️ mm:ss〕` như thẻ xong bình thường, chỉ khác
@@ -1456,6 +1458,20 @@ class _BoDieuKhienChinhTa extends TextEditingController {
         ));
         timTu = i + tenTokenDangGhiAm.length;
       }
+    }
+
+    // Thẻ Tích chọn ` (🔲) `/` (✅) ` — bấm vào là đổi biểu tượng ngay (xem
+    // `_khiBamTheTichChon`). Không chồng lấn vùng nào khác nhờ `_giaoVoiVungAi`
+    // đã chặn định dạng/AI đụng vào nó ngay từ nguồn (y hệt thẻ ghi âm).
+    for (final m in reTheTichChon.allMatches(vb)) {
+      final batDauKhop = m.start, ketThucKhop = m.end;
+      vung.add(_VungVe(
+        batDau: batDauKhop,
+        ketThuc: ketThucKhop,
+        style: const TextStyle(fontWeight: FontWeight.bold),
+        recognizer: TapGestureRecognizer()
+          ..onTapDown = (_) => khiBamTheTichChon?.call(batDauKhop, ketThucKhop),
+      ));
     }
 
     for (final l in loi) {
@@ -3389,6 +3405,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             padding: EdgeInsets.zero,
             onPressed: () => _apDungDinhDang('xoaDinhDang'),
           ),
+          IconButton(
+            iconSize: 20,
+            tooltip: 'Tích chọn — chèn ô 🔲 đầu đoạn văn, gạch ngang cả đoạn '
+                'khi bấm chuyển thành ✅',
+            icon: const Text('✅', style: TextStyle(fontSize: 16)),
+            visualDensity: matDoNut,
+            constraints: kichThuocNut,
+            padding: EdgeInsets.zero,
+            onPressed: _bamNutTichChon,
+          ),
         ],
       ),
     );
@@ -3713,6 +3739,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _boDieuKhien.khiBamDoanCanXoa = _khiBamDoanCanXoa;
     _boDieuKhien.khiBamTheGhiAmHoanChinh = _khiBamTheGhiAmHoanChinh;
     _boDieuKhien.khiBamTheDangChuyen = _khiBamTheDangChuyen;
+    _boDieuKhien.khiBamTheTichChon = _khiBamTheTichChon;
     _oTimKiem.addListener(_capNhatKetQuaTimKiem);
     _oTimKiem.addListener(_khiOTimKiemDoi);
     _oThayThe.addListener(_khiOThayTheDoi);
@@ -8054,6 +8081,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     for (final (tb, tk) in timCacVungTheGhiAm(_boDieuKhien.text)) {
       if (batDau < tk && ketThuc > tb) return true;
     }
+    // Thẻ Tích chọn cũng vậy — y hệt lý do trên.
+    for (final (tb, tk) in timCacVungTheTichChon(_boDieuKhien.text)) {
+      if (batDau < tk && ketThuc > tb) return true;
+    }
     return false;
   }
 
@@ -9014,6 +9045,121 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         if (giaTri) v.treMu = false;
       }
     });
+  }
+
+  /// Ranh giới đoạn văn (mỗi đoạn là văn bản giữa hai dấu `\n` liên tiếp,
+  /// KHÔNG kể chính dấu `\n`) chứa vị trí [viTri] — dùng chung cho cả nút
+  /// "Tích chọn" lẫn việc bấm-đổi-biểu-tượng của một thẻ đã có sẵn.
+  (int, int) _ranhGioiDoanTaiViTri(String vb, int viTri) {
+    var s = viTri.clamp(0, vb.length);
+    while (s > 0 && vb.codeUnitAt(s - 1) != 0x0A) s--;
+    var e = viTri.clamp(0, vb.length);
+    while (e < vb.length && vb.codeUnitAt(e) != 0x0A) e++;
+    return (s, e);
+  }
+
+  /// Nút "Tích chọn" (✅) ở thanh định dạng thủ công — chèn thẻ ` (🔲) ` vào
+  /// đầu MỖI đoạn văn mà con trỏ/vùng chọn hiện đang chạm tới (vùng chọn
+  /// trải nhiều đoạn thì áp dụng cho cả — kể cả đoạn đầu/cuối chưa được
+  /// chọn hết), rồi ép cả đoạn đó (trừ 5 ký tự thẻ) về KHÔNG gạch ngang thân
+  /// (biểu tượng mới luôn là 🔲 — "chưa hoàn thành"). Bỏ qua (không thêm
+  /// thẻ thứ hai) những đoạn ĐÃ có sẵn thẻ, và bỏ qua những đoạn đang bị
+  /// khoá bởi AI hoặc là một thẻ ghi âm (`_giaoVoiVungAi`) — mỗi đoạn xét
+  /// riêng, không phải chặn cả thao tác.
+  void _bamNutTichChon() {
+    final chon = _boDieuKhien.selection;
+    if (!chon.isValid) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _oChu.requestFocus();
+      });
+      return;
+    }
+    final vb = _boDieuKhien.text;
+    final diemDau = chon.start, diemCuoi = chon.end;
+
+    final danhSachDoan = <(int, int)>[];
+    var batDauHienTai = 0;
+    for (var i = 0; i <= vb.length; i++) {
+      if (i == vb.length || vb.codeUnitAt(i) == 0x0A) {
+        final s = batDauHienTai, e = i;
+        if (s <= diemCuoi && e >= diemDau) danhSachDoan.add((s, e));
+        batDauHienTai = i + 1;
+      }
+    }
+    if (danhSachDoan.isEmpty) return;
+
+    final dsApDung = <(int, int)>[];
+    for (final (s, e) in danhSachDoan) {
+      if (reTheTichChon.hasMatch(vb.substring(s, e))) continue;
+      if (_giaoVoiVungAi(s, e)) continue;
+      dsApDung.add((s, e));
+    }
+    if (dsApDung.isEmpty) {
+      _bao('Không có đoạn văn nào hợp lệ để thêm ô tích chọn (đã có sẵn, '
+          'hoặc đang bị khoá bởi AI/thẻ ghi âm).');
+      return;
+    }
+
+    _luuDiemMoc();
+    final chen = nhanTheTichChon(bieuTuongTichChonChuaXong);
+    var moi = vb;
+    var viTriConTroMoi = diemCuoi;
+
+    // Xử lý từ đoạn CUỐI (offset lớn nhất) lùi về đầu — chèn ở một đoạn
+    // không làm lệch offset của các đoạn đứng trước nó, nên không cần dồn
+    // tính độ lệch qua từng bước.
+    for (final (s, e) in dsApDung.reversed) {
+      final vbTruoc = moi;
+      moi = moi.replaceRange(s, s, chen);
+      _dieuChinhVungToanVanSauKhiSua(s, 0, chen.length);
+      _dieuChinhLoiChinhTaSauKhiSua(s, 0, chen.length, vanBanCu: vbTruoc, vanBanMoi: moi);
+      _datCoDinhDangTrongVung(s + chen.length, e + chen.length, 'gachNgang', false);
+      if (s <= viTriConTroMoi) viTriConTroMoi += chen.length;
+    }
+    _ghiVaoO(moi, viTriConTroMoi);
+    _boDieuKhien.veLai();
+    _henLuu();
+  }
+
+  /// Bấm vào một thẻ Tích chọn đã có (` (🔲) ` hoặc ` (✅) `, tại đúng
+  /// [batDau, ketThuc) trong văn bản HIỆN TẠI) — đổi biểu tượng, rồi ép cả
+  /// đoạn văn chứa nó (trừ 5 ký tự thẻ) về ĐÚNG MỘT trạng thái gạch ngang
+  /// thân tương ứng: ✅ → gạch ngang cả đoạn (đã xong); 🔲 → bỏ gạch ngang cả
+  /// đoạn (chưa xong) — bất kể trước đó đoạn đang ở trạng thái gạch ngang
+  /// nào. Không giả định thẻ luôn nằm ĐÚNG đầu đoạn (gõ thêm chữ ngay trước
+  /// thẻ theo thời gian có thể làm nó trôi khỏi vị trí đầu), nên tìm lại
+  /// ranh giới đoạn thật bằng `_ranhGioiDoanTaiViTri`.
+  void _khiBamTheTichChon(int batDau, int ketThuc) {
+    if (!mounted) return;
+    final vb = _boDieuKhien.text;
+    if (ketThuc > vb.length || batDau < 0 || batDau >= ketThuc) return;
+    final doan = vb.substring(batDau, ketThuc);
+    final khop = reTheTichChon.firstMatch(doan);
+    if (khop == null || khop.start != 0 || khop.end != doan.length) return;
+
+    final iconCu = khop.group(1)!;
+    final daXongCu = iconCu == bieuTuongTichChonDaXong;
+    final iconMoi = daXongCu ? bieuTuongTichChonChuaXong : bieuTuongTichChonDaXong;
+    final tokenMoi = nhanTheTichChon(iconMoi);
+    final (s, e) = _ranhGioiDoanTaiViTri(vb, batDau);
+
+    _luuDiemMoc();
+    final vbSau = vb.replaceRange(batDau, ketThuc, tokenMoi);
+    _dieuChinhVungToanVanSauKhiSua(batDau, doan.length, tokenMoi.length);
+    _dieuChinhLoiChinhTaSauKhiSua(batDau, doan.length, tokenMoi.length,
+        vanBanCu: vb, vanBanMoi: vbSau);
+
+    final lech = tokenMoi.length - doan.length;
+    final eSau = e + lech;
+    final apGachNgang = !daXongCu; // sắp thành ✅ ("đã xong") thì gạch ngang.
+    // Cả đoạn TRỪ 5 ký tự thẻ — gồm phần TRƯỚC thẻ (nếu có, do trôi khỏi
+    // đầu đoạn) và phần SAU thẻ.
+    _datCoDinhDangTrongVung(s, batDau, 'gachNgang', apGachNgang);
+    _datCoDinhDangTrongVung(batDau + tokenMoi.length, eSau, 'gachNgang', apGachNgang);
+
+    _ghiVaoO(vbSau, batDau + tokenMoi.length);
+    _boDieuKhien.veLai();
+    _henLuu();
   }
 
   /// D1 cho màu chữ/màu nền: đặt mauChu/mauNen thành [mau] (null = xoá) cho
@@ -11316,6 +11462,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           // thẻ ghi âm — xem `ChanSuaGiuaThe`.
                           inputFormatters: [
                             ChanSuaGiuaThe(khiCanXoaThe: _khiCanXoaTheTuBanPhim),
+                            ChanSuaGiuaTheTichChon(),
                           ],
                           textCapitalization: TextCapitalization.sentences,
                           style: _kieuVanBan,
