@@ -23,11 +23,17 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # `cache: true` (Actions Cache) đã bỏ hẳn — nó lưu bộ nhớ đệm SDK
+      # Flutter vào ĐÚNG kho lưu trữ chung với Artifacts (mục "Caches" của
+      # Actions, một trang RIÊNG không lẫn trong Releases hay Artifacts,
+      # dễ bị bỏ quên khi dọn dẹp) — từng là nguyên nhân âm thầm gây đầy hạn
+      # mức lưu trữ, khiến bước tải APK lên bên dưới cứ báo "Artifact
+      # storage quota has been hit" dù đã xoá Releases/Artifacts. Đổi lại:
+      # mỗi lần chạy tải lại Flutter SDK từ đầu, chậm hơn khoảng 1-2 phút.
       - name: Cài Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          cache: true
 
       - name: Xem phiên bản
         run: flutter --version

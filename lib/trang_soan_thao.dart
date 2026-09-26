@@ -2920,12 +2920,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   final _oVanBanKey = GlobalKey();
   final _khungVanBanKey = GlobalKey();
 
-  /// Stack ngoài cùng của cả thân trang (`body`) — cố định trên màn hình,
-  /// KHÔNG cuộn theo văn bản. Dùng làm hệ toạ độ đích khi quy đổi vị trí
-  /// các mốc phụ "Đoạn số" (`_nhanDoanSo`) từ toạ độ màn hình sang toạ độ
-  /// cục bộ để đặt `Positioned`.
-  final _khungThanTrangKey = GlobalKey();
-
   /// Dò xuống cây RenderObject tìm `RenderEditable` — chính là render object
   /// mà `TextField` dùng để vẽ chữ và đặt con trỏ thật. `visitChildren` không
   /// có cách dừng giữa chừng nên vẫn duyệt hết, nhưng `??=` đảm bảo chỉ giữ
@@ -3497,12 +3491,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// `_tiLeMocTraiDoanSo`) — phần tử `null` = mốc đó đang ẩn.
   List<int?> _doanSoMocTrai = List<int?>.filled(_tiLeMocTraiDoanSo.length, null);
 
-  /// Toạ độ Y (đo trong hệ toạ độ của `_khungThanTrangKey` — Stack ngoài
-  /// cùng của cả thân trang, CỐ ĐỊNH trên màn hình, không cuộn theo văn
-  /// bản) của từng mốc phụ — dùng để ĐẶT ĐÚNG VỊ TRÍ hiển thị, độc lập với
-  /// việc có banner/thanh công cụ nào chiếm chỗ phía trên khung soạn thảo
-  /// hay không. `null` = chưa đo được lần nào.
-  List<double?> _yMocTraiDoanSo = List<double?>.filled(_tiLeMocTraiDoanSo.length, null);
+  /// Toạ độ (đo trong hệ toạ độ CỤC BỘ của `_khungVanBanKey` — Stack bọc
+  /// ngay ngoài `TextField`, xem `_veMocPhuDoanSo`) của từng mốc phụ — dùng
+  /// để ĐẶT ĐÚNG VỊ TRÍ hiển thị. `null` = chưa đo được lần nào.
+  List<Offset?> _diemMocTraiDoanSo = List<Offset?>.filled(_tiLeMocTraiDoanSo.length, null);
 
   Timer? _henAnDoanSo;
 
@@ -3542,26 +3534,35 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// `getPositionForPoint` nhận toạ độ TOÀN CỤC, còn toạ độ CỤC BỘ của
   /// `RenderEditable` vốn đã tính theo "không gian nội dung" (không đổi khi
   /// cuộn, xem `_cuonToiKetQuaHienTai`), nên cứ cộng thẳng `_cuonVanBan.offset`
-  /// vào là ra đúng điểm cần dò, không cần quan tâm cuộn đã đi bao xa. Đúng
-  /// điểm toàn cục đó, sau khi quy đổi qua `_khungThanTrangKey`, cũng chính
-  /// là vị trí Y cần ĐẶT nhãn của mốc phụ lên màn hình — một lượt dò dùng
-  /// được cho cả hai việc.
+  /// vào là ra đúng điểm cần dò, không cần quan tâm cuộn đã đi bao xa.
+  ///
+  /// Vị trí để ĐẶT nhãn của 5 mốc phụ lại tính RIÊNG, bằng
+  /// `RenderEditable.localToGlobal(point, ancestor: khungBox)` — y hệt cách
+  /// `_veConTro()` định vị con trỏ — quy đổi THẲNG một bước sang toạ độ cục
+  /// bộ của `_khungVanBanKey` (Stack bọc ngay ngoài ô chữ), KHÔNG đi vòng
+  /// qua toạ độ toàn cục thật của màn hình. Từng đi vòng qua toạ độ toàn cục
+  /// (gọi `localToGlobal` không tham số rồi tự `globalToLocal` lại bằng một
+  /// `RenderBox` khác ở Stack NGOÀI CÙNG) — sai số cộng dồn theo độ sâu cuộn
+  /// khiến các mốc phía trên trôi dần ra ngoài màn hình, biến mất, càng cuộn
+  /// sâu càng mất nhiều mốc — lỗi đã được người dùng phát hiện và báo lại.
   void _khiCuonVanBanBaoDoanSo() {
     if (!mounted || !_cuonVanBan.hasClients) return;
     final hopVanBan = _oVanBanKey.currentContext?.findRenderObject();
     if (hopVanBan == null) return;
     final re = _timRenderEditable(hopVanBan);
     if (re == null || !re.hasSize) return;
-    final thanBox = _khungThanTrangKey.currentContext?.findRenderObject() as RenderBox?;
+    final khungBox = _khungVanBanKey.currentContext?.findRenderObject();
 
     final vpCao = _cuonVanBan.position.viewportDimension;
 
-    (int, Offset)? doTaiY(double yTrongKhungNhin) {
+    (int, Offset?)? doTaiY(double yTrongKhungNhin) {
       final diemNham = Offset(re.size.width / 2, _cuonVanBan.offset + yTrongKhungNhin);
       try {
-        final diemToanCuc = re.localToGlobal(diemNham);
-        final vt = re.getPositionForPoint(diemToanCuc);
-        return (_demSoDoanTaiViTri(_boDieuKhien.text, vt.offset), diemToanCuc);
+        final vt = re.getPositionForPoint(re.localToGlobal(diemNham));
+        final diemCucBo = khungBox is RenderBox
+            ? re.localToGlobal(diemNham, ancestor: khungBox)
+            : null;
+        return (_demSoDoanTaiViTri(_boDieuKhien.text, vt.offset), diemCucBo);
       } catch (_) {
         return null;
       }
@@ -3579,8 +3580,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     for (var i = 0; i < _tiLeMocTraiDoanSo.length; i++) {
       final kq = doTaiY(vpCao * _tiLeMocTraiDoanSo[i]);
       if (kq == null) continue;
-      final (soDoan, diemToanCuc) = kq;
-      _yMocTraiDoanSo[i] = thanBox?.globalToLocal(diemToanCuc).dy ?? _yMocTraiDoanSo[i];
+      final (soDoan, diemCucBo) = kq;
+      _diemMocTraiDoanSo[i] = diemCucBo ?? _diemMocTraiDoanSo[i];
       if (soDoan != _doanSoMocTrai[i]) {
         _doanSoMocTrai[i] = soDoan;
         doiGi = true;
@@ -3599,76 +3600,84 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     });
   }
 
-  /// Nhãn CHÍNH "Đoạn số: N" (đáy màn hình — chữ "Đoạn số: " luôn trắng
-  /// bình thường, CHỈ riêng số N đổi màu theo mốc) + 5 nhãn PHỤ chỉ hiện
-  /// mỗi số "N" (mép trái, đổi màu TOÀN BỘ chữ theo mốc) — tất cả tự ẩn sau
-  /// 1 giây kể từ lần cuộn cuối (xem `_khiCuonVanBanBaoDoanSo`). Luôn có
-  /// mặt trong app, không có cài đặt bật/tắt. Trả về DANH SÁCH `Positioned`
-  /// (không phải một widget duy nhất) để ghép thẳng vào `children` của
-  /// Stack ngoài cùng (`_khungThanTrangKey`) — mỗi nhãn phụ cần toạ độ
-  /// riêng, không thể gói chung trong một Positioned.
-  List<Widget> _nhanDoanSo(double caoBanPhim) {
-    return [
-      for (var i = 0; i < _tiLeMocTraiDoanSo.length; i++)
-        if (_doanSoMocTrai[i] != null && _yMocTraiDoanSo[i] != null)
-          Positioned(
-            left: 12,
-            top: _yMocTraiDoanSo[i]! - 13,
-            child: IgnorePointer(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.7),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  '${_doanSoMocTrai[i]}',
-                  style: TextStyle(
-                    color: _mauChuSoTheoMocDoan(_doanSoMocTrai[i]!) ?? Colors.white,
-                    fontWeight: _damChuSoTheoMocDoan(_doanSoMocTrai[i]!)
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ),
-          ),
-      Positioned(
-        left: 12,
-        bottom: caoBanPhim + 12,
-        child: IgnorePointer(
-          child: AnimatedOpacity(
-            opacity: _doanSoDangHien == null ? 0.0 : 1.0,
-            duration: const Duration(milliseconds: 150),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.7),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text.rich(
-                TextSpan(
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                  children: [
-                    const TextSpan(text: 'Đoạn số: '),
-                    TextSpan(
-                      text: '${_doanSoDangHien ?? 1}',
+  /// 5 nhãn PHỤ báo "Đoạn số" chỉ hiện mỗi số "N" (đổi màu TOÀN BỘ chữ theo
+  /// mốc), rải dọc mép trái ô soạn thảo — vẽ NGAY TRONG Stack bọc ô chữ
+  /// (`_khungVanBanKey`), dùng toạ độ CỤC BỘ đã tính sẵn ở
+  /// `_khiCuonVanBanBaoDoanSo` (`_diemMocTraiDoanSo`, đã quy đổi qua đúng
+  /// Stack này bằng `RenderEditable.localToGlobal(point, ancestor: ...)`).
+  Widget _veMocPhuDoanSo() {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: Stack(
+          children: [
+            for (var i = 0; i < _tiLeMocTraiDoanSo.length; i++)
+              if (_doanSoMocTrai[i] != null && _diemMocTraiDoanSo[i] != null)
+                Positioned(
+                  left: 12,
+                  top: _diemMocTraiDoanSo[i]!.dy - 13,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '${_doanSoMocTrai[i]}',
                       style: TextStyle(
-                        color: _mauChuSoTheoMocDoan(_doanSoDangHien ?? 1),
-                        fontWeight: _damChuSoTheoMocDoan(_doanSoDangHien ?? 1)
+                        color: _mauChuSoTheoMocDoan(_doanSoMocTrai[i]!) ?? Colors.white,
+                        fontWeight: _damChuSoTheoMocDoan(_doanSoMocTrai[i]!)
                             ? FontWeight.bold
                             : FontWeight.normal,
+                        fontSize: 12,
                       ),
                     ),
-                  ],
+                  ),
                 ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Nhãn CHÍNH "Đoạn số: N" — sát mép trái, gần đáy màn hình, tự ẩn sau 1
+  /// giây (xem `_khiCuonVanBanBaoDoanSo`). Luôn có mặt trong app, không có
+  /// cài đặt bật/tắt. Chữ "Đoạn số: " luôn trắng bình thường, CHỈ riêng số
+  /// N đổi màu theo mốc (tách bằng `Text.rich`).
+  Widget _nhanDoanSo(double caoBanPhim) {
+    return Positioned(
+      left: 12,
+      bottom: caoBanPhim + 12,
+      child: IgnorePointer(
+        child: AnimatedOpacity(
+          opacity: _doanSoDangHien == null ? 0.0 : 1.0,
+          duration: const Duration(milliseconds: 150),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.7),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text.rich(
+              TextSpan(
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                children: [
+                  const TextSpan(text: 'Đoạn số: '),
+                  TextSpan(
+                    text: '${_doanSoDangHien ?? 1}',
+                    style: TextStyle(
+                      color: _mauChuSoTheoMocDoan(_doanSoDangHien ?? 1),
+                      fontWeight: _damChuSoTheoMocDoan(_doanSoDangHien ?? 1)
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
         ),
       ),
-    ];
+    );
   }
 
   @override
@@ -11020,7 +11029,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // phải góc trên-phải khung soạn thảo — dùng `MediaQuery.paddingOf`
       // để né tai thỏ/thanh trạng thái, không cần bọc thêm SafeArea riêng).
       body: Stack(
-        key: _khungThanTrangKey,
         children: [
           Listener(
         behavior: HitTestBehavior.translucent,
@@ -11398,6 +11406,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                             ),
                           ),
                         ),
+                        // 5 mốc phụ báo "Đoạn số" dọc mép trái — đặt NGAY
+                        // TRONG Stack này (cùng khung với `_oVanBanKey`), y
+                        // hệt cách `_veConTro()` định vị con trỏ: dùng
+                        // `RenderEditable.localToGlobal(point, ancestor:
+                        // khungBox)` để quy đổi THẲNG sang toạ độ cục bộ của
+                        // CHÍNH Stack này — không đi vòng qua toạ độ TOÀN CỤC
+                        // của màn hình rồi quy đổi ngược lại (cách cũ dùng
+                        // `_khungThanTrangKey` ở Stack ngoài cùng bị lệch dần
+                        // khi cuộn sâu, khiến các mốc phía trên rơi ra ngoài
+                        // màn hình và biến mất).
+                        _veMocPhuDoanSo(),
                       ],
                     ),
                   ),
@@ -11520,7 +11539,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 onTap: _hienLaiBoPhimNhanhCamUng,
               ),
             ),
-          ..._nhanDoanSo(caoBanPhim),
+          _nhanDoanSo(caoBanPhim),
         ],
       ),
     );
