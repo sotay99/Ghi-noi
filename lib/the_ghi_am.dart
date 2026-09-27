@@ -141,31 +141,54 @@ class ChanSuaGiuaThe extends TextInputFormatter {
       cuoiMoi--;
     }
 
-    for (final (batDau, ketThuc) in vungCu) {
-      final chongLan = dau < ketThuc && cuoiCu > batDau;
-      if (!chongLan) continue;
-      final goi = khiCanXoaThe;
-      if (goi != null) {
-        // CHẶN hẳn, không tự xoá — báo lại để nơi gọi hỏi xác nhận trước
-        // (hoặc xoá thẳng không hỏi, nếu thẻ đã có trong bộ nhớ đệm — tuỳ
-        // nơi gọi quyết định, xem `_khiCanXoaTheTuBanPhim`). ÁP DỤNG CHO CẢ
-        // sửa một phần LẪN xoá TRỌN thẻ (ví dụ Ctrl+A rồi Xoá) — trước đây
-        // xoá trọn được cho qua thẳng không hỏi gì, khiến thẻ "chưa xử lý
-        // xong" mất không dấu vết. Không gọi [goi] ngay tại đây: formatter
-        // đang chạy giữa lượt cập nhật của chính TextField, mở dialog/
-        // setState ngay lúc này không an toàn.
-        SchedulerBinding.instance
-            .addPostFrameCallback((_) => goi(batDau, ketThuc));
-        return oldValue;
+    // GỘP mọi vùng thẻ chồng lấn với khoảng vừa sửa [dau, cuoiCu) thành MỘT
+    // khoảng xoá duy nhất — vùng chọn có thể phủ chữ thường XEN LẪN nhiều
+    // thẻ (ví dụ tô một đoạn chứa cả chữ thường lẫn 2-3 thẻ ghi âm rồi bấm
+    // Xoá một lần), nên không dừng lại ở thẻ ĐẦU TIÊN chạm phải nữa — lặp
+    // tới điểm cố định vì gộp thêm một thẻ có thể vừa chạm tiếp thẻ khác.
+    var batDauGop = dau, ketThucGop = cuoiCu;
+    var coChongLan = false;
+    var conDoi = true;
+    while (conDoi) {
+      conDoi = false;
+      for (final (batDau2, ketThuc2) in vungCu) {
+        if (batDau2 < ketThucGop && ketThuc2 > batDauGop) {
+          coChongLan = true;
+          if (batDau2 < batDauGop) {
+            batDauGop = batDau2;
+            conDoi = true;
+          }
+          if (ketThuc2 > ketThucGop) {
+            ketThucGop = ketThuc2;
+            conDoi = true;
+          }
+        }
       }
-      final phuTron = dau <= batDau && cuoiCu >= ketThuc;
-      if (phuTron) continue; // không có callback — theo cách cũ, cho qua.
-      final vanBanKetQua = oldText.replaceRange(batDau, ketThuc, '');
-      return TextEditingValue(
-        text: vanBanKetQua,
-        selection: TextSelection.collapsed(offset: batDau),
-      );
     }
-    return newValue;
+    if (!coChongLan) return newValue;
+
+    final goi = khiCanXoaThe;
+    if (goi != null) {
+      // CHẶN hẳn, không tự xoá — báo lại để nơi gọi hỏi xác nhận trước
+      // (hoặc xoá thẳng không hỏi, nếu MỌI thẻ trong khoảng đã có trong bộ
+      // nhớ đệm — tuỳ nơi gọi quyết định, xem `_khiCanXoaTheTuBanPhim`, giờ
+      // tự quét lại [batDauGop, ketThucGop) để xử lý ĐỦ mọi thẻ trong đó,
+      // không giả định chỉ có đúng một thẻ nữa). ÁP DỤNG CHO CẢ sửa một
+      // phần LẪN xoá TRỌN thẻ (ví dụ Ctrl+A rồi Xoá) — trước đây xoá trọn
+      // được cho qua thẳng không hỏi gì, khiến thẻ "chưa xử lý xong" mất
+      // không dấu vết. Không gọi [goi] ngay tại đây: formatter đang chạy
+      // giữa lượt cập nhật của chính TextField, mở dialog/setState ngay
+      // lúc này không an toàn.
+      SchedulerBinding.instance
+          .addPostFrameCallback((_) => goi(batDauGop, ketThucGop));
+      return oldValue;
+    }
+    final phuTron = dau <= batDauGop && cuoiCu >= ketThucGop;
+    if (phuTron) return newValue; // không có callback — theo cách cũ, cho qua.
+    final vanBanKetQua = oldText.replaceRange(batDauGop, ketThucGop, '');
+    return TextEditingValue(
+      text: vanBanKetQua,
+      selection: TextSelection.collapsed(offset: batDauGop),
+    );
   }
 }

@@ -6310,46 +6310,59 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (_boDieuKhien.theGhiAmLoiTamThoi.remove(soThe)) _boDieuKhien.veLai();
   }
 
-  /// Bấm Backspace/Delete ngay cạnh một thẻ, đủ để xoá một phần thẻ đó —
-  /// `ChanSuaGiuaThe` đã CHẶN lại (không tự xoá) và báo về đây bằng đúng
-  /// [batDau, ketThuc) của thẻ. Hỏi xác nhận y hệt cách xoá qua menu bấm-
-  /// vào-thẻ, rồi mới xoá thật nếu đồng ý — không còn âm thầm xoá nữa.
+  /// Bấm Backspace/Delete/Xoá chạm vào MỘT HAY NHIỀU thẻ (vùng chọn có thể
+  /// phủ chữ thường xen lẫn nhiều thẻ ghi âm cùng lúc) — `ChanSuaGiuaThe` đã
+  /// CHẶN lại (không tự xoá) và báo về đây bằng đúng [batDau, ketThuc) đã
+  /// GỘP đủ mọi thẻ chồng lấn. Hỏi xác nhận MỘT LẦN cho cả cụm (y hệt cách
+  /// xoá qua menu bấm-vào-thẻ khi chỉ có một thẻ), rồi xoá TOÀN BỘ khoảng
+  /// đó (chữ thường lẫn mọi thẻ) trong MỘT lần nếu đồng ý — không còn phải
+  /// bấm nhiều lần mới xoá hết từng thẻ một.
   Future<void> _khiCanXoaTheTuBanPhim(int batDau, int ketThuc) async {
     if (!mounted) return;
     final vb = _boDieuKhien.text;
     if (ketThuc > vb.length) return;
-    final doanThe = vb.substring(batDau, ketThuc);
-    final khopHoanChinh = reTheGhiAmHoanChinh.firstMatch(doanThe);
-    final khopDangChuyen = reTheDangChuyen.firstMatch(doanThe);
-    final laDangGhi = doanThe == tenTokenDangGhiAm;
-    if (khopHoanChinh == null && khopDangChuyen == null && !laDangGhi) {
-      return; // đã đổi, bỏ qua.
+    final doan = vb.substring(batDau, ketThuc);
+    final dsHoanChinh = reTheGhiAmHoanChinh.allMatches(doan).toList();
+    final dsDangChuyen = reTheDangChuyen.allMatches(doan).toList();
+    final coDangGhi = doan.contains(tenTokenDangGhiAm);
+    final soLuongThe = dsHoanChinh.length + dsDangChuyen.length + (coDangGhi ? 1 : 0);
+    if (soLuongThe == 0) return; // đã đổi khác đi trong lúc chờ, bỏ qua.
+
+    // "Đang chuyển"/"đang ghi" thì chưa bao giờ có trong bộ nhớ đệm (mất là
+    // mất thật) — có bất kỳ thẻ nào thuộc hai loại đó, hoặc một thẻ "Ghi âm
+    // N" hoàn chỉnh nhưng CHƯA có cache, là phải hỏi. Toàn bộ thẻ trong
+    // khoảng đều đã có cache thì xoá thẳng, không hỏi.
+    var coCanHoi = coDangGhi || dsDangChuyen.isNotEmpty;
+    if (!coCanHoi) {
+      for (final m in dsHoanChinh) {
+        if (!_vanBanDaTraVeTheoTheGhiAm.containsKey(int.parse(m.group(1)!))) {
+          coCanHoi = true;
+          break;
+        }
+      }
     }
 
-    // "Đang chuyển" thì chưa bao giờ có trong bộ nhớ đệm (mới gửi lần đầu,
-    // còn đang bay) — luôn phải hỏi. "Ghi âm N" thì có thể đã có cache (do
-    // vừa được hoàn tác về lại dạng thẻ) — có cache thì xoá thẳng, không hỏi.
-    final soTheHoanChinh =
-        khopHoanChinh != null ? int.parse(khopHoanChinh.group(1)!) : null;
-    final coCache = soTheHoanChinh != null &&
-        _vanBanDaTraVeTheoTheGhiAm.containsKey(soTheHoanChinh);
-
     var dongY = true;
-    if (!coCache) {
+    if (coCanHoi) {
       dongY = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
               title: const Text('Xoá thẻ ghi âm?'),
-              content: Text(laDangGhi
-                  ? 'Thẻ này ĐANG GHI ÂM — xoá sẽ HUỶ LUÔN bản ghi đang thu, '
-                      'không thể phục hồi lại được. Bạn có chắc chắn muốn '
-                      'xoá không?'
-                  : khopDangChuyen != null
-                      ? 'Thẻ này ĐANG được gửi đi phiên âm — xoá sẽ bỏ luôn '
-                          'kết quả sắp về, không thể phục hồi lại được. Bạn '
-                          'có chắc chắn muốn xoá không?'
-                      : 'Thẻ ghi âm này sẽ bị xoá VĨNH VIỄN, không thể phục '
-                          'hồi lại được. Bạn có chắc chắn muốn xoá không?'),
+              content: Text(soLuongThe > 1
+                  ? 'Vùng chọn này chứa $soLuongThe thẻ ghi âm — xoá sẽ HUỶ '
+                      'LUÔN những thẻ đó, không thể phục hồi lại được. Bạn '
+                      'có chắc chắn muốn xoá không?'
+                  : coDangGhi
+                      ? 'Thẻ này ĐANG GHI ÂM — xoá sẽ HUỶ LUÔN bản ghi đang '
+                          'thu, không thể phục hồi lại được. Bạn có chắc '
+                          'chắn muốn xoá không?'
+                      : dsDangChuyen.isNotEmpty
+                          ? 'Thẻ này ĐANG được gửi đi phiên âm — xoá sẽ bỏ '
+                              'luôn kết quả sắp về, không thể phục hồi lại '
+                              'được. Bạn có chắc chắn muốn xoá không?'
+                          : 'Thẻ ghi âm này sẽ bị xoá VĨNH VIỄN, không thể '
+                              'phục hồi lại được. Bạn có chắc chắn muốn xoá '
+                              'không?'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
@@ -6367,7 +6380,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     if (!dongY || !mounted) return;
 
-    if (laDangGhi) {
+    if (coDangGhi) {
       // Thẻ đang ghi dở — huỷ luôn bản ghi (không chốt thành thẻ xong).
       _bomDongHoTheGhiAm?.cancel();
       _bomDongHoTheGhiAm = null;
@@ -6380,33 +6393,33 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
 
     final vbHienTai = _boDieuKhien.text;
-    if (ketThuc > vbHienTai.length ||
-        vbHienTai.substring(batDau, ketThuc) != doanThe) {
+    if (ketThuc > vbHienTai.length || vbHienTai.substring(batDau, ketThuc) != doan) {
       return; // văn bản đã đổi trong lúc chờ hỏi — đừng xoá nhầm chỗ khác.
     }
-    _dieuChinhVungToanVanSauKhiSua(batDau, doanThe.length, 0);
-    _dieuChinhLoiChinhTaSauKhiSua(batDau, doanThe.length, 0);
+    _dieuChinhVungToanVanSauKhiSua(batDau, doan.length, 0);
+    _dieuChinhLoiChinhTaSauKhiSua(batDau, doan.length, 0);
     final moi = vbHienTai.replaceRange(batDau, ketThuc, '');
     _ghiVaoO(moi, batDau);
     _henLuu();
-    if (khopHoanChinh != null) {
-      final soThe = soTheHoanChinh!;
-      if (!coCache) {
+
+    for (final m in dsHoanChinh) {
+      final soThe = int.parse(m.group(1)!);
+      if (!_vanBanDaTraVeTheoTheGhiAm.containsKey(soThe)) {
         _duLieuTheoTheGhiAm.remove(soThe);
         _thoiLuongTheoTheGhiAm.remove(soThe);
         _theGhiAmDangGui.remove(soThe);
-        if (_boDieuKhien.theGhiAmLoiTamThoi.remove(soThe)) {
-          _boDieuKhien.veLai();
-        }
       }
-    } else if (khopDangChuyen != null) {
-      final soThe = int.parse(khopDangChuyen.group(1)!);
+      _boDieuKhien.theGhiAmLoiTamThoi.remove(soThe);
+    }
+    for (final m in dsDangChuyen) {
+      final soThe = int.parse(m.group(1)!);
       _duLieuTheoTheGhiAm.remove(soThe);
       _thoiLuongTheoTheGhiAm.remove(soThe);
-      if (_boDieuKhien.theGhiAmLoiTamThoi.remove(soThe)) _boDieuKhien.veLai();
+      _boDieuKhien.theGhiAmLoiTamThoi.remove(soThe);
       // KHÔNG xoá khỏi `_theGhiAmDangGui` — yêu cầu Gemini có thể vẫn đang
       // bay; để nó tự no-op khi về (không còn tìm thấy nhãn "Đang chuyển").
     }
+    _boDieuKhien.veLai();
     if (mounted && _trinhGhiAmMo) setState(() {});
   }
 
@@ -8067,7 +8080,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// thay thế, đoạn đề xuất thay thế, hay đoạn cần xoá. Có giao thì cả thao
   /// tác định dạng bị BỎ QUA TOÀN BỘ (không áp phần nào), đơn giản và an toàn
   /// hơn hẳn so với cắt riêng phần nằm ngoài vùng AI.
-  bool _giaoVoiVungAi(int batDau, int ketThuc) {
+  ///
+  /// [boQuaTheTichChon]: bỏ qua kiểm tra vùng thẻ Tích chọn — dùng khi CHÍNH
+  /// thao tác đang xét là bấm nút Tích chọn lên một đoạn ĐANG CÓ SẴN thẻ đó
+  /// (`_bamNutTichChon`) — nếu không bỏ qua, đoạn nào có thẻ sẽ luôn tự coi
+  /// là "bị khoá bởi chính thẻ của nó", không bao giờ toggle xoá được nữa.
+  bool _giaoVoiVungAi(int batDau, int ketThuc, {bool boQuaTheTichChon = false}) {
     for (final l in _boDieuKhien.loi) {
       if (batDau < l.ketThuc && ketThuc > l.batDau) return true;
     }
@@ -8084,9 +8102,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     for (final (tb, tk) in timCacVungTheGhiAm(_boDieuKhien.text)) {
       if (batDau < tk && ketThuc > tb) return true;
     }
-    // Thẻ Tích chọn cũng vậy — y hệt lý do trên.
-    for (final (tb, tk) in timCacVungTheTichChon(_boDieuKhien.text)) {
-      if (batDau < tk && ketThuc > tb) return true;
+    // Thẻ Tích chọn cũng vậy — y hệt lý do trên (trừ khi [boQuaTheTichChon]).
+    if (!boQuaTheTichChon) {
+      for (final (tb, tk) in timCacVungTheTichChon(_boDieuKhien.text)) {
+        if (batDau < tk && ketThuc > tb) return true;
+      }
     }
     return false;
   }
@@ -9106,7 +9126,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     final dsHopLe = <(int, int)>[];
     for (final (s, e) in danhSachDoan) {
-      if (_giaoVoiVungAi(s, e)) continue;
+      if (_giaoVoiVungAi(s, e, boQuaTheTichChon: true)) continue;
       if (_doanRongChoTichChon(vb.substring(s, e))) continue;
       dsHopLe.add((s, e));
     }

@@ -89,20 +89,46 @@ class ChanSuaGiuaTheTichChon extends TextInputFormatter {
       cuoiMoi--;
     }
 
-    for (final (batDau, ketThuc) in vungCu) {
-      final chongLan = dau < ketThuc && cuoiCu > batDau;
-      if (!chongLan) continue;
-      final icon = reTheTichChon.firstMatch(oldText.substring(batDau, ketThuc))?.group(1);
-      final goi = khiDaXoaThe;
-      if (goi != null && icon != null) {
-        SchedulerBinding.instance.addPostFrameCallback((_) => goi(batDau, icon));
+    // GỘP mọi thẻ chồng lấn với khoảng vừa sửa thành MỘT khoảng xoá duy
+    // nhất — vùng chọn có thể phủ chữ thường xen lẫn nhiều thẻ, xoá một lần
+    // là xong hết, không phải bấm nhiều lần mới xoá hết từng thẻ một (cùng
+    // kỹ thuật với `ChanSuaGiuaThe` của thẻ ghi âm).
+    var batDauGop = dau, ketThucGop = cuoiCu;
+    var coChongLan = false;
+    var conDoi = true;
+    while (conDoi) {
+      conDoi = false;
+      for (final (batDau2, ketThuc2) in vungCu) {
+        if (batDau2 < ketThucGop && ketThuc2 > batDauGop) {
+          coChongLan = true;
+          if (batDau2 < batDauGop) {
+            batDauGop = batDau2;
+            conDoi = true;
+          }
+          if (ketThuc2 > ketThucGop) {
+            ketThucGop = ketThuc2;
+            conDoi = true;
+          }
+        }
       }
-      final vanBanKetQua = oldText.replaceRange(batDau, ketThuc, '');
-      return TextEditingValue(
-        text: vanBanKetQua,
-        selection: TextSelection.collapsed(offset: batDau),
-      );
     }
-    return newValue;
+    if (!coChongLan) return newValue;
+
+    // Báo lại (nếu có nghe) cho MỖI thẻ ✅ nằm trong khoảng vừa gộp — có thể
+    // xoá nhiều thẻ cùng lúc, mỗi thẻ ✅ đều cần side-effect riêng.
+    final goi = khiDaXoaThe;
+    if (goi != null) {
+      for (final (batDau2, ketThuc2) in vungCu) {
+        if (batDau2 < batDauGop || ketThuc2 > ketThucGop) continue;
+        final icon = reTheTichChon.firstMatch(oldText.substring(batDau2, ketThuc2))?.group(1);
+        if (icon == null) continue;
+        SchedulerBinding.instance.addPostFrameCallback((_) => goi(batDau2, icon));
+      }
+    }
+    final vanBanKetQua = oldText.replaceRange(batDauGop, ketThucGop, '');
+    return TextEditingValue(
+      text: vanBanKetQua,
+      selection: TextSelection.collapsed(offset: batDauGop),
+    );
   }
 }
