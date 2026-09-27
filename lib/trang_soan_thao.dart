@@ -539,9 +539,13 @@ class _NutCongCuChu extends StatelessWidget {
   final String? moTa;
   final VoidCallback onTap;
 
-  /// Chỉ để DIM màu (báo mắt thấy đang tạm khoá) — bấm vào lúc này vẫn gọi
-  /// [onTap] bình thường, chỗ gọi (`_phimAoPasteCoLiet`) tự lo việc bỏ qua
-  /// hay không, widget này không quyết định.
+  /// Vừa DIM màu (báo mắt thấy đang tạm khoá) VỪA chặn cứng mọi cử chỉ
+  /// chạm bằng `IgnorePointer` (xem `build`) — không chỉ dừng ở việc để
+  /// [onTap] tự bỏ qua như trước: bấm RẤT NHANH nhiều lần liên tiếp trong
+  /// lúc đang liệt có thể khiến một cử chỉ "lọt" qua trước khi cờ liệt
+  /// (`setState`) kịp áp dụng, hoặc va chạm với việc giành lại tiêu điểm ô
+  /// chữ — chặn ngay ở tầng cử chỉ loại bỏ hẳn khả năng đó, không phụ
+  /// thuộc vào việc hàm gọi có tự kiểm tra đúng hay không.
   final bool bLiet;
 
   /// Nhân thêm vào bề rộng TỰ NHIÊN của nút (ví dụ 0.85 = hẹp bớt 15%) —
@@ -578,11 +582,14 @@ class _NutCongCuChu extends StatelessWidget {
     }
     return Tooltip(
       message: moTa ?? nhan,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () {},
-        onTapDown: (_) => onTap(),
-        child: khung,
+      child: IgnorePointer(
+        ignoring: bLiet,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () {},
+          onTapDown: (_) => onTap(),
+          child: khung,
+        ),
       ),
     );
   }
@@ -5704,8 +5711,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // đó về null ngay khi chốt xong) để nút "Hiện bảng điều khiển" luôn mở
     // được, kể cả khi thẻ đã chốt và đang ở trạng thái đang chuyển/đã
     // chuyển xong — xem `_bamNutHienBangDieuKhienGhiAm`. Đổi giá trị ở đây
-    // (bắt đầu ghi thẻ MỚI) cũng chính là lúc `_ChuSoTheNhapNhay` nhận ra
-    // số đổi và tự nhấp nháy.
+    // (bắt đầu ghi thẻ MỚI) cũng chính là lúc `_DongBanGhiAmSoNhapNhay`
+    // nhận ra số đổi và tự nhấp nháy.
     _soTheChoBangDieuKhien.value = soThe;
     _chenTokenDangGhiTheVaoVanBan();
     _batDauTheoDoiMucAmGhiAm();
@@ -6254,7 +6261,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Kiểm tra điều kiện gửi ngầm — gọi mỗi khi một thẻ vừa được chốt xong.
   /// Nếu đủ điều kiện, gửi NGẦM (không chờ, không khoá giao diện) tất cả
   /// các thẻ đã ghi xong mà chưa gửi, trong lúc thẻ mới vẫn đang ghi tiếp.
-  void _kiemTraVaGuiNgamTheGhiAmNeuDu() {
+  /// [boQuaSoThe]: loại trừ đúng MỘT thẻ khỏi lượt quét này — dùng khi vừa
+  /// đóng modal "nghe lại" (`_ngheLaiGhiAmThe`): thẻ VỪA đóng modal đó vẫn
+  /// là "Ghi âm N" chưa gửi trong văn bản, nên nếu không loại trừ, lượt
+  /// quét "bắt kịp cho các thẻ KHÁC" ngay sau khi đóng modal sẽ vô tình
+  /// bắt luôn CHÍNH thẻ đó — trong khi người dùng chỉ đang muốn NGHE, chưa
+  /// hề bấm nút chuyển hoá nào.
+  void _kiemTraVaGuiNgamTheGhiAmNeuDu({int? boQuaSoThe}) {
     // Đang mở modal "nghe lại" — tạm ngưng hẳn, kể cả cho các thẻ KHÁC
     // thẻ đang nghe (đơn giản và an toàn hơn lọc riêng đúng một thẻ) — xem
     // `_dangMoModalNgheLaiGhiAm`.
@@ -6264,6 +6277,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final soTheChuaGui = <int>[];
     for (final m in reTheGhiAmHoanChinh.allMatches(vanBan)) {
       final soThe = int.parse(m.group(1)!);
+      if (soThe == boQuaSoThe) continue;
       if (_theGhiAmDangGui.contains(soThe)) continue;
       if (!_duLieuTheoTheGhiAm.containsKey(soThe)) continue;
       soTheChuaGui.add(soThe);
@@ -6489,18 +6503,33 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         bytes: duLieu.bytes,
         mime: duLieu.mime,
       );
-      if (!chuyenHoa || !mounted) return;
-      // Bấm "Chuyển hoá..." ngay trong modal nghe lại: đóng luôn Bảng điều
-      // khiển ghi âm nếu đang mở bên dưới (nó đứng cùng Navigator, modal
-      // nghe lại vừa đóng chỉ lộ ra bảng đó, không lộ ra màn hình soạn thảo).
-      if (_bangDieuKhienGhiAmDangMo) {
-        Navigator.of(context).pop();
-        _bangDieuKhienGhiAmDangMo = false;
+      if (!mounted) return;
+      if (!chuyenHoa) {
+        // Đóng modal nghe lại mà KHÔNG bấm "Chuyển hoá..." — thẻ vẫn là
+        // "Ghi âm N" y hệt một thẻ đã ghi xong bình thường, chưa gửi AI.
+        // ĐÃ SỬA: trước đây không gán gì ở đây nên nhãn to ở AppBar/bảng
+        // điều khiển rơi vào nhánh "Đang chuẩn bị…" (chỉ đúng nghĩa trong
+        // khoảnh khắc BẮT ĐẦU một thẻ MỚI, không đúng cho trạng thái này)
+        // — giờ gán đúng nghĩa: đã ghi xong, còn chờ chuyển hoá tay.
+        setState(() => _nhanTrangThaiGhiAmGheDe.value = 'Đã ghi xong #$soThe — chưa chuyển hoá');
+        return;
       }
-      if (mounted) await _guiVaXuLyMotThe(soThe, baoLoi: true);
+      // Bấm "Chuyển hoá..." ngay trong modal nghe lại — đóng NGAY cả bảng
+      // điều khiển (nếu đang mở) VÀ AppBar trình ghi âm, không đợi gửi AI
+      // xong mới đóng — y hệt `_hoanThanhChuyenThanhVanBan` (đóng trước,
+      // chuyển ở nền sau).
+      _dongBangDieuKhienGhiAmNeuMo();
+      if (mounted) setState(() => _trinhGhiAmMo = false);
+      _nhanTrangThaiGhiAmGheDe.value = 'Đang chuyển #$soThe';
+      unawaited(_guiVaXuLyMotThe(soThe, baoLoi: true).then((_) {
+        if (!mounted) return;
+        _nhanTrangThaiGhiAmGheDe.value = _vanBanDaTraVeTheoTheGhiAm.containsKey(soThe)
+            ? 'Đã chuyển xong #$soThe'
+            : 'Lỗi khi chuyển #$soThe — thử lại sau';
+      }));
     } finally {
       _dangMoModalNgheLaiGhiAm = false;
-      _kiemTraVaGuiNgamTheGhiAmNeuDu();
+      _kiemTraVaGuiNgamTheGhiAmNeuDu(boQuaSoThe: soThe);
     }
   }
 
@@ -6525,7 +6554,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// và đang ở trạng thái đang chuyển/đã chuyển xong/lỗi — xem
   /// `_bamNutHienBangDieuKhienGhiAm`. Cập nhật đúng MỘT chỗ — mỗi lần một
   /// thẻ MỚI bắt đầu ghi (`_batDauMotTheGhiAmMoi`) — cũng chính là lúc
-  /// `_ChuSoTheNhapNhay` trong bảng điều khiển (nếu đang mở) tự nhấp nháy.
+  /// `_DongBanGhiAmSoNhapNhay` trong bảng điều khiển (nếu đang mở) tự nhấp
+  /// nháy.
   final ValueNotifier<int> _soTheChoBangDieuKhien = ValueNotifier(0);
 
   /// Đóng NGAY route dialog của Bảng điều khiển ghi âm nếu đang mở — dùng ở
@@ -12117,22 +12147,23 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 }
 
-/// Chip "N" của "Bản Ghi âm số N" ở đầu Bảng điều khiển — nhấp nháy phóng
-/// to 1,3 lần rồi thu nhỏ lại, lặp 4 lần rồi đứng im HẲN, MỖI KHI SỐ ĐỔI
-/// (đứng im hoàn toàn nếu không đổi) — thu hút chú ý khi bấm "Hoàn thành-
-/// Tạo bản ghi âm mới" ngay trong bảng điều khiển (bảng KHÔNG đóng lại,
-/// chỉ đổi số — xem `_TrangSoanThaoState._soTheChoBangDieuKhien`).
-class _ChuSoTheNhapNhay extends StatefulWidget {
-  const _ChuSoTheNhapNhay({required this.soThe, required this.coChu});
+/// Nguyên cả dòng "Bản Ghi âm số N" ở đầu Bảng điều khiển — CẢ dòng (chữ
+/// "Bản Ghi âm số " lẫn số N) cùng nhấp nháy phóng to 1,3 lần rồi thu nhỏ
+/// lại, lặp 8 lần (2400ms) rồi đứng im HẲN, MỖI KHI SỐ ĐỔI (đứng im hoàn
+/// toàn nếu không đổi) — thu hút chú ý khi bấm "Hoàn thành-Tạo bản ghi âm
+/// mới" ngay trong bảng điều khiển (bảng KHÔNG đóng lại, chỉ đổi số — xem
+/// `_TrangSoanThaoState._soTheChoBangDieuKhien`).
+class _DongBanGhiAmSoNhapNhay extends StatefulWidget {
+  const _DongBanGhiAmSoNhapNhay({required this.soThe, required this.coChu});
 
   final ValueListenable<int> soThe;
   final double coChu;
 
   @override
-  State<_ChuSoTheNhapNhay> createState() => _ChuSoTheNhapNhayState();
+  State<_DongBanGhiAmSoNhapNhay> createState() => _DongBanGhiAmSoNhapNhayState();
 }
 
-class _ChuSoTheNhapNhayState extends State<_ChuSoTheNhapNhay>
+class _DongBanGhiAmSoNhapNhayState extends State<_DongBanGhiAmSoNhapNhay>
     with SingleTickerProviderStateMixin {
   late final AnimationController _dieuKhien;
   late final Animation<double> _tiLePhongTo;
@@ -12142,14 +12173,14 @@ class _ChuSoTheNhapNhayState extends State<_ChuSoTheNhapNhay>
   void initState() {
     super.initState();
     _soHienTai = widget.soThe.value;
-    // 4 lần phóng to/thu nhỏ, mỗi lần 300ms (150 lên + 150 xuống) — tổng
-    // 1200ms rồi đứng im hẳn (không lặp lại nữa, không `repeat()`).
+    // 8 lần phóng to/thu nhỏ, mỗi lần 300ms (150 lên + 150 xuống) — tổng
+    // 2400ms rồi đứng im hẳn (không lặp lại nữa, không `repeat()`).
     _dieuKhien = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 2400),
     );
     _tiLePhongTo = TweenSequence<double>([
-      for (var i = 0; i < 4; i++) ...[
+      for (var i = 0; i < 8; i++) ...[
         TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.3), weight: 1),
         TweenSequenceItem(tween: Tween(begin: 1.3, end: 1.0), weight: 1),
       ],
@@ -12176,11 +12207,19 @@ class _ChuSoTheNhapNhayState extends State<_ChuSoTheNhapNhay>
       animation: _tiLePhongTo,
       builder: (context, _) => Transform.scale(
         scale: _tiLePhongTo.value,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-          color: Colors.cyanAccent,
-          child: Text('$_soHienTai',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: widget.coChu)),
+        child: Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text('Bản Ghi âm số ',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: widget.coChu)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              color: Colors.cyanAccent,
+              child: Text('$_soHienTai',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: widget.coChu)),
+            ),
+          ],
         ),
       ),
     );
@@ -12367,7 +12406,7 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
     // lần hoặc đóng sai route.
     widget.khiChuyenThanhVanBan,
     // (ý 6) KHÔNG bọc gì cả — giữ bảng MỞ, chỉ số thẻ tự đổi (báo qua
-    // `soThe`, xem `_ChuSoTheNhapNhay`), không đóng/mở lại bảng.
+    // `soThe`, xem `_DongBanGhiAmSoNhapNhay`), không đóng/mở lại bảng.
     widget.khiTaoBanMoi,
     () => _goiRoiDong(widget.khiPhatLai),
     () => _goiRoiDong(widget.khiDong),
@@ -12445,15 +12484,7 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
               width: double.infinity,
               decoration: duongVien,
               padding: EdgeInsets.fromLTRB(choDot + 14, 10, 12, 10),
-              child: Wrap(
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text('Bản Ghi âm số ',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: coChu)),
-                  _ChuSoTheNhapNhay(soThe: widget.soThe, coChu: coChu),
-                ],
-              ),
+              child: _DongBanGhiAmSoNhapNhay(soThe: widget.soThe, coChu: coChu),
             ),
             Container(
               width: double.infinity,
