@@ -5424,6 +5424,21 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   static const _gioiHanMoiTheGhiAm = Duration(minutes: 5);
   static const _canhBaoGioiHanTheGhiAm = Duration(minutes: 4);
 
+  /// Đếm số thẻ đã được TỰ ĐỘNG nối tiếp nhau (do hết giờ 5 phút mà KHÔNG
+  /// ai bấm gì) — reset về 0 mỗi khi có một hành động bấm tay THẬT (bấm
+  /// "Tạo bản ghi âm mới" ở dialog, "Hoàn thành-Tạo bản ghi âm mới" ở
+  /// AppBar/bảng điều khiển, hay mở trình ghi âm mới từ đầu). Mục đích:
+  /// chặn trường hợp người dùng bỏ máy đó ghi âm mãi không ai đụng vào
+  /// (tốn token AI + pin máy), mà KHÔNG phạt người dùng thật đang chủ động
+  /// bấm tay để ghi âm liên tục dài — bấm tay luôn reset về 0, không bao
+  /// giờ bị chặn. Xem `_chotTheGhiAmVaBatDauTheMoiDoQuaGioiHan`.
+  int _soLanTuDongTaoTheLienTiep = 0;
+
+  /// Cho phép tối đa 2 thẻ tự động nối tiếp nhau (không ai bấm gì) — tới
+  /// thẻ THỨ HAI này, nếu vẫn không ai bấm gì thì tự NGỪNG hẳn (đóng trình
+  /// ghi âm), không tạo thẻ thứ ba.
+  static const _soLanToiDaTuDongTaoTheLienTiep = 2;
+
   /// Ghi âm và micro-vừa-nói-vừa-ra-chữ không được cùng chạy — cả hai đều
   /// cần độc chiếm microphone của máy. Áp dụng cho MỌI nền tảng (kể cả
   /// Android/iOS gốc), không riêng web.
@@ -5642,6 +5657,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
     setState(() => _trinhGhiAmMo = true);
+    // Mở trình ghi âm mới từ đầu — bắt đầu lại vòng đếm thẻ tự động.
+    _soLanTuDongTaoTheLienTiep = 0;
     await _batDauMotTheGhiAmMoi();
     if (!mounted) return;
     final tuMoBang = widget.caiDat.tuDongMoBangDieuKhienGhiAm ??
@@ -5669,7 +5686,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _thoiLuongTheGhiAmDangGhi.value = moi;
       if (moi >= _gioiHanMoiTheGhiAm) {
         _dongHopThoaiCanhBaoTheGhiAmNeuMo();
-        _chotTheGhiAmVaBatDauTheMoiDoQuaGioiHan();
+        // Đã đạt hạn mức thẻ tự động liên tiếp (không ai bấm gì suốt) — tự
+        // NGỪNG hẳn, không tạo thêm thẻ mới nữa.
+        if (_soLanTuDongTaoTheLienTiep >= _soLanToiDaTuDongTaoTheLienTiep - 1) {
+          _dongTrinhGhiAmThe();
+        } else {
+          _chotTheGhiAmVaBatDauTheMoiDoQuaGioiHan(tuDong: true);
+        }
       } else if (moi >= _canhBaoGioiHanTheGhiAm) {
         _hienCanhBaoGioiHanTheGhiAmNeuChua();
       }
@@ -5813,8 +5836,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     return soThe;
   }
 
-  void _chotTheGhiAmVaBatDauTheMoiDoQuaGioiHan() {
+  /// [tuDong]: true = do hết giờ mà KHÔNG ai bấm gì (timer tự gọi) — tăng
+  /// vòng đếm `_soLanTuDongTaoTheLienTiep`. false = do bấm tay thật (nút
+  /// "Tạo bản ghi âm mới" ở dialog cảnh báo) — reset vòng đếm về 0, vì bấm
+  /// tay là bằng chứng người dùng vẫn đang ở đó.
+  void _chotTheGhiAmVaBatDauTheMoiDoQuaGioiHan({required bool tuDong}) {
     if (_soTheGhiAmDangGhi == null) return;
+    _soLanTuDongTaoTheLienTiep = tuDong ? _soLanTuDongTaoTheLienTiep + 1 : 0;
     _chotTheGhiAmHienTaiThanhHoanChinh().then((_) {
       if (mounted && _trinhGhiAmMo) _batDauMotTheGhiAmMoi();
     });
@@ -5826,53 +5854,94 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
   }
 
+  /// Đây là thẻ CUỐI CÙNG còn được phép tự động nối tiếp — nếu vẫn không ai
+  /// bấm gì, tới hạn thẻ này sẽ KHÔNG tạo thẻ tiếp theo nữa mà tự ngừng hẳn
+  /// (xem nhánh trong `_batDauMotTheGhiAmMoi`). Dùng để chọn đúng nội dung
+  /// cảnh báo — "sắp chạm 5 phút" (còn tự nối tiếp được) hay "sắp chạm tổng
+  /// N phút của M thẻ liên tiếp, sẽ tự NGỪNG" (hết hạn mức).
+  bool get _laTheTuDongCuoiCung =>
+      _soLanTuDongTaoTheLienTiep >= _soLanToiDaTuDongTaoTheLienTiep - 1;
+
   void _hienCanhBaoGioiHanTheGhiAmNeuChua() {
     if (_daCanhBaoGioiHanTheGhiAm || !mounted) return;
     _daCanhBaoGioiHanTheGhiAm = true;
     _hopThoaiCanhBaoTheGhiAmDangMo = true;
     final soThe = _soTheGhiAmDangGhi;
+    final laCuoi = _laTheTuDongCuoiCung;
+    final tongPhut =
+        _gioiHanMoiTheGhiAm.inMinutes * _soLanToiDaTuDongTaoTheLienTiep;
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Sắp chạm giới hạn 5 phút'),
-        content: Text('Thẻ ghi âm #$soThe sắp ghi đủ 5 phút. Nếu không chọn, '
-            'tới đúng phút thứ 5 nó sẽ tự động chốt và ghi tiếp bằng một '
-            'thẻ mới. Bạn muốn làm gì bây giờ?'),
-        // 4 lựa chọn — tách từ "Tạo bản ghi âm mới" (giữ nguyên) thành thêm
-        // 3 lựa chọn "Hoàn thành đoạn ghi âm này và..." dùng lại đúng 3 hàm
-        // đã có sẵn cho AppBar/bảng điều khiển trình ghi âm, không cần viết
-        // logic chốt thẻ mới nào.
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _chotTheGhiAmVaBatDauTheMoiDoQuaGioiHan();
-            },
-            child: const Text('Tạo bản ghi âm mới'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _hoanThanhChuyenThanhVanBan();
-            },
-            child: const Text('Hoàn thành đoạn này và chuyển thành văn bản'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _hoanThanhPhatDeNgheLai();
-            },
-            child: const Text('Hoàn thành đoạn này và phát lại để nghe'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _dongTrinhGhiAmThe();
-            },
-            child: const Text('Hoàn thành đoạn này và đóng trình ghi âm'),
-          ),
-        ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, capNhat) {
+          // Nút "Tạm dừng"/"Tiếp tục" — KHÔNG đóng dialog, chỉ tạm dừng/tiếp
+          // tục bản ghi hiện tại rồi tự đổi tên nút (nghịch đảo nhau).
+          // Tạm dừng thì bộ đếm giờ (`_bomDongHoTheGhiAm`) tự đứng yên luôn
+          // (xem điều kiện `_theGhiAmDangTamDung` trong đó), nên hạn 5 phút
+          // cũng dừng trôi theo, không cần thêm logic riêng ở đây.
+          Future<void> bamTamDungTiepTuc() async {
+            if (_theGhiAmDangTamDung) {
+              await _tiepTucTheGhiAmHienTai();
+            } else {
+              await _tamDungTheGhiAmHienTai();
+            }
+            capNhat(() {});
+          }
+
+          return AlertDialog(
+            title: Text(laCuoi
+                ? 'Sắp chạm giới hạn $tongPhut phút'
+                : 'Sắp chạm giới hạn 5 phút'),
+            content: Text(laCuoi
+                ? 'Thẻ ghi âm #$soThe (thẻ tự động thứ '
+                    '$_soLanToiDaTuDongTaoTheLienTiep liên tiếp) sắp ghi đủ 5 '
+                    'phút, tổng cộng sắp chạm $tongPhut phút không ai bấm gì. '
+                    'Nếu không chọn, tới đúng phút thứ 5 hệ thống sẽ TỰ NGỪNG '
+                    'ghi âm luôn, KHÔNG tạo thêm thẻ mới nữa (để tránh tốn '
+                    'token AI và pin máy vô ích). Bạn muốn làm gì bây giờ?'
+                : 'Thẻ ghi âm #$soThe sắp ghi đủ 5 phút. Nếu không chọn, '
+                    'tới đúng phút thứ 5 nó sẽ tự động chốt và ghi tiếp bằng '
+                    'một thẻ mới. Bạn muốn làm gì bây giờ?'),
+            // 5 lựa chọn — nút Tạm dừng/Tiếp tục luôn đứng ĐẦU, rồi tới 4 nút
+            // "Hoàn thành..."/"Tạo bản ghi âm mới" như cũ, dùng lại đúng các
+            // hàm đã có sẵn cho AppBar/bảng điều khiển trình ghi âm.
+            actions: [
+              TextButton(
+                onPressed: bamTamDungTiepTuc,
+                child: Text(_theGhiAmDangTamDung ? 'Tiếp tục' : 'Tạm dừng'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _chotTheGhiAmVaBatDauTheMoiDoQuaGioiHan(tuDong: false);
+                },
+                child: const Text('Tạo bản ghi âm mới'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _hoanThanhChuyenThanhVanBan();
+                },
+                child: const Text('Hoàn thành đoạn này và chuyển thành văn bản'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _hoanThanhPhatDeNgheLai();
+                },
+                child: const Text('Hoàn thành đoạn này và phát lại để nghe'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _dongTrinhGhiAmThe();
+                },
+                child: const Text('Hoàn thành đoạn này và đóng trình ghi âm'),
+              ),
+            ],
+          );
+        },
       ),
     ).then((_) => _hopThoaiCanhBaoTheGhiAmDangMo = false);
   }
@@ -5890,6 +5959,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _dieuChinhLoiChinhTaSauKhiSua(viTri, 0, 2);
     final moi = vb.replaceRange(viTri, viTri, '\n\n');
     _ghiVaoO(moi, viTri + 2);
+    // Bấm tay thật (không phải hết giờ tự động) — reset vòng đếm thẻ tự
+    // động liên tiếp.
+    _soLanTuDongTaoTheLienTiep = 0;
     await _batDauMotTheGhiAmMoi();
   }
 
