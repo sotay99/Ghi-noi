@@ -244,22 +244,19 @@ class ThanhCongCu extends StatelessWidget {
 
                   // Nút Ghi âm riêng chỉ tồn tại khi KHÔNG gộp chung với
                   // micro (iPhone gộp cả hai thành một nút duy nhất bên
-                  // phải, xem dưới).
+                  // phải, xem dưới) — giờ dùng CHUNG `_NutGhiAmTron` với nút
+                  // gộp của iPhone, để cả hai trông giống nhau tuyệt đối: to
+                  // bằng nút micro, nền xanh nhạt + viền xanh lá đậm lúc
+                  // chưa ghi.
                   if (!gopMicVaGhiAmThanhMotNut)
                     _NutCoChuThich(
                       hien: hienChuThich,
                       chu: dangGhiAmThe
                           ? 'Đang ghi âm — bấm để dừng'
                           : 'Ghi âm (tạo thẻ ghi âm)',
-                      child: _nut(
-                        rong,
-                        dangGhiAmThe ? Icons.stop : Icons.mic_rounded,
-                        dangGhiAmThe ? 'Dừng' : 'Ghi âm',
-                        dangGhiAmThe ? 'Dừng ghi âm' : 'Ghi âm',
-                        khiBamGhiAmThe,
-                        mau: dangGhiAmThe
-                            ? Colors.red.shade600
-                            : const Color(0xFF5F6368),
+                      child: _NutGhiAmTron(
+                        dangGhiAm: dangGhiAmThe,
+                        khiBam: khiBamGhiAmThe,
                       ),
                     ),
 
@@ -282,7 +279,7 @@ class ThanhCongCu extends StatelessWidget {
                     _NutCoChuThich(
                       hien: hienChuThich,
                       chu: 'Ghi âm (micro không dùng được trên iPhone)',
-                      child: _NutMicroHoacGhiAmGop(
+                      child: _NutGhiAmTron(
                         dangGhiAm: dangGhiAmThe,
                         khiBam: khiBamGhiAmThe,
                       ),
@@ -309,11 +306,16 @@ class ThanhCongCu extends StatelessWidget {
   }
 }
 
-/// Nút GỘP micro + ghi âm cho iPhone — icon của nút Ghi âm, nhưng khung
-/// tròn/màu nền/viền y hệt phong cách nút micro (`_NutMicroTron`): nền xanh
-/// nhạt + viền xanh dương đậm lúc chưa ghi, đỏ (không viền) lúc đang ghi.
-class _NutMicroHoacGhiAmGop extends StatelessWidget {
-  const _NutMicroHoacGhiAmGop({required this.dangGhiAm, required this.khiBam});
+/// Nút Ghi âm tròn — dùng CHUNG cho cả nút Ghi âm riêng (Android/iOS gốc và
+/// hầu hết thiết bị web) LẪN nút gộp micro+ghi âm của iPhone
+/// (`gopMicVaGhiAmThanhMotNut`, iPhone không có micro riêng vì WebKit không
+/// hỗ trợ live-dictation) — cả hai phải trông giống nhau tuyệt đối theo yêu
+/// cầu người dùng. To bằng nút micro (`_NutMicroTron`, khung tròn 40x40):
+/// nền xanh nhạt (`Colors.blue.shade50`, giữ giống nền micro cho đồng bộ thị
+/// giác) + viền xanh LÁ đậm lúc chưa ghi (khác màu viền xanh DƯƠNG của nút
+/// micro, để phân biệt hai chức năng) — đỏ đặc (không viền) lúc đang ghi.
+class _NutGhiAmTron extends StatelessWidget {
+  const _NutGhiAmTron({required this.dangGhiAm, required this.khiBam});
 
   final bool dangGhiAm;
   final VoidCallback khiBam;
@@ -346,12 +348,12 @@ class _NutMicroHoacGhiAmGop extends StatelessWidget {
                   ? null
                   : BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.blue.shade900, width: 2.5),
+                      border: Border.all(color: Colors.green.shade800, width: 2.5),
                     ),
               alignment: Alignment.center,
               child: Icon(
                 dangGhiAm ? Icons.stop : Icons.mic_rounded,
-                color: dangGhiAm ? Colors.white : Colors.blue.shade900,
+                color: dangGhiAm ? Colors.white : Colors.green.shade800,
                 size: 20,
               ),
             ),
