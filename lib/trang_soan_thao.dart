@@ -5386,38 +5386,64 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     return vtMoi.clamp(0, _boDieuKhien.text.length);
   }
 
-  /// Cuộn khung soạn thảo tới đúng con trỏ NẾU nó đang nằm ngoài khung nhìn
-  /// — chỉ cuộn tối thiểu vừa đủ thấy lại (không canh giữa như
-  /// `_cuonToiKetQuaHienTai`, vì Lên/Xuống/Trái/Phải di chuyển từng chút
-  /// một, canh giữa mỗi lần bấm sẽ giật màn hình liên tục). Gọi sau MỖI lần
-  /// `_diChuyenConTro` đổi vị trí con trỏ, kể cả khi bấm-giữ lặp lại liên
-  /// tục.
+  /// Cuộn khung soạn thảo tới đúng con trỏ NẾU nó đang nằm ngoài khung
+  /// nhìn — canh GIỮA màn hình khi cuộn (đơn giản và chắc chắn hơn hẳn
+  /// cách "nhích tối thiểu" cũ). Gọi sau MỌI thao tác ở Bộ phím nhanh có
+  /// thể đổi vị trí con trỏ (chèn ký tự, xoá, Home/End, All, Cut/Paste,
+  /// mũi tên Lên/Xuống/Trái/Phải).
+  ///
+  /// ĐÃ SỬA (không cuộn hoặc cuộn sai, kể cả mũi tên — vốn đã gọi hàm này
+  /// từ trước): bản cũ so trực tiếp `RenderEditable.getLocalRectForCaret`
+  /// (toạ độ CỤC BỘ của chính RenderEditable) với `_cuonVanBan.offset` (độ
+  /// cuộn NỘI DUNG) — đúng loại lỗi TRỘN LẪN hai hệ toạ độ khác nhau đã
+  /// từng gây lỗi 5 mốc phụ "Đoạn số" (xem lịch sử sửa lỗi đó, cùng bài
+  /// học). Sửa: quy hết mọi phép so sánh về toạ độ TOÀN CỤC màn hình thật
+  /// (`localToGlobal` không tham số — kỹ thuật đã dùng đúng và ổn định
+  /// cho `_veConTro()`), so trực tiếp với khung nhìn thật (vị trí +
+  /// chiều cao thật của `_oVanBanKey` trên màn hình) — không còn giả định
+  /// gì về ý nghĩa toạ độ cục bộ của RenderEditable nữa.
+  ///
+  /// Kiểm tra 2 lượt cách nhau đúng 1 khung hình: lượt đầu ngay sau khung
+  /// hình vừa đổi vị trí con trỏ; lượt hai đợi thêm 1 khung hình rồi kiểm
+  /// tra lại — để THẮNG được cơ chế tự-cuộn-tới-con-trỏ RIÊNG của chính
+  /// `EditableText`/`TextField` gốc (chạy độc lập, có thể tự cuộn sai dưới
+  /// bố cục `expands: true` VÀ chạy SAU lượt cuộn đầu của mình, ghi đè mất
+  /// nếu chỉ kiểm tra đúng một lượt).
   void _cuonToiConTroNeuCan() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    void kiemTraVaCuon() {
       if (!mounted || !_cuonVanBan.hasClients) return;
-      final hopVanBan = _oVanBanKey.currentContext?.findRenderObject();
-      if (hopVanBan == null) return;
-      final re = _timRenderEditable(hopVanBan);
+      final hopVanBanObj = _oVanBanKey.currentContext?.findRenderObject();
+      if (hopVanBanObj is! RenderBox || !hopVanBanObj.hasSize) return;
+      final re = _timRenderEditable(hopVanBanObj);
       if (re == null || !re.hasSize) return;
       final vt = _boDieuKhien.selection.extentOffset;
       if (vt < 0) return;
-      Rect goc;
+      Rect gocCucBo;
       try {
-        goc = re.getLocalRectForCaret(TextPosition(offset: vt));
+        gocCucBo = re.getLocalRectForCaret(TextPosition(offset: vt));
       } catch (_) {
         return;
       }
-      final offset = _cuonVanBan.offset;
-      final vpCao = _cuonVanBan.position.viewportDimension;
-      double? dich;
-      if (goc.top < offset) {
-        dich = goc.top;
-      } else if (goc.bottom > offset + vpCao) {
-        dich = goc.bottom - vpCao;
-      }
-      if (dich == null) return;
-      dich = dich.clamp(0.0, _cuonVanBan.position.maxScrollExtent);
+      final caretTrenGlobal = re.localToGlobal(gocCucBo.topLeft).dy;
+      final caretDuoiGlobal = re.localToGlobal(gocCucBo.bottomLeft).dy;
+      final khungTren = hopVanBanObj.localToGlobal(Offset.zero).dy;
+      final khungCao = hopVanBanObj.size.height;
+      final khungDuoi = khungTren + khungCao;
+
+      // Đã thấy trọn vẹn rồi — không cuộn, tránh giật màn hình vô ích lúc
+      // gõ/di chuyển bình thường trong tầm nhìn.
+      if (caretTrenGlobal >= khungTren && caretDuoiGlobal <= khungDuoi) return;
+
+      final caretGiua = (caretTrenGlobal + caretDuoiGlobal) / 2;
+      final khungGiua = khungTren + khungCao / 2;
+      final dich = (_cuonVanBan.offset + (caretGiua - khungGiua))
+          .clamp(0.0, _cuonVanBan.position.maxScrollExtent);
       _cuonVanBan.animateTo(dich, duration: const Duration(milliseconds: 150), curve: Curves.easeOut);
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      kiemTraVaCuon();
+      WidgetsBinding.instance.addPostFrameCallback((_) => kiemTraVaCuon());
     });
   }
 
