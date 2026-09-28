@@ -533,6 +533,7 @@ class _NutCongCuChu extends StatelessWidget {
     this.moTa,
     this.tyLeThuHep,
     this.bLiet = false,
+    this.noiBat = false,
   });
 
   final String nhan;
@@ -548,6 +549,16 @@ class _NutCongCuChu extends StatelessWidget {
   /// thuộc vào việc hàm gọi có tự kiểm tra đúng hay không.
   final bool bLiet;
 
+  /// NGƯỢC LẠI [bLiet] — tô màu xanh dương NỔI BẬT (không disable gì cả,
+  /// vẫn bấm được bình thường) — báo hiệu nút đang ở "chế độ nhanh": bấm
+  /// vào lúc này sẽ cho kết quả cố định, không theo logic bấm nhiều lần
+  /// thường ngày. Dùng cho nút "All" ngay sau khi vừa đạt "chọn tất cả"
+  /// (xem `_phimAllVuaChonTatCa`) — vùng chọn "chọn tất cả" rất dễ mất chỉ
+  /// bằng một cú chạm ra vùng văn bản (hành vi CHUẨN của mọi ô nhập, không
+  /// phải lỗi) nên cần một cách bấm lại NHANH, chắc chắn ra lại "chọn tất
+  /// cả" ngay, không phải bấm 2-4 lần đếm lại từ đầu.
+  final bool noiBat;
+
   /// Nhân thêm vào bề rộng TỰ NHIÊN của nút (ví dụ 0.85 = hẹp bớt 15%) —
   /// dùng cho Home/Paste khi hàng đã chật chỗ ngang. Chữ bên trong có thể
   /// tràn ra ngoài viền nút (`overflow: visible`, không cắt) — chấp nhận
@@ -562,13 +573,21 @@ class _NutCongCuChu extends StatelessWidget {
       height: 36,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: bLiet ? Colors.grey.shade200 : Colors.grey.shade100,
+        color: noiBat
+            ? Colors.blue.shade100
+            : (bLiet ? Colors.grey.shade200 : Colors.grey.shade100),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: bLiet ? Colors.grey.shade300 : Colors.grey.shade400),
+        border: Border.all(
+          color: noiBat
+              ? Colors.blue.shade400
+              : (bLiet ? Colors.grey.shade300 : Colors.grey.shade400),
+        ),
       ),
       alignment: Alignment.center,
       child: Text(nhan,
-          style: bLiet ? _kieuChu.copyWith(color: Colors.grey.shade400) : _kieuChu,
+          style: noiBat
+              ? _kieuChu.copyWith(color: Colors.blue.shade900)
+              : (bLiet ? _kieuChu.copyWith(color: Colors.grey.shade400) : _kieuChu),
           overflow: TextOverflow.visible,
           softWrap: false),
     );
@@ -3826,7 +3845,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henEpConTro?.cancel();
     _henAnDoanSo?.cancel();
     _henHetLietPastePhimAo?.cancel();
-    _henHetLietAllPhimAo?.cancel();
+    _henHetCheDoNhanhChonTatCa?.cancel();
     _theoDoiTapDoi.dispose();
     _cuonVanBan.removeListener(_khiCuonVanBanBaoDoanSo);
     _conTroDangHien.dispose();
@@ -4884,6 +4903,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       text: moi,
       selection: TextSelection.collapsed(offset: batDau + kyTu.length),
     );
+    // ĐÃ SỬA (màn hình không cuộn theo con trỏ khi bấm nút Bộ phím nhanh):
+    // trước đây chỉ mũi tên Lên/Xuống/Trái/Phải (`_diChuyenConTro`) gọi
+    // hàm cuộn này — mọi nút khác (chấm, phẩy, cách, xuống dòng ở đây) đều
+    // thiếu, khiến con trỏ có thể trôi ra ngoài khung nhìn mà màn hình
+    // không theo, nhất là văn bản dài.
+    _cuonToiConTroNeuCan();
     // (SỬA LỖI con trỏ nháy biến mất) Nút hàng phím ảo cũng là một widget
     // nhận focus được — bấm vào nó cướp mất tiêu điểm của `_oChu` NGAY SAU
     // `onPressed`, làm `_veConTro()` (chỉ vẽ khi `_oChu.hasFocus`) ẩn con
@@ -4918,6 +4943,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final moi = vb.replaceRange(batDau, ketThuc, '');
     _boDieuKhien.value =
         TextEditingValue(text: moi, selection: TextSelection.collapsed(offset: batDau));
+    _cuonToiConTroNeuCan();
     // Xem giải thích ở `_chenKyTuTuPhimAo` — cùng lý do, cùng cách sửa.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _oChu.requestFocus();
@@ -4979,6 +5005,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final moi = vb.replaceRange(batDau, ketThuc, '');
     _boDieuKhien.value =
         TextEditingValue(text: moi, selection: TextSelection.collapsed(offset: batDau));
+    _cuonToiConTroNeuCan();
     if (mounted) hienThongBaoGiua(context, 'Đã cắt và lưu vào bộ nhớ đệm');
   }
 
@@ -5021,6 +5048,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       text: moi,
       selection: TextSelection.collapsed(offset: batDau + chen.length),
     );
+    _cuonToiConTroNeuCan();
     if (mounted) hienThongBaoGiua(context, 'Đã dán văn bản vào từ bộ nhớ đệm');
   }
 
@@ -5037,28 +5065,45 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// tự động đè lên trên mọi thông báo gợi ý còn đang hiện từ lần bấm
   /// trước, không cần logic ưu tiên riêng). Chỉ đổi vùng chọn, không đụng
   /// nội dung.
-  /// Nút "All" tự "liệt" 1 giây (chỉ để mắt thấy, xem `_NutCongCuChu.bLiet`
-  /// — cùng khuôn với `_phimPasteDangLiet`) NGAY LÚC vừa chọn xong TOÀN BỘ
-  /// văn bản — báo rõ cho người dùng biết đã tới mức cao nhất, tránh bấm
-  /// tiếp liên tục vô ích (bấm nữa trong lúc liệt vẫn bị bỏ qua, không tính
-  /// vào vòng đếm 2 giây).
-  bool _phimAllDangLiet = false;
-  Timer? _henHetLietAllPhimAo;
+  /// Nút "All" tự tô màu xanh dương NỔI BẬT (xem `_NutCongCuChu.noiBat`)
+  /// trong 1 giây NGAY LÚC vừa chọn xong TOÀN BỘ văn bản — đây là "chế độ
+  /// nhanh": bấm vào lúc màu xanh còn hiện, bất kể 1 lần hay bấm liên tục
+  /// nhiều lần, LUÔN LUÔN trả về "đã chọn tất cả" ngay, không đếm lại từ
+  /// đầu (khác hẳn với logic đếm 1-4 lần thường ngày).
+  ///
+  /// Lý do cần "chế độ nhanh" này: vùng chọn "chọn tất cả" rất dễ mất chỉ
+  /// bằng một cú chạm bất kỳ vào vùng văn bản (hành vi CHUẨN của MỌI ô
+  /// nhập văn bản, không phải lỗi riêng của app này) — "chế độ nhanh" là
+  /// cách bấm lại một lần chắc chắn quay về "chọn tất cả" ngay, không cần
+  /// làm lại đúng 2-4 lần đếm từ đầu. (Từng thử một hướng khác — LIỆT/
+  /// khoá cứng nút trong 1 giây — nhưng đó là chẩn đoán SAI: mất vùng chọn
+  /// không phải do bấm lại đúng nút này, mà do bấm ra CHỖ KHÁC bất kỳ; đã
+  /// bỏ hướng đó.)
+  bool _phimAllVuaChonTatCa = false;
+  Timer? _henHetCheDoNhanhChonTatCa;
 
-  void _batLietNutAll() {
+  void _batCheDoNhanhChonTatCa() {
     if (!mounted) return;
-    setState(() => _phimAllDangLiet = true);
-    _henHetLietAllPhimAo?.cancel();
-    _henHetLietAllPhimAo = Timer(const Duration(seconds: 1), () {
-      if (mounted) setState(() => _phimAllDangLiet = false);
+    setState(() => _phimAllVuaChonTatCa = true);
+    _henHetCheDoNhanhChonTatCa?.cancel();
+    _henHetCheDoNhanhChonTatCa = Timer(const Duration(seconds: 1), () {
+      if (mounted) setState(() => _phimAllVuaChonTatCa = false);
     });
   }
 
   void _phimAoChonTatCa() {
-    if (_phimAllDangLiet) return;
     final vb = _boDieuKhien.text;
-    final chon = _boDieuKhien.selection;
     _giuFocusOChuSauKhiBam();
+
+    if (_phimAllVuaChonTatCa) {
+      _boDieuKhien.selection = TextSelection(baseOffset: 0, extentOffset: vb.length);
+      _cuonToiConTroNeuCan();
+      if (mounted) hienThongBaoGiua(context, 'Đã chọn tất cả');
+      _batCheDoNhanhChonTatCa(); // gia hạn thêm 1 giây nữa, tính từ lần bấm này.
+      return;
+    }
+
+    final chon = _boDieuKhien.selection;
     final bay = DateTime.now();
     final conTrongNguong =
         _lanBamAllTruoc != null && bay.difference(_lanBamAllTruoc!) <= _nguongBamAll;
@@ -5069,8 +5114,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _demBamAll = 0;
       _lanBamAllTruoc = null;
       _boDieuKhien.selection = TextSelection(baseOffset: 0, extentOffset: vb.length);
+      _cuonToiConTroNeuCan();
       if (mounted) hienThongBaoGiua(context, 'Đã chọn tất cả');
-      _batLietNutAll();
+      _batCheDoNhanhChonTatCa();
       return;
     }
 
@@ -5083,12 +5129,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _ => _tinhVungCumDoanVan(vb, vt), // 3
     };
     _boDieuKhien.selection = TextSelection(baseOffset: vung.$1, extentOffset: vung.$2);
+    _cuonToiConTroNeuCan();
 
     if (_demBamAll >= 2 && vung.$1 == 0 && vung.$2 == vb.length) {
       _demBamAll = 0;
       _lanBamAllTruoc = null;
       if (mounted) hienThongBaoGiua(context, 'Đã chọn tất cả');
-      _batLietNutAll();
+      _batCheDoNhanhChonTatCa();
     } else if (mounted) {
       hienThongBaoGiua(context, 'Bấm "All" 2-4 lần để chọn vùng rộng hơn');
     }
@@ -5253,6 +5300,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     final batDauDong = vt <= 0 ? 0 : vb.lastIndexOf('\n', vt - 1) + 1;
     _boDieuKhien.selection = TextSelection.collapsed(offset: batDauDong);
+    _cuonToiConTroNeuCan();
     if (mounted) {
       hienThongBaoGiua(context, 'Bấm Home 2 lần để lên trên cùng văn bản');
     }
@@ -5278,6 +5326,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final ketThucDongTho = vb.indexOf('\n', vt);
     final vtMoi = ketThucDongTho == -1 ? vb.length : ketThucDongTho;
     _boDieuKhien.selection = TextSelection.collapsed(offset: vtMoi);
+    _cuonToiConTroNeuCan();
     if (mounted) {
       hienThongBaoGiua(context, 'Bấm End 2 lần để xuống dưới cùng văn bản');
     }
@@ -6016,6 +6065,28 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (mounted) setState(() => _trinhGhiAmMo = false);
   }
 
+  /// Số thẻ nên tác động khi bấm "Hoàn thành-Chuyển thành văn bản"/"Hoàn
+  /// thành-Phát để nghe lại" mà KHÔNG có bản ghi âm nào đang chạy để chốt
+  /// (`_chotTheGhiAmHienTaiThanhHoanChinh` trả `null`) — trường hợp cụ
+  /// thể: vừa "Phát để nghe lại" rồi bấm Đóng (không bấm Chuyển hoá), thẻ
+  /// đã chốt từ trước, `_soTheGhiAmDangGhi` đã về `null`, nhưng thẻ đó vẫn
+  /// còn nguyên ở đó, chưa gửi AI — hai nút này vẫn phải hoạt động được
+  /// trên đúng thẻ đó. Nhận diện qua `_soTheChoBangDieuKhien` (số thẻ GẦN
+  /// NHẤT, không bị null hoá như `_soTheGhiAmDangGhi`) còn dữ liệu âm
+  /// thanh gốc (`_duLieuTheoTheGhiAm`, nghĩa là chưa gửi/xoá) mà chưa có
+  /// văn bản AI (`_vanBanDaTraVeTheoTheGhiAm`, nghĩa là chưa chuyển hoá
+  /// xong). `null` = không có gì để làm (ví dụ mới mở trình ghi âm, chưa
+  /// ghi được gì).
+  int? get _soTheChoHoanThanh {
+    final dangGhi = _soTheGhiAmDangGhi;
+    if (dangGhi != null) return dangGhi;
+    final gan = _soTheChoBangDieuKhien.value;
+    if (gan == 0) return null;
+    if (!_duLieuTheoTheGhiAm.containsKey(gan)) return null;
+    if (_vanBanDaTraVeTheoTheGhiAm.containsKey(gan)) return null;
+    return gan;
+  }
+
   /// Nút "Hoàn thành-Chuyển thành văn bản": chốt thẻ đang ghi thành thẻ
   /// hoàn chỉnh, ĐÓNG NGAY cả bảng điều khiển (nếu đang mở) và AppBar
   /// trình ghi âm — KHÔNG đợi gửi AI xong mới đóng như trước (người dùng
@@ -6040,7 +6111,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// sửa đúng: cho `_guiVaXuLyMotThe` CHIA SẺ/CHỜ đúng Future đang chạy cho
   /// cùng một số thẻ, thay vì bỏ qua im lặng.
   Future<void> _hoanThanhChuyenThanhVanBan() async {
-    final soThe = await _chotTheGhiAmHienTaiThanhHoanChinh();
+    var soThe = await _chotTheGhiAmHienTaiThanhHoanChinh();
+    // ĐÃ SỬA: không còn ghi âm nào đang chạy để "chốt" (ví dụ vừa nghe lại
+    // xong rồi bấm Đóng, không bấm Chuyển hoá — thẻ đã chốt từ trước) thì
+    // vẫn còn tác động được lên đúng thẻ đó — xem `_soTheChoHoanThanh`.
+    soThe ??= _soTheChoHoanThanh;
     await ghiAmTheDongHan();
     _dongBangDieuKhienGhiAmNeuMo();
     if (mounted) setState(() => _trinhGhiAmMo = false);
@@ -6065,7 +6140,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // (trong `finally`) khi xong; nếu chốt thất bại (soThe null) thì tự
     // tắt luôn ở đây, không gọi tới `_ngheLaiGhiAmThe`.
     _dangMoModalNgheLaiGhiAm = true;
-    final soThe = await _chotTheGhiAmHienTaiThanhHoanChinh();
+    var soThe = await _chotTheGhiAmHienTaiThanhHoanChinh();
+    // ĐÃ SỬA: xem chú thích ở `_hoanThanhChuyenThanhVanBan` — cùng lý do,
+    // cho phép nghe lại THÊM lần nữa một thẻ vừa nghe lại xong.
+    soThe ??= _soTheChoHoanThanh;
     if (soThe == null || !mounted) {
       _dangMoModalNgheLaiGhiAm = false;
       _kiemTraVaGuiNgamTheGhiAmNeuDu();
@@ -11151,7 +11229,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         nhan: 'All',
         moTa: 'Chọn từ — bấm 2-4 lần: đoạn văn/cụm đoạn văn/tất cả',
         onTap: _phimAoChonTatCa,
-        bLiet: _phimAllDangLiet,
+        noiBat: _phimAllVuaChonTatCa,
       ),
       // Home/End "đổi chỗ" sang hàng 4 nút điều hướng
       // (`_xayHangDieuHuongConTro`) — Lùi lại/Tiến tới xuống thay chỗ ở
