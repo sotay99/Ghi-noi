@@ -138,45 +138,47 @@ function huongDanChinhTa(boQuaTruocViTri, layLoiChinhTa, chenDauCau) {
   return huongDan;
 }
 
-/// Gửi một tệp âm thanh cho Gemini phiên âm ra chữ. Khác hẳn `goiGemini()`
-/// (chỉ gửi chữ) — đây gửi kèm dữ liệu nhị phân âm thanh dạng base64 theo
-/// đúng khuôn `inline_data` của Gemini.
-async function goiGeminiAmThanh(audioBase64, mimeType) {
-  const model = process.env.GEMINI_MODEL || MODEL_MAC_DINH;
-  const url =
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent` +
-    `?key=${process.env.GEMINI_API_KEY}`;
+/// Gửi một tệp âm thanh cho Whisper (OpenAI) phiên âm ra chữ. THAY cho việc
+/// gửi thẳng audio vào Gemini — audio là loại token đắt nhất, nên tách hẳn
+/// bước "nghe ra chữ" sang một dịch vụ chuyên biệt rẻ hơn nhiều lần, Gemini
+/// (nếu cần dùng tiếp) chỉ còn phải xử lý CHỮ (rẻ) chứ không còn đụng audio.
+/// Cần khoá riêng `OPENAI_API_KEY` (Script/Runtime environment variable),
+/// không liên quan gì tới `GEMINI_API_KEY`.
+async function goiWhisperAmThanh(audioBase64, mimeType) {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('Chưa cấu hình OPENAI_API_KEY.');
+  }
 
-  const huongDan =
-    'Phiên âm CHÍNH XÁC đoạn ghi âm giọng nói tiếng Việt sau đây thành văn bản. ' +
-    'Chỉ trả về đúng văn bản đã phiên âm, không thêm lời dẫn, không thêm dấu ngoặc kép bao quanh, không chú thích gì thêm.';
+  const bytes = Buffer.from(audioBase64, 'base64');
+  const phanMoRong = mimeType.includes('mp4') || mimeType.includes('m4a')
+    ? 'm4a'
+    : mimeType.includes('webm')
+    ? 'webm'
+    : mimeType.includes('wav')
+    ? 'wav'
+    : mimeType.includes('ogg')
+    ? 'ogg'
+    : 'mp3';
 
-  const phanHoi = await fetch(url, {
+  const bieuMau = new FormData();
+  bieuMau.append('file', new Blob([bytes], { type: mimeType }), `ghi-am.${phanMoRong}`);
+  bieuMau.append('model', 'whisper-1');
+  bieuMau.append('language', 'vi');
+
+  const phanHoi = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { text: huongDan },
-            { inline_data: { mime_type: mimeType, data: audioBase64 } },
-          ],
-        },
-      ],
-    }),
+    headers: { authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+    body: bieuMau,
   });
 
   if (!phanHoi.ok) {
     const chuLoi = await phanHoi.text();
-    throw new Error(`Gemini trả về lỗi ${phanHoi.status}: ${chuLoi.slice(0, 300)}`);
+    throw new Error(`Whisper trả về lỗi ${phanHoi.status}: ${chuLoi.slice(0, 300)}`);
   }
 
   const duLieu = await phanHoi.json();
-  const chu = (duLieu?.candidates?.[0]?.content?.parts || [])
-    .map((p) => p.text || '')
-    .join('');
-  if (!chu) throw new Error('Gemini không trả về nội dung (có thể ghi âm quá nhỏ hoặc im lặng hoàn toàn).');
+  const chu = (duLieu?.text || '').trim();
+  if (!chu) throw new Error('Whisper không trả về nội dung (có thể ghi âm quá nhỏ hoặc im lặng hoàn toàn).');
   return chu;
 }
 
@@ -236,13 +238,11 @@ exports.flowriteAi = async (req, res) => {
   const than = req.body || {};
   const { action, text, cauHoi, boQuaTruocViTri, layLoiChinhTa, chenDauCau } = than;
 
-  if (!process.env.GEMINI_API_KEY) {
-    res.status(500).json({ loi: 'Chưa cấu hình GEMINI_API_KEY.' });
-    return;
-  }
-
   // Nhánh riêng cho ghi âm: gửi lên là DỮ LIỆU ÂM THANH, không phải `text`,
-  // nên không đi qua các kiểm tra dành cho văn bản ở dưới.
+  // nên không đi qua các kiểm tra dành cho văn bản ở dưới. Đi qua Whisper
+  // (OpenAI) chứ KHÔNG qua Gemini nữa — audio là loại token đắt nhất, tách
+  // riêng dịch vụ phiên âm ra khỏi Gemini để giảm chi phí. Vì vậy nhánh này
+  // không cần GEMINI_API_KEY, chỉ cần OPENAI_API_KEY.
   if (action === 'ghi_am') {
     const { audioBase64, mimeType } = than;
     if (typeof audioBase64 !== 'string' || audioBase64.trim() === '') {
@@ -250,17 +250,22 @@ exports.flowriteAi = async (req, res) => {
       return;
     }
     // ~15 phút ghi âm ở mức nén thoại vẫn chỉ vài MB — 30MB base64 đã rất
-    // rộng rãi, chặn sớm để khỏi tốn công gọi Gemini với file bất thường.
+    // rộng rãi, chặn sớm để khỏi tốn công gọi Whisper với file bất thường.
     if (audioBase64.length > 30 * 1024 * 1024) {
       res.status(400).json({ loi: 'Tệp ghi âm quá lớn.' });
       return;
     }
     try {
-      const ketQua = await goiGeminiAmThanh(audioBase64, mimeType || 'audio/mp4');
+      const ketQua = await goiWhisperAmThanh(audioBase64, mimeType || 'audio/mp4');
       res.status(200).json({ text: ketQua });
     } catch (err) {
       res.status(502).json({ loi: String(err && err.message ? err.message : err) });
     }
+    return;
+  }
+
+  if (!process.env.GEMINI_API_KEY) {
+    res.status(500).json({ loi: 'Chưa cấu hình GEMINI_API_KEY.' });
     return;
   }
 
