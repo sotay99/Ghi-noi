@@ -4108,11 +4108,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   // ---------------------------------------------------------------- cài đặt
 
-  Future<void> _moCaiDat() async {
+  Future<void> _moCaiDat(NhomCaiDat nhom) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ManHinhCaiDat(
           caiDat: widget.caiDat,
+          nhom: nhom,
           layNhatKyMicro: () => List<String>.from(_nhatKyMicro),
           xoaNhatKyMicro: _nhatKyMicro.clear,
           // Người dùng vừa tắt "kiểm tra chính tả bằng AI": xoá hết gạch đỏ
@@ -4375,6 +4376,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henChinhTa?.cancel();
     _boDieuKhien.loi.clear();
     _viTriDaKiemTraChinhTa = banDau.length;
+    // (SỬA LỖI bộ nhớ đệm Lùi lại/Tiến tới lẫn giữa các tệp) Hai danh sách
+    // này là "bộ nhớ đệm" của nút Lùi lại/Tiến tới — không xoá thì các mốc
+    // của TỆP CŨ vẫn còn nằm lại, bấm Lùi lại/Tiến tới ở tệp mới sẽ lấy nhầm
+    // mốc của tệp cũ đè lên văn bản hiện tại.
+    _lichSuLui.clear();
+    _lichSuToi.clear();
     // (SỬA LỖI đường kẻ chia "bóng ma") Ghi chú KHÁC có thể mang toạ độ
     // đường kẻ chia hoàn toàn không liên quan tới ghi chú vừa mở — không xoá
     // thì offset cũ (ví dụ 0) vẫn "hợp lệ" trên văn bản mới (kể cả văn bản
@@ -12159,7 +12166,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 // trắng giữa thanh công cụ và bàn phím.
                 neThanhDieuHuong: caoBanPhim == 0,
                 khiBamMicro: _bamNutMicro,
-                khiBamCaiDat: _moCaiDat,
+                khiBamCaiDatMicro: () => _moCaiDat(NhomCaiDat.micro),
+                khiBamCaiDatHienThi: () => _moCaiDat(NhomCaiDat.hienThiVaTuDongSua),
                 khiBamHuongDan: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const ManHinhHuongDan()),
                 ),
@@ -12189,7 +12197,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 khiBamDanhSachPhimTat: _moDanhSachPhimTat,
                 khiBamTimKiem: () => _hienThanhTimKiem ? _dongTimKiem() : _moTimKiem(),
                 khiBamTroChuyen: () {},
-                khiBamTaiKhoan: () {},
                   ),
                 ),
                 // (Nút ẩn/hiện 4 nút điều hướng không còn "nhảy" tới đè lên

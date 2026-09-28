@@ -18,6 +18,13 @@ import 'thong_bao_giua.dart';
 
 const _cacMucThoiGian = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, _khongTuBatLai];
 
+/// Hai nhóm cài đặt — trước đây là MỘT màn hình dài 12 dòng liên tiếp, nay
+/// tách theo đúng chủ đề để dễ tìm hơn: [micro] gồm mọi thứ liên quan tới
+/// việc bật/tắt/nghe micro và ghi âm; [hienThiVaTuDongSua] gồm mọi thứ AI tự
+/// sửa chữ và hiển thị (đường kẻ chia, chấm cuối văn bản...). Vào từ hai mục
+/// riêng trong menu "Tài khoản của bạn" (xem `thanh_cong_cu.dart`).
+enum NhomCaiDat { micro, hienThiVaTuDongSua }
+
 /// Giá trị đặc biệt: micro tắt hẳn khi gõ phím, người dùng phải tự bấm nút
 /// micro mới nghe lại — không có bộ đếm thời gian nào tự động bật hộ.
 const _khongTuBatLai = -1.0;
@@ -26,6 +33,7 @@ class ManHinhCaiDat extends StatefulWidget {
   const ManHinhCaiDat({
     super.key,
     required this.caiDat,
+    required this.nhom,
     required this.khiTatKiemTraChinhTa,
     required this.khiKiemTraLaiMicro,
     this.khiDoiTuDongThemDuongKeChia,
@@ -34,6 +42,10 @@ class ManHinhCaiDat extends StatefulWidget {
   });
 
   final CaiDat caiDat;
+
+  /// Nhóm cài đặt nào đang mở — quyết định tiêu đề AppBar và danh sách dòng
+  /// hiển thị trong `build()`.
+  final NhomCaiDat nhom;
 
   /// Chỉ có trên web (xem `_dong0ThietBi`) — đọc/xoá nhật ký gỡ lỗi micro
   /// (`_nhatKyMicro` bên trang soạn thảo). `null` trên Android/iOS gốc vì
@@ -234,51 +246,66 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
 
   @override
   Widget build(BuildContext context) {
+    final laMicro = widget.nhom == NhomCaiDat.micro;
     return Scaffold(
-      appBar: AppBar(title: const Text('Cài đặt')),
+      appBar: AppBar(
+        title: Text(laMicro ? 'Cài đặt Micro' : 'Cài đặt Hiển thị và tự động sửa'),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-        children: [
-          if (kIsWeb) ...[
-            _dong0ThietBi(),
-            const Divider(height: 40),
-          ],
-          _dong1ThoiGian(),
-          const Divider(height: 40),
-          _dong2TuTatMicro(),
-          const Divider(height: 40),
-          _dong3TuDongChen(),
-          const Divider(height: 40),
-          _dong4AI(),
-          const Divider(height: 40),
-          _dong4bChenDauCauAI(),
-          const Divider(height: 40),
-          _dong4cTuDongThemDauCham(),
-          const Divider(height: 40),
-          _dong4dTuDongThutDauDong(),
-          const Divider(height: 40),
-          _dong4eTuDongThemDuongKeChia(),
-          const Divider(height: 40),
-          _dong4gChamCuoiVanBan(),
-          const Divider(height: 40),
-          _dong4fTuDongVietHoaDauCau(),
-          const Divider(height: 40),
-          _dong4hTuDongChuanHoaNgoac(),
-          const Divider(height: 40),
-          _dongPhimTat(
-            laMicro: true,
-            tieuDe: 'Phím tắt cho Micro (vừa nói vừa ra chữ)',
-            hienTai: _phimTatMicro,
-          ),
-          const Divider(height: 40),
-          _dongPhimTat(
-            laMicro: false,
-            tieuDe: 'Phím tắt cho Ghi âm (Ghi âm xong mới ra chữ — tạo thẻ ghi âm)',
-            hienTai: _phimTatGhiAm,
-          ),
-          const Divider(height: 40),
-          _dong6Micro(),
-        ],
+        children: laMicro
+            ? [
+                // Nhóm MICRO — xếp theo mức quan trọng: lối thoát khi micro
+                // trục trặc (chỉ web) lên đầu, rồi hai mốc thời gian tự
+                // bật/tắt micro, rồi hai phím tắt (Micro/Ghi âm — cùng chủ đề
+                // "bấm gì để nghe"), cuối cùng là trạng thái quyền thiết bị.
+                if (kIsWeb) ...[
+                  _dong0ThietBi(),
+                  const Divider(height: 40),
+                ],
+                _dong1ThoiGian(),
+                const Divider(height: 40),
+                _dong2TuTatMicro(),
+                const Divider(height: 40),
+                _dongPhimTat(
+                  laMicro: true,
+                  tieuDe: 'Phím tắt cho Micro (vừa nói vừa ra chữ)',
+                  hienTai: _phimTatMicro,
+                ),
+                const Divider(height: 40),
+                _dongPhimTat(
+                  laMicro: false,
+                  tieuDe:
+                      'Phím tắt cho Ghi âm (Ghi âm xong mới ra chữ — tạo thẻ ghi âm)',
+                  hienTai: _phimTatGhiAm,
+                ),
+                const Divider(height: 40),
+                _dong6Micro(),
+              ]
+            : [
+                // Nhóm HIỂN THỊ & TỰ ĐỘNG SỬA — các dòng AI sửa chữ đứng
+                // trước (chính tả, dấu câu, dấu cách, dấu chấm, viết hoa,
+                // chuẩn hoá ngoặc — cùng chủ đề "AI/tự động chỉnh câu chữ"),
+                // rồi các dòng thuần hiển thị đứng sau (thụt đầu dòng, đường
+                // kẻ chia đoạn, chấm cuối văn bản — cùng chủ đề "trình bày").
+                _dong4AI(),
+                const Divider(height: 40),
+                _dong4bChenDauCauAI(),
+                const Divider(height: 40),
+                _dong3TuDongChen(),
+                const Divider(height: 40),
+                _dong4cTuDongThemDauCham(),
+                const Divider(height: 40),
+                _dong4fTuDongVietHoaDauCau(),
+                const Divider(height: 40),
+                _dong4hTuDongChuanHoaNgoac(),
+                const Divider(height: 40),
+                _dong4dTuDongThutDauDong(),
+                const Divider(height: 40),
+                _dong4eTuDongThemDuongKeChia(),
+                const Divider(height: 40),
+                _dong4gChamCuoiVanBan(),
+              ],
       ),
     );
   }

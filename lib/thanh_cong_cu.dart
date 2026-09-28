@@ -7,6 +7,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'thong_bao_giua.dart';
 import 'vong_song_am.dart';
 
 class ThanhCongCu extends StatelessWidget {
@@ -19,7 +20,8 @@ class ThanhCongCu extends StatelessWidget {
     required this.neThanhDieuHuong,
     required this.nhanPhimTat,
     required this.khiBamMicro,
-    required this.khiBamCaiDat,
+    required this.khiBamCaiDatMicro,
+    required this.khiBamCaiDatHienThi,
     required this.khiBamHuongDan,
     required this.khiBamCaiDatKiemTraToanVan,
     required this.khiBamBanPhim,
@@ -38,7 +40,6 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamDanhSachPhimTat,
     required this.khiBamTimKiem,
     required this.khiBamTroChuyen,
-    required this.khiBamTaiKhoan,
   });
 
   final bool bat;
@@ -56,7 +57,12 @@ class ThanhCongCu extends StatelessWidget {
   final String nhanPhimTat;
 
   final VoidCallback khiBamMicro;
-  final VoidCallback khiBamCaiDat;
+
+  /// Hai mục đầu của menu "Tài khoản của bạn" — Cài đặt tách làm hai nhóm
+  /// (xem `_NutTaiKhoanMenu`, `man_hinh_cai_dat.dart`).
+  final VoidCallback khiBamCaiDatMicro;
+  final VoidCallback khiBamCaiDatHienThi;
+
   final VoidCallback khiBamHuongDan;
 
   /// Gắn với mục "Cài đặt nút "Kiểm tra toàn văn"" trong menu "Làm việc với
@@ -104,9 +110,8 @@ class ThanhCongCu extends StatelessWidget {
   /// này, dưới tên "Tìm kiếm và thay thế".
   final VoidCallback khiBamTimKiem;
 
-  /// Mục 9: hai nút mới, chưa gắn logic.
+  /// Mục 9: nút mới, chưa gắn logic.
   final VoidCallback khiBamTroChuyen;
-  final VoidCallback khiBamTaiKhoan;
 
   /// Ngưỡng bề ngang chuẩn của Material để phân biệt điện thoại (hẹp) với
   /// máy tính bảng/màn hình gập mở ra (rộng) — đủ chỗ để các nút giãn ra
@@ -226,15 +231,53 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamChepRoiXoaTatCa: khiBamChepRoiXoaTatCa,
                               khiBamXoaTatCa: khiBamXoaTatCa,
                               khiBamDanhSachPhimTat: khiBamDanhSachPhimTat,
-                              khiBamCaiDat: khiBamCaiDat,
                               khiBamTimKiem: khiBamTimKiem,
                             ),
                           ),
                           _NutCoChuThich(
                             hien: hienChuThich,
                             chu: 'Tài khoản của bạn',
-                            child: _nut(rong, Icons.account_circle,
-                                'Tài khoản', 'Tài khoản', khiBamTaiKhoan),
+                            child: _NutTaiKhoanMenu(
+                              rong: rong,
+                              khiBamCaiDatMicro: khiBamCaiDatMicro,
+                              khiBamCaiDatHienThi: khiBamCaiDatHienThi,
+                            ),
+                          ),
+                          // Nhân bản nút "Bật/Tắt Bộ phím nhanh cho màn hình
+                          // cảm ứng" (trước đây chỉ có trong menu "+ Thêm lựa
+                          // chọn") ra thành một nút riêng ngay ngoài thanh
+                          // công cụ — dễ bấm hơn, không cần mở menu. Cả hai
+                          // đường (nút riêng này và mục trong menu Thêm) vẫn
+                          // cùng gọi một hàm `khiBamBoPhimNhanh` duy nhất, nên
+                          // luôn đồng bộ trạng thái với nhau.
+                          _NutCoChuThich(
+                            hien: hienChuThich,
+                            chu: boPhimNhanhDangMo
+                                ? 'Tắt Bộ phím nhanh cho màn hình cảm ứng'
+                                : 'Bật Bộ phím nhanh cho màn hình cảm ứng',
+                            child: _nut(
+                              rong,
+                              Icons.keyboard,
+                              'Phím nhanh',
+                              'Phím nhanh',
+                              () {
+                                final dangMoTruocKhiBam = boPhimNhanhDangMo;
+                                khiBamBoPhimNhanh();
+                                // Chỉ báo khi BẬT lên (không báo lúc tắt) —
+                                // và chỉ ngay lần vừa bật, không lặp lại mỗi
+                                // khi bộ phím nhanh chỉ đang hiển thị sẵn.
+                                if (!dangMoTruocKhiBam) {
+                                  hienThongBaoGiua(
+                                    context,
+                                    'Bộ phím nhanh dành cho màn hình cảm ứng',
+                                    thoiGian: const Duration(milliseconds: 3500),
+                                  );
+                                }
+                              },
+                              mau: boPhimNhanhDangMo
+                                  ? const Color(0xFF1A73E8)
+                                  : const Color(0xFF5F6368),
+                            ),
                           ),
                           ],
                         ),
@@ -931,7 +974,6 @@ class _NutThemMenu extends StatelessWidget {
     required this.khiBamChepRoiXoaTatCa,
     required this.khiBamXoaTatCa,
     required this.khiBamDanhSachPhimTat,
-    required this.khiBamCaiDat,
     required this.khiBamTimKiem,
   });
 
@@ -953,11 +995,12 @@ class _NutThemMenu extends StatelessWidget {
   final VoidCallback khiBamXoaTatCa;
   final VoidCallback khiBamDanhSachPhimTat;
 
-  /// Mục 8b: "Cài đặt" và "Tìm kiếm và thay thế" dời vào đây, đúng vị trí mà
-  /// "Thêm ảnh"/"Chụp ảnh (camera)" vừa rời đi (nay ở menu "Làm việc với
-  /// AI") — giữ nguyên logic cũ của cả hai, chỉ đổi chỗ đặt (và đổi tên hiển
-  /// thị của nút tìm kiếm thành "Tìm kiếm và thay thế").
-  final VoidCallback khiBamCaiDat;
+  /// Mục 8b: "Tìm kiếm và thay thế" dời vào đây, đúng vị trí mà "Thêm
+  /// ảnh"/"Chụp ảnh (camera)" vừa rời đi (nay ở menu "Làm việc với AI") —
+  /// giữ nguyên logic cũ, chỉ đổi chỗ đặt (và đổi tên hiển thị thành "Tìm
+  /// kiếm và thay thế"). Mục "Cài đặt" đã dời hẳn sang menu "Tài khoản của
+  /// bạn" (tách làm hai: Cài đặt Micro / Cài đặt Hiển thị và tự động sửa —
+  /// xem `_NutTaiKhoanMenu`), không còn ở đây nữa.
   final VoidCallback khiBamTimKiem;
 
   @override
@@ -1007,9 +1050,6 @@ class _NutThemMenu extends StatelessWidget {
               case 22:
                 khiBamXoaTatCa();
                 break;
-              case 24:
-                khiBamCaiDat();
-                break;
               case 25:
                 khiBamTimKiem();
                 break;
@@ -1039,7 +1079,6 @@ class _NutThemMenu extends StatelessWidget {
                 // với AI" (đổi tên "Chuyển hình ảnh thành văn bản") — "Cài
                 // đặt" và "Tìm kiếm và thay thế" (trước đây là hai nút riêng
                 // ngoài thanh công cụ) vào thay đúng vị trí này.
-                _mucMenuThem(24, 'Cài đặt'),
                 _mucMenuThem(25, 'Tìm kiếm và thay thế'),
                 _dividerMenu(),
                 _mucMenuThem(
@@ -1056,11 +1095,81 @@ class _NutThemMenu extends StatelessWidget {
                 _mucMenuThem(6, 'Chia sẻ ứng dụng này đến với mọi người'),
                 _mucMenuThem(7, 'Góp ý thêm, báo lỗi về ứng dụng'),
                 _mucMenuThem(8, 'Donate ủng hộ-cảm ơn tác giả'),
+              ]),
+            ];
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// Menu thả xuống của nút "Tài khoản của bạn" — cùng cơ chế với
+/// `_NutThemMenu`/`_NutAIMenu`. Hai mục đầu (Cài đặt Micro / Cài đặt Hiển thị
+/// và tự động sửa) gọi callback thật — mở đúng nhóm cài đặt tương ứng trong
+/// `ManHinhCaiDat` (xem `NhomCaiDat`). Ba mục còn lại ("Điều khoản sử dụng",
+/// "Bảo mật và quyền riêng tư" — dời từ menu "+ Thêm lựa chọn" sang đây, và
+/// "Đăng nhập tài khoản" ở cuối cùng) CHƯA gắn logic, giữ đúng hiện trạng cũ
+/// (bấm vào chưa có tác dụng gì).
+class _NutTaiKhoanMenu extends StatelessWidget {
+  const _NutTaiKhoanMenu({
+    required this.rong,
+    required this.khiBamCaiDatMicro,
+    required this.khiBamCaiDatHienThi,
+  });
+
+  final bool rong;
+  final VoidCallback khiBamCaiDatMicro;
+  final VoidCallback khiBamCaiDatHienThi;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Tài khoản của bạn',
+      child: Tooltip(
+        message: 'Tài khoản của bạn',
+        child: PopupMenuButton<int>(
+          padding: EdgeInsets.zero,
+          splashRadius: 20,
+          child: rong
+              ? const _KhungNutRong(
+                  bieuTuong: Icons.account_circle,
+                  nhan: 'Tài khoản',
+                )
+              : Container(
+                  width: 38,
+                  height: 38,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.account_circle,
+                      size: 20, color: Color(0xFF5F6368)),
+                ),
+          onSelected: (gia) {
+            switch (gia) {
+              case 1:
+                khiBamCaiDatMicro();
+                break;
+              case 2:
+                khiBamCaiDatHienThi();
+                break;
+            }
+          },
+          itemBuilder: (ctx) {
+            final cuon = ScrollController();
+            return [
+              _mucDongMenu(cuon),
+              _mucCuonDanhSach(ctx, cuon, [
+                _mucMenuThem(1, 'Cài đặt Micro'),
+                _mucMenuThem(2, 'Cài đặt Hiển thị và tự động sửa'),
                 _dividerMenu(),
-                _mucMenuThem(9, 'Điều khoản sử dụng'),
-                _mucMenuThem(10, 'Bảo mật và quyền riêng tư'),
+                _mucMenuThem(3, 'Điều khoản sử dụng'),
+                _mucMenuThem(4, 'Bảo mật và quyền riêng tư'),
                 _dividerMenu(),
-                _mucMenuThem(11, 'Đăng nhập tài khoản'),
+                _mucMenuThem(5, 'Đăng nhập tài khoản'),
               ]),
             ];
           },
