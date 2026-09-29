@@ -5581,10 +5581,23 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   bool _daCanhBaoGioiHanTheGhiAm = false;
   bool _hopThoaiCanhBaoTheGhiAmDangMo = false;
 
-  static const _gioiHanMoiTheGhiAm = Duration(minutes: 5);
-  static const _canhBaoGioiHanTheGhiAm = Duration(minutes: 4);
+  /// (SIẾT LẠI mỗi thẻ tối đa 60 giây, trước đây 5 phút — thẻ ngắn giúp
+  /// người dùng nói có tổ chức hơn, đỡ lan man, và né hẳn nhu cầu phải cắt
+  /// một file ghi âm dài sẵn có — mỗi thẻ mới luôn là MỘT LƯỢT GHI TỪ ĐẦU.)
+  static const _gioiHanMoiTheGhiAm = Duration(seconds: 60);
 
-  /// Đếm số thẻ đã được TỰ ĐỘNG nối tiếp nhau (do hết giờ 5 phút mà KHÔNG
+  /// Cảnh báo ở giây 45 cho các thẻ THƯỜNG (còn được tự nối tiếp) — sớm hơn
+  /// tỉ lệ cũ một chút (cũ: cảnh báo trước đúng 1 phút so với hạn 5 phút)
+  /// để người dùng vẫn kịp phản ứng dù hạn giờ đã ngắn đi nhiều.
+  static const _canhBaoGioiHanTheGhiAm = Duration(seconds: 45);
+
+  /// Cảnh báo SỚM HƠN (giây 30) riêng cho thẻ tự động CUỐI CÙNG còn được
+  /// phép (xem `_laTheTuDongCuoiCung`) — hậu quả nặng hơn hẳn (tự NGỪNG hẳn
+  /// trình ghi âm, không phải chỉ chuyển thẻ), nên cho thêm thời gian phản
+  /// ứng.
+  static const _canhBaoGioiHanTheGhiAmCuoiCung = Duration(seconds: 30);
+
+  /// Đếm số thẻ đã được TỰ ĐỘNG nối tiếp nhau (do hết giờ 60 giây mà KHÔNG
   /// ai bấm gì) — reset về 0 mỗi khi có một hành động bấm tay THẬT (bấm
   /// "Tạo bản ghi âm mới" ở dialog, "Hoàn thành-Tạo bản ghi âm mới" ở
   /// AppBar/bảng điều khiển, hay mở trình ghi âm mới từ đầu). Mục đích:
@@ -5594,10 +5607,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// giờ bị chặn. Xem `_chotTheGhiAmVaBatDauTheMoiDoQuaGioiHan`.
   int _soLanTuDongTaoTheLienTiep = 0;
 
-  /// Cho phép tối đa 2 thẻ tự động nối tiếp nhau (không ai bấm gì) — tới
-  /// thẻ THỨ HAI này, nếu vẫn không ai bấm gì thì tự NGỪNG hẳn (đóng trình
-  /// ghi âm), không tạo thẻ thứ ba.
-  static const _soLanToiDaTuDongTaoTheLienTiep = 2;
+  /// Cho phép tối đa 5 thẻ tự động nối tiếp nhau (không ai bấm gì) — tới
+  /// thẻ THỨ NĂM này, nếu vẫn không ai bấm gì thì tự NGỪNG hẳn (đóng trình
+  /// ghi âm), không tạo thẻ thứ sáu. 60 giây × 5 thẻ = đúng 5 phút tổng
+  /// cộng không ai bấm gì thì tự ngừng hẳn.
+  static const _soLanToiDaTuDongTaoTheLienTiep = 5;
 
   /// Ghi âm và micro-vừa-nói-vừa-ra-chữ không được cùng chạy — cả hai đều
   /// cần độc chiếm microphone của máy. Áp dụng cho MỌI nền tảng (kể cả
@@ -5860,7 +5874,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         } else {
           _chotTheGhiAmVaBatDauTheMoiDoQuaGioiHan(tuDong: true);
         }
-      } else if (moi >= _canhBaoGioiHanTheGhiAm) {
+      } else if (moi >=
+          (_laTheTuDongCuoiCung
+              ? _canhBaoGioiHanTheGhiAmCuoiCung
+              : _canhBaoGioiHanTheGhiAm)) {
         _hienCanhBaoGioiHanTheGhiAmNeuChua();
       }
     });
@@ -6024,7 +6041,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Đây là thẻ CUỐI CÙNG còn được phép tự động nối tiếp — nếu vẫn không ai
   /// bấm gì, tới hạn thẻ này sẽ KHÔNG tạo thẻ tiếp theo nữa mà tự ngừng hẳn
   /// (xem nhánh trong `_batDauMotTheGhiAmMoi`). Dùng để chọn đúng nội dung
-  /// cảnh báo — "sắp chạm 5 phút" (còn tự nối tiếp được) hay "sắp chạm tổng
+  /// cảnh báo — "sắp chạm 60 giây" (còn tự nối tiếp được) hay "sắp chạm tổng
   /// N phút của M thẻ liên tiếp, sẽ tự NGỪNG" (hết hạn mức).
   bool get _laTheTuDongCuoiCung =>
       _soLanTuDongTaoTheLienTiep >= _soLanToiDaTuDongTaoTheLienTiep - 1;
@@ -6036,7 +6053,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final soThe = _soTheGhiAmDangGhi;
     final laCuoi = _laTheTuDongCuoiCung;
     final tongPhut =
-        _gioiHanMoiTheGhiAm.inMinutes * _soLanToiDaTuDongTaoTheLienTiep;
+        (_gioiHanMoiTheGhiAm.inSeconds * _soLanToiDaTuDongTaoTheLienTiep) ~/ 60;
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -6045,7 +6062,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           // Nút "Tạm dừng"/"Tiếp tục" — KHÔNG đóng dialog, chỉ tạm dừng/tiếp
           // tục bản ghi hiện tại rồi tự đổi tên nút (nghịch đảo nhau).
           // Tạm dừng thì bộ đếm giờ (`_bomDongHoTheGhiAm`) tự đứng yên luôn
-          // (xem điều kiện `_theGhiAmDangTamDung` trong đó), nên hạn 5 phút
+          // (xem điều kiện `_theGhiAmDangTamDung` trong đó), nên hạn 60 giây
           // cũng dừng trôi theo, không cần thêm logic riêng ở đây.
           Future<void> bamTamDungTiepTuc() async {
             if (_theGhiAmDangTamDung) {
@@ -6059,16 +6076,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           return AlertDialog(
             title: Text(laCuoi
                 ? 'Sắp chạm giới hạn $tongPhut phút'
-                : 'Sắp chạm giới hạn 5 phút'),
+                : 'Sắp chạm giới hạn 60 giây'),
             content: Text(laCuoi
                 ? 'Thẻ ghi âm #$soThe (thẻ tự động thứ '
-                    '$_soLanToiDaTuDongTaoTheLienTiep liên tiếp) sắp ghi đủ 5 '
-                    'phút, tổng cộng sắp chạm $tongPhut phút không ai bấm gì. '
-                    'Nếu không chọn, tới đúng phút thứ 5 hệ thống sẽ TỰ NGỪNG '
+                    '$_soLanToiDaTuDongTaoTheLienTiep liên tiếp) sắp ghi đủ 60 '
+                    'giây, tổng cộng sắp chạm $tongPhut phút không ai bấm gì. '
+                    'Nếu không chọn, tới đúng giây thứ 60 hệ thống sẽ TỰ NGỪNG '
                     'ghi âm luôn, KHÔNG tạo thêm thẻ mới nữa (để tránh tốn '
                     'token AI và pin máy vô ích). Bạn muốn làm gì bây giờ?'
-                : 'Thẻ ghi âm #$soThe sắp ghi đủ 5 phút. Nếu không chọn, '
-                    'tới đúng phút thứ 5 nó sẽ tự động chốt và ghi tiếp bằng '
+                : 'Thẻ ghi âm #$soThe sắp ghi đủ 60 giây. Nếu không chọn, '
+                    'tới đúng giây thứ 60 nó sẽ tự động chốt và ghi tiếp bằng '
                     'một thẻ mới. Bạn muốn làm gì bây giờ?'),
             // 5 lựa chọn — nút Tạm dừng/Tiếp tục luôn đứng ĐẦU, rồi tới 4 nút
             // "Hoàn thành..."/"Tạo bản ghi âm mới" như cũ, dùng lại đúng các
