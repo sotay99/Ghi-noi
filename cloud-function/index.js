@@ -260,10 +260,15 @@ exports.flowriteAi = async (req, res) => {
       res.status(400).json({ loi: 'Thiếu dữ liệu âm thanh (audioBase64).' });
       return;
     }
-    // ~15 phút ghi âm ở mức nén thoại vẫn chỉ vài MB — 30MB base64 đã rất
-    // rộng rãi, chặn sớm để khỏi tốn công gọi Groq với file bất thường.
-    if (audioBase64.length > 30 * 1024 * 1024) {
-      res.status(400).json({ loi: 'Tệp ghi âm quá lớn.' });
+    // Groq giới hạn CỨNG 25MB cho tệp âm thanh gốc — vượt là bị chính Groq
+    // từ chối, không có đường vòng. base64 làm phình dung lượng lên ~4/3
+    // lần so với tệp gốc, nên giới hạn ở đây phải quy đổi theo đúng tỉ lệ
+    // đó (không phải một con số tuỳ chọn) để khớp giới hạn thật, dùng cho cả
+    // ghi âm trong app lẫn tệp âm thanh người dùng tự tải lên (mục "Chuyển
+    // file âm thanh thành văn bản").
+    const gioiHanBase64ChoTepAmThanh = Math.ceil((25 * 1024 * 1024 * 4) / 3);
+    if (audioBase64.length > gioiHanBase64ChoTepAmThanh) {
+      res.status(400).json({ loi: 'Tệp âm thanh quá lớn — Groq chỉ nhận tối đa 25MB/tệp. Hãy nén hoặc cắt ngắn tệp rồi thử lại.' });
       return;
     }
     try {
