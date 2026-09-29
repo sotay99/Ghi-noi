@@ -3888,6 +3888,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henAnDoanSo?.cancel();
     _henHetLietPastePhimAo?.cancel();
     _henHetCheDoNhanhChonTatCa?.cancel();
+    _oKetQuaFileAmThanh?.dispose();
     _theoDoiTapDoi.dispose();
     _cuonVanBan.removeListener(_khiCuonVanBanBaoDoanSo);
     _conTroDangHien.dispose();
@@ -10882,30 +10883,147 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _moModalKetQuaFileAmThanh(vanBanKetQua);
   }
 
+  /// Giữ nội dung modal kết quả AI qua nhiều lần mở/đóng (bấm "Chọn vị trí
+  /// để chèn văn bản" chỉ ẨN modal, không đóng hẳn — quay lại vẫn phải thấy
+  /// đúng bản người dùng vừa sửa, không phải bản gốc AI trả về ban đầu).
+  /// `null` nghĩa là không có phiên chuyển-file-âm-thanh nào đang mở.
+  TextEditingController? _oKetQuaFileAmThanh;
+
+  void _dongHanKetQuaFileAmThanh() {
+    _oKetQuaFileAmThanh?.dispose();
+    _oKetQuaFileAmThanh = null;
+  }
+
+  /// [vanBan] chỉ dùng để KHỞI TẠO controller lần đầu (từ text AI trả về) —
+  /// những lần mở lại sau đó (do bấm "Quay lại kết quả AI") controller đã
+  /// tồn tại sẵn với đúng nội dung người dùng vừa sửa, không ghi đè lại.
   void _moModalKetQuaFileAmThanh(String vanBan) {
+    _oKetQuaFileAmThanh ??= TextEditingController(text: vanBan);
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Văn bản từ tệp âm thanh'),
         content: SizedBox(
           width: 420,
-          child: SingleChildScrollView(child: SelectableText(vanBan)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Bạn có thể bấm vào ô bên dưới để sửa lại chữ tuỳ ý trước khi chèn.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+              ),
+              const SizedBox(height: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 320),
+                child: SingleChildScrollView(
+                  child: TextField(
+                    controller: _oKetQuaFileAmThanh,
+                    maxLines: null,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.all(10),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
+        actionsAlignment: MainAxisAlignment.spaceBetween,
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Huỷ'),
+            onPressed: () => _xacNhanHuyKetQuaFileAmThanh(ctx),
+            child: Text('Huỷ', style: TextStyle(color: Colors.red.shade600)),
           ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _chenKyTuTuPhimAo(vanBan);
-            },
-            child: const Text('Chèn vào văn bản đang soạn'),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              OutlinedButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  _batDauChonViTriChenFile();
+                },
+                child: const Text('Chọn vị trí để chèn văn bản'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: () {
+                  final vb = _oKetQuaFileAmThanh?.text ?? '';
+                  Navigator.of(ctx).pop();
+                  _dongHanKetQuaFileAmThanh();
+                  if (vb.isNotEmpty) _chenKyTuTuPhimAo(vb);
+                },
+                child: const Text('Chèn vào văn bản đang soạn'),
+              ),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  /// Bấm "Huỷ" trên modal kết quả AI — hỏi xác nhận trước vì kết quả AI vừa
+  /// tốn tiền phiên âm sẽ mất hẳn, không lấy lại được.
+  Future<void> _xacNhanHuyKetQuaFileAmThanh(BuildContext ctxModal) async {
+    final dongY = await showDialog<bool>(
+      context: context,
+      builder: (ctx2) => AlertDialog(
+        title: const Text('Huỷ kết quả từ AI?'),
+        content: const Text(
+          'Văn bản AI vừa phiên âm (kể cả phần bạn đã sửa, nếu có) sẽ mất hẳn, '
+          'không thể lấy lại. Bạn có chắc chắn muốn huỷ không?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx2).pop(false),
+            child: const Text('Không, giữ lại'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx2).pop(true),
+            child: Text('Huỷ', style: TextStyle(color: Colors.red.shade600)),
+          ),
+        ],
+      ),
+    );
+    if (dongY == true && mounted) {
+      Navigator.of(ctxModal).pop();
+      _dongHanKetQuaFileAmThanh();
+    }
+  }
+
+  // --------------------- chọn vị trí chèn (file âm thanh thành văn bản)
+
+  /// Bật "chế độ chọn vị trí chèn" — ẩn hết AppBar/thanh định dạng/Bộ phím
+  /// nhanh/thanh công cụ dưới, chỉ chừa khung soạn thảo (di chuyển con trỏ
+  /// bằng chạm/chuột/phím mũi tên bình thường) và một thanh riêng ở đáy
+  /// (dấu cách/xuống dòng/xoá — mượn lại từ Bộ phím nhanh — cộng hai nút
+  /// Chèn/Quay lại).
+  void _batDauChonViTriChenFile() {
+    setState(() => _dangChonViTriChenFile = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _oChu.requestFocus();
+    });
+  }
+
+  /// Bấm "Quay lại kết quả AI" — tắt chế độ chọn vị trí, mở lại ĐÚNG modal
+  /// cũ (controller vẫn giữ nguyên nội dung, kể cả phần đã sửa).
+  void _quayLaiKetQuaFileAmThanh() {
+    setState(() => _dangChonViTriChenFile = false);
+    if (_oKetQuaFileAmThanh != null) {
+      _moModalKetQuaFileAmThanh(_oKetQuaFileAmThanh!.text);
+    }
+  }
+
+  /// Bấm "Chèn vào vị trí này" — lấy đúng bản CUỐI CÙNG trong ô sửa (dù
+  /// người dùng có sửa hay không), chèn ngay tại vị trí con trỏ/đè lên vùng
+  /// đang chọn (`_chenKyTuTuPhimAo` đã tự lo việc này), rồi thoát hẳn khỏi
+  /// cả chế độ chọn vị trí lẫn phiên chuyển-file-âm-thanh — không hỏi lại.
+  void _chenTaiViTriDaChon() {
+    final vb = _oKetQuaFileAmThanh?.text ?? '';
+    setState(() => _dangChonViTriChenFile = false);
+    _dongHanKetQuaFileAmThanh();
+    if (vb.isNotEmpty) _chenKyTuTuPhimAo(vb);
   }
 
   OverlayEntry? _baoDangHien;
@@ -11303,6 +11421,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// thảo.
   bool _thuGonThanhCongCu = false;
 
+  /// "Chọn vị trí để chèn văn bản" (mục "Chuyển file âm thanh thành văn
+  /// bản") — xem `_batDauChonViTriChenFile`.
+  bool _dangChonViTriChenFile = false;
+
   /// Hàng 4 nút mũi tên điều hướng con trỏ (Lên/Xuống/Trái/Phải) — nằm
   /// NGAY TRÊN hàng Copy/Cut/Paste/All/Home/End (`_xayHangCongCuVanBanCamUng`),
   /// cùng bật/tắt theo `_boPhimNhanhCamUngMo`. CHỈ dựng khi
@@ -11638,6 +11760,94 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
+  /// Thanh đáy riêng khi đang "chọn vị trí để chèn văn bản" (kết quả AI từ
+  /// tệp âm thanh) — mượn lại nguyên ba nút dấu cách/xuống dòng/xoá của Bộ
+  /// phím nhanh, cộng hai nút Chèn/Quay lại. Đây là NƠI DUY NHẤT còn bấm
+  /// được lúc này — AppBar, thanh định dạng, Bộ phím nhanh gốc, thanh công
+  /// cụ dưới đều đã ẩn hết (xem các điều kiện `_dangChonViTriChenFile` ở
+  /// `build`), chỉ còn khung soạn thảo (di chuyển con trỏ/tạo vùng chọn
+  /// bình thường) và thanh này.
+  Widget _xayThanhChonViTriChenFile() {
+    final manHinhHep = MediaQuery.sizeOf(context).width < _nguongManHinhHep;
+    final rongNutPhimAo = manHinhHep ? 48.0 * 0.85 : 48.0;
+    return Material(
+      color: Colors.white,
+      elevation: 4,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE3F2FD),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'Di chuyển con trỏ tới vị trí muốn chèn văn bản từ AI, rồi bấm '
+                  '"Chèn vào vị trí này". Có vùng đang chọn thì văn bản mới sẽ '
+                  'thay thế đúng vùng đó.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF1565C0)),
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _NutPhimAo(
+                    nhan: '␣',
+                    moTa: 'Dấu cách',
+                    rong: rongNutPhimAo,
+                    onTap: () => _chenKyTuTuPhimAo(' '),
+                  ),
+                  const SizedBox(width: 8),
+                  _NutPhimAo(
+                    nhan: '⏎',
+                    moTa: 'Xuống dòng',
+                    rong: rongNutPhimAo,
+                    onTap: () => _chenKyTuTuPhimAo('\n'),
+                  ),
+                  const SizedBox(width: 8),
+                  _NutPhimAo(
+                    nhan: '⌫',
+                    moTa: 'Xoá — bấm giữ để xoá liên tục',
+                    mauNen: Colors.red.shade50,
+                    mauVien: Colors.red.shade300,
+                    rong: rongNutPhimAo,
+                    lapLai: true,
+                    onTap: _xoaKyTuTuPhimAo,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _quayLaiKetQuaFileAmThanh,
+                      child: const Text('Quay lại kết quả AI'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _chenTaiViTriDaChon,
+                      child: const Text('Chèn vào vị trí này'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Một ô trong bảng nút trình ghi âm — icon + nhãn (tự xuống hàng khi màn
   /// hình hẹp, không cắt chữ), nền màu riêng theo nhóm chức năng, viền mảnh
   /// xám để trông như một bảng lưới thật. Bắt `onTapDown` (không đợi
@@ -11931,7 +12141,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // giẫm lên nhau).
       appBar: _hienThanhTimKiem
           ? null
-          : (_trinhGhiAmMo ? _xayAppBarTrinhGhiAmThe() : (_thuGonThanhCongCu ? null : appBar)),
+          : (_trinhGhiAmMo
+              ? _xayAppBarTrinhGhiAmThe()
+              : ((_thuGonThanhCongCu || _dangChonViTriChenFile) ? null : appBar)),
       // translucent: chỉ NGHE sự kiện chạm để tắt chú thích, không chặn nó
       // đi tiếp xuống nút/ô bên dưới — một cú bấm vừa tắt chú thích vừa làm
       // đúng việc của nút đó (mở cài đặt, bật micro...).
@@ -12027,13 +12239,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             // nhận ra có ranh giới, không tạo thêm một "đường kẻ đậm" nhìn
             // rối mắt giữa hai thanh vốn đã sát nhau.
             // B1: thanh định dạng thủ công cũng nhường chỗ khi tìm kiếm mở.
-            if (!_anThanhDinhDang && !_hienThanhTimKiem && !_trinhGhiAmMo && !_thuGonThanhCongCu)
+            if (!_anThanhDinhDang && !_hienThanhTimKiem && !_trinhGhiAmMo && !_thuGonThanhCongCu && !_dangChonViTriChenFile)
               Divider(height: 1, thickness: 1, color: Colors.grey.withValues(alpha: 0.12)),
-            if (!_anThanhDinhDang && !_hienThanhTimKiem && !_trinhGhiAmMo && !_thuGonThanhCongCu)
+            if (!_anThanhDinhDang && !_hienThanhTimKiem && !_trinhGhiAmMo && !_thuGonThanhCongCu && !_dangChonViTriChenFile)
               _thanhDinhDangThuCong(),
             // Mục 7: và một đường kẻ mỏng nữa ở mép dưới thanh định dạng,
             // phân tách nó với vùng soạn thảo bên dưới.
-            if (!_anThanhDinhDang && !_hienThanhTimKiem && !_trinhGhiAmMo && !_thuGonThanhCongCu)
+            if (!_anThanhDinhDang && !_hienThanhTimKiem && !_trinhGhiAmMo && !_thuGonThanhCongCu && !_dangChonViTriChenFile)
               Divider(height: 1, thickness: 1, color: Colors.grey.withValues(alpha: 0.12)),
             Expanded(
               child: Padding(
@@ -12335,14 +12547,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 ),
               ),
             ),
-            if (_boPhimNhanhCamUngMo && !_boPhimNhanhCamUngAn && !_dieuHuongConTroAn)
+            if (_dangChonViTriChenFile) _xayThanhChonViTriChenFile(),
+            if (!_dangChonViTriChenFile && _boPhimNhanhCamUngMo && !_boPhimNhanhCamUngAn && !_dieuHuongConTroAn)
               _xayHangDieuHuongConTro(),
-            if (_boPhimNhanhCamUngMo && !_boPhimNhanhCamUngAn) _xayHangCongCuVanBanCamUng(),
-            if (_boPhimNhanhCamUngMo && !_boPhimNhanhCamUngAn) _xayHangPhimNhanhCamUng(),
+            if (!_dangChonViTriChenFile && _boPhimNhanhCamUngMo && !_boPhimNhanhCamUngAn) _xayHangCongCuVanBanCamUng(),
+            if (!_dangChonViTriChenFile && _boPhimNhanhCamUngMo && !_boPhimNhanhCamUngAn) _xayHangPhimNhanhCamUng(),
             // Bọc riêng bằng ValueListenableBuilder (xem chú thích ở
             // `_songAmTick`) — CHỈ ThanhCongCu dựng lại mỗi lần sóng âm đổi
             // (tới 5 lần/giây lúc ghi âm/nghe), không đụng tới AppBar trình
             // ghi âm hay phần còn lại của trang.
+            if (!_dangChonViTriChenFile)
             Stack(
               children: [
                 ValueListenableBuilder<int>(
@@ -12419,7 +12633,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           // (có lối thoát riêng "Hoàn thành-Đóng trình ghi âm"/"Xoá bản này")
           // — ẩn luôn nút nổi này, không thì nó đè lên góc phải của bảng nút
           // trình ghi âm mới.
-          if (_thuGonThanhCongCu && !_hienThanhTimKiem && !_trinhGhiAmMo)
+          if (_thuGonThanhCongCu && !_hienThanhTimKiem && !_trinhGhiAmMo && !_dangChonViTriChenFile)
             Positioned(
               top: MediaQuery.paddingOf(context).top + 4,
               right: 8,
@@ -12441,7 +12655,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           // y hệt, cần đúng lối thoát nổi này.
           if ((_thuGonThanhCongCu || _trinhGhiAmMo) &&
               _boPhimNhanhCamUngMo &&
-              _boPhimNhanhCamUngAn)
+              _boPhimNhanhCamUngAn &&
+              !_dangChonViTriChenFile)
             Positioned(
               right: 8,
               bottom: caoBanPhim + 56,
