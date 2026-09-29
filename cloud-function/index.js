@@ -192,6 +192,54 @@ async function goiGroqAmThanh(audioBase64, mimeType, maNgonNgu) {
   return chu;
 }
 
+/// Gửi một tệp ảnh cho Gemini để trích chữ ra (OCR) — dùng cho action
+/// 'chuyen_anh'. Cùng khuôn `inline_data` như audio trước đây từng dùng
+/// (nay đã chuyển sang Groq), chỉ khác loại dữ liệu. Gemini được chọn thay
+/// vì Groq (rẻ hơn) vì các model vision rẻ nhất của Groq (Llama 4
+/// Scout/3.2 Vision) KHÔNG khai hỗ trợ chính thức tiếng Việt, còn Gemini
+/// hỗ trợ đa ngôn ngữ rộng hơn nhiều — cùng rủi ro "nuốt chữ" như đã gặp
+/// với audio, nhưng lần này chọn né ngay từ đầu thay vì thử rồi mới biết.
+async function goiGeminiAnh(imageBase64, mimeType) {
+  const model = process.env.GEMINI_MODEL || MODEL_MAC_DINH;
+  const url =
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent` +
+    `?key=${process.env.GEMINI_API_KEY}`;
+
+  const huongDan =
+    'Trích xuất CHÍNH XÁC toàn bộ chữ có trong ảnh sau đây thành văn bản, giữ đúng ' +
+    'thứ tự đọc tự nhiên (trên xuống dưới, trái sang phải). Chỉ trả về đúng văn bản ' +
+    'đã trích xuất, không thêm lời dẫn, không thêm dấu ngoặc kép bao quanh, không ' +
+    'chú thích gì thêm. Nếu ảnh không có chữ nào, trả về chuỗi rỗng.';
+
+  const phanHoi = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: huongDan },
+            { inline_data: { mime_type: mimeType, data: imageBase64 } },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!phanHoi.ok) {
+    const chuLoi = await phanHoi.text();
+    throw new Error(`Gemini trả về lỗi ${phanHoi.status}: ${chuLoi.slice(0, 300)}`);
+  }
+
+  const duLieu = await phanHoi.json();
+  const chu = (duLieu?.candidates?.[0]?.content?.parts || [])
+    .map((p) => p.text || '')
+    .join('');
+  if (!chu) throw new Error('Gemini không trả về nội dung (có thể ảnh không có chữ hoặc quá mờ).');
+  return chu;
+}
+
 async function goiGemini(huongDan, vanBan) {
   const model = process.env.GEMINI_MODEL || MODEL_MAC_DINH;
   const url =
@@ -273,6 +321,37 @@ exports.flowriteAi = async (req, res) => {
     }
     try {
       const ketQua = await goiGroqAmThanh(audioBase64, mimeType || 'audio/mp4', ngonNgu);
+      res.status(200).json({ text: ketQua });
+    } catch (err) {
+      res.status(502).json({ loi: String(err && err.message ? err.message : err) });
+    }
+    return;
+  }
+
+  // Nhánh riêng cho ảnh: gửi lên là DỮ LIỆU HÌNH ẢNH, không phải `text` —
+  // dùng Gemini (không phải Groq) vì các model vision rẻ nhất của Groq
+  // không khai hỗ trợ chính thức tiếng Việt, xem chú thích ở
+  // `goiGeminiAnh`.
+  if (action === 'chuyen_anh') {
+    if (!process.env.GEMINI_API_KEY) {
+      res.status(500).json({ loi: 'Chưa cấu hình GEMINI_API_KEY.' });
+      return;
+    }
+    const { imageBase64, mimeType } = than;
+    if (typeof imageBase64 !== 'string' || imageBase64.trim() === '') {
+      res.status(400).json({ loi: 'Thiếu dữ liệu hình ảnh (imageBase64).' });
+      return;
+    }
+    // Gemini nhận tới 100MB dữ liệu inline, nhưng ảnh thường chỉ vài MB —
+    // chặn ở 15MB tệp gốc (quy đổi base64 ~4/3 lần) đã rất rộng rãi, tránh
+    // gửi nhầm ảnh khổng lồ bất thường.
+    const gioiHanBase64ChoAnh = Math.ceil((15 * 1024 * 1024 * 4) / 3);
+    if (imageBase64.length > gioiHanBase64ChoAnh) {
+      res.status(400).json({ loi: 'Ảnh quá lớn — chỉ nhận tối đa 15MB/tệp. Hãy nén ảnh rồi thử lại.' });
+      return;
+    }
+    try {
+      const ketQua = await goiGeminiAnh(imageBase64, mimeType || 'image/jpeg');
       res.status(200).json({ text: ketQua });
     } catch (err) {
       res.status(502).json({ loi: String(err && err.message ? err.message : err) });

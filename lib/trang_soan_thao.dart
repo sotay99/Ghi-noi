@@ -23,6 +23,7 @@ import 'nghe_resize_trinh_duyet.dart';
 import 'ghi_am_the.dart';
 import 'the_tich_chon.dart';
 import 'gui_ghi_am_gemini.dart';
+import 'gui_anh_gemini.dart';
 import 'canh_bao_roi_trang.dart';
 import 'kho_du_lieu.dart';
 import 'theo_doi_tap_doi_phim.dart';
@@ -10883,11 +10884,113 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _moModalKetQuaFileAmThanh(vanBanKetQua);
   }
 
+  /// Các đuôi ảnh Gemini nhận — lọc ngay trong hộp thoại chọn tệp, tránh
+  /// chọn nhầm định dạng chắc chắn bị từ chối phía máy chủ.
+  static const _duoiAnhHoTro = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'];
+
+  /// Giới hạn dung lượng ảnh GỐC — rộng rãi hơn nhiều so với ảnh thường gặp
+  /// (điện thoại chụp cũng chỉ vài MB), chỉ để chặn tệp bất thường; Gemini
+  /// nhận tới 100MB dữ liệu inline nên không phải giới hạn cứng như bên
+  /// Groq/audio.
+  static const _gioiHanTepAnhByte = 15 * 1024 * 1024;
+
+  String _doanMimeAnhTuDuoiTep(String duoi) {
+    switch (duoi.toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'heic':
+        return 'image/heic';
+      case 'heif':
+        return 'image/heif';
+      default:
+        return 'image/jpeg';
+    }
+  }
+
+  /// Mục "Chuyển hình ảnh thành văn bản" trong menu "Làm việc với AI" —
+  /// ĐÚNG LUỒNG như `_chonVaChuyenFileAmThanh` ở trên (chọn tệp, kiểm dung
+  /// lượng, gửi AI, modal kết quả sửa được + Huỷ có xác nhận + Chọn vị trí
+  /// để chèn), chỉ khác: gửi qua Gemini (`guiAnhChoGemini`, xem lý do chọn
+  /// Gemini thay Groq ở `cloud-function/index.js`) thay vì Groq.
+  Future<void> _chonVaChuyenAnhThanhVanBan() async {
+    PlatformFile? tep;
+    try {
+      tep = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: _duoiAnhHoTro,
+      );
+    } catch (e) {
+      if (mounted) _bao('Không mở được hộp thoại chọn ảnh: $e');
+      return;
+    }
+    if (tep == null) return; // người dùng huỷ chọn.
+
+    Uint8List bytes;
+    try {
+      bytes = await tep.readAsBytes();
+    } catch (e) {
+      _bao('Không đọc được nội dung ảnh vừa chọn: $e');
+      return;
+    }
+    if (bytes.length > _gioiHanTepAnhByte) {
+      final soMB = (bytes.length / (1024 * 1024)).toStringAsFixed(1);
+      _bao('Ảnh "${tep.name}" nặng ${soMB}MB, vượt quá 15MB cho phép. Hãy nén '
+          'ảnh bằng công cụ bên ngoài rồi thử lại.');
+      return;
+    }
+
+    final mimeType = _doanMimeAnhTuDuoiTep(tep.extension ?? '');
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const AlertDialog(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+            SizedBox(width: 16),
+            Expanded(child: Text('Đang chuyển hình ảnh thành văn bản...')),
+          ],
+        ),
+      ),
+    );
+
+    String? vanBanKetQua;
+    String? loi;
+    try {
+      vanBanKetQua = await guiAnhChoGemini(bytes, mimeType);
+    } catch (e) {
+      loi = e.toString();
+    }
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop(); // đóng hộp "đang xử lý".
+
+    if (loi != null || vanBanKetQua == null || vanBanKetQua.trim().isEmpty) {
+      _bao('Chuyển ảnh thất bại: ${loi ?? "không có nội dung trả về."}');
+      return;
+    }
+
+    _moModalKetQuaFileAmThanh(vanBanKetQua, tieuDe: 'Văn bản từ hình ảnh');
+  }
+
   /// Giữ nội dung modal kết quả AI qua nhiều lần mở/đóng (bấm "Chọn vị trí
   /// để chèn văn bản" chỉ ẨN modal, không đóng hẳn — quay lại vẫn phải thấy
   /// đúng bản người dùng vừa sửa, không phải bản gốc AI trả về ban đầu).
-  /// `null` nghĩa là không có phiên chuyển-file-âm-thanh nào đang mở.
+  /// `null` nghĩa là không có phiên "kết quả AI từ tệp" nào đang mở. DÙNG
+  /// CHUNG cho cả "Chuyển file âm thanh" lẫn "Chuyển hình ảnh" — luồng hai
+  /// tính năng giống hệt nhau, chỉ khác tiêu đề modal
+  /// (`_tieuDeModalKetQuaFile`) và hàm gọi AI phía trước.
   TextEditingController? _oKetQuaFileAmThanh;
+  String _tieuDeModalKetQuaFile = 'Văn bản từ tệp âm thanh';
 
   void _dongHanKetQuaFileAmThanh() {
     _oKetQuaFileAmThanh?.dispose();
@@ -10897,12 +11000,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// [vanBan] chỉ dùng để KHỞI TẠO controller lần đầu (từ text AI trả về) —
   /// những lần mở lại sau đó (do bấm "Quay lại kết quả AI") controller đã
   /// tồn tại sẵn với đúng nội dung người dùng vừa sửa, không ghi đè lại.
-  void _moModalKetQuaFileAmThanh(String vanBan) {
+  /// [tieuDe] chỉ cần truyền ở lần mở ĐẦU (từ `_chonVaChuyenFileAmThanh`/
+  /// `_chonVaChuyenAnhThanhVanBan`) — các lần mở lại sau đó bỏ trống, giữ
+  /// nguyên tiêu đề đã lưu.
+  void _moModalKetQuaFileAmThanh(String vanBan, {String? tieuDe}) {
+    if (tieuDe != null) _tieuDeModalKetQuaFile = tieuDe;
     _oKetQuaFileAmThanh ??= TextEditingController(text: vanBan);
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Văn bản từ tệp âm thanh'),
+        title: Text(_tieuDeModalKetQuaFile),
         content: SizedBox(
           width: 420,
           child: Column(
@@ -12587,6 +12694,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 ),
                 khiBamCaiDatKiemTraToanVan: _moModalCaiDatKiemTraToanVan,
                 khiBamChuyenFileAmThanh: _chonVaChuyenFileAmThanh,
+                khiBamChuyenAnhThanhVanBan: _chonVaChuyenAnhThanhVanBan,
                 khiBamBanPhim: () => _moModalTam(
                   'Bàn phím',
                   Icons.keyboard_outlined,

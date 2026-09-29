@@ -25,6 +25,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamHuongDan,
     required this.khiBamCaiDatKiemTraToanVan,
     required this.khiBamChuyenFileAmThanh,
+    required this.khiBamChuyenAnhThanhVanBan,
     required this.khiBamBanPhim,
     required this.khiBamBoPhimNhanh,
     required this.boPhimNhanhDangMo,
@@ -72,6 +73,7 @@ class ThanhCongCu extends StatelessWidget {
   /// trước.
   final VoidCallback khiBamCaiDatKiemTraToanVan;
   final VoidCallback khiBamChuyenFileAmThanh;
+  final VoidCallback khiBamChuyenAnhThanhVanBan;
   final VoidCallback khiBamBanPhim;
 
   /// "Bộ phím nhanh cho màn hình cảm ứng" (mục "Bật/Tắt..." trong "+ Thêm
@@ -214,6 +216,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamCaiDatKiemTraToanVan: khiBamCaiDatKiemTraToanVan,
                               khiBamKiemTraToanVan: khiBamKiemTraToanVan,
                               khiBamChuyenFileAmThanh: khiBamChuyenFileAmThanh,
+                              khiBamChuyenAnhThanhVanBan: khiBamChuyenAnhThanhVanBan,
                             ),
                           ),
                           _NutCoChuThich(
@@ -1193,15 +1196,17 @@ class _NutTaiKhoanMenu extends StatelessWidget {
 
 /// Menu thả xuống của nút "Làm việc với AI" — cùng cơ chế với
 /// `_NutThemMenu` (PopupMenuButton tự neo ngay phía trên nút vì nút nằm sát
-/// đáy màn hình). Ba mục đầu (ảnh) chưa gắn logic; "Chuyển file âm thanh
+/// đáy màn hình). "Chuyển hình ảnh thành văn bản", "Chuyển file âm thanh
 /// thành văn bản" và "Cài đặt nút "Kiểm tra toàn văn"" đã gọi callback
-/// thật.
+/// thật; "Chụp ảnh (camera)" và bốn mục AI-về-chữ (trò chuyện/tóm tắt/mở
+/// rộng/viết lại) vẫn chưa gắn logic.
 class _NutAIMenu extends StatelessWidget {
   const _NutAIMenu({
     required this.rong,
     required this.khiBamCaiDatKiemTraToanVan,
     required this.khiBamKiemTraToanVan,
     required this.khiBamChuyenFileAmThanh,
+    required this.khiBamChuyenAnhThanhVanBan,
   });
 
   final bool rong;
@@ -1215,6 +1220,11 @@ class _NutAIMenu extends StatelessWidget {
   /// cùng máy chủ/luồng AI đang dùng cho ghi âm trong app (nay chạy qua
   /// Groq), rồi hiện modal kết quả kèm nút Huỷ/Chèn.
   final VoidCallback khiBamChuyenFileAmThanh;
+
+  /// Mục "Chuyển hình ảnh thành văn bản" — ĐÚNG LUỒNG với mục âm thanh ở
+  /// trên (chọn tệp, gửi AI, modal kết quả sửa được + Chọn vị trí để chèn),
+  /// chỉ khác gửi qua Gemini thay vì Groq.
+  final VoidCallback khiBamChuyenAnhThanhVanBan;
 
   @override
   Widget build(BuildContext context) {
@@ -1246,6 +1256,7 @@ class _NutAIMenu extends StatelessWidget {
             if (gia == 5) khiBamCaiDatKiemTraToanVan();
             if (gia == 9) khiBamKiemTraToanVan();
             if (gia == 8) khiBamChuyenFileAmThanh();
+            if (gia == 6) khiBamChuyenAnhThanhVanBan();
           },
           // (VIỆC 3) Xem chú thích ở `_NutThemMenu` — cùng cơ chế: một
           // `ScrollController` mới mỗi lần menu mở, dùng chung giữa nút cuộn
@@ -1257,11 +1268,12 @@ class _NutAIMenu extends StatelessWidget {
               // KHÔNG cuộn theo phần còn lại.
               _mucDongMenu(cuon),
               _mucCuonDanhSach(ctx, cuon, [
-                // Ba mục đầu menu — "Thêm ảnh"/"Chụp ảnh (camera)" dời từ
-                // menu "+ Thêm lựa chọn" sang đây (đổi tên mục ảnh, chưa
-                // gắn logic), cộng thêm mục "Chuyển file âm thanh thành văn
-                // bản" — đã gắn logic thật, xem `_chonVaChuyenFileAmThanh`
-                // trong `trang_soan_thao.dart`.
+                // Ba mục đầu menu — "Chuyển hình ảnh thành văn bản" dời từ
+                // menu "+ Thêm lựa chọn" sang đây (đổi tên mục ảnh) — đã gắn
+                // logic thật, ĐÚNG LUỒNG với "Chuyển file âm thanh thành văn
+                // bản" (xem `_chonVaChuyenAnhThanhVanBan`/
+                // `_chonVaChuyenFileAmThanh` trong `trang_soan_thao.dart`).
+                // "Chụp ảnh (camera)" vẫn chưa gắn logic.
                 _mucMenuThem(6, 'Chuyển hình ảnh thành văn bản'),
                 _mucMenuThem(7, 'Chụp ảnh (camera)'),
                 _mucMenuThem(8, 'Chuyển file âm thanh thành văn bản'),
