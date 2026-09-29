@@ -6,6 +6,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart' show kIsWeb, ValueListenable;
@@ -10812,23 +10813,27 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// nay chạy qua Groq — xem `gui_ghi_am_gemini.dart`), rồi hiện modal kết
   /// quả kèm hai nút Huỷ/Chèn.
   Future<void> _chonVaChuyenFileAmThanh() async {
-    FilePickerResult? ketQua;
+    // (file_picker 13.x — bản 12.0.0 viết lại toàn bộ API) `FilePickerResult`
+    // đã bị bỏ hẳn: `pickFile()` (số ít) giờ trả thẳng `PlatformFile?`, không
+    // còn wrapper `.files`; đọc dữ liệu qua `readAsBytes()` thay vì tham số
+    // `withData`/thuộc tính `.bytes` (cả hai đã bị đánh dấu bỏ).
+    PlatformFile? tep;
     try {
-      ketQua = await FilePicker.platform.pickFiles(
+      tep = await FilePicker.platform.pickFile(
         type: FileType.custom,
         allowedExtensions: _duoiTepAmThanhHoTro,
-        withData: true,
       );
     } catch (e) {
       if (mounted) _bao('Không mở được hộp thoại chọn tệp: $e');
       return;
     }
-    if (ketQua == null || ketQua.files.isEmpty) return; // người dùng huỷ chọn.
+    if (tep == null) return; // người dùng huỷ chọn.
 
-    final tep = ketQua.files.single;
-    final bytes = tep.bytes;
-    if (bytes == null) {
-      _bao('Không đọc được nội dung tệp vừa chọn.');
+    Uint8List bytes;
+    try {
+      bytes = await tep.readAsBytes();
+    } catch (e) {
+      _bao('Không đọc được nội dung tệp vừa chọn: $e');
       return;
     }
     if (bytes.length > _gioiHanTepAmThanhByte) {
