@@ -13,6 +13,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import 'cai_dat.dart';
@@ -10768,6 +10769,139 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
+  // ------------------------------- chuyển file âm thanh thành văn bản (AI)
+
+  /// Giới hạn dung lượng tệp GỐC (chưa mã hoá base64) cho phép chọn — khớp
+  /// đúng giới hạn cứng 25MB của Groq (nơi thật sự xử lý audio, xem
+  /// `cloud-function/index.js`), không phải một con số tự chọn tuỳ ý.
+  static const _gioiHanTepAmThanhByte = 25 * 1024 * 1024;
+
+  /// Các đuôi tệp Groq/Whisper hỗ trợ — lọc ngay trong hộp thoại chọn tệp,
+  /// tránh người dùng chọn nhầm định dạng chắc chắn bị từ chối phía máy chủ.
+  static const _duoiTepAmThanhHoTro = [
+    'mp3', 'mp4', 'mpeg', 'mpga', 'm4a', 'wav', 'webm', 'flac', 'ogg', 'oga', 'aac',
+  ];
+
+  String _doanMimeTuDuoiTep(String duoi) {
+    switch (duoi.toLowerCase()) {
+      case 'mp3':
+      case 'mpga':
+        return 'audio/mpeg';
+      case 'mp4':
+      case 'm4a':
+        return 'audio/mp4';
+      case 'wav':
+        return 'audio/wav';
+      case 'webm':
+        return 'audio/webm';
+      case 'flac':
+        return 'audio/flac';
+      case 'ogg':
+      case 'oga':
+        return 'audio/ogg';
+      case 'aac':
+        return 'audio/aac';
+      default:
+        return 'audio/mpeg';
+    }
+  }
+
+  /// Mục "Chuyển file âm thanh thành văn bản" trong menu "Làm việc với AI"
+  /// (`thanh_cong_cu.dart`) — mở hộp thoại chọn tệp, kiểm dung lượng, gửi
+  /// qua ĐÚNG luồng AI dùng chung với ghi âm trong app (`guiGhiAmChoGemini`,
+  /// nay chạy qua Groq — xem `gui_ghi_am_gemini.dart`), rồi hiện modal kết
+  /// quả kèm hai nút Huỷ/Chèn.
+  Future<void> _chonVaChuyenFileAmThanh() async {
+    FilePickerResult? ketQua;
+    try {
+      ketQua = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: _duoiTepAmThanhHoTro,
+        withData: true,
+      );
+    } catch (e) {
+      if (mounted) _bao('Không mở được hộp thoại chọn tệp: $e');
+      return;
+    }
+    if (ketQua == null || ketQua.files.isEmpty) return; // người dùng huỷ chọn.
+
+    final tep = ketQua.files.single;
+    final bytes = tep.bytes;
+    if (bytes == null) {
+      _bao('Không đọc được nội dung tệp vừa chọn.');
+      return;
+    }
+    if (bytes.length > _gioiHanTepAmThanhByte) {
+      final soMB = (bytes.length / (1024 * 1024)).toStringAsFixed(1);
+      _bao('Tệp "${tep.name}" nặng ${soMB}MB, vượt quá 25MB cho phép. Hãy nén '
+          'hoặc cắt ngắn tệp âm thanh bằng công cụ bên ngoài rồi thử lại.');
+      return;
+    }
+
+    final mimeType = _doanMimeTuDuoiTep(tep.extension ?? '');
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const AlertDialog(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+            SizedBox(width: 16),
+            Expanded(child: Text('Đang chuyển tệp âm thanh thành văn bản...')),
+          ],
+        ),
+      ),
+    );
+
+    String? vanBanKetQua;
+    String? loi;
+    try {
+      vanBanKetQua = await guiGhiAmChoGemini(bytes, mimeType);
+    } catch (e) {
+      loi = e.toString();
+    }
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop(); // đóng hộp "đang xử lý".
+
+    if (loi != null || vanBanKetQua == null || vanBanKetQua.trim().isEmpty) {
+      _bao('Chuyển tệp thất bại: ${loi ?? "không có nội dung trả về."}');
+      return;
+    }
+
+    _moModalKetQuaFileAmThanh(vanBanKetQua);
+  }
+
+  void _moModalKetQuaFileAmThanh(String vanBan) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Văn bản từ tệp âm thanh'),
+        content: SizedBox(
+          width: 420,
+          child: SingleChildScrollView(child: SelectableText(vanBan)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Huỷ'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _chenKyTuTuPhimAo(vanBan);
+            },
+            child: const Text('Chèn vào văn bản đang soạn'),
+          ),
+        ],
+      ),
+    );
+  }
+
   OverlayEntry? _baoDangHien;
 
   /// (VIỆC 6) [spans] khác null thì hiện bằng `RichText`/`TextSpan` (cho phép
@@ -12232,6 +12366,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   MaterialPageRoute(builder: (_) => const ManHinhHuongDan()),
                 ),
                 khiBamCaiDatKiemTraToanVan: _moModalCaiDatKiemTraToanVan,
+                khiBamChuyenFileAmThanh: _chonVaChuyenFileAmThanh,
                 khiBamBanPhim: () => _moModalTam(
                   'Bàn phím',
                   Icons.keyboard_outlined,
