@@ -1105,12 +1105,14 @@ class _NutThemMenu extends StatelessWidget {
 }
 
 /// Menu thả xuống của nút "Tài khoản của bạn" — cùng cơ chế với
-/// `_NutThemMenu`/`_NutAIMenu`. Hai mục đầu (Cài đặt Micro / Cài đặt Hiển thị
-/// và tự động sửa) gọi callback thật — mở đúng nhóm cài đặt tương ứng trong
-/// `ManHinhCaiDat` (xem `NhomCaiDat`). Ba mục còn lại ("Điều khoản sử dụng",
-/// "Bảo mật và quyền riêng tư" — dời từ menu "+ Thêm lựa chọn" sang đây, và
-/// "Đăng nhập tài khoản" ở cuối cùng) CHƯA gắn logic, giữ đúng hiện trạng cũ
-/// (bấm vào chưa có tác dụng gì).
+/// `_NutThemMenu`/`_NutAIMenu`. Bảy mục: hai mục MỚI đầu tiên ("Language -
+/// Ngôn ngữ", "Mỗi khi khởi động Ứng dụng: Hiển thị Tệp...") và ba mục cuối
+/// ("Điều khoản sử dụng", "Bảo mật và quyền riêng tư" — dời từ menu "+ Thêm
+/// lựa chọn" sang đây, và "Đăng nhập tài khoản") CHƯA gắn logic, giữ nguyên
+/// hiện trạng (bấm vào chưa có tác dụng gì) — chờ gắn sau. Chỉ hai mục ở
+/// giữa (Cài đặt Micro / Cài đặt Hiển thị và tự động sửa) gọi callback
+/// thật — mở đúng nhóm cài đặt tương ứng trong `ManHinhCaiDat` (xem
+/// `NhomCaiDat`).
 class _NutTaiKhoanMenu extends StatelessWidget {
   const _NutTaiKhoanMenu({
     required this.rong,
@@ -1163,6 +1165,12 @@ class _NutTaiKhoanMenu extends StatelessWidget {
             return [
               _mucDongMenu(cuon),
               _mucCuonDanhSach(ctx, cuon, [
+                // Hai mục mới — CHƯA gắn logic (chờ gắn sau), tạm đặt ở đầu
+                // menu, cùng kiểu dòng với "Cài đặt Micro"/"Cài đặt Hiển thị
+                // và tự động sửa" bên dưới.
+                _mucMenuThem(6, 'Language - Ngôn ngữ'),
+                _mucMenuThem(7, 'Mỗi khi khởi động Ứng dụng: Hiển thị Tệp...'),
+                _dividerMenu(),
                 _mucMenuThem(1, 'Cài đặt Micro'),
                 _mucMenuThem(2, 'Cài đặt Hiển thị và tự động sửa'),
                 _dividerMenu(),

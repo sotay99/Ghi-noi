@@ -3441,6 +3441,36 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             padding: EdgeInsets.zero,
             onPressed: _bamNutTichChon,
           ),
+          // Nút Ghim — luôn ở CUỐI. Ghim thì thanh này hết tự ẩn sau mỗi lần
+          // bấm nút định dạng (xem `_dongThanhDinhDangNeuChuaGhim`). Bấm
+          // chính nút Ghim thì KHÔNG tự ẩn thanh (khác các nút định dạng
+          // khác) — người dùng cần thấy ngay trạng thái ghim vừa đổi.
+          IconButton(
+            iconSize: 20,
+            tooltip: widget.caiDat.ghimThanhDinhDang
+                ? 'Bỏ ghim thanh công cụ định dạng'
+                : 'Ghim thanh công cụ định dạng',
+            icon: const Icon(Icons.push_pin),
+            visualDensity: matDoNut,
+            constraints: kichThuocNut,
+            padding: EdgeInsets.zero,
+            style: IconButton.styleFrom(
+              backgroundColor:
+                  widget.caiDat.ghimThanhDinhDang ? const Color(0xFFE3F2FD) : null,
+              foregroundColor: widget.caiDat.ghimThanhDinhDang
+                  ? const Color(0xFF1565C0)
+                  : const Color(0xFF5F6368),
+            ),
+            onPressed: () async {
+              final ghimMoi = !widget.caiDat.ghimThanhDinhDang;
+              await widget.caiDat.datGhimThanhDinhDang(ghimMoi);
+              if (!mounted) return;
+              setState(() {});
+              if (ghimMoi) {
+                hienThongBaoGiua(context, 'Đã Ghim thanh công cụ định dạng');
+              }
+            },
+          ),
         ],
       ),
     );
@@ -3454,8 +3484,19 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// luôn lùi vừa đúng một đợt gõ hoặc một lượt nói trọn vẹn — không cắt
   /// ngang giữa chừng, và tự nhiên phân biệt được đợt đó là gõ tay hay nói,
   /// vì hai đợt hai nguồn không bao giờ trộn chung một điểm mốc.
-  final List<_TrangThaiVanBan> _lichSuLui = [];
-  final List<_TrangThaiVanBan> _lichSuToi = [];
+  /// (NÂNG CẤP bộ nhớ đệm theo từng tệp) Mỗi tệp ghi chú có RIÊNG một cặp
+  /// danh sách Lùi lại/Tiến tới, khoá theo `id` — không còn dùng chung một
+  /// cặp cho mọi tệp (trước đây `.clear()` khi chuyển tệp làm mất sạch mốc
+  /// của tệp cũ, quay lại tệp đó là mất luôn). `_lichSuLui`/`_lichSuToi` bên
+  /// dưới là getter trỏ đúng vào cặp của `_ghiChuHienTai.id` — mọi chỗ gọi
+  /// `.add`/`.clear`/`.removeAt`/... ở khắp file vẫn viết y hệt như cũ,
+  /// không cần sửa gì thêm, vì List trả về là THAM CHIẾU thật nằm trong Map.
+  final Map<String, List<_TrangThaiVanBan>> _lichSuLuiTheoTep = {};
+  final Map<String, List<_TrangThaiVanBan>> _lichSuToiTheoTep = {};
+  List<_TrangThaiVanBan> get _lichSuLui =>
+      _lichSuLuiTheoTep.putIfAbsent(_ghiChuHienTai.id, () => []);
+  List<_TrangThaiVanBan> get _lichSuToi =>
+      _lichSuToiTheoTep.putIfAbsent(_ghiChuHienTai.id, () => []);
   static const _soLuongLichSuToiDa = 50;
 
   /// Bỏ qua mọi kết quả còn lại của câu nói đang dở.
@@ -4310,7 +4351,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (dongY != true || !mounted) return;
 
     final chaId = _ghiChuHienTai.chaId;
-    widget.kho.xoaGhiChu(_ghiChuHienTai.id);
+    final idVuaXoa = _ghiChuHienTai.id;
+    widget.kho.xoaGhiChu(idVuaXoa);
+    // Dọn luôn bộ nhớ đệm Lùi lại/Tiến tới của tệp vừa xoá — tệp không còn
+    // tồn tại nữa thì giữ lại mốc cũ trong Map chỉ tổ chiếm bộ nhớ vô ích.
+    _lichSuLuiTheoTep.remove(idVuaXoa);
+    _lichSuToiTheoTep.remove(idVuaXoa);
 
     final conLai = widget.kho.noiDungThuMuc(chaId).ghiChuCon;
     final laTuDongTao = conLai.isEmpty;
@@ -4376,12 +4422,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henChinhTa?.cancel();
     _boDieuKhien.loi.clear();
     _viTriDaKiemTraChinhTa = banDau.length;
-    // (SỬA LỖI bộ nhớ đệm Lùi lại/Tiến tới lẫn giữa các tệp) Hai danh sách
-    // này là "bộ nhớ đệm" của nút Lùi lại/Tiến tới — không xoá thì các mốc
-    // của TỆP CŨ vẫn còn nằm lại, bấm Lùi lại/Tiến tới ở tệp mới sẽ lấy nhầm
-    // mốc của tệp cũ đè lên văn bản hiện tại.
-    _lichSuLui.clear();
-    _lichSuToi.clear();
+    // (Bộ nhớ đệm Lùi lại/Tiến tới giờ tách riêng theo từng tệp — xem getter
+    // `_lichSuLui`/`_lichSuToi` — không cần xoá gì ở đây nữa: `_ghiChuHienTai`
+    // vừa đổi ở trên tự khiến getter trỏ sang đúng cặp danh sách của tệp mới,
+    // còn cặp của tệp vừa rời vẫn giữ nguyên mốc trong Map để quay lại vẫn
+    // thấy.)
     // (SỬA LỖI đường kẻ chia "bóng ma") Ghi chú KHÁC có thể mang toạ độ
     // đường kẻ chia hoàn toàn không liên quan tới ghi chú vừa mở — không xoá
     // thì offset cũ (ví dụ 0) vẫn "hợp lệ" trên văn bản mới (kể cả văn bản
@@ -9616,6 +9661,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _ghiVaoO(moi, viTriConTroMoi.clamp(0, moi.length));
     _boDieuKhien.veLai();
     _henLuu();
+    _dongThanhDinhDangNeuChuaGhim();
   }
 
   /// Bấm vào một thẻ Tích chọn đã có (` (🔲) ` hoặc ` (✅) `, tại đúng
@@ -9739,6 +9785,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // có chữ nào đổi để mà lùi lại).
     if (chon.isCollapsed) {
       _bamNutDinhDangTaiConTro(loai, mau: mau);
+      _dongThanhDinhDangNeuChuaGhim();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _oChu.requestFocus();
       });
@@ -9811,6 +9858,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     });
     _boDieuKhien.veLai();
     _henLuu();
+    _dongThanhDinhDangNeuChuaGhim();
   }
 
   /// YÊU CẦU 2a: bấm nút/phím tắt định dạng khi vùng chọn ĐANG RỖNG — tính
@@ -11022,9 +11070,21 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
-  /// Mục 11: ẩn/hiện thanh định dạng thủ công (B/I/U/S/...) — chỉ một biến
-  /// bool đơn giản, không cần lưu lại giữa các lần mở trang.
-  bool _anThanhDinhDang = false;
+  /// Mục 11: ẩn/hiện thanh định dạng thủ công (B/I/U/S/...). Mặc định ẨN —
+  /// bấm nút "abc" (`_nutAnThanhDinhDang`, xem dưới) để mở, rồi bấm bất kỳ
+  /// nút định dạng nào bên trong (kích hoạt logic của nút đó xong) sẽ tự ẩn
+  /// lại ngay, TRỪ KHI đã ghim (`widget.caiDat.ghimThanhDinhDang`) — xem
+  /// `_dongThanhDinhDangNeuChuaGhim`.
+  bool _anThanhDinhDang = true;
+
+  /// Gọi ngay sau khi một nút trong thanh định dạng vừa kích hoạt xong logic
+  /// của nó (áp định dạng, tích chọn...) — tự ẩn thanh lại, trừ khi người
+  /// dùng đã ghim. Không làm gì nếu thanh vốn đã ẩn sẵn (đỡ `setState` thừa).
+  void _dongThanhDinhDangNeuChuaGhim() {
+    if (widget.caiDat.ghimThanhDinhDang) return;
+    if (_anThanhDinhDang) return;
+    setState(() => _anThanhDinhDang = true);
+  }
 
   // "Sao chép tất cả", "Sao chép rồi xoá tất cả" và "Xoá tất cả" đã dời vào
   // menu "+ Thêm lựa chọn" của thanh công cụ dưới (xem `ThanhCongCu`); nút

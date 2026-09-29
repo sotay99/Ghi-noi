@@ -28,6 +28,7 @@ class CaiDat {
   static const _khoaMauNenGanNhat = 'ghi_noi_mau_nen_gan_nhat';
   static const _khoaTuDongMoBangDieuKhienGhiAm =
       'ghi_noi_tu_dong_mo_bang_dieu_khien_ghi_am';
+  static const _khoaGhimThanhDinhDang = 'ghi_noi_ghim_thanh_dinh_dang';
 
   /// Số giây chờ, kể từ lúc người dùng ngừng gõ phím, tới khi micro tự bật
   /// lại. Mặc định 1 giây.
@@ -61,6 +62,12 @@ class CaiDat {
   /// Có tự chèn một dấu cách ngay sau đoạn chữ mỗi lần nói xong hay không.
   /// Mặc định bật.
   bool tuDongChenKhoangCach = true;
+
+  /// Thanh công cụ định dạng (đậm/nghiêng/gạch chân/màu chữ...) có đang được
+  /// GHIM hay không — ghim thì bấm nút định dạng KHÔNG tự ẩn thanh đó đi
+  /// nữa. Mặc định TẮT (chưa ghim — thanh tự ẩn sau mỗi lần bấm, đúng hành
+  /// vi mới).
+  bool ghimThanhDinhDang = false;
 
   /// Có tự gọi AI kiểm tra chính tả mỗi khi có đoạn văn mới hay không.
   /// Mặc định BẬT.
@@ -223,6 +230,7 @@ class CaiDat {
     nguongTuDongGuiTheGhiAmGiay = (kho.getInt(_khoaNguongTuDongGuiTheGhiAmGiay) ?? 20)
         .clamp(gioiHanDuoiNguongTuDongGuiTheGhiAm, gioiHanTrenNguongTuDongGuiTheGhiAm);
     tuDongMoBangDieuKhienGhiAm = kho.getBool(_khoaTuDongMoBangDieuKhienGhiAm);
+    ghimThanhDinhDang = kho.getBool(_khoaGhimThanhDinhDang) ?? false;
     tuDongChenDauCauBangAI = kho.getBool(_khoaTuDongChenDauCau) ?? true;
     mucDoDaiDeXuat = (kho.getInt(_khoaMucDoDaiDeXuat) ?? 2).clamp(0, 4);
     cauLenhTuyChinhKiemTraToanVan = kho.getString(_khoaCauLenhTuyChinhKiemTraToanVan) ?? '';
@@ -449,6 +457,12 @@ class CaiDat {
     tuDongGuiNgamTheGhiAm = bat;
     final kho = await SharedPreferences.getInstance();
     await kho.setBool(_khoaTuDongGuiNgamTheGhiAm, bat);
+  }
+
+  Future<void> datGhimThanhDinhDang(bool bat) async {
+    ghimThanhDinhDang = bat;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setBool(_khoaGhimThanhDinhDang, bat);
   }
 
   Future<void> datTuDongMoBangDieuKhienGhiAm(bool bat) async {
