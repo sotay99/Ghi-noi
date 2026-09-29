@@ -67,9 +67,14 @@ Future<void> ghiAmTheBatDauThe() async {
       break;
     }
   }
-  final boGhi = dinhDangDung == null
-      ? html.MediaRecorder(luong)
-      : html.MediaRecorder(luong, {'mimeType': dinhDangDung});
+  // (THỬ NGHIỆM chất lượng phiên âm — xem chú thích ở `ghi_am_the_io.dart`)
+  // Trước đây KHÔNG hề chỉnh bitrate ở đây — `MediaRecorder` tự chọn mức
+  // nén mặc định của trình duyệt (thường khá thấp cho voice). Ép rõ
+  // 96000bps, cùng mức với bản Android/iOS gốc, để thử xem AI có bớt
+  // "nuốt chữ" khi phiên âm không.
+  final tuyChon = <String, Object>{'audioBitsPerSecond': 96000};
+  if (dinhDangDung != null) tuyChon['mimeType'] = dinhDangDung;
+  final boGhi = html.MediaRecorder(luong, tuyChon);
   _doanHienTai = [];
   _boGhi = boGhi;
   final trackDau = luong.getAudioTracks().isNotEmpty ? luong.getAudioTracks().first : null;

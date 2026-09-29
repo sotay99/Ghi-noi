@@ -27,7 +27,13 @@ Future<void> ghiAmTheBatDauThe() async {
   await _may.start(
     const RecordConfig(
       encoder: AudioEncoder.aacLc,
-      bitRate: 32000,
+      // (THỬ NGHIỆM chất lượng phiên âm) Nâng từ 32000 lên 96000 — nghi ngờ
+      // mức nén thấp góp phần làm AI (Groq/Whisper) "nuốt chữ" khi phiên âm
+      // giọng nói, cạnh giới hạn riêng của mô hình với tiếng Việt. Nếu thử
+      // ghi âm thật không thấy đỡ hơn rõ rệt, coi như xác nhận bitrate không
+      // phải nguyên nhân chính, có thể hạ lại 32000 (tệp nhẹ hơn, ít quan
+      // trọng với giọng nói thường).
+      bitRate: 96000,
       sampleRate: 22050,
       numChannels: 1,
     ),
