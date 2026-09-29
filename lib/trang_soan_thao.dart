@@ -6,7 +6,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart' show kIsWeb, ValueListenable;
@@ -10816,10 +10815,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // (file_picker 13.x — bản 12.0.0 viết lại toàn bộ API) `FilePickerResult`
     // đã bị bỏ hẳn: `pickFile()` (số ít) giờ trả thẳng `PlatformFile?`, không
     // còn wrapper `.files`; đọc dữ liệu qua `readAsBytes()` thay vì tham số
-    // `withData`/thuộc tính `.bytes` (cả hai đã bị đánh dấu bỏ).
+    // `withData`/thuộc tính `.bytes` (cả hai đã bị đánh dấu bỏ). `.platform`
+    // cũng bị bỏ luôn — bản 13.x gọi thẳng hàm TĨNH `FilePicker.pickFile()`,
+    // không còn qua `FilePicker.platform` như các bản cũ.
     PlatformFile? tep;
     try {
-      tep = await FilePicker.platform.pickFile(
+      tep = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: _duoiTepAmThanhHoTro,
       );
