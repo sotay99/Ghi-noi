@@ -138,15 +138,25 @@ function huongDanChinhTa(boQuaTruocViTri, layLoiChinhTa, chenDauCau) {
   return huongDan;
 }
 
-/// Gửi một tệp âm thanh cho Whisper (OpenAI) phiên âm ra chữ. THAY cho việc
-/// gửi thẳng audio vào Gemini — audio là loại token đắt nhất, nên tách hẳn
-/// bước "nghe ra chữ" sang một dịch vụ chuyên biệt rẻ hơn nhiều lần, Gemini
-/// (nếu cần dùng tiếp) chỉ còn phải xử lý CHỮ (rẻ) chứ không còn đụng audio.
-/// Cần khoá riêng `OPENAI_API_KEY` (Script/Runtime environment variable),
-/// không liên quan gì tới `GEMINI_API_KEY`.
-async function goiWhisperAmThanh(audioBase64, mimeType) {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error('Chưa cấu hình OPENAI_API_KEY.');
+/// Gửi một tệp âm thanh cho Whisper Large v3 Turbo CHẠY TRÊN GROQ phiên âm ra
+/// chữ. THAY cho việc gửi thẳng audio vào Gemini — audio là loại token đắt
+/// nhất, nên tách hẳn bước "nghe ra chữ" sang một dịch vụ chuyên biệt rẻ hơn
+/// nhiều lần, Gemini (nếu cần dùng tiếp) chỉ còn phải xử lý CHỮ (rẻ) chứ
+/// không còn đụng audio. Trước đây gọi thẳng OpenAI Whisper (~0,36
+/// USD/giờ) — Groq chạy CÙNG MỘT MÔ HÌNH Whisper trên phần cứng riêng (LPU)
+/// của họ, giá chỉ ~0,04 USD/giờ (rẻ hơn ~9 lần), tốc độ nhanh hơn nhiều.
+/// Endpoint tương thích định dạng OpenAI nên thân hàm gần như không đổi so
+/// với bản gọi OpenAI trước đó, chỉ đổi địa chỉ/khoá/tên model. Cần khoá
+/// riêng `GROQ_API_KEY` (Runtime environment variable), không liên quan gì
+/// tới `GEMINI_API_KEY`.
+///
+/// [maNgonNgu]: mã ngôn ngữ ISO gửi cho Whisper (vd 'vi', 'en'...) — app
+/// hiện chỉ có tiếng Việt nên luôn truyền 'vi', nhưng để sẵn tham số riêng
+/// (đọc từ `than.ngonNgu` phía client nếu có) — sau này app thêm chọn ngôn
+/// ngữ chỉ cần đổi giá trị gửi lên, không cần sửa lại hàm này.
+async function goiGroqAmThanh(audioBase64, mimeType, maNgonNgu) {
+  if (!process.env.GROQ_API_KEY) {
+    throw new Error('Chưa cấu hình GROQ_API_KEY.');
   }
 
   const bytes = Buffer.from(audioBase64, 'base64');
@@ -162,23 +172,23 @@ async function goiWhisperAmThanh(audioBase64, mimeType) {
 
   const bieuMau = new FormData();
   bieuMau.append('file', new Blob([bytes], { type: mimeType }), `ghi-am.${phanMoRong}`);
-  bieuMau.append('model', 'whisper-1');
-  bieuMau.append('language', 'vi');
+  bieuMau.append('model', 'whisper-large-v3-turbo');
+  bieuMau.append('language', maNgonNgu || 'vi');
 
-  const phanHoi = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+  const phanHoi = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
     method: 'POST',
-    headers: { authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+    headers: { authorization: `Bearer ${process.env.GROQ_API_KEY}` },
     body: bieuMau,
   });
 
   if (!phanHoi.ok) {
     const chuLoi = await phanHoi.text();
-    throw new Error(`Whisper trả về lỗi ${phanHoi.status}: ${chuLoi.slice(0, 300)}`);
+    throw new Error(`Groq trả về lỗi ${phanHoi.status}: ${chuLoi.slice(0, 300)}`);
   }
 
   const duLieu = await phanHoi.json();
   const chu = (duLieu?.text || '').trim();
-  if (!chu) throw new Error('Whisper không trả về nội dung (có thể ghi âm quá nhỏ hoặc im lặng hoàn toàn).');
+  if (!chu) throw new Error('Groq không trả về nội dung (có thể ghi âm quá nhỏ hoặc im lặng hoàn toàn).');
   return chu;
 }
 
@@ -240,23 +250,24 @@ exports.flowriteAi = async (req, res) => {
 
   // Nhánh riêng cho ghi âm: gửi lên là DỮ LIỆU ÂM THANH, không phải `text`,
   // nên không đi qua các kiểm tra dành cho văn bản ở dưới. Đi qua Whisper
-  // (OpenAI) chứ KHÔNG qua Gemini nữa — audio là loại token đắt nhất, tách
-  // riêng dịch vụ phiên âm ra khỏi Gemini để giảm chi phí. Vì vậy nhánh này
-  // không cần GEMINI_API_KEY, chỉ cần OPENAI_API_KEY.
+  // Large v3 Turbo chạy trên GROQ chứ KHÔNG qua Gemini nữa — audio là loại
+  // token đắt nhất, tách riêng dịch vụ phiên âm ra khỏi Gemini để giảm chi
+  // phí (Groq lại rẻ hơn ~9 lần so với gọi thẳng OpenAI Whisper). Vì vậy
+  // nhánh này không cần GEMINI_API_KEY, chỉ cần GROQ_API_KEY.
   if (action === 'ghi_am') {
-    const { audioBase64, mimeType } = than;
+    const { audioBase64, mimeType, ngonNgu } = than;
     if (typeof audioBase64 !== 'string' || audioBase64.trim() === '') {
       res.status(400).json({ loi: 'Thiếu dữ liệu âm thanh (audioBase64).' });
       return;
     }
     // ~15 phút ghi âm ở mức nén thoại vẫn chỉ vài MB — 30MB base64 đã rất
-    // rộng rãi, chặn sớm để khỏi tốn công gọi Whisper với file bất thường.
+    // rộng rãi, chặn sớm để khỏi tốn công gọi Groq với file bất thường.
     if (audioBase64.length > 30 * 1024 * 1024) {
       res.status(400).json({ loi: 'Tệp ghi âm quá lớn.' });
       return;
     }
     try {
-      const ketQua = await goiWhisperAmThanh(audioBase64, mimeType || 'audio/mp4');
+      const ketQua = await goiGroqAmThanh(audioBase64, mimeType || 'audio/mp4', ngonNgu);
       res.status(200).json({ text: ketQua });
     } catch (err) {
       res.status(502).json({ loi: String(err && err.message ? err.message : err) });
