@@ -1,14 +1,18 @@
-// Màn hình "Trò chuyện về văn bản này" (mục trong menu "Làm việc với AI")
-// — toàn màn hình, giống chuyển sang một trang mới (Navigator.push), có nút
-// đóng (X) ở AppBar để quay lại trang soạn thảo. Chỉ người dùng hỏi-đáp với
-// AI (Gemini) về văn bản đang soạn — không sửa văn bản gốc, không có luồng
-// nào khác ngoài chat.
+// Màn hình "Trò chuyện về văn bản này"/"Trò chuyện về đoạn văn đã chọn"
+// (mục trong menu "Làm việc với AI", tên đổi tuỳ có vùng chọn hay không lúc
+// bấm — xem `thanh_cong_cu.dart`) — toàn màn hình, giống chuyển sang một
+// trang mới (Navigator.push), có nút đóng (X) ở AppBar để quay lại trang
+// soạn thảo. Chỉ người dùng hỏi-đáp với AI (Gemini) về văn bản đang soạn —
+// không sửa văn bản gốc, không có luồng nào khác ngoài chat.
 //
 // Lượt hỏi ĐẦU TIÊN của một cuộc trò chuyện MỚI luôn gửi kèm toàn văn bản
-// (nhúng vào nội dung lượt đó gửi cho AI — ẩn khỏi khung hiển thị, người
-// dùng chỉ thấy đúng câu họ gõ). Từ lượt thứ hai trở đi KHÔNG tự kèm nữa —
-// muốn AI đọc lại bản mới nhất (vì văn bản có thể đã đổi từ lúc mở chat) thì
-// bấm nút "+" cạnh khung nhập, chọn "Đính kèm lại toàn bộ văn bản mới nhất".
+// NẾU người dùng không tự chọn thẻ đính kèm nào khác. Từ lượt thứ hai trở
+// đi KHÔNG tự kèm gì nữa — muốn AI đọc thêm gì thì bấm nút "+" cạnh khung
+// nhập, chọn MỘT trong hai thẻ: "Toàn bộ văn bản mới nhất" hoặc "Đoạn văn
+// đang chọn" (chỉ bấm được khi trang soạn thảo phía sau đang có vùng chọn —
+// xem [layDoanVanDangChon]). Chỉ MỘT thẻ cho mỗi lượt gửi — chọn thẻ mới
+// thì mất thẻ cũ; thẻ đã đính kèm cho một tin nhắn ĐÃ GỬI hiện lại y nguyên
+// phía trên bong bóng tin nhắn đó khi xem lại lịch sử.
 //
 // [lichSu] là THAM CHIẾU do nơi gọi (`trang_soan_thao.dart`) cầm — màn hình
 // này chỉ thêm/xoá thẳng vào đó, nơi gọi tự động "nhớ" theo từng tệp ghi chú
@@ -27,16 +31,25 @@ class ManHinhTroChuyen extends StatefulWidget {
     super.key,
     required this.lichSu,
     required this.layVanBanHienTai,
+    required this.layDoanVanDangChon,
   });
 
   /// Tham chiếu sống — mọi thêm/xoá ở đây đều "lưu" thẳng vào bộ nhớ đệm của
   /// tệp ghi chú đang mở (do nơi gọi cầm List này).
   final List<TinNhanTroChuyen> lichSu;
 
-  /// Gọi lại mỗi khi cần ĐÍNH KÈM văn bản (lượt đầu tiên, hoặc khi người
-  /// dùng chủ động bấm "+" → "Đính kèm lại...") — LUÔN lấy bản MỚI NHẤT tại
-  /// đúng thời điểm gửi, không phải bản chụp lúc mở màn hình.
+  /// Gọi lại mỗi khi cần ĐÍNH KÈM toàn văn bản (lượt đầu tiên, hoặc khi
+  /// người dùng chủ động bấm "+" → "Toàn bộ văn bản mới nhất") — LUÔN lấy
+  /// bản MỚI NHẤT tại đúng thời điểm gửi, không phải bản chụp lúc mở màn
+  /// hình.
   final String Function() layVanBanHienTai;
+
+  /// Nội dung vùng chọn hiện có ở trang soạn thảo PHÍA SAU màn hình chat
+  /// này, hay `null` nếu không có — trang soạn thảo vẫn "sống" trong cây
+  /// widget (chỉ bị che, không bị huỷ) nên gọi lại hàm này bất cứ lúc nào
+  /// trong lúc màn hình chat đang mở đều cho kết quả đúng (và ổn định,
+  /// không đổi, vì trang phía sau không thể tương tác được trong lúc này).
+  final String? Function() layDoanVanDangChon;
 
   @override
   State<ManHinhTroChuyen> createState() => _ManHinhTroChuyenState();
@@ -46,7 +59,12 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   final _oNhap = TextEditingController();
   final _cuon = ScrollController();
   bool _dangGui = false;
-  bool _dinhKemVanBanMoiNhat = false;
+  LoaiDinhKemTroChuyen _dinhKemHienTai = LoaiDinhKemTroChuyen.khong;
+
+  /// Chỉ có ý nghĩa khi [_dinhKemHienTai] == doanChon — nội dung đoạn chọn
+  /// đã chụp lúc bấm "+", KHÔNG đọc lại `layDoanVanDangChon()` mỗi lần gửi
+  /// (đề phòng giữa lúc bấm "+" và lúc thật sự gửi, dù hiếm, có gì đó đổi).
+  String? _noiDungDoanChonDinhKem;
 
   /// Khác `null` khi đang sửa lại một tin nhắn người dùng đã gửi (bấm bút
   /// chì) — giữ ĐÚNG chỉ số của tin nhắn đó trong [ManHinhTroChuyen.lichSu].
@@ -54,6 +72,21 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   /// trả lời của AI), rồi coi như vừa gõ một câu hỏi mới đúng tại vị trí đó
   /// — xem `_guiHoacXacNhanSua`.
   int? _dangSuaChiSo;
+
+  @override
+  void initState() {
+    super.initState();
+    // Mở kênh chat lúc trang soạn thảo đang có vùng chọn (dù từ mục "Trò
+    // chuyện về đoạn văn đã chọn" hay bất kỳ lối vào nào khác) — tự đính
+    // kèm sẵn "Đoạn văn đang chọn" ngay khi mở, không bắt người dùng phải tự
+    // bấm "+" lại. Cuộc trò chuyện cũ (nếu có, đang trống hay đang dở) vẫn
+    // giữ nguyên, chỉ thêm thẻ chờ gửi cho lượt kế tiếp.
+    final doan = widget.layDoanVanDangChon();
+    if (doan != null) {
+      _dinhKemHienTai = LoaiDinhKemTroChuyen.doanChon;
+      _noiDungDoanChonDinhKem = doan;
+    }
+  }
 
   @override
   void dispose() {
@@ -79,17 +112,40 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     _oNhap.clear();
 
     final laLuotDau = widget.lichSu.isEmpty;
-    final canDinhKem = laLuotDau || _dinhKemVanBanMoiNhat;
-    final choAi = canDinhKem
-        ? 'Đây là toàn văn bản đang soạn (mới nhất):\n"""\n'
+    // Lượt đầu tiên của một cuộc trò chuyện MỚI vẫn LUÔN tự đính kèm toàn
+    // văn nếu người dùng chưa tự chọn thẻ nào khác — giữ nguyên hành vi cũ.
+    final dinhKem = _dinhKemHienTai != LoaiDinhKemTroChuyen.khong
+        ? _dinhKemHienTai
+        : (laLuotDau ? LoaiDinhKemTroChuyen.toanVan : LoaiDinhKemTroChuyen.khong);
+
+    String? noiDungDinhKem;
+    String choAi;
+    switch (dinhKem) {
+      case LoaiDinhKemTroChuyen.toanVan:
+        choAi = 'Đây là toàn văn bản đang soạn (mới nhất):\n"""\n'
             '${widget.layVanBanHienTai()}\n"""\n\n'
-            'Câu hỏi của tôi: $cauHoi'
-        : cauHoi;
+            'Câu hỏi của tôi: $cauHoi';
+      case LoaiDinhKemTroChuyen.doanChon:
+        noiDungDinhKem = _noiDungDoanChonDinhKem ?? '';
+        choAi = 'Đây là một đoạn trong văn bản đang soạn (đoạn đã chọn):\n"""\n'
+            '$noiDungDinhKem\n"""\n\n'
+            'Câu hỏi của tôi: $cauHoi';
+      case LoaiDinhKemTroChuyen.khong:
+        choAi = cauHoi;
+    }
 
     setState(() {
-      widget.lichSu.add(TinNhanTroChuyen(laNguoiDung: true, choHienThi: cauHoi, choAi: choAi));
+      widget.lichSu.add(TinNhanTroChuyen(
+        laNguoiDung: true,
+        choHienThi: cauHoi,
+        choAi: choAi,
+        dinhKem: dinhKem,
+        noiDungDinhKem: noiDungDinhKem,
+      ));
       _dangGui = true;
-      _dinhKemVanBanMoiNhat = false; // Đính kèm là một lần cho MỖI lượt gửi.
+      // Đính kèm là MỘT LẦN cho MỖI lượt gửi.
+      _dinhKemHienTai = LoaiDinhKemTroChuyen.khong;
+      _noiDungDoanChonDinhKem = null;
     });
     _cuonXuongDuoi();
 
@@ -119,6 +175,51 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
       }
     });
     _cuonXuongDuoi();
+  }
+
+  void _chonDinhKemToanVan() {
+    setState(() {
+      _dinhKemHienTai = LoaiDinhKemTroChuyen.toanVan;
+      _noiDungDoanChonDinhKem = null;
+    });
+  }
+
+  void _chonDinhKemDoanChon() {
+    final doan = widget.layDoanVanDangChon();
+    if (doan == null) return; // Menu đã tự vô hiệu mục này khi không có gì chọn.
+    setState(() {
+      _dinhKemHienTai = LoaiDinhKemTroChuyen.doanChon;
+      _noiDungDoanChonDinhKem = doan;
+    });
+  }
+
+  void _boDinhKem() {
+    setState(() {
+      _dinhKemHienTai = LoaiDinhKemTroChuyen.khong;
+      _noiDungDoanChonDinhKem = null;
+    });
+  }
+
+  void _hienNoiDungDinhKem(String tieuDe, String noiDung) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tieuDe),
+        content: SizedBox(
+          width: 420,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 400),
+            child: SingleChildScrollView(child: SelectableText(noiDung)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Nút bút chì trên một tin nhắn người dùng — nạp sẵn nội dung cũ vào ô
@@ -182,7 +283,8 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     if (dongY == true && mounted) {
       setState(() {
         widget.lichSu.clear();
-        _dinhKemVanBanMoiNhat = false;
+        _dinhKemHienTai = LoaiDinhKemTroChuyen.khong;
+        _noiDungDoanChonDinhKem = null;
         _dangSuaChiSo = null;
         _oNhap.clear();
       });
@@ -265,10 +367,14 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                             padding: const EdgeInsets.symmetric(vertical: 6),
                             child: t.laNguoiDung
                                 ? _BongBongNguoiDung(
-                                    chu: t.choHienThi,
+                                    tin: t,
                                     onSua: (!_dangGui && chiSoChoPhepSua.contains(i))
                                         ? () => _batDauSua(i)
                                         : null,
+                                    onXemDinhKem: () => _hienNoiDungDinhKem(
+                                      'Đoạn văn đang chọn',
+                                      t.noiDungDinhKem ?? '',
+                                    ),
                                   )
                                 : _TinNhanAi(chu: t.choHienThi),
                           );
@@ -288,15 +394,20 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                   ),
                 ),
               ),
-            if (_dinhKemVanBanMoiNhat)
+            if (_dinhKemHienTai != LoaiDinhKemTroChuyen.khong)
               Padding(
                 padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: Chip(
-                    avatar: const Icon(Icons.description_outlined, size: 18),
-                    label: const Text('Toàn bộ văn bản mới nhất'),
-                    onDeleted: () => setState(() => _dinhKemVanBanMoiNhat = false),
+                  child: _TheDinhKem(
+                    nhan: _dinhKemHienTai == LoaiDinhKemTroChuyen.toanVan
+                        ? 'Toàn bộ văn bản mới nhất'
+                        : 'Đoạn văn đang chọn',
+                    onXoa: _boDinhKem,
+                    onBam: _dinhKemHienTai == LoaiDinhKemTroChuyen.doanChon
+                        ? () => _hienNoiDungDinhKem(
+                            'Đoạn văn đang chọn', _noiDungDoanChonDinhKem ?? '')
+                        : null,
                   ),
                 ),
               ),
@@ -312,10 +423,21 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                     itemBuilder: (ctx) => [
                       const PopupMenuItem(
                         value: 1,
-                        child: Text('Đính kèm lại toàn bộ văn bản mới nhất'),
+                        child: Text('Toàn bộ văn bản mới nhất'),
+                      ),
+                      PopupMenuItem(
+                        value: 2,
+                        enabled: widget.layDoanVanDangChon() != null,
+                        child: const Text('Đoạn văn đang chọn'),
                       ),
                     ],
-                    onSelected: (_) => setState(() => _dinhKemVanBanMoiNhat = true),
+                    onSelected: (v) {
+                      if (v == 1) {
+                        _chonDinhKemToanVan();
+                      } else {
+                        _chonDinhKemDoanChon();
+                      }
+                    },
                   ),
                   Expanded(
                     child: TextField(
@@ -371,6 +493,28 @@ class _NutGui extends StatelessWidget {
   }
 }
 
+/// Thẻ đính kèm — dùng chung cho thẻ CHỜ GỬI (trên khung nhập, có nút X để
+/// bỏ) và thẻ LỊCH SỬ (trên một tin nhắn đã gửi, không có nút X, chỉ có thể
+/// bấm xem lại nội dung nếu [onBam] khác `null`).
+class _TheDinhKem extends StatelessWidget {
+  const _TheDinhKem({required this.nhan, this.onXoa, this.onBam});
+  final String nhan;
+  final VoidCallback? onXoa;
+  final VoidCallback? onBam;
+
+  @override
+  Widget build(BuildContext context) {
+    final the = Chip(
+      avatar: const Icon(Icons.description_outlined, size: 18),
+      label: Text(nhan),
+      onDeleted: onXoa,
+      visualDensity: VisualDensity.compact,
+    );
+    if (onBam == null) return the;
+    return InkWell(borderRadius: BorderRadius.circular(20), onTap: onBam, child: the);
+  }
+}
+
 /// Sao chép [chu] vào bộ nhớ đệm của thiết bị, kèm thông báo ngắn — dùng
 /// CHUNG cho mọi nút "Sao chép" trong màn hình này (bong bóng người dùng,
 /// tin nhắn AI, khung kết quả riêng từng khối ```...```).
@@ -408,11 +552,16 @@ class _NutHanhDongNho extends StatelessWidget {
 /// Bong bóng tin nhắn của người dùng — bọc khung, sát mép phải. Cho chọn
 /// văn bản để sao chép (`SelectableText`), kèm nút Sao chép + nút Sửa (bút
 /// chì, chỉ hiện khi [onSua] khác `null` — xem giới hạn "2 tin nhắn gần
-/// nhất" ở nơi gọi).
+/// nhất" ở nơi gọi). Có thẻ đính kèm (nếu có) hiện ngay phía trên.
 class _BongBongNguoiDung extends StatelessWidget {
-  const _BongBongNguoiDung({required this.chu, required this.onSua});
-  final String chu;
+  const _BongBongNguoiDung({
+    required this.tin,
+    required this.onSua,
+    required this.onXemDinhKem,
+  });
+  final TinNhanTroChuyen tin;
   final VoidCallback? onSua;
+  final VoidCallback onXemDinhKem;
 
   @override
   Widget build(BuildContext context) {
@@ -421,6 +570,16 @@ class _BongBongNguoiDung extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          if (tin.dinhKem != LoaiDinhKemTroChuyen.khong)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: _TheDinhKem(
+                nhan: tin.dinhKem == LoaiDinhKemTroChuyen.toanVan
+                    ? 'Toàn bộ văn bản mới nhất'
+                    : 'Đoạn văn đang chọn',
+                onBam: tin.dinhKem == LoaiDinhKemTroChuyen.doanChon ? onXemDinhKem : null,
+              ),
+            ),
           Container(
             constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -429,7 +588,7 @@ class _BongBongNguoiDung extends StatelessWidget {
               border: Border.all(color: _mauChinh.withValues(alpha: 0.4)),
               borderRadius: const BorderRadius.all(Radius.circular(14)),
             ),
-            child: SelectableText(chu),
+            child: SelectableText(tin.choHienThi),
           ),
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -439,7 +598,7 @@ class _BongBongNguoiDung extends StatelessWidget {
               _NutHanhDongNho(
                 icon: Icons.copy,
                 tooltip: 'Sao chép',
-                onTap: () => _saoChep(context, chu),
+                onTap: () => _saoChep(context, tin.choHienThi),
               ),
             ],
           ),

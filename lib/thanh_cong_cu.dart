@@ -31,6 +31,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamMoRongToanVan,
     required this.khiBamVietLaiToanVan,
     required this.khiBamTroChuyenVeVanBan,
+    required this.layDoanVanDangChon,
     required this.khiBamBanPhim,
     required this.khiBamBoPhimNhanh,
     required this.boPhimNhanhDangMo,
@@ -99,6 +100,13 @@ class ThanhCongCu extends StatelessWidget {
   /// (nút "Trò chuyện" ngoài thanh công cụ — "Trò chuyện VỚI MỌI NGƯỜI",
   /// một tính năng khác hẳn, hiện vẫn là chỗ đặt trước).
   final VoidCallback khiBamTroChuyenVeVanBan;
+
+  /// Nội dung vùng chọn hiện có ở trang soạn thảo, hay `null` nếu không có
+  /// — gọi lại MỖI LẦN cần biết (không lưu trạng thái). Quyết định các mục
+  /// trong menu "Làm việc với AI" (tóm tắt/mở rộng/viết lại/kiểm tra chính
+  /// tả/kiểm tra dấu câu/trò chuyện) hiện tên "...toàn văn"/"...văn bản
+  /// này" hay "...đoạn văn này"/"...đoạn văn đã chọn".
+  final String? Function() layDoanVanDangChon;
   final VoidCallback khiBamBanPhim;
 
   /// "Bộ phím nhanh cho màn hình cảm ứng" (mục "Bật/Tắt..." trong "+ Thêm
@@ -257,6 +265,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamMoRongToanVan: khiBamMoRongToanVan,
                               khiBamVietLaiToanVan: khiBamVietLaiToanVan,
                               khiBamTroChuyenVeVanBan: khiBamTroChuyenVeVanBan,
+                              layDoanVanDangChon: layDoanVanDangChon,
                             ),
                           ),
                           _NutCoChuThich(
@@ -1255,6 +1264,7 @@ class _NutAIMenu extends StatelessWidget {
     required this.khiBamMoRongToanVan,
     required this.khiBamVietLaiToanVan,
     required this.khiBamTroChuyenVeVanBan,
+    required this.layDoanVanDangChon,
   });
 
   final bool rong;
@@ -1303,6 +1313,10 @@ class _NutAIMenu extends StatelessWidget {
   /// mục này).
   final VoidCallback khiBamTroChuyenVeVanBan;
 
+  /// Có vùng chọn hay không ở trang soạn thảo — quyết định tên hiển thị của
+  /// từng mục ("...toàn văn" → "...đoạn văn này"/"...đoạn văn đã chọn").
+  final String? Function() layDoanVanDangChon;
+
   @override
   Widget build(BuildContext context) {
     return Semantics(
@@ -1347,6 +1361,13 @@ class _NutAIMenu extends StatelessWidget {
           // và khung cuộn thật.
           itemBuilder: (ctx) {
             final cuon = ScrollController();
+            // Có vùng chọn hay không QUYẾT ĐỊNH NGAY LÚC MỞ MENU tên hiển
+            // thị của từng mục ("...toàn văn" → "...đoạn văn này"/"...đoạn
+            // văn đã chọn") — đọc MỘT LẦN ở đây, dùng lại cho mọi mục bên
+            // dưới, vì vùng chọn không thể đổi trong lúc menu đang mở
+            // (người dùng đang bận điều hướng menu, không chạm được vào ô
+            // soạn thảo phía sau).
+            final coDoanChon = layDoanVanDangChon() != null;
             return [
               // Nút X đỏ đóng menu + hai nút cuộn — luôn ở đầu danh sách,
               // KHÔNG cuộn theo phần còn lại.
@@ -1367,9 +1388,12 @@ class _NutAIMenu extends StatelessWidget {
                 _mucMenuThem(7, 'Chụp ảnh (camera)'),
                 _mucMenuThem(8, 'Chuyển file âm thanh thành văn bản'),
                 _dividerMenu(),
-                _mucMenuThem(1, 'Trò chuyện về văn bản này'),
-                _mucMenuThem(2, 'Tóm tắt toàn văn'),
-                _mucMenuThem(3, 'Mở rộng toàn văn'),
+                _mucMenuThem(
+                  1,
+                  coDoanChon ? 'Trò chuyện về đoạn văn đã chọn' : 'Trò chuyện về văn bản này',
+                ),
+                _mucMenuThem(2, coDoanChon ? 'Tóm tắt đoạn văn này' : 'Tóm tắt toàn văn'),
+                _mucMenuThem(3, coDoanChon ? 'Mở rộng đoạn văn này' : 'Mở rộng toàn văn'),
                 _mucMenuThem(4, 'Viết lại cho hay hơn'),
                 _dividerMenu(),
                 // Hai mục CHỈ MỘT PHẦN của "Kiểm tra toàn văn" — ĐÚNG
@@ -1377,8 +1401,14 @@ class _NutAIMenu extends StatelessWidget {
                 // sóng/tô dấu câu), chỉ khác việc AI CHỈ tìm đúng một loại
                 // lỗi. Đặt ngay TRÊN "Kiểm tra toàn văn" theo đúng thứ tự
                 // yêu cầu.
-                _mucMenuThem(10, 'Kiểm tra lỗi chính tả toàn văn'),
-                _mucMenuThem(11, 'Kiểm tra dấu câu toàn văn'),
+                _mucMenuThem(
+                  10,
+                  coDoanChon ? 'Kiểm tra lỗi chính tả đoạn văn này' : 'Kiểm tra lỗi chính tả toàn văn',
+                ),
+                _mucMenuThem(
+                  11,
+                  coDoanChon ? 'Kiểm tra dấu câu đoạn văn này' : 'Kiểm tra dấu câu toàn văn',
+                ),
                 // "Kiểm tra toàn văn" dời từ một nút riêng ngoài thanh công
                 // cụ vào ngay TRÊN mục cài đặt của nó — giữ màu xanh lá +
                 // icon dấu tích ở đây; mục cài đặt bên dưới không cần tô màu
@@ -1392,7 +1422,7 @@ class _NutAIMenu extends StatelessWidget {
                       Icon(Icons.task_alt, size: 16, color: Colors.green.shade600),
                       const SizedBox(width: 8),
                       Text(
-                        'Kiểm tra toàn văn',
+                        coDoanChon ? 'Kiểm tra đoạn văn này' : 'Kiểm tra toàn văn',
                         style: TextStyle(color: Colors.green.shade600),
                       ),
                     ],

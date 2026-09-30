@@ -9004,21 +9004,25 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// cloud-function/index.js.
   Future<void> _khiBamKiemTraToanVan({String? loaiKiemTra}) async {
     if (_dangKiemTraToanVan) return;
-    final vanBan = _boDieuKhien.text;
+    final vungChon = _vungDangChonHopLe();
+    final vanBan = vungChon != null ? vungChon.textInside(_boDieuKhien.text) : _boDieuKhien.text;
     if (vanBan.trim().isEmpty) {
-      _bao('Chưa có văn bản nào để kiểm tra.');
+      _bao(vungChon != null
+          ? 'Đoạn đang chọn trống, không có gì để kiểm tra.'
+          : 'Chưa có văn bản nào để kiểm tra.');
       return;
     }
 
     final daHuy = ValueNotifier<bool>(false);
     setState(() => _dangKiemTraToanVan = true);
 
+    final hauTo = vungChon != null ? ' ở đoạn đang chọn' : ' toàn văn';
     final moTaDangXuLy = switch (loaiKiemTra) {
-      'chinh_ta' => 'AI đang kiểm tra lỗi chính tả toàn văn, tìm từ/cụm từ '
+      'chinh_ta' => 'AI đang kiểm tra lỗi chính tả$hauTo, tìm từ/cụm từ '
           'sai để đề xuất sửa.',
-      'dau_cau' => 'AI đang kiểm tra dấu câu toàn văn, tìm chỗ còn thiếu để '
+      'dau_cau' => 'AI đang kiểm tra dấu câu$hauTo, tìm chỗ còn thiếu để '
           'đề xuất chèn thêm.',
-      _ => 'AI đang kiểm tra lại toàn văn để soát lỗi chính tả - ngữ '
+      _ => 'AI đang kiểm tra lại$hauTo để soát lỗi chính tả - ngữ '
           'pháp, và đề xuất cách sửa đổi. Đây là bước quan trọng trước '
           'khi hoàn thiện văn bản.',
     };
@@ -9063,7 +9067,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     try {
       ketQua = await _dichVuToanVan.kiemTra(
         vanBan,
-        vungDaXuLy: _vungToanVanDaXuLy(),
+        // Đang kiểm tra một ĐOẠN CHỌN (toạ độ cục bộ, bắt đầu từ 0) thì
+        // "vùng đã xử lý" (toạ độ toàn văn của các lượt trước) không còn ý
+        // nghĩa gì để so khớp — bỏ qua hẳn, không gửi lên.
+        vungDaXuLy: vungChon != null ? const [] : _vungToanVanDaXuLy(),
         // "Chỉ dấu câu" LUÔN cần chenDauCau=true để nhánh phân tích
         // dauCauMoi ở `DichVuKiemTraToanVan.kiemTra` chạy — không phụ
         // thuộc cài đặt "Tự động chèn dấu câu" của người dùng.
@@ -9093,7 +9100,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
 
-    _apDungKetQuaToanVan(ketQua);
+    _apDungKetQuaToanVan(
+      vungChon != null ? _dichKetQuaToanVan(ketQua, vungChon.start) : ketQua,
+    );
     _henLuu();
     _hienPopupXongTamThoi();
   }
@@ -11114,8 +11123,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// của người dùng, hoặc cả hai — bắt buộc chọn ít nhất một trong hai mới
   /// bấm "Gửi cho AI xử lý" được.
   void _moModalChonKieuTomTat() {
-    if (_boDieuKhien.text.trim().isEmpty) {
-      _bao('Trang đang trống, không có gì để tóm tắt.');
+    final vungChon = _vungDangChonHopLe();
+    final vanBanGoc = vungChon != null ? vungChon.textInside(_boDieuKhien.text) : _boDieuKhien.text;
+    if (vanBanGoc.trim().isEmpty) {
+      _bao(vungChon != null
+          ? 'Đoạn đang chọn trống, không có gì để tóm tắt.'
+          : 'Trang đang trống, không có gì để tóm tắt.');
       return;
     }
     var chonPhanTram = true;
@@ -11129,7 +11142,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         builder: (ctx, capNhat) {
           final coTheGui = chonPhanTram || chonCauLenh;
           return AlertDialog(
-            title: const Text('Chọn kiểu tóm tắt'),
+            title: Text(vungChon != null ? 'Chọn kiểu tóm tắt (đoạn đang chọn)' : 'Chọn kiểu tóm tắt'),
             content: SizedBox(
               width: 420,
               child: SingleChildScrollView(
@@ -11199,6 +11212,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     : () {
                         Navigator.of(ctx).pop();
                         _guiTomTatChoAi(
+                          vanBanGoc: vanBanGoc,
+                          vungChon: vungChon,
                           phanTram: chonPhanTram ? phanTram.round() : null,
                           huongDanNguoiDung: chonCauLenh ? oCauLenh.text : null,
                         );
@@ -11212,7 +11227,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     ).then((_) => oCauLenh.dispose());
   }
 
-  Future<void> _guiTomTatChoAi({int? phanTram, String? huongDanNguoiDung}) async {
+  Future<void> _guiTomTatChoAi({
+    required String vanBanGoc,
+    required TextSelection? vungChon,
+    int? phanTram,
+    String? huongDanNguoiDung,
+  }) async {
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -11235,7 +11255,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     String? loi;
     try {
       vanBanKetQua = await guiTomTatChoGemini(
-        _boDieuKhien.text,
+        vanBanGoc,
         phanTram: phanTram,
         huongDanNguoiDung: huongDanNguoiDung,
       );
@@ -11250,7 +11270,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
 
-    _moModalKetQuaToanVan(vanBanKetQua, tieuDe: 'Kết quả tóm tắt');
+    _moModalKetQuaToanVan(
+      vanBanKetQua,
+      tieuDe: vungChon != null ? 'Kết quả tóm tắt (đoạn đã chọn)' : 'Kết quả tóm tắt',
+      vungChon: vungChon,
+    );
   }
 
   /// Mục "Mở rộng toàn văn" trong menu "Làm việc với AI" — ĐÚNG KHUÔN
@@ -11258,8 +11282,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// % ĐỘ DÀI MONG MUỐN so với bản gốc (120-400%, mỗi mốc cách nhau 10,
   /// mặc định 200%), không phải % còn lại như tóm tắt.
   void _moModalChonKieuMoRong() {
-    if (_boDieuKhien.text.trim().isEmpty) {
-      _bao('Trang đang trống, không có gì để mở rộng.');
+    final vungChon = _vungDangChonHopLe();
+    final vanBanGoc = vungChon != null ? vungChon.textInside(_boDieuKhien.text) : _boDieuKhien.text;
+    if (vanBanGoc.trim().isEmpty) {
+      _bao(vungChon != null
+          ? 'Đoạn đang chọn trống, không có gì để mở rộng.'
+          : 'Trang đang trống, không có gì để mở rộng.');
       return;
     }
     var chonPhanTram = true;
@@ -11273,7 +11301,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         builder: (ctx, capNhat) {
           final coTheGui = chonPhanTram || chonCauLenh;
           return AlertDialog(
-            title: const Text('Chọn kiểu mở rộng'),
+            title: Text(vungChon != null ? 'Chọn kiểu mở rộng (đoạn đang chọn)' : 'Chọn kiểu mở rộng'),
             content: SizedBox(
               width: 420,
               child: SingleChildScrollView(
@@ -11343,6 +11371,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     : () {
                         Navigator.of(ctx).pop();
                         _guiMoRongChoAi(
+                          vanBanGoc: vanBanGoc,
+                          vungChon: vungChon,
                           phanTram: chonPhanTram ? phanTram.round() : null,
                           huongDanNguoiDung: chonCauLenh ? oCauLenh.text : null,
                         );
@@ -11356,7 +11386,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     ).then((_) => oCauLenh.dispose());
   }
 
-  Future<void> _guiMoRongChoAi({int? phanTram, String? huongDanNguoiDung}) async {
+  Future<void> _guiMoRongChoAi({
+    required String vanBanGoc,
+    required TextSelection? vungChon,
+    int? phanTram,
+    String? huongDanNguoiDung,
+  }) async {
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -11379,7 +11414,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     String? loi;
     try {
       vanBanKetQua = await guiMoRongChoGemini(
-        _boDieuKhien.text,
+        vanBanGoc,
         phanTram: phanTram,
         huongDanNguoiDung: huongDanNguoiDung,
       );
@@ -11394,7 +11429,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
 
-    _moModalKetQuaToanVan(vanBanKetQua, tieuDe: 'Kết quả mở rộng');
+    _moModalKetQuaToanVan(
+      vanBanKetQua,
+      tieuDe: vungChon != null ? 'Kết quả mở rộng (đoạn đã chọn)' : 'Kết quả mở rộng',
+      vungChon: vungChon,
+    );
   }
 
   /// Mục "Viết lại cho hay hơn" trong menu "Làm việc với AI" — ĐƠN GIẢN HƠN
@@ -11402,8 +11441,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// tự), CÓ THỂ ĐỂ TRỐNG — để trống thì AI tự do chọn cách viết lại theo
   /// ý nó, không có lựa chọn %.
   void _moModalChonKieuVietLai() {
-    if (_boDieuKhien.text.trim().isEmpty) {
-      _bao('Trang đang trống, không có gì để viết lại.');
+    final vungChon = _vungDangChonHopLe();
+    final vanBanGoc = vungChon != null ? vungChon.textInside(_boDieuKhien.text) : _boDieuKhien.text;
+    if (vanBanGoc.trim().isEmpty) {
+      _bao(vungChon != null
+          ? 'Đoạn đang chọn trống, không có gì để viết lại.'
+          : 'Trang đang trống, không có gì để viết lại.');
       return;
     }
     final oCauLenh = TextEditingController();
@@ -11411,7 +11454,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Viết lại cho hay hơn'),
+        title: Text(vungChon != null ? 'Viết lại cho hay hơn (đoạn đang chọn)' : 'Viết lại cho hay hơn'),
         content: SizedBox(
           width: 420,
           child: Column(
@@ -11445,7 +11488,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           FilledButton(
             onPressed: () {
               Navigator.of(ctx).pop();
-              _guiVietLaiChoAi(huongDanNguoiDung: oCauLenh.text);
+              _guiVietLaiChoAi(
+                vanBanGoc: vanBanGoc,
+                vungChon: vungChon,
+                huongDanNguoiDung: oCauLenh.text,
+              );
             },
             child: const Text('Gửi cho AI xử lý'),
           ),
@@ -11454,7 +11501,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     ).then((_) => oCauLenh.dispose());
   }
 
-  Future<void> _guiVietLaiChoAi({String? huongDanNguoiDung}) async {
+  Future<void> _guiVietLaiChoAi({
+    required String vanBanGoc,
+    required TextSelection? vungChon,
+    String? huongDanNguoiDung,
+  }) async {
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -11477,7 +11528,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     String? loi;
     try {
       vanBanKetQua = await guiVietLaiChoGemini(
-        _boDieuKhien.text,
+        vanBanGoc,
         huongDanNguoiDung: huongDanNguoiDung,
       );
     } catch (e) {
@@ -11491,7 +11542,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
 
-    _moModalKetQuaToanVan(vanBanKetQua, tieuDe: 'Kết quả viết lại');
+    _moModalKetQuaToanVan(
+      vanBanKetQua,
+      tieuDe: vungChon != null ? 'Kết quả viết lại (đoạn đã chọn)' : 'Kết quả viết lại',
+      vungChon: vungChon,
+    );
   }
 
   /// Mục "Trò chuyện về văn bản này" trong menu "Làm việc với AI" — mở màn
@@ -11516,6 +11571,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         builder: (_) => ManHinhTroChuyen(
           lichSu: lichSu,
           layVanBanHienTai: () => _boDieuKhien.text,
+          layDoanVanDangChon: _layDoanVanDangChon,
         ),
       ),
     );
@@ -11556,7 +11612,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _oKetQuaToanVan = null;
   }
 
-  void _moModalKetQuaToanVan(String vanBan, {String? tieuDe}) {
+  void _moModalKetQuaToanVan(String vanBan, {String? tieuDe, TextSelection? vungChon}) {
     if (tieuDe != null) _tieuDeModalKetQuaToanVan = tieuDe;
     _oKetQuaToanVan ??= TextEditingController(text: vanBan);
     showDialog<void>(
@@ -11601,9 +11657,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               final vb = _oKetQuaToanVan?.text ?? '';
               Navigator.of(ctx).pop();
               _dongHanKetQuaToanVan();
-              if (vb.trim().isNotEmpty) _thayTheToanBoVanBan(vb);
+              if (vb.trim().isEmpty) return;
+              if (vungChon != null) {
+                _thayTheDoanDangChon(vungChon, vb);
+              } else {
+                _thayTheToanBoVanBan(vb);
+              }
             },
-            child: const Text('Thay thế toàn bộ văn bản'),
+            child: Text(vungChon != null ? 'Thay thế đoạn đã chọn' : 'Thay thế toàn bộ văn bản'),
           ),
         ],
       ),
@@ -11691,6 +11752,83 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
     _boDieuKhien.khongPhuHop.add(v);
     _batNhapNhayKhongPhuHop(v, 'xanh');
+  }
+
+  // --------------------------------------- AI làm việc với vùng đang chọn
+
+  /// Nội dung vùng chọn hiện có trong ô soạn thảo, hay `null` nếu không có
+  /// vùng chọn thật (con trỏ đứng yên/không hợp lệ/rỗng) — dùng để các mục
+  /// "Làm việc với AI" (tóm tắt/mở rộng/viết lại/kiểm tra chính tả/kiểm tra
+  /// dấu câu/trò chuyện) tự đổi tên "...toàn văn" → "...đoạn văn này"/"...
+  /// đoạn văn đã chọn" ngay trong menu, và kênh chat biết có gì để đính kèm
+  /// khi bấm "+". Gọi lại MỖI LẦN cần biết (không lưu trạng thái), vì vùng
+  /// chọn đổi liên tục theo thao tác của người dùng.
+  String? _layDoanVanDangChon() {
+    final vung = _vungDangChonHopLe();
+    return vung == null ? null : vung.textInside(_boDieuKhien.text);
+  }
+
+  /// Y HỆT [_layDoanVanDangChon] nhưng trả về cả TOẠ ĐỘ (`TextSelection`)
+  /// — dùng ở nơi cần thay thế ĐÚNG LẠI đoạn đó sau khi AI xử lý xong (xem
+  /// `_thayTheDoanDangChon`), thay vì thay cả bài.
+  TextSelection? _vungDangChonHopLe() {
+    final sel = _boDieuKhien.selection;
+    if (!sel.isValid || sel.isCollapsed) return null;
+    final vb = _boDieuKhien.text;
+    final batDau = sel.start.clamp(0, vb.length);
+    final ketThuc = sel.end.clamp(0, vb.length);
+    if (batDau >= ketThuc) return null;
+    return TextSelection(baseOffset: batDau, extentOffset: ketThuc);
+  }
+
+  /// Nút "Thay thế đoạn đã chọn" ở modal kết quả (tóm tắt/mở rộng/viết lại
+  /// khi bắt đầu từ một vùng chọn) — như `_thayTheToanBoVanBan` nhưng chỉ
+  /// ghi đè đúng [vung]: vị trí vùng chọn LÚC BẤM MỞ modal chọn kiểu, KHÔNG
+  /// phải vùng chọn hiện tại. Trong suốt lúc chờ AI xử lý, mọi hộp thoại đi
+  /// qua đều `barrierDismissible: false` nên trang soạn thảo phía sau không
+  /// thể bị đụng vào — vị trí đó chắc chắn còn đúng, chỉ kiểm tra lại cho
+  /// chắc (đề phòng văn bản bị đổi qua đường khác, ví dụ ghi âm nền).
+  Future<void> _thayTheDoanDangChon(TextSelection vung, String vanBanMoi) async {
+    final vbHienTai = _boDieuKhien.text;
+    if (vung.start < 0 || vung.end > vbHienTai.length || vung.start >= vung.end) {
+      _bao('Đoạn văn bản gốc đã thay đổi, không thể thay thế. Vui lòng thử lại.');
+      return;
+    }
+    _luuDiemMoc();
+    _dieuChinhLoiChinhTaSauKhiSua(vung.start, vung.end - vung.start, vanBanMoi.length);
+    _dieuChinhVungToanVanSauKhiSua(vung.start, vung.end - vung.start, vanBanMoi.length);
+    final moi = vbHienTai.replaceRange(vung.start, vung.end, vanBanMoi);
+    final viTriConTroMoi = vung.start + vanBanMoi.length;
+    _ghiVaoO(moi, viTriConTroMoi);
+    _neo = viTriConTroMoi;
+    await _luuVanBan();
+    if (mounted) _nhapNhayToanVan(vung.start, viTriConTroMoi);
+    if (mounted) _bao('Đã thay thế đoạn văn bản đã chọn.');
+  }
+
+  /// Dịch mọi "viTri" trong [kq] thêm [dich] — dùng khi "Kiểm tra lỗi chính
+  /// tả toàn văn"/"Kiểm tra dấu câu toàn văn" chạy trên một ĐOẠN CHỌN thay
+  /// vì cả bài: máy chủ AI trả "viTri" tính trên đoạn gửi lên (bắt đầu từ
+  /// 0), phải cộng lại đúng vị trí bắt đầu của đoạn đó trên TOÀN VĂN trước
+  /// khi đưa cho `_apDungKetQuaToanVan` (hàm đó luôn thao tác trên toạ độ
+  /// toàn văn).
+  KetQuaKiemTraToanVan _dichKetQuaToanVan(KetQuaKiemTraToanVan kq, int dich) {
+    if (dich == 0) return kq;
+    return KetQuaKiemTraToanVan(
+      chinhTa: [
+        for (final c in kq.chinhTa) ChinhTaMuc(tu: c.tu, viTri: c.viTri + dich, deXuat: c.deXuat),
+      ],
+      khongPhuHop: [
+        for (final k in kq.khongPhuHop)
+          KhongPhuHopMuc(doan: k.doan, viTri: k.viTri + dich, deXuat: k.deXuat),
+      ],
+      canXoa: [
+        for (final x in kq.canXoa) CanXoaMuc(doan: x.doan, viTri: x.viTri + dich),
+      ],
+      dauCauMoi: [
+        for (final d in kq.dauCauMoi) DauCauMoiToanVanMuc(dauCau: d.dauCau, viTri: d.viTri + dich),
+      ],
+    );
   }
 
   /// Mục "Chụp ảnh (camera)" trong menu "Làm việc với AI" — ĐÚNG LUỒNG với
@@ -13479,6 +13617,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 khiBamMoRongToanVan: _moModalChonKieuMoRong,
                 khiBamVietLaiToanVan: _moModalChonKieuVietLai,
                 khiBamTroChuyenVeVanBan: _moTroChuyenVeVanBan,
+                layDoanVanDangChon: _layDoanVanDangChon,
                 khiBamBanPhim: () => _moModalTam(
                   'Bàn phím',
                   Icons.keyboard_outlined,

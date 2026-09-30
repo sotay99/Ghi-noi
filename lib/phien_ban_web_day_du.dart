@@ -2,4 +2,4 @@
 /// ghi kèm trong nhật ký micro gỡ lỗi (xem `ManHinhCaiDat` → "Xem nhật ký
 /// micro") — người dùng gửi log kèm số này để biết chính xác lỗi xảy ra ở
 /// bản nào. Không có ý nghĩa gì trên Android/iOS gốc.
-const phienBanWebDayDu = 'v97';
+const phienBanWebDayDu = 'v98';
