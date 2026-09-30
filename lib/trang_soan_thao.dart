@@ -21,6 +21,7 @@ import 'cai_dat.dart';
 import 'doan_thiet_bi.dart';
 import 'mo_lien_ket_ngoai.dart';
 import 'nghe_resize_trinh_duyet.dart';
+import 'dinh_dang_clip.dart';
 import 'ghi_am_the.dart';
 import 'the_tich_chon.dart';
 import 'gui_ghi_am_gemini.dart';
@@ -5093,6 +5094,276 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   int _demBamAll = 0;
   static const _nguongBamAll = Duration(seconds: 2);
 
+  // ---------------------------------- copy/cắt/dán GIỮ ĐỊNH DẠNG (chỉ web)
+
+  /// Đánh dấu ở ĐẦU chuỗi `text/html` ghi kèm lúc Copy/Cắt — bọc một gói
+  /// JSON (base64, ĐÚNG khuôn `_macDinhDangThuCong`/`_apDungDinhDangThuCong`
+  /// đã dùng để lưu/đọc tệp) trong một COMMENT HTML, nên mọi trình duyệt/ứng
+  /// dụng khác đọc `text/html` này đều bỏ qua vô hại — chỉ Flowrite (đọc lại
+  /// ở [_tachGoiDinhDangTuHtml]) hiểu và khôi phục ĐÚNG TUYỆT ĐỐI. Phần HTML
+  /// còn lại (thẻ `<b>/<i>/span style=...`) mới là thứ Google Docs/Excel...
+  /// thật sự đọc khi dán, xem [_dinhDangThuCongSangHtml].
+  static const _danhDauGoiDinhDangClip = 'FLOWRITE-CLIP-V1';
+  static final _reGoiDinhDangClip = RegExp('<!--$_danhDauGoiDinhDangClip:([A-Za-z0-9+/=]+)-->');
+
+  /// Đóng gói các vùng định dạng thủ công GIAO với [batDau, ketThuc) thành
+  /// base64 — offset dịch về 0 tại [batDau] (toạ độ TƯƠNG ĐỐI trong đoạn vừa
+  /// copy, vì nơi dán có thể ở một tệp khác, offset tuyệt đối vô nghĩa).
+  /// Kèm độ dài + mã băm của đoạn văn bản gốc để bên dán XÁC MINH lại đúng
+  /// đoạn chữ đó còn nguyên trước khi tin theo định dạng — lệch một ký tự
+  /// cũng bỏ qua toàn bộ, thà mất định dạng còn hơn gán sai chỗ. `null` nếu
+  /// đoạn không có định dạng thủ công nào (không đáng ghi rich clipboard).
+  String? _macGoiDinhDangChoClipboard(String doan, int batDau, int ketThuc) {
+    final ds = <Map<String, dynamic>>[];
+    for (final d in _boDieuKhien.dinhDang) {
+      if (d.rong) continue;
+      final a = d.batDau < batDau ? batDau : d.batDau;
+      final b = d.ketThuc > ketThuc ? ketThuc : d.ketThuc;
+      if (a >= b) continue;
+      ds.add(_VungDinhDangThuCong(
+        batDau: a - batDau,
+        ketThuc: b - batDau,
+        dam: d.dam,
+        nghieng: d.nghieng,
+        gachChan: d.gachChan,
+        gachNgang: d.gachNgang,
+        treMu: d.treMu,
+        treChan: d.treChan,
+        mauChu: d.mauChu,
+        mauNen: d.mauNen,
+      ).toJson());
+    }
+    if (ds.isEmpty) return null;
+    final goi = {'len': doan.length, 'ham': _bamFnv1a(doan), 'sp': ds};
+    return base64Encode(utf8.encode(jsonEncode(goi)));
+  }
+
+  /// Ngược lại [_macGoiDinhDangChoClipboard] — decode, XÁC MINH [vanBanDaDan]
+  /// khớp đúng độ dài/mã băm đã ghi lúc copy, rồi thêm các vùng định dạng
+  /// (dịch theo [batDauChen], vị trí đoạn vừa dán trong văn bản hiện tại)
+  /// vào `_boDieuKhien.dinhDang`. Hỏng khuôn/không khớp ở bất kỳ đâu thì bỏ
+  /// qua ÊM RU — dán vẫn thành công, chỉ mất định dạng, KHÔNG BAO GIỜ gán
+  /// định dạng sai chỗ.
+  void _apDungGoiDinhDangTuClipboard(String maHoa, String vanBanDaDan, int batDauChen) {
+    try {
+      final goi = jsonDecode(utf8.decode(base64Decode(maHoa)));
+      if (goi is! Map) return;
+      if (goi['len'] != vanBanDaDan.length) return;
+      if (goi['ham'] != _bamFnv1a(vanBanDaDan)) return;
+      final sp = goi['sp'];
+      if (sp is! List) return;
+      _themVungDinhDangTuDs(sp, batDauChen);
+    } catch (_) {
+      // Bỏ qua toàn bộ — xem chú thích khai báo hàm.
+    }
+  }
+
+  /// Thêm các vùng định dạng mã hoá kiểu `_VungDinhDangThuCong.toJson()`
+  /// trong [ds] vào `_boDieuKhien.dinhDang`, dịch toạ độ theo [batDauChen] —
+  /// dùng chung cho cả gói JSON riêng của Flowrite ([_apDungGoiDinhDangTuClipboard])
+  /// lẫn kết quả rút từ HTML nguồn ngoài ([_dinhDangTuHtmlNgoai]).
+  void _themVungDinhDangTuDs(List<dynamic> ds, int batDauChen) {
+    final vb = _boDieuKhien.text;
+    for (final j in ds) {
+      if (j is! Map) continue;
+      final m = Map<String, dynamic>.from(j);
+      final vt = m['vt'];
+      final kt = m['kt'];
+      if (vt is! int || kt is! int) continue;
+      m['vt'] = vt + batDauChen;
+      m['kt'] = kt + batDauChen;
+      final v = _VungDinhDangThuCong.fromJson(m, vb.length);
+      if (v != null) _boDieuKhien.dinhDang.add(v);
+    }
+  }
+
+  /// Tách gói JSON riêng của Flowrite (nếu có) khỏi chuỗi `text/html` vừa
+  /// đọc được từ clipboard — `null` nếu không có (clipboard trống, hoặc đến
+  /// từ nguồn khác không phải Flowrite).
+  String? _tachGoiDinhDangTuHtml(String? htmlClipboard) {
+    if (htmlClipboard == null) return null;
+    return _reGoiDinhDangClip.firstMatch(htmlClipboard)?.group(1);
+  }
+
+  /// Bốn thực thể HTML cơ bản nhất — đủ dùng cho chữ thường trong đoạn dán,
+  /// không cần bộ giải mã thực thể đầy đủ.
+  String _giaiMaThucTheHtml(String s) => s
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .replaceAll('&apos;', "'")
+      .replaceAll('&amp;', '&'); // LUÔN giải mã & sau cùng — tránh giải mã
+  // "&amp;lt;" thành "&lt;" rồi lại thành "<" oan (giải mã kép).
+
+  /// Rút chữ thô + BA kiểu định dạng cơ bản nhất (đậm/nghiêng/gạch chân) từ
+  /// một chuỗi `text/html` TỪ NGUỒN NGOÀI (Google Docs/Word/trang web...,
+  /// KHÔNG mang đánh dấu riêng của Flowrite — xem [_tachGoiDinhDangTuHtml]
+  /// cho trường hợp chính Flowrite). CHỦ Ý chỉ nhận 3 thẻ `<b>/<strong>`,
+  /// `<i>/<em>`, `<u>` — bỏ qua mọi thẻ/kiểu khác (bảng, tiêu đề, cỡ chữ,
+  /// màu...), đúng tinh thần "cố gắng tốt nhất", không cầu toàn.
+  ///
+  /// Trả về `null` nếu có bất kỳ trục trặc nào, HOẶC nếu chữ rút ra từ HTML
+  /// không khớp Y HỆT [vanBanThoDaDoc] (đọc từ `text/plain` riêng của cùng
+  /// clipboard) — khác biệt cách trình duyệt dựng `text/plain` so với cách
+  /// hàm này rút chữ từ thẻ HTML (ví dụ xuống dòng quanh khối `<p>/<div>`)
+  /// là chuyện bình thường, và khi đó THÀ bỏ qua định dạng còn hơn gán sai
+  /// chỗ hoặc dán nhầm chữ.
+  List<Map<String, dynamic>>? _dinhDangTuHtmlNgoai(String htmlGoc, String vanBanThoDaDoc) {
+    try {
+      var html = htmlGoc.replaceAll(
+          RegExp(r'<script[\s\S]*?</script>', caseSensitive: false), '');
+      html = html.replaceAll(RegExp(r'<style[\s\S]*?</style>', caseSensitive: false), '');
+      final buf = StringBuffer();
+      final runs = <(int, int, bool, bool, bool)>[];
+      var dam = false, nghieng = false, gachChan = false;
+      for (final m in RegExp(r'<[^>]*>|[^<]+', dotAll: true).allMatches(html)) {
+        final tok = m[0]!;
+        if (tok.startsWith('<')) {
+          final te = tok.toLowerCase();
+          final dong = !te.startsWith('</');
+          if (RegExp(r'^</?\s*(b|strong)\b').hasMatch(te)) {
+            dam = dong;
+          } else if (RegExp(r'^</?\s*(i|em)\b').hasMatch(te)) {
+            nghieng = dong;
+          } else if (RegExp(r'^</?\s*u\b').hasMatch(te)) {
+            gachChan = dong;
+          } else if (te.startsWith('<br')) {
+            final bd = buf.length;
+            buf.write('\n');
+            runs.add((bd, buf.length, dam, nghieng, gachChan));
+          }
+          continue;
+        }
+        final chu = _giaiMaThucTheHtml(tok);
+        if (chu.isEmpty) continue;
+        final bd = buf.length;
+        buf.write(chu);
+        runs.add((bd, buf.length, dam, nghieng, gachChan));
+      }
+      if (buf.toString() != vanBanThoDaDoc) return null;
+
+      final ds = <Map<String, dynamic>>[];
+      var i = 0;
+      while (i < runs.length) {
+        final (bd, kt0, d, n, g) = runs[i];
+        var kt = kt0;
+        var j = i + 1;
+        while (j < runs.length &&
+            runs[j].$3 == d &&
+            runs[j].$4 == n &&
+            runs[j].$5 == g &&
+            runs[j].$1 == kt) {
+          kt = runs[j].$2;
+          j++;
+        }
+        if (d || n || g) {
+          ds.add(_VungDinhDangThuCong(batDau: bd, ketThuc: kt, dam: d, nghieng: n, gachChan: g)
+              .toJson());
+        }
+        i = j;
+      }
+      return ds.isEmpty ? null : ds;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Ba ký tự HTML tối thiểu cần thoát trong một đoạn chữ thường trước khi
+  /// chèn vào giữa các thẻ — `"`/`'` không cần vì chữ không nằm trong thuộc
+  /// tính nào ở đây.
+  String _thoatHtml(String s) =>
+      s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+
+  /// `rgba(...)` từ một `Color` — dùng `toARGB32()` (đã dùng sẵn ở
+  /// `_VungDinhDangThuCong.toJson`), không phụ thuộc getter `.value` cũ.
+  String _mauCssTuColor(Color c) {
+    final v = c.toARGB32();
+    final a = (v >> 24) & 0xFF, r = (v >> 16) & 0xFF, g = (v >> 8) & 0xFF, b = v & 0xFF;
+    return 'rgba($r,$g,$b,${(a / 255).toStringAsFixed(3)})';
+  }
+
+  /// Dựng phần HTML thật (thẻ/`style` chuẩn — thứ Google Docs/Excel/Word...
+  /// đọc khi dán) cho đoạn [batDau, ketThuc) — ĐÚNG thuật toán "gộp các vùng
+  /// định dạng chồng lấn thành từng đoạn liền không chồng lấn" đã dùng để vẽ
+  /// trong `buildTextSpan` (giản lược, bỏ phần tô vùng tìm kiếm/vùng chọn —
+  /// không liên quan tới việc xuất clipboard), để HTML xuất ra ĐÚNG Y HỆT
+  /// những gì người dùng đang nhìn thấy trên trang.
+  String _dinhDangThuCongSangHtml(String doan, int batDauGoc, int ketThucGoc) {
+    if (doan.isEmpty) return '';
+    final trongVung = <_VungDinhDangThuCong>[];
+    final diem = <int>{0, doan.length};
+    for (final d in _boDieuKhien.dinhDang) {
+      if (d.rong) continue;
+      final a = (d.batDau < batDauGoc ? batDauGoc : d.batDau) - batDauGoc;
+      final b = (d.ketThuc > ketThucGoc ? ketThucGoc : d.ketThuc) - batDauGoc;
+      if (a >= b) continue;
+      diem.add(a);
+      diem.add(b);
+      trongVung.add(_VungDinhDangThuCong(
+        batDau: a,
+        ketThuc: b,
+        dam: d.dam,
+        nghieng: d.nghieng,
+        gachChan: d.gachChan,
+        gachNgang: d.gachNgang,
+        treMu: d.treMu,
+        treChan: d.treChan,
+        mauChu: d.mauChu,
+        mauNen: d.mauNen,
+      ));
+    }
+    final moc = diem.toList()..sort();
+    final buf = StringBuffer();
+    for (var i = 0; i < moc.length - 1; i++) {
+      final a = moc[i], b = moc[i + 1];
+      if (a >= b) continue;
+      var dam = false, nghieng = false, gachChan = false, gachNgang = false, treMu = false, treChan = false;
+      Color? mauChu, mauNen;
+      for (final d in trongVung) {
+        if (d.batDau <= a && d.ketThuc >= b) {
+          dam = dam || d.dam;
+          nghieng = nghieng || d.nghieng;
+          gachChan = gachChan || d.gachChan;
+          gachNgang = gachNgang || d.gachNgang;
+          treMu = treMu || d.treMu;
+          treChan = treChan || d.treChan;
+          mauChu = d.mauChu ?? mauChu;
+          mauNen = d.mauNen ?? mauNen;
+        }
+      }
+      final chuThoat = _thoatHtml(doan.substring(a, b)).replaceAll('\n', '<br>');
+      final css = StringBuffer();
+      if (dam) css.write('font-weight:bold;');
+      if (nghieng) css.write('font-style:italic;');
+      if (gachChan && gachNgang) {
+        css.write('text-decoration:underline line-through;');
+      } else if (gachChan) {
+        css.write('text-decoration:underline;');
+      } else if (gachNgang) {
+        css.write('text-decoration:line-through;');
+      }
+      if (treChan) css.write('font-size:70%;vertical-align:sub;');
+      if (treMu) css.write('vertical-align:super;');
+      if (mauChu != null) css.write('color:${_mauCssTuColor(mauChu)};');
+      if (mauNen != null) css.write('background-color:${_mauCssTuColor(mauNen)};');
+      buf.write(css.isEmpty ? chuThoat : '<span style="$css">$chuThoat</span>');
+    }
+    return buf.toString();
+  }
+
+  /// Dựng cả chuỗi `text/html` hoàn chỉnh (gói riêng của Flowrite + HTML
+  /// thật) cho đoạn [batDau, ketThuc) — `null` nếu đoạn không có định dạng
+  /// thủ công nào (không đáng ghi rich clipboard, nơi gọi tự rơi về
+  /// `Clipboard.setData` chữ thô như trước giờ).
+  String? _dungHtmlChoClipboard(String doan, int batDau, int ketThuc) {
+    final maHoaGoi = _macGoiDinhDangChoClipboard(doan, batDau, ketThuc);
+    if (maHoaGoi == null) return null;
+    final than = _dinhDangThuCongSangHtml(doan, batDau, ketThuc);
+    return '<!--$_danhDauGoiDinhDangClip:$maHoaGoi--><span>$than</span>';
+  }
+
   /// "Copy" — chỉ làm gì đó khi ĐANG CÓ vùng chọn (không collapsed); vùng
   /// chọn rỗng thì không có gì để chép, im lặng bỏ qua.
   Future<void> _phimAoCopy() async {
@@ -5101,7 +5372,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (!chon.isValid || chon.isCollapsed) return;
     final doan = _boDieuKhien.text.substring(chon.start, chon.end);
     if (doan.isEmpty) return;
-    await Clipboard.setData(ClipboardData(text: doan));
+    // (Web) đoạn có định dạng thủ công thì thử ghi kèm `text/html` giữ
+    // nguyên định dạng đó — thất bại/không có gì đáng ghi thì rơi về
+    // `Clipboard.setData` chữ thô hệt trước giờ, KHÔNG MẤT GÌ so với trước.
+    final htmlClip = _dungHtmlChoClipboard(doan, chon.start, chon.end);
+    final daGhiGiauDinhDang =
+        htmlClip != null && await ghiClipboardCoDinhDang(doan, htmlClip);
+    if (!daGhiGiauDinhDang) {
+      await Clipboard.setData(ClipboardData(text: doan));
+    }
     if (mounted) hienThongBaoGiua(context, 'Đã copy vào bộ nhớ đệm');
   }
 
@@ -5121,7 +5400,23 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _khiCanXoaTheTuBanPhim(theChongLan.$1, theChongLan.$2);
       return;
     }
-    await Clipboard.setData(ClipboardData(text: doan));
+    // (Web) đoạn có định dạng thủ công thì thử ghi kèm `text/html` — xem
+    // giải thích ở `_phimAoCopy`, cùng cơ chế.
+    final htmlClip = _dungHtmlChoClipboard(doan, batDau, ketThuc);
+    final daGhiGiauDinhDang =
+        htmlClip != null && await ghiClipboardCoDinhDang(doan, htmlClip);
+    if (!daGhiGiauDinhDang) {
+      await Clipboard.setData(ClipboardData(text: doan));
+    }
+    // Cắt LUÔN phải là một mốc Lùi lại/Tiến tới RIÊNG của chính nó — không
+    // được gộp chung vào đợt gõ tay đang dở (nếu vừa gõ gì đó trong 5 giây
+    // trước). Kết thúc đợt gõ hiện tại TRƯỚC khi áp dụng thay đổi: lượt sửa
+    // sắp tới (đi qua `_khiNguoiDungSua` → `_apDungChinhSuaNguoiDung` như
+    // mọi lượt sửa khác, xem giải thích ở trên) sẽ tự thấy đây là "lần gõ
+    // đầu tiên của một đợt mới" và tự lưu mốc — không cần gọi `_luuDiemMoc`
+    // tay ở đây, tránh trùng cơ chế.
+    _henRanhGioiGoTay?.cancel();
+    _dangTrongDotGoTay = false;
     final moi = vb.replaceRange(batDau, ketThuc, '');
     _boDieuKhien.value =
         TextEditingValue(text: moi, selection: TextSelection.collapsed(offset: batDau));
@@ -5163,11 +5458,36 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _khiCanXoaTheTuBanPhim(theChongLan.$1, theChongLan.$2);
       return;
     }
+    // (Web) thử lấy thêm gói định dạng đi kèm trong clipboard — KHÔNG ảnh
+    // hưởng gì tới việc dán chữ ở trên nếu thất bại/không có (native, hay
+    // clipboard không có `text/html`): [chen] đã đọc xong từ đường
+    // `Clipboard.getData('text/plain')` riêng, không phụ thuộc biến này.
+    final htmlClipboard = await docHtmlTuClipboard();
+    final maHoaGoi = _tachGoiDinhDangTuHtml(htmlClipboard);
+    // Dán LUÔN phải là một mốc Lùi lại/Tiến tới RIÊNG — xem giải thích ở
+    // `_phimAoCut`, cùng cơ chế.
+    _henRanhGioiGoTay?.cancel();
+    _dangTrongDotGoTay = false;
     final moi = vb.replaceRange(batDau, ketThuc, chen);
     _boDieuKhien.value = TextEditingValue(
       text: moi,
       selection: TextSelection.collapsed(offset: batDau + chen.length),
     );
+    // Đợi `.value =` ở trên chạy XONG toàn bộ dây chuyền sửa văn bản thường
+    // (qua `_khiNguoiDungSua` → `_apDungChinhSuaNguoiDung`, đã tự dời mọi
+    // vùng định dạng CŨ theo đúng phép chèn) rồi mới THÊM các vùng định dạng
+    // MỚI của đoạn vừa dán — không đụng gì vào dây chuyền dời/co giãn đã có,
+    // chỉ cộng thêm sau cùng.
+    if (maHoaGoi != null) {
+      setState(() => _apDungGoiDinhDangTuClipboard(maHoaGoi, chen, batDau));
+    } else if (htmlClipboard != null) {
+      // Không mang đánh dấu riêng của Flowrite — thử "cố gắng tốt nhất" rút
+      // định dạng cơ bản (đậm/nghiêng/gạch chân) từ HTML nguồn ngoài (Google
+      // Docs/Word/trang web...). `_dinhDangTuHtmlNgoai` tự trả về `null` nếu
+      // chữ rút ra không khớp y hệt [chen] — an toàn, không dán sai chữ.
+      final ds = _dinhDangTuHtmlNgoai(htmlClipboard, chen);
+      if (ds != null) setState(() => _themVungDinhDangTuDs(ds, batDau));
+    }
     _cuonToiConTroNeuCan();
     if (mounted) hienThongBaoGiua(context, 'Đã dán văn bản vào từ bộ nhớ đệm');
   }
