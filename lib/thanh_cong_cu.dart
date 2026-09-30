@@ -837,7 +837,7 @@ class _DongMenuCoTheBam extends StatelessWidget {
 /// [noiBat]: chữ đậm + xanh dương — dùng đúng một chỗ, mục "Bật Bộ phím
 /// nhanh cho màn hình cảm ứng" khi thiết bị (tự đoán hoặc chọn tay) là
 /// Android/iPhone, xem `_NutThemMenu`.
-Widget _mucMenuThem(int gia, String chu, {bool noiBat = false}) {
+Widget _mucMenuThem(int gia, String chu, {bool noiBat = false, Color? mauChu}) {
   return _DongMenuCoTheBam(
     gia: gia,
     child: Text(
@@ -845,11 +845,16 @@ Widget _mucMenuThem(int gia, String chu, {bool noiBat = false}) {
       style: TextStyle(
         fontSize: 13,
         fontWeight: noiBat ? FontWeight.bold : null,
-        color: noiBat ? Colors.blue.shade700 : null,
+        color: mauChu ?? (noiBat ? Colors.blue.shade700 : null),
       ),
     ),
   );
 }
+
+/// Màu tím đậm dùng chung cho mọi mục menu AI đang xử lý theo NGỮ CẢNH
+/// ĐOẠN VĂN ĐANG CHỌN (khác hẳn màu chữ mặc định khi xử lý cả bài) — xem
+/// `_NutAIMenu`.
+const _mauTimNguCanhDoanChon = Color(0xFF6A1B9A);
 
 /// Đường kẻ phân cách giữa các nhóm mục — GIỮ NGUYÊN chiều cao/vẻ ngoài của
 /// `PopupMenuDivider(height: 8)` trước đây, chỉ đổi sang một `Divider`
@@ -1456,7 +1461,7 @@ class _NutAIMenu extends StatelessWidget {
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: epToanVanKhiCoVungChon
-                            ? Colors.green.shade700
+                            ? _mauTimNguCanhDoanChon
                             : const Color(0xFF0B3D91),
                       ),
                     ),
@@ -1465,10 +1470,23 @@ class _NutAIMenu extends StatelessWidget {
                 _mucMenuThem(
                   1,
                   coDoanChon ? 'Trò chuyện về đoạn văn đã chọn' : 'Trò chuyện về văn bản này',
+                  mauChu: coDoanChon ? _mauTimNguCanhDoanChon : null,
                 ),
-                _mucMenuThem(2, coDoanChon ? 'Tóm tắt đoạn văn này' : 'Tóm tắt toàn văn'),
-                _mucMenuThem(3, coDoanChon ? 'Mở rộng đoạn văn này' : 'Mở rộng toàn văn'),
-                _mucMenuThem(4, 'Viết lại cho hay hơn'),
+                _mucMenuThem(
+                  2,
+                  coDoanChon ? 'Tóm tắt đoạn văn này' : 'Tóm tắt toàn văn',
+                  mauChu: coDoanChon ? _mauTimNguCanhDoanChon : null,
+                ),
+                _mucMenuThem(
+                  3,
+                  coDoanChon ? 'Mở rộng đoạn văn này' : 'Mở rộng toàn văn',
+                  mauChu: coDoanChon ? _mauTimNguCanhDoanChon : null,
+                ),
+                _mucMenuThem(
+                  4,
+                  'Viết lại cho hay hơn',
+                  mauChu: coDoanChon ? _mauTimNguCanhDoanChon : null,
+                ),
                 _dividerMenu(),
                 // Hai mục CHỈ MỘT PHẦN của "Kiểm tra toàn văn" — ĐÚNG
                 // NGUYÊN cơ chế đó (cùng popup, cùng cách vẽ gạch đỏ lượn
@@ -1478,10 +1496,12 @@ class _NutAIMenu extends StatelessWidget {
                 _mucMenuThem(
                   10,
                   coDoanChon ? 'Kiểm tra lỗi chính tả đoạn văn này' : 'Kiểm tra lỗi chính tả toàn văn',
+                  mauChu: coDoanChon ? _mauTimNguCanhDoanChon : null,
                 ),
                 _mucMenuThem(
                   11,
                   coDoanChon ? 'Kiểm tra dấu câu đoạn văn này' : 'Kiểm tra dấu câu toàn văn',
+                  mauChu: coDoanChon ? _mauTimNguCanhDoanChon : null,
                 ),
                 // "Kiểm tra toàn văn" dời từ một nút riêng ngoài thanh công
                 // cụ vào ngay TRÊN mục cài đặt của nó — giữ màu xanh lá +

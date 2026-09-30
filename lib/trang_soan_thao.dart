@@ -2656,6 +2656,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final co = _vungChonThatSu() != null;
     if (co == _coVungChonGanNhat) return;
     _coVungChonGanNhat = co;
+    // MỘT vùng chọn MỚI vừa xuất hiện (không phải vùng chọn cũ mở rộng
+    // thêm) — luôn quay về ngữ cảnh "đoạn văn đang chọn", bỏ công tắc ép
+    // toàn văn của lần chọn trước, dù người dùng có bấm đổi ngữ cảnh thế
+    // nào trước đó. Bôi đen bằng chuột luôn đi qua một khoảnh khắc con trỏ
+    // rỗng (bấm xuống trước khi kéo), nên đúng lúc này bắt được mọi lần bắt
+    // đầu chọn mới.
+    if (co) _epToanVanKhiCoVungChon = false;
     setState(() {});
   }
 
@@ -11173,6 +11180,52 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// kiểu tóm tắt" trước khi gọi Gemini: theo % độ dài, theo câu lệnh tự do
   /// của người dùng, hoặc cả hai — bắt buộc chọn ít nhất một trong hai mới
   /// bấm "Gửi cho AI xử lý" được.
+  /// Bộ nhớ đệm cho modal "Tóm tắt toàn văn"/"Mở rộng toàn văn"/"Viết lại
+  /// cho hay hơn" — MỖI NÚT một bộ nhớ RIÊNG (không lẫn giữa ba nút), nhưng
+  /// CHUNG cho mọi tệp ghi chú và mọi ngữ cảnh (toàn văn/đoạn chọn) — mở lại
+  /// modal của cùng một nút thì luôn thấy đúng % và câu lệnh đã ghi lần
+  /// trước. Chỉ sống trong RAM của phiên hiện tại — F5 hay vào lại app thì
+  /// mất, giống mọi bộ nhớ đệm khác trong tệp này.
+  bool _tomTatNhoChonPhanTram = true;
+  double _tomTatNhoPhanTram = 50.0;
+  bool _tomTatNhoChonCauLenh = false;
+  String _tomTatNhoCauLenh = '';
+
+  bool _moRongNhoChonPhanTram = true;
+  double _moRongNhoPhanTram = 200.0;
+  bool _moRongNhoChonCauLenh = false;
+  String _moRongNhoCauLenh = '';
+
+  String _vietLaiNhoCauLenh = '';
+
+  /// Nút "Xoá tất cả" dưới ô câu lệnh tự do trong ba modal Tóm tắt/Mở
+  /// rộng/Viết lại — hỏi xác nhận trước, xác nhận thì xoá trắng cả ô nhập
+  /// lẫn bộ nhớ đệm của nút đó.
+  Future<void> _xacNhanXoaCauLenh(
+    BuildContext ctx,
+    TextEditingController oCauLenh,
+    void Function() capNhat,
+  ) async {
+    final dongY = await showDialog<bool>(
+      context: ctx,
+      builder: (ctx2) => AlertDialog(
+        title: const Text('Xoá tất cả câu lệnh?'),
+        content: const Text('Toàn bộ nội dung đang ghi trong ô câu lệnh sẽ bị xoá sạch. Bạn chắc chứ?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx2).pop(false), child: const Text('Huỷ')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx2).pop(true),
+            child: const Text('Xoá tất cả', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (dongY == true) {
+      oCauLenh.clear();
+      capNhat();
+    }
+  }
+
   void _moModalChonKieuTomTat() {
     final vungChon = _vungDangChonHopLe();
     final vanBanGoc = vungChon != null ? vungChon.textInside(_boDieuKhien.text) : _boDieuKhien.text;
@@ -11182,10 +11235,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           : 'Trang đang trống, không có gì để tóm tắt.');
       return;
     }
-    var chonPhanTram = true;
-    var phanTram = 50.0;
-    var chonCauLenh = false;
-    final oCauLenh = TextEditingController();
+    var chonPhanTram = _tomTatNhoChonPhanTram;
+    var phanTram = _tomTatNhoPhanTram;
+    var chonCauLenh = _tomTatNhoChonCauLenh;
+    final oCauLenh = TextEditingController(text: _tomTatNhoCauLenh);
 
     showDialog<void>(
       context: context,
@@ -11234,7 +11287,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       onChanged: (gia) => capNhat(() => chonCauLenh = gia ?? false),
                       title: const Text('Rút gọn theo yêu cầu của bạn'),
                     ),
-                    if (chonCauLenh)
+                    if (chonCauLenh) ...[
                       Padding(
                         padding: const EdgeInsets.only(left: 12, right: 4),
                         child: TextField(
@@ -11248,6 +11301,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           ),
                         ),
                       ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () => _xacNhanXoaCauLenh(ctx, oCauLenh, () => capNhat(() {})),
+                          child: const Text('Xoá tất cả', style: TextStyle(color: Colors.red)),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -11275,7 +11336,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           );
         },
       ),
-    ).then((_) => oCauLenh.dispose());
+    ).then((_) {
+      _tomTatNhoChonPhanTram = chonPhanTram;
+      _tomTatNhoPhanTram = phanTram;
+      _tomTatNhoChonCauLenh = chonCauLenh;
+      _tomTatNhoCauLenh = oCauLenh.text;
+      oCauLenh.dispose();
+    });
   }
 
   Future<void> _guiTomTatChoAi({
@@ -11341,10 +11408,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           : 'Trang đang trống, không có gì để mở rộng.');
       return;
     }
-    var chonPhanTram = true;
-    var phanTram = 200.0;
-    var chonCauLenh = false;
-    final oCauLenh = TextEditingController();
+    var chonPhanTram = _moRongNhoChonPhanTram;
+    var phanTram = _moRongNhoPhanTram;
+    var chonCauLenh = _moRongNhoChonCauLenh;
+    final oCauLenh = TextEditingController(text: _moRongNhoCauLenh);
 
     showDialog<void>(
       context: context,
@@ -11393,7 +11460,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       onChanged: (gia) => capNhat(() => chonCauLenh = gia ?? false),
                       title: const Text('Mở rộng theo yêu cầu của bạn'),
                     ),
-                    if (chonCauLenh)
+                    if (chonCauLenh) ...[
                       Padding(
                         padding: const EdgeInsets.only(left: 12, right: 4),
                         child: TextField(
@@ -11407,6 +11474,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           ),
                         ),
                       ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () => _xacNhanXoaCauLenh(ctx, oCauLenh, () => capNhat(() {})),
+                          child: const Text('Xoá tất cả', style: TextStyle(color: Colors.red)),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -11434,7 +11509,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           );
         },
       ),
-    ).then((_) => oCauLenh.dispose());
+    ).then((_) {
+      _moRongNhoChonPhanTram = chonPhanTram;
+      _moRongNhoPhanTram = phanTram;
+      _moRongNhoChonCauLenh = chonCauLenh;
+      _moRongNhoCauLenh = oCauLenh.text;
+      oCauLenh.dispose();
+    });
   }
 
   Future<void> _guiMoRongChoAi({
@@ -11500,56 +11581,68 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           : 'Trang đang trống, không có gì để viết lại.');
       return;
     }
-    final oCauLenh = TextEditingController();
+    final oCauLenh = TextEditingController(text: _vietLaiNhoCauLenh);
 
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(vungChon != null ? 'Viết lại cho hay hơn (đoạn đang chọn)' : 'Viết lại cho hay hơn'),
-        content: SizedBox(
-          width: 420,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Bạn có thể ghi câu lệnh riêng cho cách viết lại, hoặc để '
-                'trống để AI tự do viết lại theo ý nó.',
-                style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: oCauLenh,
-                maxLines: 3,
-                maxLength: 500,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  hintText: 'Ví dụ: viết theo giọng trang trọng hơn...',
-                  contentPadding: EdgeInsets.all(8),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, capNhat) => AlertDialog(
+          title: Text(vungChon != null ? 'Viết lại cho hay hơn (đoạn đang chọn)' : 'Viết lại cho hay hơn'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Bạn có thể ghi câu lệnh riêng cho cách viết lại, hoặc để '
+                  'trống để AI tự do viết lại theo ý nó.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                TextField(
+                  controller: oCauLenh,
+                  maxLines: 3,
+                  maxLength: 500,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    hintText: 'Ví dụ: viết theo giọng trang trọng hơn...',
+                    contentPadding: EdgeInsets.all(8),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => _xacNhanXoaCauLenh(ctx, oCauLenh, () => capNhat(() {})),
+                    child: const Text('Xoá tất cả', style: TextStyle(color: Colors.red)),
+                  ),
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Đóng bảng'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _guiVietLaiChoAi(
+                  vanBanGoc: vanBanGoc,
+                  vungChon: vungChon,
+                  huongDanNguoiDung: oCauLenh.text,
+                );
+              },
+              child: const Text('Gửi cho AI xử lý'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Đóng bảng'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _guiVietLaiChoAi(
-                vanBanGoc: vanBanGoc,
-                vungChon: vungChon,
-                huongDanNguoiDung: oCauLenh.text,
-              );
-            },
-            child: const Text('Gửi cho AI xử lý'),
-          ),
-        ],
       ),
-    ).then((_) => oCauLenh.dispose());
+    ).then((_) {
+      _vietLaiNhoCauLenh = oCauLenh.text;
+      oCauLenh.dispose();
+    });
   }
 
   Future<void> _guiVietLaiChoAi({
