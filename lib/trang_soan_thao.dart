@@ -27,6 +27,8 @@ import 'gui_ghi_am_gemini.dart';
 import 'gui_anh_gemini.dart';
 import 'gui_mo_rong_gemini.dart';
 import 'gui_tom_tat_gemini.dart';
+import 'gui_viet_lai_gemini.dart';
+import 'man_hinh_tro_chuyen.dart';
 import 'canh_bao_roi_trang.dart';
 import 'kho_du_lieu.dart';
 import 'theo_doi_tap_doi_phim.dart';
@@ -11372,10 +11374,119 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _moModalKetQuaToanVan(vanBanKetQua, tieuDe: 'Kết quả mở rộng');
   }
 
-  /// Giữ nội dung modal kết quả "Tóm tắt toàn văn"/"Mở rộng toàn văn" qua
-  /// lần mở lại (nếu có, dù luồng hiện tại luôn mở-rồi-đóng-hẳn) — dùng
-  /// CHUNG cho cả hai tính năng (chỉ khác [tieuDe]), cùng ý tưởng
-  /// `_oKetQuaFileAmThanh`, nhưng KHÔNG có "Chọn vị trí để chèn văn bản":
+  /// Mục "Viết lại cho hay hơn" trong menu "Làm việc với AI" — ĐƠN GIẢN HƠN
+  /// tóm tắt/mở rộng: modal chỉ có MỘT ô câu lệnh tự do (giới hạn 500 ký
+  /// tự), CÓ THỂ ĐỂ TRỐNG — để trống thì AI tự do chọn cách viết lại theo
+  /// ý nó, không có lựa chọn %.
+  void _moModalChonKieuVietLai() {
+    if (_boDieuKhien.text.trim().isEmpty) {
+      _bao('Trang đang trống, không có gì để viết lại.');
+      return;
+    }
+    final oCauLenh = TextEditingController();
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Viết lại cho hay hơn'),
+        content: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Bạn có thể ghi câu lệnh riêng cho cách viết lại, hoặc để '
+                'trống để AI tự do viết lại theo ý nó.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: oCauLenh,
+                maxLines: 3,
+                maxLength: 500,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'Ví dụ: viết theo giọng trang trọng hơn...',
+                  contentPadding: EdgeInsets.all(8),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Đóng bảng'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _guiVietLaiChoAi(huongDanNguoiDung: oCauLenh.text);
+            },
+            child: const Text('Gửi cho AI xử lý'),
+          ),
+        ],
+      ),
+    ).then((_) => oCauLenh.dispose());
+  }
+
+  Future<void> _guiVietLaiChoAi({String? huongDanNguoiDung}) async {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const AlertDialog(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+            SizedBox(width: 16),
+            Expanded(child: Text('Đang viết lại toàn văn...')),
+          ],
+        ),
+      ),
+    );
+
+    String? vanBanKetQua;
+    String? loi;
+    try {
+      vanBanKetQua = await guiVietLaiChoGemini(
+        _boDieuKhien.text,
+        huongDanNguoiDung: huongDanNguoiDung,
+      );
+    } catch (e) {
+      loi = e.toString();
+    }
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop(); // đóng hộp "đang xử lý".
+
+    if (loi != null || vanBanKetQua == null || vanBanKetQua.trim().isEmpty) {
+      _bao('Viết lại thất bại: ${loi ?? "không có nội dung trả về."}');
+      return;
+    }
+
+    _moModalKetQuaToanVan(vanBanKetQua, tieuDe: 'Kết quả viết lại');
+  }
+
+  /// Mục "Trò chuyện về văn bản này" trong menu "Làm việc với AI" (và nút
+  /// "Trò chuyện" ở thanh công cụ dưới — CÙNG một tính năng, chỉ là lối vào
+  /// nhanh hơn) — mở màn hình chat TOÀN MÀN HÌNH (`ManHinhTroChuyen`), kèm
+  /// bản chụp văn bản đang soạn tại thời điểm bấm.
+  void _moTroChuyenVeVanBan() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ManHinhTroChuyen(vanBan: _boDieuKhien.text),
+      ),
+    );
+  }
+
+  /// Giữ nội dung modal kết quả "Tóm tắt toàn văn"/"Mở rộng toàn văn"/"Viết
+  /// lại cho hay hơn" qua lần mở lại (nếu có, dù luồng hiện tại luôn
+  /// mở-rồi-đóng-hẳn) — dùng CHUNG cho cả ba tính năng (chỉ khác [tieuDe]),
+  /// cùng ý tưởng `_oKetQuaFileAmThanh`, nhưng KHÔNG có "Chọn vị trí để chèn văn bản":
   /// cả hai đều luôn thay thế TOÀN VĂN, không chèn tại một vị trí.
   TextEditingController? _oKetQuaToanVan;
   String _tieuDeModalKetQuaToanVan = 'Kết quả tóm tắt';
@@ -13306,6 +13417,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 khiBamChupAnh: _chupVaChuyenAnhThanhVanBan,
                 khiBamTomTatToanVan: _moModalChonKieuTomTat,
                 khiBamMoRongToanVan: _moModalChonKieuMoRong,
+                khiBamVietLaiToanVan: _moModalChonKieuVietLai,
                 khiBamBanPhim: () => _moModalTam(
                   'Bàn phím',
                   Icons.keyboard_outlined,
@@ -13330,7 +13442,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 khiBamXoaTatCa: () => _xoaTatCa(),
                 khiBamDanhSachPhimTat: _moDanhSachPhimTat,
                 khiBamTimKiem: () => _hienThanhTimKiem ? _dongTimKiem() : _moTimKiem(),
-                khiBamTroChuyen: () {},
+                khiBamTroChuyen: _moTroChuyenVeVanBan,
                   ),
                 ),
                 // (Nút ẩn/hiện 4 nút điều hướng không còn "nhảy" tới đè lên

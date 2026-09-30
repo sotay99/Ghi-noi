@@ -29,6 +29,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamChupAnh,
     required this.khiBamTomTatToanVan,
     required this.khiBamMoRongToanVan,
+    required this.khiBamVietLaiToanVan,
     required this.khiBamBanPhim,
     required this.khiBamBoPhimNhanh,
     required this.boPhimNhanhDangMo,
@@ -86,6 +87,10 @@ class ThanhCongCu extends StatelessWidget {
 
   /// Mục "Mở rộng toàn văn" — mở modal "Chọn kiểu mở rộng" rồi gọi Gemini.
   final VoidCallback khiBamMoRongToanVan;
+
+  /// Mục "Viết lại cho hay hơn" — modal chỉ có một ô câu lệnh tự do (có
+  /// thể để trống) rồi gọi Gemini.
+  final VoidCallback khiBamVietLaiToanVan;
   final VoidCallback khiBamBanPhim;
 
   /// "Bộ phím nhanh cho màn hình cảm ứng" (mục "Bật/Tắt..." trong "+ Thêm
@@ -127,7 +132,9 @@ class ThanhCongCu extends StatelessWidget {
   /// này, dưới tên "Tìm kiếm và thay thế".
   final VoidCallback khiBamTimKiem;
 
-  /// Mục 9: nút mới, chưa gắn logic.
+  /// Mục 9: mở màn hình chat toàn màn hình "Trò chuyện về văn bản này" —
+  /// CÙNG callback với mục cùng tên trong menu "Làm việc với AI", chỉ là
+  /// lối vào nhanh hơn (xem `_NutAIMenu.khiBamTroChuyen`).
   final VoidCallback khiBamTroChuyen;
 
   /// Ngưỡng bề ngang chuẩn của Material để phân biệt điện thoại (hẹp) với
@@ -232,6 +239,8 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamChupAnh: khiBamChupAnh,
                               khiBamTomTatToanVan: khiBamTomTatToanVan,
                               khiBamMoRongToanVan: khiBamMoRongToanVan,
+                              khiBamVietLaiToanVan: khiBamVietLaiToanVan,
+                              khiBamTroChuyen: khiBamTroChuyen,
                             ),
                           ),
                           _NutCoChuThich(
@@ -1213,8 +1222,9 @@ class _NutTaiKhoanMenu extends StatelessWidget {
 /// `_NutThemMenu` (PopupMenuButton tự neo ngay phía trên nút vì nút nằm sát
 /// đáy màn hình). "Chuyển hình ảnh thành văn bản", "Chụp ảnh (camera)",
 /// "Chuyển file âm thanh thành văn bản", "Tóm tắt toàn văn", "Mở rộng toàn
-/// văn" và "Cài đặt nút "Kiểm tra toàn văn"" đã gọi callback thật; hai mục
-/// AI-về-chữ còn lại (trò chuyện/viết lại) vẫn chưa gắn logic.
+/// văn", "Viết lại cho hay hơn", "Trò chuyện về văn bản này" và "Cài đặt
+/// nút "Kiểm tra toàn văn"" đều đã gọi callback thật — mọi mục trong menu
+/// này giờ có logic thật, không còn chỗ đặt trước nào nữa.
 class _NutAIMenu extends StatelessWidget {
   const _NutAIMenu({
     required this.rong,
@@ -1225,6 +1235,8 @@ class _NutAIMenu extends StatelessWidget {
     required this.khiBamChupAnh,
     required this.khiBamTomTatToanVan,
     required this.khiBamMoRongToanVan,
+    required this.khiBamVietLaiToanVan,
+    required this.khiBamTroChuyen,
   });
 
   final bool rong;
@@ -1256,6 +1268,16 @@ class _NutAIMenu extends StatelessWidget {
   /// Mục "Mở rộng toàn văn" — ĐÚNG KHUÔN "Tóm tắt toàn văn" ở trên, chỉ đảo
   /// ngược ý nghĩa (mở rộng thêm thay vì rút gọn).
   final VoidCallback khiBamMoRongToanVan;
+
+  /// Mục "Viết lại cho hay hơn" — modal chỉ có một ô câu lệnh tự do (có
+  /// thể để trống) rồi gọi Gemini, cùng modal kết quả với nút "Thay thế
+  /// toàn bộ văn bản" như tóm tắt/mở rộng.
+  final VoidCallback khiBamVietLaiToanVan;
+
+  /// Mục "Trò chuyện về văn bản này" — mở màn hình chat toàn màn hình.
+  /// CÙNG callback với nút "Trò chuyện" riêng ở thanh công cụ dưới (xem
+  /// `ThanhCongCu.khiBamTroChuyen`) — chỉ là hai lối vào cho một tính năng.
+  final VoidCallback khiBamTroChuyen;
 
   @override
   Widget build(BuildContext context) {
@@ -1291,6 +1313,8 @@ class _NutAIMenu extends StatelessWidget {
             if (gia == 7) khiBamChupAnh();
             if (gia == 2) khiBamTomTatToanVan();
             if (gia == 3) khiBamMoRongToanVan();
+            if (gia == 4) khiBamVietLaiToanVan();
+            if (gia == 1) khiBamTroChuyen();
           },
           // (VIỆC 3) Xem chú thích ở `_NutThemMenu` — cùng cơ chế: một
           // `ScrollController` mới mỗi lần menu mở, dùng chung giữa nút cuộn

@@ -21,18 +21,16 @@ const QUY_TAC_CHINH_TA_CHUNG =
 
 /// Mỗi tính năng AI trong app ứng với một "hành động" ở đây. Muốn thêm tính
 /// năng mới thì thêm một case, không cần sửa gì khác.
-function huongDanTheoHanhDong(action, cauHoi) {
+function huongDanTheoHanhDong(action) {
   switch (action) {
     case 'tom_tat':
       return null; // Xử lý riêng trong huongDanTomTat() — cần ghép % độ dài và/hoặc câu lệnh tuỳ chỉnh của người dùng.
     case 'mo_rong':
       return null; // Xử lý riêng trong huongDanMoRong() — cần ghép % độ dài và/hoặc câu lệnh tuỳ chỉnh của người dùng.
     case 'got_dua':
-      return 'Sửa lỗi chính tả, ngữ pháp và câu chữ của đoạn văn bản tiếng Việt sau đây cho mượt mà, tự nhiên hơn — KHÔNG đổi ý nghĩa. Chỉ trả về đúng đoạn văn đã sửa, không thêm lời dẫn hay giải thích:';
+      return null; // Xử lý riêng trong huongDanVietLai() — nhận thêm câu lệnh tuỳ chỉnh của người dùng (có thể để trống).
     case 'de_xuat_y_tuong':
       return 'Dựa vào đoạn văn bản tiếng Việt sau đây, đề xuất 3-5 ý tưởng hoặc hướng phát triển tiếp theo, trình bày dạng gạch đầu dòng, ngắn gọn:';
-    case 'tro_chuyen':
-      return `Người dùng đang hỏi về đoạn văn bản bên dưới. Câu hỏi của họ: "${(cauHoi || '').slice(0, 2000)}". Trả lời bằng tiếng Việt, ngắn gọn, đi thẳng vào vấn đề, dựa trên nội dung văn bản được cung cấp:`;
     case 'chinh_ta':
       return null; // Xử lý riêng trong exports.flowriteAi — cần ghép thêm vị trí ranh giới ngữ cảnh, không cố định như các action khác.
     case 'toan_van':
@@ -147,6 +145,25 @@ function huongDanMoRong(than) {
       `NGOÀI ra, người dùng còn có yêu cầu riêng cho cách mở rộng — ưu tiên làm theo ý này, nếu xung đột với chỉ dẫn ở trên thì theo ý người dùng: "${huongDanNguoiDung.slice(0, 800)}". `;
   }
   huongDan += 'Chỉ trả về đúng đoạn văn đã mở rộng, không thêm lời dẫn, không thêm chú thích:';
+  return huongDan;
+}
+
+/// Hướng dẫn cho "Viết lại cho hay hơn" (modal chỉ có MỘT ô câu lệnh tự do,
+/// CÓ THỂ ĐỂ TRỐNG — để trống thì AI tự do chọn cách viết lại theo ý nó).
+function huongDanVietLai(than) {
+  const huongDanNguoiDung =
+    typeof than.huongDanNguoiDung === 'string' ? than.huongDanNguoiDung.trim() : '';
+
+  let huongDan =
+    'Viết lại đoạn văn bản tiếng Việt sau đây cho hay hơn, câu chữ mượt mà và tự nhiên hơn — KHÔNG đổi ý nghĩa gốc. ';
+
+  if (huongDanNguoiDung) {
+    huongDan +=
+      `Người dùng có yêu cầu riêng cho cách viết lại — ưu tiên làm theo ý này, nếu xung đột với chỉ dẫn ở trên thì theo ý người dùng: "${huongDanNguoiDung.slice(0, 800)}". `;
+  } else {
+    huongDan += 'Người dùng không yêu cầu gì thêm — tự do chọn cách viết lại mà bạn thấy hay nhất. ';
+  }
+  huongDan += 'Chỉ trả về đúng đoạn văn đã viết lại, không thêm lời dẫn, không thêm chú thích:';
   return huongDan;
 }
 
@@ -364,6 +381,39 @@ async function goiGemini(huongDan, vanBan) {
   return chu;
 }
 
+/// Gửi CẢ CUỘC HỘI THOẠI cho Gemini — dùng cho "Trò chuyện về văn bản này"
+/// (action 'tro_chuyen'). Khác `goiGemini` (một lượt, ghép sẵn huongDan +
+/// vanBan) ở chỗ nhận thẳng mảng `contents` nhiều lượt (user/model xen kẽ)
+/// — client tự giữ toàn bộ lịch sử hội thoại (bản thân Gemini API không có
+/// khái niệm phiên/session phía máy chủ), lượt đầu tiên trong mảng đã mang
+/// theo toàn văn bản (xem client `lib/man_hinh_tro_chuyen.dart`) nên máy
+/// chủ này không cần biết gì thêm về "văn bản đang soạn" — chỉ việc chuyển
+/// tiếp nguyên `contents` cho Gemini.
+async function goiGeminiChat(contents) {
+  const model = process.env.GEMINI_MODEL || MODEL_MAC_DINH;
+  const url =
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent` +
+    `?key=${process.env.GEMINI_API_KEY}`;
+
+  const phanHoi = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ contents }),
+  });
+
+  if (!phanHoi.ok) {
+    const chuLoi = await phanHoi.text();
+    throw new Error(`Gemini trả về lỗi ${phanHoi.status}: ${chuLoi.slice(0, 300)}`);
+  }
+
+  const duLieu = await phanHoi.json();
+  const chu = (duLieu?.candidates?.[0]?.content?.parts || [])
+    .map((p) => p.text || '')
+    .join('');
+  if (!chu) throw new Error('Gemini không trả về nội dung.');
+  return chu;
+}
+
 /// Điểm vào của Cloud Function — đặt tên "flowriteAi" khi tạo hàm trên
 /// Google Cloud Console phải khớp đúng tên này (Entry point).
 exports.flowriteAi = async (req, res) => {
@@ -389,7 +439,7 @@ exports.flowriteAi = async (req, res) => {
   }
 
   const than = req.body || {};
-  const { action, text, cauHoi, boQuaTruocViTri, layLoiChinhTa, chenDauCau } = than;
+  const { action, text, boQuaTruocViTri, layLoiChinhTa, chenDauCau } = than;
 
   // Nhánh riêng cho ghi âm: gửi lên là DỮ LIỆU ÂM THANH, không phải `text`,
   // nên không đi qua các kiểm tra dành cho văn bản ở dưới. Đi qua Whisper
@@ -454,6 +504,47 @@ exports.flowriteAi = async (req, res) => {
     return;
   }
 
+  // Nhánh riêng cho "Trò chuyện về văn bản này": gửi lên CẢ CUỘC HỘI THOẠI
+  // (`lichSu`), không phải `text` đơn lẻ — xem `goiGeminiChat`. Lượt đầu
+  // tiên trong `lichSu` (do client tự ghép) đã mang theo toàn văn bản, nên
+  // máy chủ này không cần — và không nên — kiểm tra `text` ở đây.
+  if (action === 'tro_chuyen') {
+    if (!process.env.GEMINI_API_KEY) {
+      res.status(500).json({ loi: 'Chưa cấu hình GEMINI_API_KEY.' });
+      return;
+    }
+    const { lichSu } = than;
+    if (!Array.isArray(lichSu) || lichSu.length === 0) {
+      res.status(400).json({ loi: 'Thiếu lịch sử hội thoại (lichSu).' });
+      return;
+    }
+    if (lichSu.length > 60) {
+      res.status(400).json({ loi: 'Cuộc trò chuyện quá dài (tối đa 60 lượt) — hãy mở một cuộc trò chuyện mới.' });
+      return;
+    }
+    const contents = [];
+    for (const luot of lichSu) {
+      const vaiTro = luot && luot.vaiTro === 'ai' ? 'model' : 'user';
+      const noiDung = luot && typeof luot.noiDung === 'string' ? luot.noiDung.trim() : '';
+      if (!noiDung) {
+        res.status(400).json({ loi: 'Một lượt trong lichSu thiếu nội dung (noiDung).' });
+        return;
+      }
+      if (noiDung.length > 25000) {
+        res.status(400).json({ loi: 'Một lượt trong lichSu quá dài (tối đa 25.000 ký tự).' });
+        return;
+      }
+      contents.push({ role: vaiTro, parts: [{ text: noiDung }] });
+    }
+    try {
+      const ketQua = await goiGeminiChat(contents);
+      res.status(200).json({ text: ketQua });
+    } catch (err) {
+      res.status(502).json({ loi: String(err && err.message ? err.message : err) });
+    }
+    return;
+  }
+
   if (!process.env.GEMINI_API_KEY) {
     res.status(500).json({ loi: 'Chưa cấu hình GEMINI_API_KEY.' });
     return;
@@ -481,8 +572,10 @@ exports.flowriteAi = async (req, res) => {
     huongDan = huongDanTomTat(than);
   } else if (action === 'mo_rong') {
     huongDan = huongDanMoRong(than);
+  } else if (action === 'got_dua') {
+    huongDan = huongDanVietLai(than);
   } else {
-    huongDan = huongDanTheoHanhDong(action, cauHoi);
+    huongDan = huongDanTheoHanhDong(action);
   }
   if (!huongDan) {
     res.status(400).json({ loi: `Không hỗ trợ action: "${action}".` });
