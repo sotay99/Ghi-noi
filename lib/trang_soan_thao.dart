@@ -29,6 +29,7 @@ import 'gui_mo_rong_gemini.dart';
 import 'gui_tom_tat_gemini.dart';
 import 'gui_viet_lai_gemini.dart';
 import 'man_hinh_tro_chuyen.dart';
+import 'tin_nhan_tro_chuyen.dart';
 import 'canh_bao_roi_trang.dart';
 import 'kho_du_lieu.dart';
 import 'theo_doi_tap_doi_phim.dart';
@@ -11471,14 +11472,51 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _moModalKetQuaToanVan(vanBanKetQua, tieuDe: 'Kết quả viết lại');
   }
 
-  /// Mục "Trò chuyện về văn bản này" trong menu "Làm việc với AI" (và nút
-  /// "Trò chuyện" ở thanh công cụ dưới — CÙNG một tính năng, chỉ là lối vào
-  /// nhanh hơn) — mở màn hình chat TOÀN MÀN HÌNH (`ManHinhTroChuyen`), kèm
-  /// bản chụp văn bản đang soạn tại thời điểm bấm.
+  /// Mục "Trò chuyện về văn bản này" trong menu "Làm việc với AI" — mở màn
+  /// hình chat TOÀN MÀN HÌNH (`ManHinhTroChuyen`). RIÊNG với nút "Trò
+  /// chuyện" ngoài thanh công cụ (tính năng xã hội khác hẳn, xem
+  /// `_moThongBaoTroChuyenDangNangCap`).
+  ///
+  /// [_troChuyenTheoTep]: mỗi tệp ghi chú giữ RIÊNG một cuộc trò chuyện,
+  /// khoá theo `_ghiChuHienTai.id` — y hệt cách `_lichSuLuiTheoTep` giữ
+  /// riêng Lùi lại/Tiến tới cho từng tệp. Chỉ sống trong bộ nhớ (RAM) của
+  /// phiên hiện tại — tải lại trang (F5) hay mở lại app thì mất sạch, đúng
+  /// như "bộ nhớ đệm" yêu cầu, KHÔNG lưu ổ đĩa/Realtime Database. Danh
+  /// sách trả về là THAM CHIẾU thật nằm trong Map, nên `ManHinhTroChuyen`
+  /// tự thêm/xoá tin nhắn thẳng vào đó là đã "lưu" lại cho tệp này, không
+  /// cần cơ chế callback nào thêm.
+  final Map<String, List<TinNhanTroChuyen>> _troChuyenTheoTep = {};
+
   void _moTroChuyenVeVanBan() {
+    final lichSu = _troChuyenTheoTep.putIfAbsent(_ghiChuHienTai.id, () => []);
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ManHinhTroChuyen(vanBan: _boDieuKhien.text),
+        builder: (_) => ManHinhTroChuyen(
+          lichSu: lichSu,
+          layVanBanHienTai: () => _boDieuKhien.text,
+        ),
+      ),
+    );
+  }
+
+  /// Nút "Trò chuyện" NGOÀI thanh công cụ — "Trò chuyện VỚI MỌI NGƯỜI", một
+  /// tính năng xã hội khác hẳn "Trò chuyện về văn bản này" (chat với AI, ở
+  /// trên) — chưa làm, chỉ báo đang nâng cấp.
+  void _moThongBaoTroChuyenDangNangCap() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Trò chuyện'),
+        content: const Text(
+          'Tính năng này giúp bạn trò chuyện với mọi người... Tính năng '
+          'này hiện đang nâng cấp.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Đã hiểu'),
+          ),
+        ],
       ),
     );
   }
@@ -13418,6 +13456,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 khiBamTomTatToanVan: _moModalChonKieuTomTat,
                 khiBamMoRongToanVan: _moModalChonKieuMoRong,
                 khiBamVietLaiToanVan: _moModalChonKieuVietLai,
+                khiBamTroChuyenVeVanBan: _moTroChuyenVeVanBan,
                 khiBamBanPhim: () => _moModalTam(
                   'Bàn phím',
                   Icons.keyboard_outlined,
@@ -13442,7 +13481,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 khiBamXoaTatCa: () => _xoaTatCa(),
                 khiBamDanhSachPhimTat: _moDanhSachPhimTat,
                 khiBamTimKiem: () => _hienThanhTimKiem ? _dongTimKiem() : _moTimKiem(),
-                khiBamTroChuyen: _moTroChuyenVeVanBan,
+                khiBamTroChuyen: _moThongBaoTroChuyenDangNangCap,
                   ),
                 ),
                 // (Nút ẩn/hiện 4 nút điều hướng không còn "nhảy" tới đè lên

@@ -27,6 +27,7 @@ on:
       - 'lib/gui_viet_lai_gemini.dart'
       - 'lib/gui_tro_chuyen_gemini.dart'
       - 'lib/man_hinh_tro_chuyen.dart'
+      - 'lib/tin_nhan_tro_chuyen.dart'
       - 'lib/ket_qua_ghi_am_the.dart'
       - 'lib/kho_du_lieu.dart'
       - 'lib/kiem_tra_chinh_ta.dart'

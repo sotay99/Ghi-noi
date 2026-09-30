@@ -30,6 +30,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamTomTatToanVan,
     required this.khiBamMoRongToanVan,
     required this.khiBamVietLaiToanVan,
+    required this.khiBamTroChuyenVeVanBan,
     required this.khiBamBanPhim,
     required this.khiBamBoPhimNhanh,
     required this.boPhimNhanhDangMo,
@@ -72,8 +73,7 @@ class ThanhCongCu extends StatelessWidget {
   final VoidCallback khiBamHuongDan;
 
   /// Gắn với mục "Cài đặt nút "Kiểm tra toàn văn"" trong menu "Làm việc với
-  /// AI". "Chuyển file âm thanh thành văn bản" cũng đã gắn logic thật — các
-  /// mục còn lại (trò chuyện, mở rộng, viết lại) vẫn chỉ là chỗ đặt trước.
+  /// AI".
   final VoidCallback khiBamCaiDatKiemTraToanVan;
   final VoidCallback khiBamChuyenFileAmThanh;
   final VoidCallback khiBamChuyenAnhThanhVanBan;
@@ -91,6 +91,12 @@ class ThanhCongCu extends StatelessWidget {
   /// Mục "Viết lại cho hay hơn" — modal chỉ có một ô câu lệnh tự do (có
   /// thể để trống) rồi gọi Gemini.
   final VoidCallback khiBamVietLaiToanVan;
+
+  /// Mục "Trò chuyện về văn bản này" trong menu "Làm việc với AI" — mở màn
+  /// hình chat toàn màn hình. RIÊNG biệt với [khiBamTroChuyen] bên dưới
+  /// (nút "Trò chuyện" ngoài thanh công cụ — "Trò chuyện VỚI MỌI NGƯỜI",
+  /// một tính năng khác hẳn, hiện vẫn là chỗ đặt trước).
+  final VoidCallback khiBamTroChuyenVeVanBan;
   final VoidCallback khiBamBanPhim;
 
   /// "Bộ phím nhanh cho màn hình cảm ứng" (mục "Bật/Tắt..." trong "+ Thêm
@@ -132,9 +138,10 @@ class ThanhCongCu extends StatelessWidget {
   /// này, dưới tên "Tìm kiếm và thay thế".
   final VoidCallback khiBamTimKiem;
 
-  /// Mục 9: mở màn hình chat toàn màn hình "Trò chuyện về văn bản này" —
-  /// CÙNG callback với mục cùng tên trong menu "Làm việc với AI", chỉ là
-  /// lối vào nhanh hơn (xem `_NutAIMenu.khiBamTroChuyen`).
+  /// Mục 9: nút "Trò chuyện" NGOÀI thanh công cụ — "Trò chuyện VỚI MỌI
+  /// NGƯỜI" (xem tooltip ở nơi dùng), một tính năng XÃ HỘI khác hẳn với
+  /// "Trò chuyện về văn bản này" (chat với AI, [khiBamTroChuyenVeVanBan] ở
+  /// trên) — hiện vẫn là chỗ đặt trước, chỉ hiện thông báo "đang nâng cấp".
   final VoidCallback khiBamTroChuyen;
 
   /// Ngưỡng bề ngang chuẩn của Material để phân biệt điện thoại (hẹp) với
@@ -240,7 +247,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamTomTatToanVan: khiBamTomTatToanVan,
                               khiBamMoRongToanVan: khiBamMoRongToanVan,
                               khiBamVietLaiToanVan: khiBamVietLaiToanVan,
-                              khiBamTroChuyen: khiBamTroChuyen,
+                              khiBamTroChuyenVeVanBan: khiBamTroChuyenVeVanBan,
                             ),
                           ),
                           _NutCoChuThich(
@@ -1236,7 +1243,7 @@ class _NutAIMenu extends StatelessWidget {
     required this.khiBamTomTatToanVan,
     required this.khiBamMoRongToanVan,
     required this.khiBamVietLaiToanVan,
-    required this.khiBamTroChuyen,
+    required this.khiBamTroChuyenVeVanBan,
   });
 
   final bool rong;
@@ -1274,10 +1281,11 @@ class _NutAIMenu extends StatelessWidget {
   /// toàn bộ văn bản" như tóm tắt/mở rộng.
   final VoidCallback khiBamVietLaiToanVan;
 
-  /// Mục "Trò chuyện về văn bản này" — mở màn hình chat toàn màn hình.
-  /// CÙNG callback với nút "Trò chuyện" riêng ở thanh công cụ dưới (xem
-  /// `ThanhCongCu.khiBamTroChuyen`) — chỉ là hai lối vào cho một tính năng.
-  final VoidCallback khiBamTroChuyen;
+  /// Mục "Trò chuyện về văn bản này" — mở màn hình chat toàn màn hình. RIÊNG
+  /// biệt với nút "Trò chuyện" ở thanh công cụ dưới (`ThanhCongCu.khiBamTroChuyen`
+  /// — nút đó hiện là chỗ đặt trước "đang nâng cấp", KHÔNG liên quan tới
+  /// mục này).
+  final VoidCallback khiBamTroChuyenVeVanBan;
 
   @override
   Widget build(BuildContext context) {
@@ -1314,7 +1322,7 @@ class _NutAIMenu extends StatelessWidget {
             if (gia == 2) khiBamTomTatToanVan();
             if (gia == 3) khiBamMoRongToanVan();
             if (gia == 4) khiBamVietLaiToanVan();
-            if (gia == 1) khiBamTroChuyen();
+            if (gia == 1) khiBamTroChuyenVeVanBan();
           },
           // (VIỆC 3) Xem chú thích ở `_NutThemMenu` — cùng cơ chế: một
           // `ScrollController` mới mỗi lần menu mở, dùng chung giữa nút cuộn
