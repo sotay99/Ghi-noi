@@ -134,6 +134,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
         choAi = cauHoi;
     }
 
+    late final int chiSoAi;
     setState(() {
       widget.lichSu.add(TinNhanTroChuyen(
         laNguoiDung: true,
@@ -146,32 +147,51 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
       // Đính kèm là MỘT LẦN cho MỖI lượt gửi.
       _dinhKemHienTai = LoaiDinhKemTroChuyen.khong;
       _noiDungDoanChonDinhKem = null;
+      // Thêm sẵn tin nhắn AI RỖNG ngay bây giờ — chữ sẽ chảy dần vào đây
+      // (STREAMING) thay vì đợi AI trả lời xong hết mới hiện một lần.
+      widget.lichSu.add(TinNhanTroChuyen(laNguoiDung: false, choHienThi: ''));
+      chiSoAi = widget.lichSu.length - 1;
     });
     _cuonXuongDuoi();
 
     String? loi;
-    String? traLoi;
+    var coChu = false;
     try {
-      traLoi = await guiTroChuyenChoGemini([
-        for (final t in widget.lichSu)
+      final luong = guiTroChuyenChoGeminiStream([
+        // KHÔNG gửi tin nhắn AI rỗng vừa thêm ở trên (sublist bỏ phần tử
+        // cuối) — nó chưa có nội dung gì để làm "lịch sử" cả.
+        for (final t in widget.lichSu.sublist(0, chiSoAi))
           LuotTroChuyen(
             vaiTro: t.laNguoiDung ? 'nguoiDung' : 'ai',
-            noiDung: t.choAi,
+            // Tin nhắn AI luôn lấy chữ ĐANG HIỂN THỊ (đã chảy xong hoàn
+            // chỉnh từ lượt trước) — không dùng choAi (chỉ có ý nghĩa cho
+            // tin nhắn NGƯỜI DÙNG, mang theo văn bản đính kèm).
+            noiDung: t.laNguoiDung ? t.choAi : t.choHienThi,
           ),
       ]);
+      await for (final doan in luong) {
+        coChu = true;
+        if (!mounted) return;
+        setState(() => widget.lichSu[chiSoAi].choHienThi += doan);
+        _cuonXuongDuoi();
+      }
     } catch (e) {
       loi = e.toString();
     }
     if (!mounted) return;
     setState(() {
       _dangGui = false;
-      if (traLoi != null && traLoi.trim().isNotEmpty) {
-        widget.lichSu.add(TinNhanTroChuyen(laNguoiDung: false, choHienThi: traLoi.trim()));
-      } else {
-        widget.lichSu.add(TinNhanTroChuyen(
-          laNguoiDung: false,
-          choHienThi: 'AI trả lời thất bại: ${loi ?? "không có nội dung trả về."}',
-        ));
+      if (loi != null && !coChu) {
+        // Lỗi ngay từ đầu, chưa nhận được chữ nào — thay hẳn bằng thông
+        // báo lỗi (tin nhắn rỗng để nguyên nhìn rất kỳ).
+        widget.lichSu[chiSoAi].choHienThi = 'AI trả lời thất bại: $loi';
+      } else if (loi != null) {
+        // Đã nhận được một phần rồi mới đứt giữa chừng (mất mạng...) — giữ
+        // lại phần đã có, chỉ báo thêm là bị ngắt ngang.
+        widget.lichSu[chiSoAi].choHienThi += '\n\n[Bị ngắt giữa chừng: $loi]';
+      } else if (widget.lichSu[chiSoAi].choHienThi.trim().isEmpty) {
+        widget.lichSu[chiSoAi].choHienThi =
+            'AI trả lời thất bại: không có nội dung trả về.';
       }
     });
     _cuonXuongDuoi();
@@ -341,28 +361,15 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                       return ListView.builder(
                         controller: _cuon,
                         padding: const EdgeInsets.all(12),
-                        itemCount: widget.lichSu.length + (_dangGui ? 1 : 0),
+                        itemCount: widget.lichSu.length,
                         itemBuilder: (context, i) {
-                          if (i >= widget.lichSu.length) {
-                            return const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 8),
-                              child: Row(
-                                children: [
-                                  SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  ),
-                                  SizedBox(width: 10),
-                                  Text(
-                                    'AI đang trả lời...',
-                                    style: TextStyle(color: Color(0xFF5F6368)),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }
                           final t = widget.lichSu[i];
+                          // Tin nhắn AI cuối cùng, trong lúc còn đang chảy
+                          // chữ dần (STREAMING) — chưa cho sao chép (chữ
+                          // chưa xong), hiện gợi ý "đang trả lời" nếu vẫn
+                          // còn rỗng (chưa nhận được mẩu chữ đầu tiên).
+                          final dangStream =
+                              _dangGui && !t.laNguoiDung && i == widget.lichSu.length - 1;
                           return Padding(
                             padding: const EdgeInsets.symmetric(vertical: 6),
                             child: t.laNguoiDung
@@ -376,7 +383,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                                       t.noiDungDinhKem ?? '',
                                     ),
                                   )
-                                : _TinNhanAi(chu: t.choHienThi),
+                                : _TinNhanAi(chu: t.choHienThi, dangStream: dangStream),
                           );
                         },
                       );
@@ -614,12 +621,27 @@ class _BongBongNguoiDung extends StatelessWidget {
 /// lite nhẹ (`#`/`##`/`###`, `**đậm**`, `*nghiêng*`/`_nghiêng_`, `` `mã` ``,
 /// gạch đầu dòng `- `/`* `) thay vì hiện nguyên các ký tự đánh dấu — xem
 /// `_spanDoanVanBan`. Toàn bộ đều cho chọn để sao chép.
+///
+/// [dangStream] true khi đây là câu trả lời ĐANG CHẢY CHỮ DẦN (streaming,
+/// chưa xong hẳn): rỗng thì hiện gợi ý "đang trả lời", có chữ rồi thì cứ
+/// hiện y hệt bình thường (chữ tự dài ra theo từng lần build lại) nhưng ẨN
+/// nút Sao chép — nội dung chưa trọn vẹn, sao chép lúc này dễ chép thiếu.
 class _TinNhanAi extends StatelessWidget {
-  const _TinNhanAi({required this.chu});
+  const _TinNhanAi({required this.chu, this.dangStream = false});
   final String chu;
+  final bool dangStream;
 
   @override
   Widget build(BuildContext context) {
+    if (dangStream && chu.isEmpty) {
+      return const Row(
+        children: [
+          SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+          SizedBox(width: 10),
+          Text('AI đang trả lời...', style: TextStyle(color: Color(0xFF5F6368))),
+        ],
+      );
+    }
     final doan = _tachKhoiMa(chu);
     final kieuGoc = DefaultTextStyle.of(context).style;
     return Column(
@@ -636,12 +658,13 @@ class _TinNhanAi extends StatelessWidget {
           ),
         // Sao chép NGUYÊN VĂN cả tin nhắn (gồm cả dấu ```...``` nếu có) —
         // khác với nút "Sao chép" riêng trong từng khung kết quả (chỉ sao
-        // chép đúng khối đó).
-        _NutHanhDongNho(
-          icon: Icons.copy,
-          tooltip: 'Sao chép',
-          onTap: () => _saoChep(context, chu),
-        ),
+        // chép đúng khối đó). Ẩn trong lúc còn đang chảy chữ dở.
+        if (!dangStream)
+          _NutHanhDongNho(
+            icon: Icons.copy,
+            tooltip: 'Sao chép',
+            onTap: () => _saoChep(context, chu),
+          ),
       ],
     );
   }

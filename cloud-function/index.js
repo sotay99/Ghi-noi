@@ -424,11 +424,22 @@ async function goiGemini(huongDan, vanBan) {
 /// theo toàn văn bản (xem client `lib/man_hinh_tro_chuyen.dart`) nên máy
 /// chủ này không cần biết gì thêm về "văn bản đang soạn" — chỉ việc chuyển
 /// tiếp nguyên `contents` cho Gemini.
-async function goiGeminiChat(contents) {
+/// Y HỆT `goiGeminiChat` cũ (nay bỏ) nhưng STREAMING: gọi thẳng
+/// `:streamGenerateContent?alt=sse` của Gemini (trả về từng đoạn theo
+/// khuôn Server-Sent-Events — mỗi dòng `data: {...}` là một mẩu JSON nhỏ
+/// mang thêm vài chữ mới), rồi mỗi lần nhận được một mẩu là ĐẨY THẲNG đoạn
+/// chữ đó ra [res] ngay (không đợi gộp đủ) — client (`man_hinh_tro_chuyen
+/// .dart`) đọc dần dần và cập nhật màn hình theo, tạo hiệu ứng chữ chạy ra
+/// liên tục thay vì đợi xong hết mới hiện một lần.
+///
+/// CỐ Ý không trả lại nguyên khuôn SSE của Gemini cho client — bóc sẵn chữ
+/// ra rồi chỉ đẩy đúng phần chữ thô (plain text, nối liền nhau), để client
+/// không cần biết gì về khuôn dữ liệu của Gemini, chỉ việc nối chuỗi.
+async function goiGeminiChatStream(contents, res) {
   const model = process.env.GEMINI_MODEL || MODEL_MAC_DINH;
   const url =
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent` +
-    `?key=${process.env.GEMINI_API_KEY}`;
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent` +
+    `?alt=sse&key=${process.env.GEMINI_API_KEY}`;
 
   const phanHoi = await fetch(url, {
     method: 'POST',
@@ -436,17 +447,60 @@ async function goiGeminiChat(contents) {
     body: JSON.stringify({ contents }),
   });
 
-  if (!phanHoi.ok) {
+  if (!phanHoi.ok || !phanHoi.body) {
     const chuLoi = await phanHoi.text();
     throw new Error(`Gemini trả về lỗi ${phanHoi.status}: ${chuLoi.slice(0, 300)}`);
   }
 
-  const duLieu = await phanHoi.json();
-  const chu = (duLieu?.candidates?.[0]?.content?.parts || [])
-    .map((p) => p.text || '')
-    .join('');
-  if (!chu) throw new Error('Gemini không trả về nội dung.');
-  return chu;
+  // Từ đây KHÔNG còn đường lùi để đổi status/trả JSON lỗi nữa — response
+  // đã bắt đầu gửi (text/plain, 200). Lỗi xảy ra giữa chừng chỉ có thể kết
+  // thúc sớm response, phần chữ đã gửi vẫn giữ nguyên phía client.
+  res.status(200);
+  res.set('content-type', 'text/plain; charset=utf-8');
+  res.set('cache-control', 'no-cache');
+
+  const reader = phanHoi.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let du = ''; // Phần dòng cuối CHƯA TRỌN của đợt trước, ghép tiếp vào đợt này.
+  let coChu = false;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      du += decoder.decode(value, { stream: true });
+      const dong = du.split('\n');
+      du = dong.pop() ?? '';
+      for (const d of dong) {
+        const d2 = d.trim();
+        if (!d2.startsWith('data:')) continue;
+        const phanJson = d2.slice(5).trim();
+        if (!phanJson || phanJson === '[DONE]') continue;
+        let obj;
+        try {
+          obj = JSON.parse(phanJson);
+        } catch {
+          continue; // Mẩu JSON bị cắt ngang giữa hai đợt đọc — bỏ qua, hiếm khi xảy ra.
+        }
+        const doanChu = (obj?.candidates?.[0]?.content?.parts || [])
+          .map((p) => p.text || '')
+          .join('');
+        if (doanChu) {
+          coChu = true;
+          res.write(doanChu);
+        }
+      }
+    }
+  } finally {
+    res.end();
+  }
+
+  if (!coChu) {
+    // Đã kết thúc response (200, rỗng) — không còn cách nào báo lỗi qua mã
+    // trạng thái HTTP nữa. Client tự nhận ra "luồng rỗng hoàn toàn" và tự
+    // báo lỗi phù hợp (xem `guiTroChuyenChoGeminiStream`).
+    return;
+  }
 }
 
 /// Điểm vào của Cloud Function — đặt tên "flowriteAi" khi tạo hàm trên
@@ -540,9 +594,10 @@ exports.flowriteAi = async (req, res) => {
   }
 
   // Nhánh riêng cho "Trò chuyện về văn bản này": gửi lên CẢ CUỘC HỘI THOẠI
-  // (`lichSu`), không phải `text` đơn lẻ — xem `goiGeminiChat`. Lượt đầu
-  // tiên trong `lichSu` (do client tự ghép) đã mang theo toàn văn bản, nên
-  // máy chủ này không cần — và không nên — kiểm tra `text` ở đây.
+  // (`lichSu`), không phải `text` đơn lẻ — xem `goiGeminiChatStream`. Lượt
+  // đầu tiên trong `lichSu` (do client tự ghép) đã mang theo toàn văn bản,
+  // nên máy chủ này không cần — và không nên — kiểm tra `text` ở đây. Phản
+  // hồi STREAMING (chữ thô, chảy dần) chứ không phải JSON một lần.
   if (action === 'tro_chuyen') {
     if (!process.env.GEMINI_API_KEY) {
       res.status(500).json({ loi: 'Chưa cấu hình GEMINI_API_KEY.' });
@@ -572,8 +627,7 @@ exports.flowriteAi = async (req, res) => {
       contents.push({ role: vaiTro, parts: [{ text: noiDung }] });
     }
     try {
-      const ketQua = await goiGeminiChat(contents);
-      res.status(200).json({ text: ketQua });
+      await goiGeminiChatStream(contents, res);
     } catch (err) {
       res.status(502).json({ loi: String(err && err.message ? err.message : err) });
     }

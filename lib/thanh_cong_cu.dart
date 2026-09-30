@@ -32,6 +32,10 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamVietLaiToanVan,
     required this.khiBamTroChuyenVeVanBan,
     required this.layDoanVanDangChon,
+    required this.coVungChonThatSu,
+    required this.epToanVanKhiCoVungChon,
+    required this.khiBamDoiCheDoLamViec,
+    required this.khoaMenuAI,
     required this.khiBamBanPhim,
     required this.khiBamBoPhimNhanh,
     required this.boPhimNhanhDangMo,
@@ -107,6 +111,28 @@ class ThanhCongCu extends StatelessWidget {
   /// tả/kiểm tra dấu câu/trò chuyện) hiện tên "...toàn văn"/"...văn bản
   /// này" hay "...đoạn văn này"/"...đoạn văn đã chọn".
   final String? Function() layDoanVanDangChon;
+
+  /// Có vùng chọn THẬT SỰ hay không (KHÔNG bị ảnh hưởng bởi
+  /// [epToanVanKhiCoVungChon] — khác [layDoanVanDangChon]) — quyết định nút
+  /// "Làm việc với AI" có sáng nền xanh hay không, và mục "Làm việc với
+  /// Toàn bộ văn bản"/"Làm việc với Đoạn văn đang chọn" (vị trí 4, ngay
+  /// dưới "Chuyển file âm thanh thành văn bản") có hiện ra hay không.
+  final bool Function() coVungChonThatSu;
+
+  /// Trạng thái hiện tại của công tắc "Làm việc với Toàn bộ văn bản"/"Làm
+  /// việc với Đoạn văn đang chọn" — `true` nghĩa là đang ÉP mọi mục AI xử
+  /// lý toàn văn dù đang có vùng chọn thật.
+  final bool epToanVanKhiCoVungChon;
+
+  /// Bấm mục "Làm việc với Toàn bộ văn bản"/"Làm việc với Đoạn văn đang
+  /// chọn" — đảo [epToanVanKhiCoVungChon]. PopupMenuButton không tự vẽ lại
+  /// nhãn các mục khác trong lúc đang mở, nên nơi gọi phải tự đóng rồi mở
+  /// lại menu ngay sau khi đảo (qua [khoaMenuAI]) để thấy đổi ngay.
+  final VoidCallback khiBamDoiCheDoLamViec;
+
+  /// Khoá để tự mở lại `PopupMenuButton` bên trong `_NutAIMenu` ngay sau
+  /// khi [khiBamDoiCheDoLamViec] đảo trạng thái — xem giải thích ở đó.
+  final GlobalKey<PopupMenuButtonState<int>> khoaMenuAI;
   final VoidCallback khiBamBanPhim;
 
   /// "Bộ phím nhanh cho màn hình cảm ứng" (mục "Bật/Tắt..." trong "+ Thêm
@@ -266,6 +292,10 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamVietLaiToanVan: khiBamVietLaiToanVan,
                               khiBamTroChuyenVeVanBan: khiBamTroChuyenVeVanBan,
                               layDoanVanDangChon: layDoanVanDangChon,
+                              coVungChonThatSu: coVungChonThatSu,
+                              epToanVanKhiCoVungChon: epToanVanKhiCoVungChon,
+                              khiBamDoiCheDoLamViec: khiBamDoiCheDoLamViec,
+                              khoaMenuAI: khoaMenuAI,
                             ),
                           ),
                           _NutCoChuThich(
@@ -590,11 +620,17 @@ class _KhungNutRong extends StatelessWidget {
     required this.bieuTuong,
     required this.nhan,
     this.mau = const Color(0xFF5F6368),
+    this.mauNen = Colors.white,
   });
 
   final IconData bieuTuong;
   final String nhan;
   final Color mau;
+
+  /// Nền — mặc định trắng như từ trước giờ; "Làm việc với AI" đổi nền
+  /// xanh khi trang soạn thảo có vùng chọn (xem `_NutAIMenu`), các nút
+  /// khác vẫn giữ nguyên mặc định.
+  final Color mauNen;
 
   @override
   Widget build(BuildContext context) {
@@ -604,7 +640,7 @@ class _KhungNutRong extends StatelessWidget {
       // Nền trắng riêng, không lấy màu nền của thanh công cụ — xem giải
       // thích ở NutNho.
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: mauNen,
         border: Border.all(color: const Color(0xFFDADCE0)),
         borderRadius: BorderRadius.circular(16),
       ),
@@ -1265,6 +1301,10 @@ class _NutAIMenu extends StatelessWidget {
     required this.khiBamVietLaiToanVan,
     required this.khiBamTroChuyenVeVanBan,
     required this.layDoanVanDangChon,
+    required this.coVungChonThatSu,
+    required this.epToanVanKhiCoVungChon,
+    required this.khiBamDoiCheDoLamViec,
+    required this.khoaMenuAI,
   });
 
   final bool rong;
@@ -1317,31 +1357,41 @@ class _NutAIMenu extends StatelessWidget {
   /// từng mục ("...toàn văn" → "...đoạn văn này"/"...đoạn văn đã chọn").
   final String? Function() layDoanVanDangChon;
 
+  /// Có vùng chọn THẬT SỰ hay không — xem giải thích ở `ThanhCongCu`.
+  final bool Function() coVungChonThatSu;
+  final bool epToanVanKhiCoVungChon;
+  final VoidCallback khiBamDoiCheDoLamViec;
+  final GlobalKey<PopupMenuButtonState<int>> khoaMenuAI;
+
   @override
   Widget build(BuildContext context) {
+    final noiBat = coVungChonThatSu();
     return Semantics(
       button: true,
       label: 'Làm việc với AI',
       child: Tooltip(
         message: 'Làm việc với AI',
         child: PopupMenuButton<int>(
+          key: khoaMenuAI,
           padding: EdgeInsets.zero,
           splashRadius: 20,
           child: rong
-              ? const _KhungNutRong(
+              ? _KhungNutRong(
                   bieuTuong: Icons.smart_toy_outlined,
                   nhan: 'Làm việc với AI',
+                  mau: noiBat ? Colors.white : const Color(0xFF5F6368),
+                  mauNen: noiBat ? const Color(0xFF1A73E8) : Colors.white,
                 )
               : Container(
                   width: 38,
                   height: 38,
                   alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
+                  decoration: BoxDecoration(
+                    color: noiBat ? const Color(0xFF1A73E8) : Colors.white,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.smart_toy_outlined,
-                      size: 20, color: Color(0xFF5F6368)),
+                  child: Icon(Icons.smart_toy_outlined,
+                      size: 20, color: noiBat ? Colors.white : const Color(0xFF5F6368)),
                 ),
           onSelected: (gia) {
             if (gia == 5) khiBamCaiDatKiemTraToanVan();
@@ -1355,6 +1405,7 @@ class _NutAIMenu extends StatelessWidget {
             if (gia == 3) khiBamMoRongToanVan();
             if (gia == 4) khiBamVietLaiToanVan();
             if (gia == 1) khiBamTroChuyenVeVanBan();
+            if (gia == 12) khiBamDoiCheDoLamViec();
           },
           // (VIỆC 3) Xem chú thích ở `_NutThemMenu` — cùng cơ chế: một
           // `ScrollController` mới mỗi lần menu mở, dùng chung giữa nút cuộn
@@ -1387,6 +1438,29 @@ class _NutAIMenu extends StatelessWidget {
                 _mucMenuThem(6, 'Chuyển hình ảnh thành văn bản'),
                 _mucMenuThem(7, 'Chụp ảnh (camera)'),
                 _mucMenuThem(8, 'Chuyển file âm thanh thành văn bản'),
+                // Vị trí 4 — CHỈ hiện khi có vùng chọn THẬT SỰ (không bị ảnh
+                // hưởng bởi chính công tắc này — nếu không, bấm ép "toàn
+                // bộ văn bản" xong sẽ tự làm mục này biến mất, không bấm
+                // lại được để quay về "đoạn văn đang chọn" nữa). Công tắc
+                // đảo NGAY [epToanVanKhiCoVungChon], khiến mọi mục bên
+                // dưới tự đổi tên theo (dùng `coDoanChon` đã tính ở trên,
+                // vốn đã tôn trọng công tắc này).
+                if (coVungChonThatSu())
+                  _DongMenuCoTheBam(
+                    gia: 12,
+                    height: 34,
+                    child: Text(
+                      epToanVanKhiCoVungChon
+                          ? 'Làm việc với Đoạn văn đang chọn'
+                          : 'Làm việc với Toàn bộ văn bản',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: epToanVanKhiCoVungChon
+                            ? Colors.green.shade700
+                            : const Color(0xFF0B3D91),
+                      ),
+                    ),
+                  ),
                 _dividerMenu(),
                 _mucMenuThem(
                   1,

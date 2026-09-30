@@ -2639,6 +2639,51 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
   }
 
+  /// Có vùng chọn (khác rỗng) hay không TẠI LẦN BUILD GẦN NHẤT — chỉ để so
+  /// sánh trong `_khiVungChonCoTheDoi`, không tự tin cậy giá trị này ở nơi
+  /// khác (đọc thẳng `_layDoanVanDangChon()`/`_vungDangChonHopLe()` mới
+  /// đúng lúc dùng thật).
+  bool _coVungChonGanNhat = false;
+
+  /// Nút "Làm việc với AI" tự sáng nền xanh khi trang soạn thảo có vùng
+  /// chọn — `_boDieuKhien` đổi cả trăm lần khi gõ phím bình thường (mỗi ký
+  /// tự một lần), nên CHỈ setState khi tình trạng "có/không vùng chọn"
+  /// THẬT SỰ đổi (true→false hoặc ngược lại), không phải mỗi lần gọi. Đọc
+  /// [_vungChonThatSu] (KHÔNG phải [_layDoanVanDangChon]) vì highlight này
+  /// phải phản ánh đúng có bôi đen hay không, bất kể công tắc
+  /// [_epToanVanKhiCoVungChon] đang ép chế độ nào.
+  void _khiVungChonCoTheDoi() {
+    final co = _vungChonThatSu() != null;
+    if (co == _coVungChonGanNhat) return;
+    _coVungChonGanNhat = co;
+    setState(() {});
+  }
+
+  /// Công tắc "Làm việc với Toàn bộ văn bản"/"Làm việc với Đoạn văn đang
+  /// chọn" (mục thứ 4 trong menu AI) — `true` nghĩa là đang ÉP mọi mục AI xử
+  /// lý toàn văn dù đang có vùng chọn thật. Chỉ có ý nghĩa khi
+  /// [_vungChonThatSu] khác `null`; hết vùng chọn thì công tắc coi như tắt
+  /// (không cần tự reset vì [_vungDangChonHopLe] chỉ đọc nó KHI có vùng
+  /// chọn thật).
+  bool _epToanVanKhiCoVungChon = false;
+
+  /// Khoá để tự đóng-rồi-mở lại `PopupMenuButton` của menu AI ngay sau khi
+  /// đảo [_epToanVanKhiCoVungChon] — `PopupMenuButton` không tự vẽ lại nhãn
+  /// các mục bên trong trong lúc đang mở, nên phải đóng/mở lại để thấy nhãn
+  /// mới ngay (đã hỏi ý người dùng, được chọn cách an toàn hơn thay vì tự
+  /// dựng menu riêng để có hiệu ứng chớp nháy tại chỗ).
+  final _khoaMenuAI = GlobalKey<PopupMenuButtonState<int>>();
+
+  /// Bấm mục "Làm việc với Toàn bộ văn bản"/"Làm việc với Đoạn văn đang
+  /// chọn" — đảo [_epToanVanKhiCoVungChon] rồi mở lại menu AI ngay sau khi
+  /// khung hình hiện tại vẽ xong, để nhãn các mục khác cập nhật theo.
+  void _doiCheDoLamViecVoiVungChon() {
+    setState(() => _epToanVanKhiCoVungChon = !_epToanVanKhiCoVungChon);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _khoaMenuAI.currentState?.showButtonMenu();
+    });
+  }
+
   /// Con trỏ tự vẽ — chỉ hiện khi Ô CHỮ đang có tiêu điểm VÀ vùng chọn RỖNG
   /// (con trỏ, không phải đang bôi chọn) — hệt hành vi caret chuẩn.
   Widget _veConTro() {
@@ -3805,6 +3850,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // đổi focus, gọi listener này đúng lúc (đã an toàn, không còn trong
     // initState nữa) để bắt đầu nháy.
     _oChu.addListener(_khiFocusConTroDoi);
+    // Nút "Làm việc với AI" tự sáng nền xanh khi có vùng chọn (xem
+    // `_khiVungChonCoTheDoi`) — chỉ setState khi tình trạng "có/không vùng
+    // chọn" THẬT SỰ đổi (không phải mỗi lần con trỏ nhích một ký tự), để
+    // không rebuild thừa mỗi lần gõ phím.
+    _boDieuKhien.addListener(_khiVungChonCoTheDoi);
 
     WidgetsBinding.instance.addObserver(this);
     // (SỬA LỖI "bãi đất trống" kẹt lại sau khi ẩn bàn phím ảo) Xem giải
@@ -3901,6 +3951,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _cuonVanBan.removeListener(_khiCuonVanBanBaoDoanSo);
     _conTroDangHien.dispose();
     _oChu.removeListener(_khiFocusConTroDoi);
+    _boDieuKhien.removeListener(_khiVungChonCoTheDoi);
     _bomDongHoTheGhiAm?.cancel();
     _dangKyMucAmTheGhiAm?.cancel();
     _thoiLuongTheGhiAmDangGhi.dispose();
@@ -11768,10 +11819,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     return vung == null ? null : vung.textInside(_boDieuKhien.text);
   }
 
-  /// Y HỆT [_layDoanVanDangChon] nhưng trả về cả TOẠ ĐỘ (`TextSelection`)
-  /// — dùng ở nơi cần thay thế ĐÚNG LẠI đoạn đó sau khi AI xử lý xong (xem
-  /// `_thayTheDoanDangChon`), thay vì thay cả bài.
-  TextSelection? _vungDangChonHopLe() {
+  /// Vùng chọn THẬT SỰ đang có trên trang soạn thảo — KHÔNG bị ảnh hưởng bởi
+  /// công tắc [_epToanVanKhiCoVungChon]. Dùng để quyết định nút "Làm việc với
+  /// AI" có sáng nền xanh hay không, và mục "Làm việc với Toàn bộ văn
+  /// bản"/"Làm việc với Đoạn văn đang chọn" có hiện ra hay không — hai chỗ đó
+  /// PHẢI thấy vùng chọn thật dù công tắc đang ép toàn văn, nếu không bấm ép
+  /// xong sẽ không còn cách nào bấm lại để quay về xử lý đoạn chọn.
+  TextSelection? _vungChonThatSu() {
     final sel = _boDieuKhien.selection;
     if (!sel.isValid || sel.isCollapsed) return null;
     final vb = _boDieuKhien.text;
@@ -11779,6 +11833,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final ketThuc = sel.end.clamp(0, vb.length);
     if (batDau >= ketThuc) return null;
     return TextSelection(baseOffset: batDau, extentOffset: ketThuc);
+  }
+
+  /// Y HỆT [_layDoanVanDangChon] nhưng trả về cả TOẠ ĐỘ (`TextSelection`)
+  /// — dùng ở nơi cần thay thế ĐÚNG LẠI đoạn đó sau khi AI xử lý xong (xem
+  /// `_thayTheDoanDangChon`), thay vì thay cả bài. Tôn trọng công tắc
+  /// [_epToanVanKhiCoVungChon]: đang ép toàn văn thì coi như không có vùng
+  /// chọn, để mọi nơi xử lý AI tự chuyển sang xử lý cả bài.
+  TextSelection? _vungDangChonHopLe() {
+    if (_epToanVanKhiCoVungChon) return null;
+    return _vungChonThatSu();
   }
 
   /// Nút "Thay thế đoạn đã chọn" ở modal kết quả (tóm tắt/mở rộng/viết lại
@@ -13618,6 +13682,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 khiBamVietLaiToanVan: _moModalChonKieuVietLai,
                 khiBamTroChuyenVeVanBan: _moTroChuyenVeVanBan,
                 layDoanVanDangChon: _layDoanVanDangChon,
+                coVungChonThatSu: () => _vungChonThatSu() != null,
+                epToanVanKhiCoVungChon: _epToanVanKhiCoVungChon,
+                khiBamDoiCheDoLamViec: _doiCheDoLamViecVoiVungChon,
+                khoaMenuAI: _khoaMenuAI,
                 khiBamBanPhim: () => _moModalTam(
                   'Bàn phím',
                   Icons.keyboard_outlined,

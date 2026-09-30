@@ -26,7 +26,13 @@ enum LoaiDinhKemTroChuyen {
 /// người dùng không tự chọn thẻ nào khác; các lượt sau chỉ kèm khi người
 /// dùng chủ động bấm "+") — lượt đó gửi cho AI kèm nội dung đính kèm, nhưng
 /// người dùng trong khung chat chỉ thấy đúng câu họ gõ (cộng thẻ hiện phía
-/// trên, nếu có).
+/// trên, nếu có). Với tin nhắn AI thì [choAi] không có ý nghĩa — khi ghép
+/// lại lịch sử gửi cho AI, nơi gọi luôn lấy thẳng [choHienThi] của các tin
+/// nhắn AI (xem `man_hinh_tro_chuyen.dart`).
+///
+/// [choHienThi] CỐ Ý không phải `final` — tin nhắn AI được cập nhật DẦN
+/// từng đoạn trong lúc AI đang trả lời streaming (nối thêm mỗi đoạn chữ
+/// mới vào cuối), không tạo lại đối tượng mới mỗi lần.
 class TinNhanTroChuyen {
   TinNhanTroChuyen({
     required this.laNguoiDung,
@@ -37,7 +43,7 @@ class TinNhanTroChuyen {
   }) : choAi = choAi ?? choHienThi;
 
   final bool laNguoiDung;
-  final String choHienThi;
+  String choHienThi;
   final String choAi;
   final LoaiDinhKemTroChuyen dinhKem;
 
