@@ -40,6 +40,49 @@ function huongDanTheoHanhDong(action) {
   }
 }
 
+/// Đoạn "NGỮ CẢNH ĐÃ XỬ LÝ" dùng chung cho cả ba kiểu kiểm tra toàn văn
+/// (đầy đủ/chỉ chính tả/chỉ dấu câu) — trả về chuỗi rỗng nếu không có vùng
+/// nào đã xử lý trước đó.
+function moTaVungDaXuLy(vungDaXuLy) {
+  if (vungDaXuLy.length === 0) return '';
+  const ds = vungDaXuLy
+    .filter((v) => v && Number.isInteger(v.batDau) && Number.isInteger(v.ketThuc))
+    .map((v) => `[${v.batDau},${v.ketThuc})`)
+    .join(', ');
+  return `NGỮ CẢNH ĐÃ XỬ LÝ: các khoảng vị trí ký tự sau đây trên văn bản GỐC đã được xử lý xong ở lượt kiểm tra trước, TUYỆT ĐỐI không báo lỗi mới nằm trong hoặc chồng lấn bất kỳ khoảng nào trong số này — coi chúng là NGỮ CẢNH THAM KHẢO đã xong việc, không phải văn bản cần bạn can thiệp: ${ds}. `;
+}
+
+/// Hướng dẫn cho "Kiểm tra lỗi chính tả toàn văn" (mục riêng trong menu
+/// "Làm việc với AI", phía TRÊN "Kiểm tra toàn văn") — ĐÚNG cơ chế
+/// `huongDanToanVan` (cùng action 'toan_van', cùng `_apDungKetQuaToanVan`
+/// phía client vẽ gạch đỏ lượn sóng) nhưng CHỈ tìm lỗi chính tả, không tìm
+/// đoạn không phù hợp/cần xoá/thiếu dấu câu.
+function huongDanChiChinhTaToanVan(than) {
+  const vungDaXuLy = Array.isArray(than.vungDaXuLy) ? than.vungDaXuLy : [];
+  let huongDan =
+    'Bạn là bộ kiểm tra CHÍNH TẢ tiếng Việt (không kiểm tra ngữ pháp, không kiểm tra văn phong, KHÔNG đề xuất đoạn nào cần thay thế hay xoá, KHÔNG tìm dấu câu thiếu) cho TOÀN BỘ văn bản sau đây. ' +
+    QUY_TAC_CHINH_TA_CHUNG + ' ' +
+    moTaVungDaXuLy(vungDaXuLy);
+  huongDan +=
+    'Trả về DUY NHẤT một object JSON hợp lệ (không giải thích, không bọc trong dấu ```), đúng khuôn: {"chinhTa":[{"tu":"...","viTri":0,"deXuat":["...","..."]}]}. ' +
+    '"tu" là nguyên văn cụm sai chính tả, "viTri" là vị trí ký tự bắt đầu (đếm từ 0) TRÊN TOÀN BỘ văn bản được cung cấp, "deXuat" tối đa 3 cụm đúng để thay thế. Không có lỗi nào thì để mảng rỗng []. Văn bản cần kiểm tra:';
+  return huongDan;
+}
+
+/// Hướng dẫn cho "Kiểm tra dấu câu toàn văn" — ĐÚNG cơ chế `huongDanToanVan`
+/// nhưng CHỈ tìm chỗ thiếu dấu câu, không sửa chính tả, không đề xuất đoạn
+/// cần thay thế/xoá.
+function huongDanChiDauCauToanVan(than) {
+  const vungDaXuLy = Array.isArray(than.vungDaXuLy) ? than.vungDaXuLy : [];
+  let huongDan =
+    'Bạn soát TOÀN BỘ văn bản tiếng Việt sau đây, CHỈ tìm những chỗ CÒN THIẾU dấu câu (chấm, phẩy, hỏi, than, chấm phẩy, hai chấm, ba chấm, ngoặc đơn, ngoặc kép, gạch ngang, hoặc dấu khác bạn thấy cần) và đề xuất CHÈN THÊM vào — KHÔNG sửa chính tả, KHÔNG đề xuất đoạn nào cần thay thế hay xoá. ' +
+    moTaVungDaXuLy(vungDaXuLy);
+  huongDan +=
+    'Trả về DUY NHẤT một object JSON hợp lệ (không giải thích, không bọc trong dấu ```), đúng khuôn: {"dauCauMoi":[{"dauCau":"...","viTri":0}]}. ' +
+    '"dauCau" là chuỗi dấu câu cần chèn, "viTri" là vị trí ký tự (trên văn bản GỐC) ngay TRƯỚC chỗ chèn (chèn vào SAU ký tự viTri-1, TRƯỚC ký tự viTri). Không thiếu dấu câu nào thì để mảng rỗng []. Văn bản cần kiểm tra:';
+  return huongDan;
+}
+
 /// Hướng dẫn cho "Kiểm tra toàn văn" — nhận thêm các cài đặt riêng của người
 /// dùng (đoạn 3, 5 của yêu cầu): vùng đã xử lý ở lượt trước, có chèn dấu câu
 /// hay không, khoảng ký tự tham khảo cho đoạn đề xuất, và câu lệnh tuỳ chỉnh.
@@ -52,16 +95,8 @@ function huongDanToanVan(than) {
 
   let huongDan =
     'Bạn là biên tập viên tiếng Việt, soát lại TOÀN BỘ văn bản sau đây một cách kỹ lưỡng. ' +
-    QUY_TAC_CHINH_TA_CHUNG + ' ';
-
-  if (vungDaXuLy.length > 0) {
-    const ds = vungDaXuLy
-      .filter((v) => v && Number.isInteger(v.batDau) && Number.isInteger(v.ketThuc))
-      .map((v) => `[${v.batDau},${v.ketThuc})`)
-      .join(', ');
-    huongDan +=
-      `NGỮ CẢNH ĐÃ XỬ LÝ: các khoảng vị trí ký tự sau đây trên văn bản GỐC đã được xử lý xong ở lượt kiểm tra trước, TUYỆT ĐỐI không báo lỗi mới, không đề xuất "khongPhuHop"/"canXoa" mới, và không chèn "dauCauMoi" mới nằm trong hoặc chồng lấn bất kỳ khoảng nào trong số này — coi chúng là NGỮ CẢNH THAM KHẢO đã xong việc, không phải văn bản cần bạn can thiệp: ${ds}. `;
-  }
+    QUY_TAC_CHINH_TA_CHUNG + ' ' +
+    moTaVungDaXuLy(vungDaXuLy);
 
   let khuonMau =
     '{"chinhTa":[{"tu":"...","viTri":0,"deXuat":["...","..."]}],"khongPhuHop":[{"doan":"...","viTri":0,"deXuat":"..."}],"canXoa":[{"doan":"...","viTri":0}]';
@@ -567,7 +602,13 @@ exports.flowriteAi = async (req, res) => {
       chenDauCau === true,
     );
   } else if (action === 'toan_van') {
-    huongDan = huongDanToanVan(than);
+    if (than.loaiKiemTra === 'chinh_ta') {
+      huongDan = huongDanChiChinhTaToanVan(than);
+    } else if (than.loaiKiemTra === 'dau_cau') {
+      huongDan = huongDanChiDauCauToanVan(than);
+    } else {
+      huongDan = huongDanToanVan(than);
+    }
   } else if (action === 'tom_tat') {
     huongDan = huongDanTomTat(than);
   } else if (action === 'mo_rong') {

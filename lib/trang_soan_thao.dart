@@ -8994,7 +8994,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Bấm nút "Kiểm tra toàn văn bằng AI": gửi TOÀN BỘ văn bản hiện có lên
   /// máy chủ AI soát lại một lượt, trong lúc chờ hiện popup có thể bấm "Dừng
   /// ngay lập tức" để huỷ (kết quả về trễ vẫn bị vứt, không áp dụng gì cả).
-  Future<void> _khiBamKiemTraToanVan() async {
+  ///
+  /// [loaiKiemTra]: `null` (mặc định) là bản ĐẦY ĐỦ như cũ. `'chinh_ta'`/
+  /// `'dau_cau'` là hai mục riêng phía TRÊN mục này trong menu "Làm việc
+  /// với AI" — ĐÚNG NGUYÊN cơ chế này (cùng popup "đang xử lý", cùng
+  /// `_apDungKetQuaToanVan` vẽ gạch đỏ lượn sóng/tô dấu câu), chỉ khác
+  /// dòng mô tả và việc CHỈ hỏi/nhận đúng một loại kết quả — xem
+  /// `huongDanChiChinhTaToanVan`/`huongDanChiDauCauToanVan` trong
+  /// cloud-function/index.js.
+  Future<void> _khiBamKiemTraToanVan({String? loaiKiemTra}) async {
     if (_dangKiemTraToanVan) return;
     final vanBan = _boDieuKhien.text;
     if (vanBan.trim().isEmpty) {
@@ -9004,6 +9012,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     final daHuy = ValueNotifier<bool>(false);
     setState(() => _dangKiemTraToanVan = true);
+
+    final moTaDangXuLy = switch (loaiKiemTra) {
+      'chinh_ta' => 'AI đang kiểm tra lỗi chính tả toàn văn, tìm từ/cụm từ '
+          'sai để đề xuất sửa.',
+      'dau_cau' => 'AI đang kiểm tra dấu câu toàn văn, tìm chỗ còn thiếu để '
+          'đề xuất chèn thêm.',
+      _ => 'AI đang kiểm tra lại toàn văn để soát lỗi chính tả - ngữ '
+          'pháp, và đề xuất cách sửa đổi. Đây là bước quan trọng trước '
+          'khi hoàn thiện văn bản.',
+    };
 
     unawaited(showDialog<void>(
       context: context,
@@ -9018,12 +9036,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               child: CircularProgressIndicator(strokeWidth: 3),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'AI đang kiểm tra lại toàn văn để soát lỗi chính tả - ngữ '
-              'pháp, và đề xuất cách sửa đổi. Đây là bước quan trọng trước '
-              'khi hoàn thiện văn bản.',
+            Text(
+              moTaDangXuLy,
               textAlign: TextAlign.center,
-              style: TextStyle(height: 1.4),
+              style: const TextStyle(height: 1.4),
             ),
           ],
         ),
@@ -9048,9 +9064,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       ketQua = await _dichVuToanVan.kiemTra(
         vanBan,
         vungDaXuLy: _vungToanVanDaXuLy(),
-        chenDauCau: widget.caiDat.tuDongChenDauCauBangAI,
+        // "Chỉ dấu câu" LUÔN cần chenDauCau=true để nhánh phân tích
+        // dauCauMoi ở `DichVuKiemTraToanVan.kiemTra` chạy — không phụ
+        // thuộc cài đặt "Tự động chèn dấu câu" của người dùng.
+        chenDauCau: loaiKiemTra == 'dau_cau'
+            ? true
+            : widget.caiDat.tuDongChenDauCauBangAI,
         khoangKyTu: widget.caiDat.khoangKyTuDeXuatHienTai(),
         cauLenhTuyChinh: widget.caiDat.cauLenhTuyChinhKiemTraToanVan,
+        loaiKiemTra: loaiKiemTra,
       );
     } catch (e) {
       loiXayRa = e;
@@ -13472,6 +13494,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 noiBatBoPhimNhanh:
                     kIsWeb && (_thietBiHienTai == ThietBi.android || _thietBiHienTai == ThietBi.iphone),
                 khiBamKiemTraToanVan: _khiBamKiemTraToanVan,
+                khiBamKiemTraChinhTaToanVan: () =>
+                    _khiBamKiemTraToanVan(loaiKiemTra: 'chinh_ta'),
+                khiBamKiemTraDauCauToanVan: () =>
+                    _khiBamKiemTraToanVan(loaiKiemTra: 'dau_cau'),
                 dangGhiAmThe: _trinhGhiAmMo,
                 khiBamGhiAmThe: _bamNutGhiAmThe,
                 gopMicVaGhiAmThanhMotNut:

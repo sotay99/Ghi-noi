@@ -72,12 +72,24 @@ class DichVuKiemTraToanVan {
   /// tìm thêm dấu câu còn thiếu hay không (mục 3). [khoangKyTu]: khoảng ký
   /// tự tham khảo cho đoạn đề xuất (mục 5). [cauLenhTuyChinh]: câu lệnh
   /// riêng của người dùng, gửi kèm chỉ dẫn hệ thống (mục 5).
+  ///
+  /// [loaiKiemTra]: `null` (mặc định) là "Kiểm tra toàn văn" đầy đủ như cũ.
+  /// `'chinh_ta'`/`'dau_cau'` là hai mục riêng trong menu "Làm việc với AI"
+  /// (CHỈ tìm lỗi chính tả / CHỈ tìm dấu câu thiếu — xem
+  /// `huongDanChiChinhTaToanVan`/`huongDanChiDauCauToanVan` trong
+  /// cloud-function/index.js) — server khi đó chỉ trả về đúng MỘT trong hai
+  /// trường `chinhTa`/`dauCauMoi`, các trường còn lại tự nhiên vắng mặt nên
+  /// việc phân tích JSON bên dưới không cần đổi gì (đã mặc định `?? const
+  /// []` cho mọi trường). Gọi `'dau_cau'` thì BẮT BUỘC cũng truyền
+  /// `chenDauCau: true`, nếu không việc phân tích `dauCauMoi` phía dưới sẽ
+  /// tự bỏ qua (xem điều kiện `if (chenDauCau)`).
   Future<KetQuaKiemTraToanVan> kiemTra(
     String vanBan, {
     List<VungDaXuLy> vungDaXuLy = const [],
     bool chenDauCau = false,
     (int, int)? khoangKyTu,
     String cauLenhTuyChinh = '',
+    String? loaiKiemTra,
   }) async {
     final phanHoi = await http
         .post(
@@ -94,6 +106,7 @@ class DichVuKiemTraToanVan {
             if (khoangKyTu != null) 'doDaiMin': khoangKyTu.$1,
             if (khoangKyTu != null) 'doDaiMax': khoangKyTu.$2,
             'cauLenhTuyChinh': cauLenhTuyChinh,
+            if (loaiKiemTra != null) 'loaiKiemTra': loaiKiemTra,
           }),
         )
         .timeout(const Duration(seconds: 60));

@@ -36,6 +36,8 @@ class ThanhCongCu extends StatelessWidget {
     required this.boPhimNhanhDangMo,
     this.noiBatBoPhimNhanh = false,
     required this.khiBamKiemTraToanVan,
+    required this.khiBamKiemTraChinhTaToanVan,
+    required this.khiBamKiemTraDauCauToanVan,
     required this.dangGhiAmThe,
     required this.khiBamGhiAmThe,
     this.gopMicVaGhiAmThanhMotNut = false,
@@ -109,6 +111,11 @@ class ThanhCongCu extends StatelessWidget {
   final bool noiBatBoPhimNhanh;
 
   final VoidCallback khiBamKiemTraToanVan;
+
+  /// Hai mục CHỈ MỘT PHẦN của "Kiểm tra toàn văn" ở trên — CHỈ chính tả /
+  /// CHỈ dấu câu.
+  final VoidCallback khiBamKiemTraChinhTaToanVan;
+  final VoidCallback khiBamKiemTraDauCauToanVan;
 
   /// Trình ghi âm (thẻ ghi âm) đang mở hay không — đổi icon/màu nút Ghi âm
   /// (ô vuông đỏ = dừng) và, ở thiết bị gộp-một-nút (`gopMicVaGhiAmThanhMotNut`),
@@ -241,6 +248,8 @@ class ThanhCongCu extends StatelessWidget {
                               rong: rong,
                               khiBamCaiDatKiemTraToanVan: khiBamCaiDatKiemTraToanVan,
                               khiBamKiemTraToanVan: khiBamKiemTraToanVan,
+                              khiBamKiemTraChinhTaToanVan: khiBamKiemTraChinhTaToanVan,
+                              khiBamKiemTraDauCauToanVan: khiBamKiemTraDauCauToanVan,
                               khiBamChuyenFileAmThanh: khiBamChuyenFileAmThanh,
                               khiBamChuyenAnhThanhVanBan: khiBamChuyenAnhThanhVanBan,
                               khiBamChupAnh: khiBamChupAnh,
@@ -1237,6 +1246,8 @@ class _NutAIMenu extends StatelessWidget {
     required this.rong,
     required this.khiBamCaiDatKiemTraToanVan,
     required this.khiBamKiemTraToanVan,
+    required this.khiBamKiemTraChinhTaToanVan,
+    required this.khiBamKiemTraDauCauToanVan,
     required this.khiBamChuyenFileAmThanh,
     required this.khiBamChuyenAnhThanhVanBan,
     required this.khiBamChupAnh,
@@ -1252,6 +1263,11 @@ class _NutAIMenu extends StatelessWidget {
   /// Mục 8c: "Kiểm tra toàn văn" dời từ một nút riêng ngoài thanh công cụ
   /// vào đây, giữ nguyên logic thật.
   final VoidCallback khiBamKiemTraToanVan;
+
+  /// Hai mục CHỈ MỘT PHẦN của "Kiểm tra toàn văn" — CHỈ chính tả / CHỈ dấu
+  /// câu, đặt ngay TRÊN mục đó trong menu.
+  final VoidCallback khiBamKiemTraChinhTaToanVan;
+  final VoidCallback khiBamKiemTraDauCauToanVan;
 
   /// Mục "Chuyển file âm thanh thành văn bản" — mở bộ chọn file, gửi cho
   /// cùng máy chủ/luồng AI đang dùng cho ghi âm trong app (nay chạy qua
@@ -1316,6 +1332,8 @@ class _NutAIMenu extends StatelessWidget {
           onSelected: (gia) {
             if (gia == 5) khiBamCaiDatKiemTraToanVan();
             if (gia == 9) khiBamKiemTraToanVan();
+            if (gia == 10) khiBamKiemTraChinhTaToanVan();
+            if (gia == 11) khiBamKiemTraDauCauToanVan();
             if (gia == 8) khiBamChuyenFileAmThanh();
             if (gia == 6) khiBamChuyenAnhThanhVanBan();
             if (gia == 7) khiBamChupAnh();
@@ -1354,6 +1372,13 @@ class _NutAIMenu extends StatelessWidget {
                 _mucMenuThem(3, 'Mở rộng toàn văn'),
                 _mucMenuThem(4, 'Viết lại cho hay hơn'),
                 _dividerMenu(),
+                // Hai mục CHỈ MỘT PHẦN của "Kiểm tra toàn văn" — ĐÚNG
+                // NGUYÊN cơ chế đó (cùng popup, cùng cách vẽ gạch đỏ lượn
+                // sóng/tô dấu câu), chỉ khác việc AI CHỈ tìm đúng một loại
+                // lỗi. Đặt ngay TRÊN "Kiểm tra toàn văn" theo đúng thứ tự
+                // yêu cầu.
+                _mucMenuThem(10, 'Kiểm tra lỗi chính tả toàn văn'),
+                _mucMenuThem(11, 'Kiểm tra dấu câu toàn văn'),
                 // "Kiểm tra toàn văn" dời từ một nút riêng ngoài thanh công
                 // cụ vào ngay TRÊN mục cài đặt của nó — giữ màu xanh lá +
                 // icon dấu tích ở đây; mục cài đặt bên dưới không cần tô màu

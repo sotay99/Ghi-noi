@@ -48,6 +48,13 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   bool _dangGui = false;
   bool _dinhKemVanBanMoiNhat = false;
 
+  /// Khác `null` khi đang sửa lại một tin nhắn người dùng đã gửi (bấm bút
+  /// chì) — giữ ĐÚNG chỉ số của tin nhắn đó trong [ManHinhTroChuyen.lichSu].
+  /// Gửi lại lúc này sẽ XOÁ tin nhắn cũ CÙNG mọi tin nhắn sau nó (kể cả câu
+  /// trả lời của AI), rồi coi như vừa gõ một câu hỏi mới đúng tại vị trí đó
+  /// — xem `_guiHoacXacNhanSua`.
+  int? _dangSuaChiSo;
+
   @override
   void dispose() {
     _oNhap.dispose();
@@ -114,6 +121,42 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     _cuonXuongDuoi();
   }
 
+  /// Nút bút chì trên một tin nhắn người dùng — nạp sẵn nội dung cũ vào ô
+  /// nhập để sửa, KHÔNG xoá gì cho tới khi thật sự bấm gửi lại (xem
+  /// `_guiHoacXacNhanSua`) — bấm bút chì rồi đổi ý (bấm chip "Huỷ sửa")
+  /// thì mọi thứ nguyên vẹn.
+  void _batDauSua(int chiSo) {
+    setState(() {
+      _dangSuaChiSo = chiSo;
+      _oNhap.text = widget.lichSu[chiSo].choHienThi;
+      _oNhap.selection = TextSelection.collapsed(offset: _oNhap.text.length);
+    });
+  }
+
+  void _huySua() {
+    setState(() {
+      _dangSuaChiSo = null;
+      _oNhap.clear();
+    });
+  }
+
+  /// Nút Gửi khi đang ở chế độ sửa: xoá tin nhắn cũ CÙNG mọi tin nhắn sau
+  /// nó (kể cả câu trả lời của AI đứng ngay sau), rồi để `_gui()` xử lý
+  /// tiếp y hệt một câu hỏi mới bình thường — nếu tin nhắn bị sửa vốn là
+  /// tin nhắn ĐẦU TIÊN, danh sách rỗng lại nên `_gui()` tự nhận ra đây lại
+  /// là "lượt đầu" và tự đính kèm toàn văn lại như cũ, không cần xử lý gì
+  /// thêm.
+  Future<void> _guiHoacXacNhanSua() async {
+    final chiSo = _dangSuaChiSo;
+    if (chiSo != null) {
+      setState(() {
+        widget.lichSu.removeRange(chiSo, widget.lichSu.length);
+        _dangSuaChiSo = null;
+      });
+    }
+    await _gui();
+  }
+
   Future<void> _xacNhanXoaTroChuyen() async {
     final dongY = await showDialog<bool>(
       context: context,
@@ -140,6 +183,8 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
       setState(() {
         widget.lichSu.clear();
         _dinhKemVanBanMoiNhat = false;
+        _dangSuaChiSo = null;
+        _oNhap.clear();
       });
     }
   }
@@ -179,40 +224,70 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                         ),
                       ),
                     )
-                  : ListView.builder(
-                      controller: _cuon,
-                      padding: const EdgeInsets.all(12),
-                      itemCount: widget.lichSu.length + (_dangGui ? 1 : 0),
-                      itemBuilder: (context, i) {
-                        if (i >= widget.lichSu.length) {
-                          return const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8),
-                            child: Row(
-                              children: [
-                                SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                ),
-                                SizedBox(width: 10),
-                                Text(
-                                  'AI đang trả lời...',
-                                  style: TextStyle(color: Color(0xFF5F6368)),
-                                ),
-                              ],
-                            ),
+                  : Builder(builder: (context) {
+                      // CHỈ 2 tin nhắn NGƯỜI DÙNG gần nhất được phép sửa —
+                      // tính sẵn tập chỉ số một lần mỗi lần build, tra cứu
+                      // nhanh trong itemBuilder bên dưới.
+                      final chiSoNguoiDung = [
+                        for (var i = 0; i < widget.lichSu.length; i++)
+                          if (widget.lichSu[i].laNguoiDung) i,
+                      ];
+                      final chiSoChoPhepSua = chiSoNguoiDung.length <= 2
+                          ? chiSoNguoiDung.toSet()
+                          : chiSoNguoiDung.sublist(chiSoNguoiDung.length - 2).toSet();
+
+                      return ListView.builder(
+                        controller: _cuon,
+                        padding: const EdgeInsets.all(12),
+                        itemCount: widget.lichSu.length + (_dangGui ? 1 : 0),
+                        itemBuilder: (context, i) {
+                          if (i >= widget.lichSu.length) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8),
+                              child: Row(
+                                children: [
+                                  SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                  SizedBox(width: 10),
+                                  Text(
+                                    'AI đang trả lời...',
+                                    style: TextStyle(color: Color(0xFF5F6368)),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                          final t = widget.lichSu[i];
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: t.laNguoiDung
+                                ? _BongBongNguoiDung(
+                                    chu: t.choHienThi,
+                                    onSua: (!_dangGui && chiSoChoPhepSua.contains(i))
+                                        ? () => _batDauSua(i)
+                                        : null,
+                                  )
+                                : _TinNhanAi(chu: t.choHienThi),
                           );
-                        }
-                        final t = widget.lichSu[i];
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          child: t.laNguoiDung
-                              ? _BongBongNguoiDung(chu: t.choHienThi)
-                              : _TinNhanAi(chu: t.choHienThi),
-                        );
-                      },
-                    ),
+                        },
+                      );
+                    }),
             ),
+            if (_dangSuaChiSo != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Chip(
+                    avatar: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('Đang sửa tin nhắn — gửi lại sẽ xoá các tin nhắn sau đó'),
+                    onDeleted: _huySua,
+                  ),
+                ),
+              ),
             if (_dinhKemVanBanMoiNhat)
               Padding(
                 padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
@@ -248,7 +323,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                       minLines: 1,
                       maxLines: 5,
                       textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _gui(),
+                      onSubmitted: (_) => _guiHoacXacNhanSua(),
                       decoration: const InputDecoration(
                         hintText: 'Nhập câu hỏi...',
                         border: OutlineInputBorder(
@@ -260,7 +335,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  _NutGui(dangGui: _dangGui, khiBam: _gui),
+                  _NutGui(dangGui: _dangGui, khiBam: _guiHoacXacNhanSua),
                 ],
               ),
             ),
@@ -296,25 +371,79 @@ class _NutGui extends StatelessWidget {
   }
 }
 
+/// Sao chép [chu] vào bộ nhớ đệm của thiết bị, kèm thông báo ngắn — dùng
+/// CHUNG cho mọi nút "Sao chép" trong màn hình này (bong bóng người dùng,
+/// tin nhắn AI, khung kết quả riêng từng khối ```...```).
+void _saoChep(BuildContext context, String chu) {
+  Clipboard.setData(ClipboardData(text: chu));
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('Đã sao chép'), duration: Duration(seconds: 1)),
+  );
+}
+
+/// Nút hành động nhỏ (sao chép/sửa) hiện dưới mỗi tin nhắn — icon nhỏ, màu
+/// xám nhạt, không lấn át nội dung chính.
+class _NutHanhDongNho extends StatelessWidget {
+  const _NutHanhDongNho({required this.icon, required this.tooltip, required this.onTap});
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Icon(icon, size: 15, color: const Color(0xFF5F6368)),
+        ),
+      ),
+    );
+  }
+}
+
 /// Bong bóng tin nhắn của người dùng — bọc khung, sát mép phải. Cho chọn
-/// văn bản để sao chép (`SelectableText`).
+/// văn bản để sao chép (`SelectableText`), kèm nút Sao chép + nút Sửa (bút
+/// chì, chỉ hiện khi [onSua] khác `null` — xem giới hạn "2 tin nhắn gần
+/// nhất" ở nơi gọi).
 class _BongBongNguoiDung extends StatelessWidget {
-  const _BongBongNguoiDung({required this.chu});
+  const _BongBongNguoiDung({required this.chu, required this.onSua});
   final String chu;
+  final VoidCallback? onSua;
 
   @override
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.centerRight,
-      child: Container(
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: _mauChinh.withValues(alpha: 0.1),
-          border: Border.all(color: _mauChinh.withValues(alpha: 0.4)),
-          borderRadius: const BorderRadius.all(Radius.circular(14)),
-        ),
-        child: SelectableText(chu),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Container(
+            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: _mauChinh.withValues(alpha: 0.1),
+              border: Border.all(color: _mauChinh.withValues(alpha: 0.4)),
+              borderRadius: const BorderRadius.all(Radius.circular(14)),
+            ),
+            child: SelectableText(chu),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (onSua != null)
+                _NutHanhDongNho(icon: Icons.edit_outlined, tooltip: 'Sửa', onTap: onSua!),
+              _NutHanhDongNho(
+                icon: Icons.copy,
+                tooltip: 'Sao chép',
+                onTap: () => _saoChep(context, chu),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -346,6 +475,14 @@ class _TinNhanAi extends StatelessWidget {
                     TextSpan(children: _spanDoanVanBan(d.chu, kieuGoc)),
                   ),
           ),
+        // Sao chép NGUYÊN VĂN cả tin nhắn (gồm cả dấu ```...``` nếu có) —
+        // khác với nút "Sao chép" riêng trong từng khung kết quả (chỉ sao
+        // chép đúng khối đó).
+        _NutHanhDongNho(
+          icon: Icons.copy,
+          tooltip: 'Sao chép',
+          onTap: () => _saoChep(context, chu),
+        ),
       ],
     );
   }
@@ -474,15 +611,7 @@ class _KhungKetQua extends StatelessWidget {
           Align(
             alignment: Alignment.centerRight,
             child: TextButton.icon(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: chu));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Đã sao chép'),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
-              },
+              onPressed: () => _saoChep(context, chu),
               icon: const Icon(Icons.copy, size: 16),
               label: const Text('Sao chép'),
               style: TextButton.styleFrom(
