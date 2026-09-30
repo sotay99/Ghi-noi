@@ -44,6 +44,10 @@ COMPILE_SDK_TOI_THIEU = 37
 QUYEN = (
     '    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n'
     '    <uses-permission android:name="android.permission.INTERNET"/>\n'
+    # Mục "Chụp ảnh (camera)" (image_picker, ImageSource.camera) trong menu
+    # "Làm việc với AI" — thiếu quyền này thì bấm chụp ảnh không mở được
+    # camera, không báo lỗi rõ ràng.
+    '    <uses-permission android:name="android.permission.CAMERA"/>\n'
 )
 
 # Android 11 trở lên: không khai <queries> thì ứng dụng không nhìn thấy dịch vụ
@@ -188,7 +192,7 @@ def main() -> int:
     # Kiem lai: thieu mot trong ba thu nay la ban APK dung nhung micro chet.
     lai = MANIFEST.read_text(encoding='utf-8')
     for can in ('RECORD_AUDIO', 'android.permission.INTERNET',
-                'android.speech.RecognitionService'):
+                'android.permission.CAMERA', 'android.speech.RecognitionService'):
         if can not in lai:
             print(f'LOI: manifest van thieu {can}', file=sys.stderr)
             return 1

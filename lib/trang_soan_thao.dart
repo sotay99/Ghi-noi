@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import 'cai_dat.dart';
@@ -6074,19 +6075,69 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           }
 
           return AlertDialog(
-            title: Text(laCuoi
-                ? 'Sắp chạm giới hạn $tongPhut phút'
-                : 'Sắp chạm giới hạn 60 giây'),
-            content: Text(laCuoi
-                ? 'Thẻ ghi âm #$soThe (thẻ tự động thứ '
-                    '$_soLanToiDaTuDongTaoTheLienTiep liên tiếp) sắp ghi đủ 60 '
-                    'giây, tổng cộng sắp chạm $tongPhut phút không ai bấm gì. '
-                    'Nếu không chọn, tới đúng giây thứ 60 hệ thống sẽ TỰ NGỪNG '
-                    'ghi âm luôn, KHÔNG tạo thêm thẻ mới nữa (để tránh tốn '
-                    'token AI và pin máy vô ích). Bạn muốn làm gì bây giờ?'
-                : 'Thẻ ghi âm #$soThe sắp ghi đủ 60 giây. Nếu không chọn, '
-                    'tới đúng giây thứ 60 nó sẽ tự động chốt và ghi tiếp bằng '
-                    'một thẻ mới. Bạn muốn làm gì bây giờ?'),
+            title: laCuoi
+                ? RichText(
+                    text: TextSpan(
+                      style: DefaultTextStyle.of(context)
+                          .style
+                          .copyWith(fontWeight: FontWeight.bold, fontSize: 20),
+                      children: [
+                        const TextSpan(text: 'Sắp chạm giới hạn '),
+                        TextSpan(
+                          text: '$tongPhut phút',
+                          style: const TextStyle(
+                            backgroundColor: Colors.yellowAccent,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : const Text('Sắp chạm giới hạn 60 giây'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _DemGiayCanhBaoTheGhiAm(
+                  thoiLuong: _thoiLuongTheGhiAmDangGhi,
+                  gioiHan: _gioiHanMoiTheGhiAm,
+                ),
+                const SizedBox(height: 10),
+                if (laCuoi)
+                  RichText(
+                    text: TextSpan(
+                      style: DefaultTextStyle.of(context).style,
+                      children: [
+                        TextSpan(
+                          text: 'Thẻ ghi âm #$soThe (thẻ tự động thứ '
+                              '$_soLanToiDaTuDongTaoTheLienTiep liên tiếp) sắp ghi đủ 60 '
+                              'giây, tổng cộng sắp chạm $tongPhut phút không ai bấm gì. ',
+                        ),
+                        const TextSpan(
+                          text: 'Nếu không chọn, tới đúng giây thứ 60 hệ '
+                              'thống sẽ TỰ NGỪNG ghi âm luôn, KHÔNG tạo '
+                              'thêm thẻ mới nữa',
+                          style: TextStyle(
+                            backgroundColor: Colors.yellowAccent,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const TextSpan(
+                          text: ' (để tránh tốn token AI và pin máy vô ích). '
+                              'Bạn muốn làm gì bây giờ?',
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Text(
+                    'Thẻ ghi âm #$soThe sắp ghi đủ 60 giây. Bạn có thể '
+                    'không cần làm gì bây giờ cả — tới đúng giây thứ 60 nó '
+                    'sẽ tự động chốt và ghi tiếp bằng một thẻ mới. Bạn '
+                    'muốn làm gì bây giờ?',
+                  ),
+              ],
+            ),
             // 5 lựa chọn — nút Tạm dừng/Tiếp tục luôn đứng ĐẦU, rồi tới 4 nút
             // "Hoàn thành..."/"Tạo bản ghi âm mới" như cũ, dùng lại đúng các
             // hàm đã có sẵn cho AppBar/bảng điều khiển trình ghi âm.
@@ -10999,6 +11050,74 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _moModalKetQuaFileAmThanh(vanBanKetQua, tieuDe: 'Văn bản từ hình ảnh');
   }
 
+  /// Mục "Chụp ảnh (camera)" trong menu "Làm việc với AI" — ĐÚNG LUỒNG với
+  /// `_chonVaChuyenAnhThanhVanBan` ở trên (cùng gọi Gemini, cùng modal kết
+  /// quả sửa được + Huỷ có xác nhận + Chọn vị trí để chèn), chỉ khác nguồn
+  /// ảnh: mở thẳng camera thiết bị (`image_picker`) thay vì bộ chọn tệp có
+  /// sẵn.
+  Future<void> _chupVaChuyenAnhThanhVanBan() async {
+    XFile? anh;
+    try {
+      anh = await ImagePicker().pickImage(source: ImageSource.camera);
+    } catch (e) {
+      if (mounted) _bao('Không mở được camera: $e');
+      return;
+    }
+    if (anh == null) return; // người dùng huỷ chụp (bấm lùi lại/đóng camera).
+
+    Uint8List bytes;
+    try {
+      bytes = await anh.readAsBytes();
+    } catch (e) {
+      if (mounted) _bao('Không đọc được ảnh vừa chụp: $e');
+      return;
+    }
+    if (bytes.length > _gioiHanTepAnhByte) {
+      final soMB = (bytes.length / (1024 * 1024)).toStringAsFixed(1);
+      _bao('Ảnh vừa chụp nặng ${soMB}MB, vượt quá 15MB cho phép.');
+      return;
+    }
+
+    final phanDuoi = anh.name.contains('.') ? anh.name.split('.').last : 'jpg';
+    final mimeType = anh.mimeType ?? _doanMimeAnhTuDuoiTep(phanDuoi);
+
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const AlertDialog(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+            SizedBox(width: 16),
+            Expanded(child: Text('Đang chuyển hình ảnh thành văn bản...')),
+          ],
+        ),
+      ),
+    );
+
+    String? vanBanKetQua;
+    String? loi;
+    try {
+      vanBanKetQua = await guiAnhChoGemini(bytes, mimeType);
+    } catch (e) {
+      loi = e.toString();
+    }
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop(); // đóng hộp "đang xử lý".
+
+    if (loi != null || vanBanKetQua == null || vanBanKetQua.trim().isEmpty) {
+      _bao('Chuyển ảnh thất bại: ${loi ?? "không có nội dung trả về."}');
+      return;
+    }
+
+    _moModalKetQuaFileAmThanh(vanBanKetQua, tieuDe: 'Văn bản từ ảnh chụp');
+  }
+
   /// Giữ nội dung modal kết quả AI qua nhiều lần mở/đóng (bấm "Chọn vị trí
   /// để chèn văn bản" chỉ ẨN modal, không đóng hẳn — quay lại vẫn phải thấy
   /// đúng bản người dùng vừa sửa, không phải bản gốc AI trả về ban đầu).
@@ -12712,6 +12831,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 khiBamCaiDatKiemTraToanVan: _moModalCaiDatKiemTraToanVan,
                 khiBamChuyenFileAmThanh: _chonVaChuyenFileAmThanh,
                 khiBamChuyenAnhThanhVanBan: _chonVaChuyenAnhThanhVanBan,
+                khiBamChupAnh: _chupVaChuyenAnhThanhVanBan,
                 khiBamBanPhim: () => _moModalTam(
                   'Bàn phím',
                   Icons.keyboard_outlined,
@@ -12795,6 +12915,70 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           _nhanDoanSo(caoBanPhim),
         ],
       ),
+    );
+  }
+}
+
+/// Dòng "Đang ở giây thứ N / M" trong hộp thoại cảnh báo sắp chạm giới hạn
+/// thẻ ghi âm (`_hienCanhBaoGioiHanTheGhiAmNeuChua`) — sống theo
+/// `_thoiLuongTheGhiAmDangGhi` (cập nhật mỗi giây), và tự nhấp nháy (đổi độ
+/// mờ liên tục) khi chỉ còn 5 giây cuối trước mốc cứng `gioiHan`, để người
+/// dùng dễ nhận ra đang gấp.
+class _DemGiayCanhBaoTheGhiAm extends StatefulWidget {
+  const _DemGiayCanhBaoTheGhiAm({required this.thoiLuong, required this.gioiHan});
+
+  final ValueListenable<Duration> thoiLuong;
+  final Duration gioiHan;
+
+  @override
+  State<_DemGiayCanhBaoTheGhiAm> createState() => _DemGiayCanhBaoTheGhiAmState();
+}
+
+class _DemGiayCanhBaoTheGhiAmState extends State<_DemGiayCanhBaoTheGhiAm>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _dieuKhien;
+
+  @override
+  void initState() {
+    super.initState();
+    _dieuKhien = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _dieuKhien.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final gioiHanGiay = widget.gioiHan.inSeconds;
+    return ValueListenableBuilder<Duration>(
+      valueListenable: widget.thoiLuong,
+      builder: (context, thoiLuong, _) {
+        final giay = thoiLuong.inSeconds.clamp(0, gioiHanGiay);
+        final sapCham = giay >= gioiHanGiay - 5;
+        final chu = Text(
+          'Đang ở giây thứ $giay / $gioiHanGiay giây',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+            color: sapCham ? Colors.red.shade700 : Colors.black87,
+          ),
+        );
+        if (!sapCham) return chu;
+        return AnimatedBuilder(
+          animation: _dieuKhien,
+          builder: (context, child) => Opacity(
+            opacity: 0.3 + 0.7 * _dieuKhien.value,
+            child: child,
+          ),
+          child: chu,
+        );
+      },
     );
   }
 }

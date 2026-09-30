@@ -26,6 +26,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamCaiDatKiemTraToanVan,
     required this.khiBamChuyenFileAmThanh,
     required this.khiBamChuyenAnhThanhVanBan,
+    required this.khiBamChupAnh,
     required this.khiBamBanPhim,
     required this.khiBamBoPhimNhanh,
     required this.boPhimNhanhDangMo,
@@ -74,6 +75,10 @@ class ThanhCongCu extends StatelessWidget {
   final VoidCallback khiBamCaiDatKiemTraToanVan;
   final VoidCallback khiBamChuyenFileAmThanh;
   final VoidCallback khiBamChuyenAnhThanhVanBan;
+
+  /// Mục "Chụp ảnh (camera)" — mở camera thiết bị, chụp một tấm, rồi chuyển
+  /// hoá y hệt luồng "Chuyển hình ảnh thành văn bản" (qua Gemini).
+  final VoidCallback khiBamChupAnh;
   final VoidCallback khiBamBanPhim;
 
   /// "Bộ phím nhanh cho màn hình cảm ứng" (mục "Bật/Tắt..." trong "+ Thêm
@@ -217,6 +222,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamKiemTraToanVan: khiBamKiemTraToanVan,
                               khiBamChuyenFileAmThanh: khiBamChuyenFileAmThanh,
                               khiBamChuyenAnhThanhVanBan: khiBamChuyenAnhThanhVanBan,
+                              khiBamChupAnh: khiBamChupAnh,
                             ),
                           ),
                           _NutCoChuThich(
@@ -1196,9 +1202,9 @@ class _NutTaiKhoanMenu extends StatelessWidget {
 
 /// Menu thả xuống của nút "Làm việc với AI" — cùng cơ chế với
 /// `_NutThemMenu` (PopupMenuButton tự neo ngay phía trên nút vì nút nằm sát
-/// đáy màn hình). "Chuyển hình ảnh thành văn bản", "Chuyển file âm thanh
-/// thành văn bản" và "Cài đặt nút "Kiểm tra toàn văn"" đã gọi callback
-/// thật; "Chụp ảnh (camera)" và bốn mục AI-về-chữ (trò chuyện/tóm tắt/mở
+/// đáy màn hình). "Chuyển hình ảnh thành văn bản", "Chụp ảnh (camera)",
+/// "Chuyển file âm thanh thành văn bản" và "Cài đặt nút "Kiểm tra toàn
+/// văn"" đã gọi callback thật; bốn mục AI-về-chữ (trò chuyện/tóm tắt/mở
 /// rộng/viết lại) vẫn chưa gắn logic.
 class _NutAIMenu extends StatelessWidget {
   const _NutAIMenu({
@@ -1207,6 +1213,7 @@ class _NutAIMenu extends StatelessWidget {
     required this.khiBamKiemTraToanVan,
     required this.khiBamChuyenFileAmThanh,
     required this.khiBamChuyenAnhThanhVanBan,
+    required this.khiBamChupAnh,
   });
 
   final bool rong;
@@ -1225,6 +1232,10 @@ class _NutAIMenu extends StatelessWidget {
   /// trên (chọn tệp, gửi AI, modal kết quả sửa được + Chọn vị trí để chèn),
   /// chỉ khác gửi qua Gemini thay vì Groq.
   final VoidCallback khiBamChuyenAnhThanhVanBan;
+
+  /// Mục "Chụp ảnh (camera)" — mở camera thiết bị rồi chuyển hoá y hệt luồng
+  /// "Chuyển hình ảnh thành văn bản" ở trên.
+  final VoidCallback khiBamChupAnh;
 
   @override
   Widget build(BuildContext context) {
@@ -1257,6 +1268,7 @@ class _NutAIMenu extends StatelessWidget {
             if (gia == 9) khiBamKiemTraToanVan();
             if (gia == 8) khiBamChuyenFileAmThanh();
             if (gia == 6) khiBamChuyenAnhThanhVanBan();
+            if (gia == 7) khiBamChupAnh();
           },
           // (VIỆC 3) Xem chú thích ở `_NutThemMenu` — cùng cơ chế: một
           // `ScrollController` mới mỗi lần menu mở, dùng chung giữa nút cuộn
@@ -1273,7 +1285,9 @@ class _NutAIMenu extends StatelessWidget {
                 // logic thật, ĐÚNG LUỒNG với "Chuyển file âm thanh thành văn
                 // bản" (xem `_chonVaChuyenAnhThanhVanBan`/
                 // `_chonVaChuyenFileAmThanh` trong `trang_soan_thao.dart`).
-                // "Chụp ảnh (camera)" vẫn chưa gắn logic.
+                // "Chụp ảnh (camera)" cũng đã gắn logic thật — xem
+                // `_chupVaChuyenAnhThanhVanBan` (mở camera thay vì bộ chọn
+                // tệp, còn lại y hệt).
                 _mucMenuThem(6, 'Chuyển hình ảnh thành văn bản'),
                 _mucMenuThem(7, 'Chụp ảnh (camera)'),
                 _mucMenuThem(8, 'Chuyển file âm thanh thành văn bản'),
