@@ -25,6 +25,7 @@ import 'ghi_am_the.dart';
 import 'the_tich_chon.dart';
 import 'gui_ghi_am_gemini.dart';
 import 'gui_anh_gemini.dart';
+import 'gui_tom_tat_gemini.dart';
 import 'canh_bao_roi_trang.dart';
 import 'kho_du_lieu.dart';
 import 'theo_doi_tap_doi_phim.dart';
@@ -3891,6 +3892,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henHetLietPastePhimAo?.cancel();
     _henHetCheDoNhanhChonTatCa?.cancel();
     _oKetQuaFileAmThanh?.dispose();
+    _oKetQuaTomTat?.dispose();
     _theoDoiTapDoi.dispose();
     _cuonVanBan.removeListener(_khiCuonVanBanBaoDoanSo);
     _conTroDangHien.dispose();
@@ -6074,21 +6076,22 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             capNhat(() {});
           }
 
+          // Chữ thường, đen, cỡ bình thường — chỉ tô sáng (nền vàng) những
+          // đoạn cần nổi bật, và tô ĐỎ riêng con số phút. Trước đây to/đậm
+          // cả tiêu đề lẫn cả câu — nhìn rối, đã bỏ theo góp ý.
+          final kieuChuThuong = DefaultTextStyle.of(context)
+              .style
+              .copyWith(color: Colors.black87, fontWeight: FontWeight.normal);
           return AlertDialog(
             title: laCuoi
                 ? RichText(
                     text: TextSpan(
-                      style: DefaultTextStyle.of(context)
-                          .style
-                          .copyWith(fontWeight: FontWeight.bold, fontSize: 20),
+                      style: kieuChuThuong.copyWith(fontWeight: FontWeight.bold),
                       children: [
                         const TextSpan(text: 'Sắp chạm giới hạn '),
                         TextSpan(
                           text: '$tongPhut phút',
-                          style: const TextStyle(
-                            backgroundColor: Colors.yellowAccent,
-                            color: Colors.black,
-                          ),
+                          style: const TextStyle(color: Colors.red),
                         ),
                       ],
                     ),
@@ -6106,21 +6109,23 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 if (laCuoi)
                   RichText(
                     text: TextSpan(
-                      style: DefaultTextStyle.of(context).style,
+                      style: kieuChuThuong,
                       children: [
                         TextSpan(
                           text: 'Thẻ ghi âm #$soThe (thẻ tự động thứ '
                               '$_soLanToiDaTuDongTaoTheLienTiep liên tiếp) sắp ghi đủ 60 '
-                              'giây, tổng cộng sắp chạm $tongPhut phút không ai bấm gì. ',
+                              'giây, tổng cộng sắp chạm ',
                         ),
+                        TextSpan(
+                          text: '$tongPhut phút',
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                        const TextSpan(text: ' không ai bấm gì. '),
                         const TextSpan(
                           text: 'Nếu không chọn, tới đúng giây thứ 60 hệ '
                               'thống sẽ TỰ NGỪNG ghi âm luôn, KHÔNG tạo '
                               'thêm thẻ mới nữa',
-                          style: TextStyle(
-                            backgroundColor: Colors.yellowAccent,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: TextStyle(backgroundColor: Colors.yellowAccent),
                         ),
                         const TextSpan(
                           text: ' (để tránh tốn token AI và pin máy vô ích). '
@@ -6130,11 +6135,27 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     ),
                   )
                 else
-                  Text(
-                    'Thẻ ghi âm #$soThe sắp ghi đủ 60 giây. Bạn có thể '
-                    'không cần làm gì bây giờ cả — tới đúng giây thứ 60 nó '
-                    'sẽ tự động chốt và ghi tiếp bằng một thẻ mới. Bạn '
-                    'muốn làm gì bây giờ?',
+                  RichText(
+                    text: TextSpan(
+                      style: kieuChuThuong,
+                      children: [
+                        TextSpan(
+                          text: 'Thẻ ghi âm #$soThe sắp ghi đủ 60 giây. ',
+                        ),
+                        const TextSpan(
+                          text: 'Bạn có thể không cần làm gì bây giờ cả',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const TextSpan(
+                          text: ' — tới đúng giây thứ 60 nó sẽ tự động chốt '
+                              'và ghi tiếp bằng một thẻ mới. Bạn muốn làm '
+                              'gì bây giờ?',
+                        ),
+                      ],
+                    ),
                   ),
               ],
             ),
@@ -11050,6 +11071,273 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _moModalKetQuaFileAmThanh(vanBanKetQua, tieuDe: 'Văn bản từ hình ảnh');
   }
 
+  /// Mục "Tóm tắt toàn văn" trong menu "Làm việc với AI" — mở modal "Chọn
+  /// kiểu tóm tắt" trước khi gọi Gemini: theo % độ dài, theo câu lệnh tự do
+  /// của người dùng, hoặc cả hai — bắt buộc chọn ít nhất một trong hai mới
+  /// bấm "Gửi cho AI xử lý" được.
+  void _moModalChonKieuTomTat() {
+    if (_boDieuKhien.text.trim().isEmpty) {
+      _bao('Trang đang trống, không có gì để tóm tắt.');
+      return;
+    }
+    var chonPhanTram = true;
+    var phanTram = 50.0;
+    var chonCauLenh = false;
+    final oCauLenh = TextEditingController();
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, capNhat) {
+          final coTheGui = chonPhanTram || chonCauLenh;
+          return AlertDialog(
+            title: const Text('Chọn kiểu tóm tắt'),
+            content: SizedBox(
+              width: 420,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      value: chonPhanTram,
+                      onChanged: (gia) => capNhat(() => chonPhanTram = gia ?? false),
+                      title: const Text('Tóm tắt theo phần trăm'),
+                    ),
+                    if (chonPhanTram) ...[
+                      Text(
+                        'Rút gọn còn ${phanTram.round()}% văn bản gốc',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Color(0xFF1A73E8),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Slider(
+                        value: phanTram,
+                        min: 10,
+                        max: 90,
+                        divisions: 80,
+                        label: '${phanTram.round()}%',
+                        onChanged: (gia) => capNhat(() => phanTram = gia),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      value: chonCauLenh,
+                      onChanged: (gia) => capNhat(() => chonCauLenh = gia ?? false),
+                      title: const Text('Rút gọn theo yêu cầu của bạn'),
+                    ),
+                    if (chonCauLenh)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 12, right: 4),
+                        child: TextField(
+                          controller: oCauLenh,
+                          maxLines: 3,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            hintText: 'Ví dụ: chỉ giữ lại các ý chính về...',
+                            contentPadding: EdgeInsets.all(8),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Đóng bảng'),
+              ),
+              FilledButton(
+                onPressed: !coTheGui
+                    ? null
+                    : () {
+                        Navigator.of(ctx).pop();
+                        _guiTomTatChoAi(
+                          phanTram: chonPhanTram ? phanTram.round() : null,
+                          huongDanNguoiDung: chonCauLenh ? oCauLenh.text : null,
+                        );
+                      },
+                child: const Text('Gửi cho AI xử lý'),
+              ),
+            ],
+          );
+        },
+      ),
+    ).then((_) => oCauLenh.dispose());
+  }
+
+  Future<void> _guiTomTatChoAi({int? phanTram, String? huongDanNguoiDung}) async {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const AlertDialog(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+            SizedBox(width: 16),
+            Expanded(child: Text('Đang tóm tắt toàn văn...')),
+          ],
+        ),
+      ),
+    );
+
+    String? vanBanKetQua;
+    String? loi;
+    try {
+      vanBanKetQua = await guiTomTatChoGemini(
+        _boDieuKhien.text,
+        phanTram: phanTram,
+        huongDanNguoiDung: huongDanNguoiDung,
+      );
+    } catch (e) {
+      loi = e.toString();
+    }
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop(); // đóng hộp "đang xử lý".
+
+    if (loi != null || vanBanKetQua == null || vanBanKetQua.trim().isEmpty) {
+      _bao('Tóm tắt thất bại: ${loi ?? "không có nội dung trả về."}');
+      return;
+    }
+
+    _moModalKetQuaTomTat(vanBanKetQua);
+  }
+
+  /// Giữ nội dung modal kết quả "Tóm tắt toàn văn" qua lần mở lại (nếu có,
+  /// dù luồng hiện tại luôn mở-rồi-đóng-hẳn) — cùng ý tưởng
+  /// `_oKetQuaFileAmThanh`, nhưng KHÔNG có "Chọn vị trí để chèn văn bản":
+  /// tính năng này luôn thay thế TOÀN VĂN, không chèn tại một vị trí.
+  TextEditingController? _oKetQuaTomTat;
+
+  void _dongHanKetQuaTomTat() {
+    _oKetQuaTomTat?.dispose();
+    _oKetQuaTomTat = null;
+  }
+
+  void _moModalKetQuaTomTat(String vanBan) {
+    _oKetQuaTomTat ??= TextEditingController(text: vanBan);
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Kết quả tóm tắt'),
+        content: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Bạn có thể bấm vào ô bên dưới để sửa lại chữ tuỳ ý trước khi thay thế.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+              ),
+              const SizedBox(height: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 320),
+                child: SingleChildScrollView(
+                  child: TextField(
+                    controller: _oKetQuaTomTat,
+                    maxLines: null,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.all(10),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actionsAlignment: MainAxisAlignment.spaceBetween,
+        actions: [
+          TextButton(
+            onPressed: () => _xacNhanHuyKetQuaTomTat(ctx),
+            child: Text('Huỷ', style: TextStyle(color: Colors.red.shade600)),
+          ),
+          FilledButton(
+            onPressed: () {
+              final vb = _oKetQuaTomTat?.text ?? '';
+              Navigator.of(ctx).pop();
+              _dongHanKetQuaTomTat();
+              if (vb.trim().isNotEmpty) _thayTheToanBoVanBan(vb);
+            },
+            child: const Text('Thay thế toàn bộ văn bản'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _xacNhanHuyKetQuaTomTat(BuildContext ctxModal) async {
+    final dongY = await showDialog<bool>(
+      context: context,
+      builder: (ctx2) => AlertDialog(
+        title: const Text('Huỷ kết quả tóm tắt?'),
+        content: const Text(
+          'Văn bản AI vừa tóm tắt (kể cả phần bạn đã sửa, nếu có) sẽ mất hẳn, '
+          'không thể lấy lại. Bạn có chắc chắn muốn huỷ không?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx2).pop(false),
+            child: const Text('Không, giữ lại'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx2).pop(true),
+            child: Text('Huỷ', style: TextStyle(color: Colors.red.shade600)),
+          ),
+        ],
+      ),
+    );
+    if (dongY == true && mounted) {
+      Navigator.of(ctxModal).pop();
+      _dongHanKetQuaTomTat();
+    }
+  }
+
+  /// Nút "Thay thế toàn bộ văn bản" ở modal kết quả "Tóm tắt toàn văn" — xoá
+  /// sạch văn bản hiện tại, ghi đè bằng [vanBanMoi]. Y HỆT logic `_xoaTatCa`
+  /// (mọi mốc trạng thái phải reset về vạch xuất phát, nếu không câu nói kế
+  /// tiếp lại nhắm vào vị trí không còn tồn tại) — chỉ khác ghi [vanBanMoi]
+  /// thay vì chuỗi rỗng. `_luuDiemMoc()` chụp lại bản CŨ trước khi ghi đè
+  /// (kèm lưu vào bộ nhớ đệm qua `_luuVanBan()`), để Lùi lại (Ctrl+Z) khôi
+  /// phục đúng bản gốc.
+  Future<void> _thayTheToanBoVanBan(String vanBanMoi) async {
+    _luuDiemMoc();
+
+    _ghiVaoO(vanBanMoi, vanBanMoi.length);
+    _neo = vanBanMoi.length;
+    _chuTam = '';
+    _tuDaChotTrongPhien = [];
+    _partialTruocDo = [];
+    _henChinhTa?.cancel();
+    _boDieuKhien.loi.clear();
+    for (final k in _boDieuKhien.khongPhuHop) {
+      k.henNhapNhay?.cancel();
+    }
+    _boDieuKhien.khongPhuHop.clear();
+    for (final x in _boDieuKhien.canXoa) {
+      x.henNhapNhay?.cancel();
+    }
+    _boDieuKhien.canXoa.clear();
+    _viTriDaKiemTraChinhTa = 0;
+    _cacViTriDuongKeChia.clear();
+    _viTriChoVietHoa = null;
+    _boQuaCauNay = _micro.isListening;
+    await _luuVanBan();
+    if (mounted) _bao('Đã thay thế toàn bộ văn bản bằng bản tóm tắt.');
+  }
+
   /// Mục "Chụp ảnh (camera)" trong menu "Làm việc với AI" — ĐÚNG LUỒNG với
   /// `_chonVaChuyenAnhThanhVanBan` ở trên (cùng gọi Gemini, cùng modal kết
   /// quả sửa được + Huỷ có xác nhận + Chọn vị trí để chèn), chỉ khác nguồn
@@ -12832,6 +13120,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 khiBamChuyenFileAmThanh: _chonVaChuyenFileAmThanh,
                 khiBamChuyenAnhThanhVanBan: _chonVaChuyenAnhThanhVanBan,
                 khiBamChupAnh: _chupVaChuyenAnhThanhVanBan,
+                khiBamTomTatToanVan: _moModalChonKieuTomTat,
                 khiBamBanPhim: () => _moModalTam(
                   'Bàn phím',
                   Icons.keyboard_outlined,
@@ -12960,16 +13249,19 @@ class _DemGiayCanhBaoTheGhiAmState extends State<_DemGiayCanhBaoTheGhiAm>
       valueListenable: widget.thoiLuong,
       builder: (context, thoiLuong, _) {
         final giay = thoiLuong.inSeconds.clamp(0, gioiHanGiay);
-        final sapCham = giay >= gioiHanGiay - 5;
+        // Đỏ từ 10 giây cuối (ví dụ giây 50/60), đỏ VÀ nhấp nháy từ 5 giây
+        // cuối (giây 55/60) — hai mốc tách riêng theo đúng yêu cầu.
+        final sapDo = giay >= gioiHanGiay - 10;
+        final sapNhapNhay = giay >= gioiHanGiay - 5;
         final chu = Text(
           'Đang ở giây thứ $giay / $gioiHanGiay giây',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 15,
-            color: sapCham ? Colors.red.shade700 : Colors.black87,
+            color: sapDo ? Colors.red.shade700 : Colors.black87,
           ),
         );
-        if (!sapCham) return chu;
+        if (!sapNhapNhay) return chu;
         return AnimatedBuilder(
           animation: _dieuKhien,
           builder: (context, child) => Opacity(

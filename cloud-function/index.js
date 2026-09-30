@@ -24,7 +24,7 @@ const QUY_TAC_CHINH_TA_CHUNG =
 function huongDanTheoHanhDong(action, cauHoi) {
   switch (action) {
     case 'tom_tat':
-      return 'Tóm tắt đoạn văn bản tiếng Việt sau đây, ngắn gọn, giữ đúng ý chính. Chỉ trả về đúng phần tóm tắt, không thêm lời dẫn:';
+      return null; // Xử lý riêng trong huongDanTomTat() — cần ghép % độ dài và/hoặc câu lệnh tuỳ chỉnh của người dùng.
     case 'mo_rong':
       return 'Mở rộng đoạn văn bản tiếng Việt sau đây, thêm chi tiết hợp lý, giữ nguyên văn phong gốc. Chỉ trả về đúng đoạn văn đã mở rộng, không thêm lời dẫn:';
     case 'got_dua':
@@ -92,6 +92,33 @@ function huongDanToanVan(than) {
   }
 
   huongDan += ' Văn bản cần kiểm tra:';
+  return huongDan;
+}
+
+/// Hướng dẫn cho "Tóm tắt toàn văn" (modal "Chọn kiểu tóm tắt") — nhận thêm
+/// % độ dài mong muốn (`than.phanTram`, 10-90) và/hoặc câu lệnh tự do của
+/// người dùng (`than.huongDanNguoiDung`). Phía client đã chặn gửi lên khi cả
+/// hai đều trống (bắt buộc chọn ít nhất một), nhưng vẫn xử lý an toàn ở đây
+/// nếu lỡ thiếu — rơi về tóm tắt ngắn gọn mặc định.
+function huongDanTomTat(than) {
+  const phanTram =
+    Number.isInteger(than.phanTram) && than.phanTram >= 10 && than.phanTram <= 90
+      ? than.phanTram
+      : null;
+  const huongDanNguoiDung =
+    typeof than.huongDanNguoiDung === 'string' ? than.huongDanNguoiDung.trim() : '';
+
+  let huongDan = 'Tóm tắt đoạn văn bản tiếng Việt sau đây, giữ đúng ý chính. ';
+
+  if (phanTram != null) {
+    huongDan +=
+      `Bản tóm tắt cần dài khoảng ${phanTram}% so với độ dài văn bản gốc (ước lượng theo số từ). `;
+  }
+  if (huongDanNguoiDung) {
+    huongDan +=
+      `NGOÀI ra, người dùng còn có yêu cầu riêng cho cách tóm tắt — ưu tiên làm theo ý này, nếu xung đột với chỉ dẫn ở trên thì theo ý người dùng: "${huongDanNguoiDung.slice(0, 800)}". `;
+  }
+  huongDan += 'Chỉ trả về đúng phần tóm tắt, không thêm lời dẫn, không thêm chú thích:';
   return huongDan;
 }
 
@@ -382,6 +409,8 @@ exports.flowriteAi = async (req, res) => {
     );
   } else if (action === 'toan_van') {
     huongDan = huongDanToanVan(than);
+  } else if (action === 'tom_tat') {
+    huongDan = huongDanTomTat(than);
   } else {
     huongDan = huongDanTheoHanhDong(action, cauHoi);
   }

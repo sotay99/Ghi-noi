@@ -27,6 +27,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamChuyenFileAmThanh,
     required this.khiBamChuyenAnhThanhVanBan,
     required this.khiBamChupAnh,
+    required this.khiBamTomTatToanVan,
     required this.khiBamBanPhim,
     required this.khiBamBoPhimNhanh,
     required this.boPhimNhanhDangMo,
@@ -70,8 +71,7 @@ class ThanhCongCu extends StatelessWidget {
 
   /// Gắn với mục "Cài đặt nút "Kiểm tra toàn văn"" trong menu "Làm việc với
   /// AI". "Chuyển file âm thanh thành văn bản" cũng đã gắn logic thật — các
-  /// mục còn lại (trò chuyện, tóm tắt, mở rộng, viết lại) vẫn chỉ là chỗ đặt
-  /// trước.
+  /// mục còn lại (trò chuyện, mở rộng, viết lại) vẫn chỉ là chỗ đặt trước.
   final VoidCallback khiBamCaiDatKiemTraToanVan;
   final VoidCallback khiBamChuyenFileAmThanh;
   final VoidCallback khiBamChuyenAnhThanhVanBan;
@@ -79,6 +79,9 @@ class ThanhCongCu extends StatelessWidget {
   /// Mục "Chụp ảnh (camera)" — mở camera thiết bị, chụp một tấm, rồi chuyển
   /// hoá y hệt luồng "Chuyển hình ảnh thành văn bản" (qua Gemini).
   final VoidCallback khiBamChupAnh;
+
+  /// Mục "Tóm tắt toàn văn" — mở modal "Chọn kiểu tóm tắt" rồi gọi Gemini.
+  final VoidCallback khiBamTomTatToanVan;
   final VoidCallback khiBamBanPhim;
 
   /// "Bộ phím nhanh cho màn hình cảm ứng" (mục "Bật/Tắt..." trong "+ Thêm
@@ -223,6 +226,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamChuyenFileAmThanh: khiBamChuyenFileAmThanh,
                               khiBamChuyenAnhThanhVanBan: khiBamChuyenAnhThanhVanBan,
                               khiBamChupAnh: khiBamChupAnh,
+                              khiBamTomTatToanVan: khiBamTomTatToanVan,
                             ),
                           ),
                           _NutCoChuThich(
@@ -1203,9 +1207,9 @@ class _NutTaiKhoanMenu extends StatelessWidget {
 /// Menu thả xuống của nút "Làm việc với AI" — cùng cơ chế với
 /// `_NutThemMenu` (PopupMenuButton tự neo ngay phía trên nút vì nút nằm sát
 /// đáy màn hình). "Chuyển hình ảnh thành văn bản", "Chụp ảnh (camera)",
-/// "Chuyển file âm thanh thành văn bản" và "Cài đặt nút "Kiểm tra toàn
-/// văn"" đã gọi callback thật; bốn mục AI-về-chữ (trò chuyện/tóm tắt/mở
-/// rộng/viết lại) vẫn chưa gắn logic.
+/// "Chuyển file âm thanh thành văn bản", "Tóm tắt toàn văn" và "Cài đặt nút
+/// "Kiểm tra toàn văn"" đã gọi callback thật; ba mục AI-về-chữ còn lại (trò
+/// chuyện/mở rộng/viết lại) vẫn chưa gắn logic.
 class _NutAIMenu extends StatelessWidget {
   const _NutAIMenu({
     required this.rong,
@@ -1214,6 +1218,7 @@ class _NutAIMenu extends StatelessWidget {
     required this.khiBamChuyenFileAmThanh,
     required this.khiBamChuyenAnhThanhVanBan,
     required this.khiBamChupAnh,
+    required this.khiBamTomTatToanVan,
   });
 
   final bool rong;
@@ -1236,6 +1241,11 @@ class _NutAIMenu extends StatelessWidget {
   /// Mục "Chụp ảnh (camera)" — mở camera thiết bị rồi chuyển hoá y hệt luồng
   /// "Chuyển hình ảnh thành văn bản" ở trên.
   final VoidCallback khiBamChupAnh;
+
+  /// Mục "Tóm tắt toàn văn" — mở modal "Chọn kiểu tóm tắt" (theo %/theo câu
+  /// lệnh tự do/cả hai) rồi gọi Gemini, xong hiện modal kết quả với nút
+  /// "Thay thế toàn bộ văn bản".
+  final VoidCallback khiBamTomTatToanVan;
 
   @override
   Widget build(BuildContext context) {
@@ -1269,6 +1279,7 @@ class _NutAIMenu extends StatelessWidget {
             if (gia == 8) khiBamChuyenFileAmThanh();
             if (gia == 6) khiBamChuyenAnhThanhVanBan();
             if (gia == 7) khiBamChupAnh();
+            if (gia == 2) khiBamTomTatToanVan();
           },
           // (VIỆC 3) Xem chú thích ở `_NutThemMenu` — cùng cơ chế: một
           // `ScrollController` mới mỗi lần menu mở, dùng chung giữa nút cuộn
@@ -1287,7 +1298,10 @@ class _NutAIMenu extends StatelessWidget {
                 // `_chonVaChuyenFileAmThanh` trong `trang_soan_thao.dart`).
                 // "Chụp ảnh (camera)" cũng đã gắn logic thật — xem
                 // `_chupVaChuyenAnhThanhVanBan` (mở camera thay vì bộ chọn
-                // tệp, còn lại y hệt).
+                // tệp, còn lại y hệt). "Tóm tắt toàn văn" đã gắn logic thật
+                // — xem `_moModalChonKieuTomTat` (mở modal chọn kiểu trước
+                // khi gọi Gemini, kết quả có nút "Thay thế toàn bộ văn
+                // bản").
                 _mucMenuThem(6, 'Chuyển hình ảnh thành văn bản'),
                 _mucMenuThem(7, 'Chụp ảnh (camera)'),
                 _mucMenuThem(8, 'Chuyển file âm thanh thành văn bản'),
