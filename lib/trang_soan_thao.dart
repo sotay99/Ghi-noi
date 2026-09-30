@@ -25,6 +25,7 @@ import 'ghi_am_the.dart';
 import 'the_tich_chon.dart';
 import 'gui_ghi_am_gemini.dart';
 import 'gui_anh_gemini.dart';
+import 'gui_mo_rong_gemini.dart';
 import 'gui_tom_tat_gemini.dart';
 import 'canh_bao_roi_trang.dart';
 import 'kho_du_lieu.dart';
@@ -3892,7 +3893,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henHetLietPastePhimAo?.cancel();
     _henHetCheDoNhanhChonTatCa?.cancel();
     _oKetQuaFileAmThanh?.dispose();
-    _oKetQuaTomTat?.dispose();
+    _oKetQuaToanVan?.dispose();
     _theoDoiTapDoi.dispose();
     _cuonVanBan.removeListener(_khiCuonVanBanBaoDoanSo);
     _conTroDangHien.dispose();
@@ -11138,6 +11139,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                         child: TextField(
                           controller: oCauLenh,
                           maxLines: 3,
+                          maxLength: 500,
                           decoration: const InputDecoration(
                             border: OutlineInputBorder(),
                             hintText: 'Ví dụ: chỉ giữ lại các ý chính về...',
@@ -11211,26 +11213,173 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
 
-    _moModalKetQuaTomTat(vanBanKetQua);
+    _moModalKetQuaToanVan(vanBanKetQua, tieuDe: 'Kết quả tóm tắt');
   }
 
-  /// Giữ nội dung modal kết quả "Tóm tắt toàn văn" qua lần mở lại (nếu có,
-  /// dù luồng hiện tại luôn mở-rồi-đóng-hẳn) — cùng ý tưởng
+  /// Mục "Mở rộng toàn văn" trong menu "Làm việc với AI" — ĐÚNG KHUÔN
+  /// `_moModalChonKieuTomTat` ở trên, chỉ đảo ngược ý nghĩa: thanh kéo là
+  /// % ĐỘ DÀI MONG MUỐN so với bản gốc (120-400%, mỗi mốc cách nhau 10,
+  /// mặc định 200%), không phải % còn lại như tóm tắt.
+  void _moModalChonKieuMoRong() {
+    if (_boDieuKhien.text.trim().isEmpty) {
+      _bao('Trang đang trống, không có gì để mở rộng.');
+      return;
+    }
+    var chonPhanTram = true;
+    var phanTram = 200.0;
+    var chonCauLenh = false;
+    final oCauLenh = TextEditingController();
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, capNhat) {
+          final coTheGui = chonPhanTram || chonCauLenh;
+          return AlertDialog(
+            title: const Text('Chọn kiểu mở rộng'),
+            content: SizedBox(
+              width: 420,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      value: chonPhanTram,
+                      onChanged: (gia) => capNhat(() => chonPhanTram = gia ?? false),
+                      title: const Text('Mở rộng theo phần trăm'),
+                    ),
+                    if (chonPhanTram) ...[
+                      Text(
+                        'Mở rộng thành ${phanTram.round()}% văn bản gốc',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Color(0xFF1A73E8),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Slider(
+                        value: phanTram,
+                        min: 120,
+                        max: 400,
+                        divisions: 28, // Mỗi mốc cách nhau 10: (400-120)/10.
+                        label: '${phanTram.round()}%',
+                        onChanged: (gia) => capNhat(() => phanTram = gia),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      value: chonCauLenh,
+                      onChanged: (gia) => capNhat(() => chonCauLenh = gia ?? false),
+                      title: const Text('Mở rộng theo yêu cầu của bạn'),
+                    ),
+                    if (chonCauLenh)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 12, right: 4),
+                        child: TextField(
+                          controller: oCauLenh,
+                          maxLines: 3,
+                          maxLength: 500,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            hintText: 'Ví dụ: thêm ví dụ minh hoạ cho...',
+                            contentPadding: EdgeInsets.all(8),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Đóng bảng'),
+              ),
+              FilledButton(
+                onPressed: !coTheGui
+                    ? null
+                    : () {
+                        Navigator.of(ctx).pop();
+                        _guiMoRongChoAi(
+                          phanTram: chonPhanTram ? phanTram.round() : null,
+                          huongDanNguoiDung: chonCauLenh ? oCauLenh.text : null,
+                        );
+                      },
+                child: const Text('Gửi cho AI xử lý'),
+              ),
+            ],
+          );
+        },
+      ),
+    ).then((_) => oCauLenh.dispose());
+  }
+
+  Future<void> _guiMoRongChoAi({int? phanTram, String? huongDanNguoiDung}) async {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const AlertDialog(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+            SizedBox(width: 16),
+            Expanded(child: Text('Đang mở rộng toàn văn...')),
+          ],
+        ),
+      ),
+    );
+
+    String? vanBanKetQua;
+    String? loi;
+    try {
+      vanBanKetQua = await guiMoRongChoGemini(
+        _boDieuKhien.text,
+        phanTram: phanTram,
+        huongDanNguoiDung: huongDanNguoiDung,
+      );
+    } catch (e) {
+      loi = e.toString();
+    }
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop(); // đóng hộp "đang xử lý".
+
+    if (loi != null || vanBanKetQua == null || vanBanKetQua.trim().isEmpty) {
+      _bao('Mở rộng thất bại: ${loi ?? "không có nội dung trả về."}');
+      return;
+    }
+
+    _moModalKetQuaToanVan(vanBanKetQua, tieuDe: 'Kết quả mở rộng');
+  }
+
+  /// Giữ nội dung modal kết quả "Tóm tắt toàn văn"/"Mở rộng toàn văn" qua
+  /// lần mở lại (nếu có, dù luồng hiện tại luôn mở-rồi-đóng-hẳn) — dùng
+  /// CHUNG cho cả hai tính năng (chỉ khác [tieuDe]), cùng ý tưởng
   /// `_oKetQuaFileAmThanh`, nhưng KHÔNG có "Chọn vị trí để chèn văn bản":
-  /// tính năng này luôn thay thế TOÀN VĂN, không chèn tại một vị trí.
-  TextEditingController? _oKetQuaTomTat;
+  /// cả hai đều luôn thay thế TOÀN VĂN, không chèn tại một vị trí.
+  TextEditingController? _oKetQuaToanVan;
+  String _tieuDeModalKetQuaToanVan = 'Kết quả tóm tắt';
 
-  void _dongHanKetQuaTomTat() {
-    _oKetQuaTomTat?.dispose();
-    _oKetQuaTomTat = null;
+  void _dongHanKetQuaToanVan() {
+    _oKetQuaToanVan?.dispose();
+    _oKetQuaToanVan = null;
   }
 
-  void _moModalKetQuaTomTat(String vanBan) {
-    _oKetQuaTomTat ??= TextEditingController(text: vanBan);
+  void _moModalKetQuaToanVan(String vanBan, {String? tieuDe}) {
+    if (tieuDe != null) _tieuDeModalKetQuaToanVan = tieuDe;
+    _oKetQuaToanVan ??= TextEditingController(text: vanBan);
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Kết quả tóm tắt'),
+        title: Text(_tieuDeModalKetQuaToanVan),
         content: SizedBox(
           width: 420,
           child: Column(
@@ -11246,7 +11395,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 constraints: const BoxConstraints(maxHeight: 320),
                 child: SingleChildScrollView(
                   child: TextField(
-                    controller: _oKetQuaTomTat,
+                    controller: _oKetQuaToanVan,
                     maxLines: null,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
@@ -11261,14 +11410,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         actionsAlignment: MainAxisAlignment.spaceBetween,
         actions: [
           TextButton(
-            onPressed: () => _xacNhanHuyKetQuaTomTat(ctx),
+            onPressed: () => _xacNhanHuyKetQuaToanVan(ctx),
             child: Text('Huỷ', style: TextStyle(color: Colors.red.shade600)),
           ),
           FilledButton(
             onPressed: () {
-              final vb = _oKetQuaTomTat?.text ?? '';
+              final vb = _oKetQuaToanVan?.text ?? '';
               Navigator.of(ctx).pop();
-              _dongHanKetQuaTomTat();
+              _dongHanKetQuaToanVan();
               if (vb.trim().isNotEmpty) _thayTheToanBoVanBan(vb);
             },
             child: const Text('Thay thế toàn bộ văn bản'),
@@ -11278,13 +11427,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
-  Future<void> _xacNhanHuyKetQuaTomTat(BuildContext ctxModal) async {
+  Future<void> _xacNhanHuyKetQuaToanVan(BuildContext ctxModal) async {
     final dongY = await showDialog<bool>(
       context: context,
       builder: (ctx2) => AlertDialog(
-        title: const Text('Huỷ kết quả tóm tắt?'),
+        title: const Text('Huỷ kết quả này?'),
         content: const Text(
-          'Văn bản AI vừa tóm tắt (kể cả phần bạn đã sửa, nếu có) sẽ mất hẳn, '
+          'Văn bản AI vừa trả về (kể cả phần bạn đã sửa, nếu có) sẽ mất hẳn, '
           'không thể lấy lại. Bạn có chắc chắn muốn huỷ không?',
         ),
         actions: [
@@ -11301,17 +11450,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
     if (dongY == true && mounted) {
       Navigator.of(ctxModal).pop();
-      _dongHanKetQuaTomTat();
+      _dongHanKetQuaToanVan();
     }
   }
 
-  /// Nút "Thay thế toàn bộ văn bản" ở modal kết quả "Tóm tắt toàn văn" — xoá
-  /// sạch văn bản hiện tại, ghi đè bằng [vanBanMoi]. Y HỆT logic `_xoaTatCa`
-  /// (mọi mốc trạng thái phải reset về vạch xuất phát, nếu không câu nói kế
-  /// tiếp lại nhắm vào vị trí không còn tồn tại) — chỉ khác ghi [vanBanMoi]
-  /// thay vì chuỗi rỗng. `_luuDiemMoc()` chụp lại bản CŨ trước khi ghi đè
-  /// (kèm lưu vào bộ nhớ đệm qua `_luuVanBan()`), để Lùi lại (Ctrl+Z) khôi
-  /// phục đúng bản gốc.
+  /// Nút "Thay thế toàn bộ văn bản" ở modal kết quả "Tóm tắt toàn văn"/"Mở
+  /// rộng toàn văn" — xoá sạch văn bản hiện tại, ghi đè bằng [vanBanMoi]. Y
+  /// HỆT logic `_xoaTatCa` (mọi mốc trạng thái phải reset về vạch xuất phát,
+  /// nếu không câu nói kế tiếp lại nhắm vào vị trí không còn tồn tại) — chỉ
+  /// khác ghi [vanBanMoi] thay vì chuỗi rỗng. `_luuDiemMoc()` chụp lại bản
+  /// CŨ trước khi ghi đè (kèm lưu vào bộ nhớ đệm qua `_luuVanBan()`), để
+  /// Lùi lại (Ctrl+Z) khôi phục đúng bản gốc.
   Future<void> _thayTheToanBoVanBan(String vanBanMoi) async {
     _luuDiemMoc();
 
@@ -11335,7 +11484,30 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _viTriChoVietHoa = null;
     _boQuaCauNay = _micro.isListening;
     await _luuVanBan();
-    if (mounted) _bao('Đã thay thế toàn bộ văn bản bằng bản tóm tắt.');
+    // Toàn văn vừa được AI viết lại nhấp nháy xanh/đen 4 giây — TÁI DÙNG
+    // nguyên cơ chế `_VungKhongPhuHop` của "đoạn AI đề xuất thay thế" (mục
+    // "Kiểm tra toàn văn"), xem `_nhapNhayToanVan`.
+    if (mounted) _nhapNhayToanVan(0, vanBanMoi.length);
+    if (mounted) _bao('Đã thay thế toàn bộ văn bản.');
+  }
+
+  /// Cho khoảng chữ [batDau, ketThuc) — thường là TOÀN BỘ văn bản vừa được
+  /// AI viết lại/thay thế — nhấp nháy xanh dương/đen trong 4 giây rồi tự
+  /// dọn, không cần gọi gì thêm. TÁI DÙNG NGUYÊN `_VungKhongPhuHop` +
+  /// `_batNhapNhayKhongPhuHop` đã có cho "đoạn AI đề xuất thay thế" (mục
+  /// "Kiểm tra toàn văn") — chỉ khác: "gốc" và "đề xuất" trỏ CHUNG một
+  /// khoảng (không có gì để đổi qua đổi lại, chỉ mượn hiệu ứng thị giác,
+  /// không có tương tác bấm chọn nào đi kèm).
+  void _nhapNhayToanVan(int batDau, int ketThuc) {
+    if (batDau < 0 || batDau >= ketThuc || ketThuc > _boDieuKhien.text.length) return;
+    final v = _VungKhongPhuHop(
+      batDauGoc: batDau,
+      ketThucGoc: ketThuc,
+      batDauDeXuat: batDau,
+      ketThucDeXuat: ketThuc,
+    );
+    _boDieuKhien.khongPhuHop.add(v);
+    _batNhapNhayKhongPhuHop(v, 'xanh');
   }
 
   /// Mục "Chụp ảnh (camera)" trong menu "Làm việc với AI" — ĐÚNG LUỒNG với
@@ -13121,6 +13293,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 khiBamChuyenAnhThanhVanBan: _chonVaChuyenAnhThanhVanBan,
                 khiBamChupAnh: _chupVaChuyenAnhThanhVanBan,
                 khiBamTomTatToanVan: _moModalChonKieuTomTat,
+                khiBamMoRongToanVan: _moModalChonKieuMoRong,
                 khiBamBanPhim: () => _moModalTam(
                   'Bàn phím',
                   Icons.keyboard_outlined,

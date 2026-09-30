@@ -26,7 +26,7 @@ function huongDanTheoHanhDong(action, cauHoi) {
     case 'tom_tat':
       return null; // Xử lý riêng trong huongDanTomTat() — cần ghép % độ dài và/hoặc câu lệnh tuỳ chỉnh của người dùng.
     case 'mo_rong':
-      return 'Mở rộng đoạn văn bản tiếng Việt sau đây, thêm chi tiết hợp lý, giữ nguyên văn phong gốc. Chỉ trả về đúng đoạn văn đã mở rộng, không thêm lời dẫn:';
+      return null; // Xử lý riêng trong huongDanMoRong() — cần ghép % độ dài và/hoặc câu lệnh tuỳ chỉnh của người dùng.
     case 'got_dua':
       return 'Sửa lỗi chính tả, ngữ pháp và câu chữ của đoạn văn bản tiếng Việt sau đây cho mượt mà, tự nhiên hơn — KHÔNG đổi ý nghĩa. Chỉ trả về đúng đoạn văn đã sửa, không thêm lời dẫn hay giải thích:';
     case 'de_xuat_y_tuong':
@@ -119,6 +119,34 @@ function huongDanTomTat(than) {
       `NGOÀI ra, người dùng còn có yêu cầu riêng cho cách tóm tắt — ưu tiên làm theo ý này, nếu xung đột với chỉ dẫn ở trên thì theo ý người dùng: "${huongDanNguoiDung.slice(0, 800)}". `;
   }
   huongDan += 'Chỉ trả về đúng phần tóm tắt, không thêm lời dẫn, không thêm chú thích:';
+  return huongDan;
+}
+
+/// Hướng dẫn cho "Mở rộng toàn văn" (modal "Chọn kiểu mở rộng") — ĐÚNG
+/// KHUÔN `huongDanTomTat` ở trên, chỉ đảo ngược ý nghĩa: `than.phanTram`
+/// (120-400) là độ dài MONG MUỐN so với bản gốc, 100% nghĩa là giữ nguyên
+/// không đổi, trên 100% là mở rộng thêm — phải nói RÕ quy ước này cho AI
+/// hiểu vì "200%" không tự nhiên như "tóm tắt còn 50%".
+function huongDanMoRong(than) {
+  const phanTram =
+    Number.isInteger(than.phanTram) && than.phanTram >= 100 && than.phanTram <= 400
+      ? than.phanTram
+      : null;
+  const huongDanNguoiDung =
+    typeof than.huongDanNguoiDung === 'string' ? than.huongDanNguoiDung.trim() : '';
+
+  let huongDan =
+    'Mở rộng đoạn văn bản tiếng Việt sau đây, thêm chi tiết hợp lý, giữ nguyên văn phong gốc. ';
+
+  if (phanTram != null) {
+    huongDan +=
+      `Bản mở rộng cần dài khoảng ${phanTram}% so với độ dài văn bản gốc (ước lượng theo số từ) — quy ước: 100% nghĩa là giữ nguyên không đổi, trên 100% là mở rộng thêm đúng theo tỉ lệ đó. `;
+  }
+  if (huongDanNguoiDung) {
+    huongDan +=
+      `NGOÀI ra, người dùng còn có yêu cầu riêng cho cách mở rộng — ưu tiên làm theo ý này, nếu xung đột với chỉ dẫn ở trên thì theo ý người dùng: "${huongDanNguoiDung.slice(0, 800)}". `;
+  }
+  huongDan += 'Chỉ trả về đúng đoạn văn đã mở rộng, không thêm lời dẫn, không thêm chú thích:';
   return huongDan;
 }
 
@@ -411,6 +439,8 @@ exports.flowriteAi = async (req, res) => {
     huongDan = huongDanToanVan(than);
   } else if (action === 'tom_tat') {
     huongDan = huongDanTomTat(than);
+  } else if (action === 'mo_rong') {
+    huongDan = huongDanMoRong(than);
   } else {
     huongDan = huongDanTheoHanhDong(action, cauHoi);
   }

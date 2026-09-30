@@ -28,6 +28,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamChuyenAnhThanhVanBan,
     required this.khiBamChupAnh,
     required this.khiBamTomTatToanVan,
+    required this.khiBamMoRongToanVan,
     required this.khiBamBanPhim,
     required this.khiBamBoPhimNhanh,
     required this.boPhimNhanhDangMo,
@@ -82,6 +83,9 @@ class ThanhCongCu extends StatelessWidget {
 
   /// Mục "Tóm tắt toàn văn" — mở modal "Chọn kiểu tóm tắt" rồi gọi Gemini.
   final VoidCallback khiBamTomTatToanVan;
+
+  /// Mục "Mở rộng toàn văn" — mở modal "Chọn kiểu mở rộng" rồi gọi Gemini.
+  final VoidCallback khiBamMoRongToanVan;
   final VoidCallback khiBamBanPhim;
 
   /// "Bộ phím nhanh cho màn hình cảm ứng" (mục "Bật/Tắt..." trong "+ Thêm
@@ -227,6 +231,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamChuyenAnhThanhVanBan: khiBamChuyenAnhThanhVanBan,
                               khiBamChupAnh: khiBamChupAnh,
                               khiBamTomTatToanVan: khiBamTomTatToanVan,
+                              khiBamMoRongToanVan: khiBamMoRongToanVan,
                             ),
                           ),
                           _NutCoChuThich(
@@ -1207,9 +1212,9 @@ class _NutTaiKhoanMenu extends StatelessWidget {
 /// Menu thả xuống của nút "Làm việc với AI" — cùng cơ chế với
 /// `_NutThemMenu` (PopupMenuButton tự neo ngay phía trên nút vì nút nằm sát
 /// đáy màn hình). "Chuyển hình ảnh thành văn bản", "Chụp ảnh (camera)",
-/// "Chuyển file âm thanh thành văn bản", "Tóm tắt toàn văn" và "Cài đặt nút
-/// "Kiểm tra toàn văn"" đã gọi callback thật; ba mục AI-về-chữ còn lại (trò
-/// chuyện/mở rộng/viết lại) vẫn chưa gắn logic.
+/// "Chuyển file âm thanh thành văn bản", "Tóm tắt toàn văn", "Mở rộng toàn
+/// văn" và "Cài đặt nút "Kiểm tra toàn văn"" đã gọi callback thật; hai mục
+/// AI-về-chữ còn lại (trò chuyện/viết lại) vẫn chưa gắn logic.
 class _NutAIMenu extends StatelessWidget {
   const _NutAIMenu({
     required this.rong,
@@ -1219,6 +1224,7 @@ class _NutAIMenu extends StatelessWidget {
     required this.khiBamChuyenAnhThanhVanBan,
     required this.khiBamChupAnh,
     required this.khiBamTomTatToanVan,
+    required this.khiBamMoRongToanVan,
   });
 
   final bool rong;
@@ -1246,6 +1252,10 @@ class _NutAIMenu extends StatelessWidget {
   /// lệnh tự do/cả hai) rồi gọi Gemini, xong hiện modal kết quả với nút
   /// "Thay thế toàn bộ văn bản".
   final VoidCallback khiBamTomTatToanVan;
+
+  /// Mục "Mở rộng toàn văn" — ĐÚNG KHUÔN "Tóm tắt toàn văn" ở trên, chỉ đảo
+  /// ngược ý nghĩa (mở rộng thêm thay vì rút gọn).
+  final VoidCallback khiBamMoRongToanVan;
 
   @override
   Widget build(BuildContext context) {
@@ -1280,6 +1290,7 @@ class _NutAIMenu extends StatelessWidget {
             if (gia == 6) khiBamChuyenAnhThanhVanBan();
             if (gia == 7) khiBamChupAnh();
             if (gia == 2) khiBamTomTatToanVan();
+            if (gia == 3) khiBamMoRongToanVan();
           },
           // (VIỆC 3) Xem chú thích ở `_NutThemMenu` — cùng cơ chế: một
           // `ScrollController` mới mỗi lần menu mở, dùng chung giữa nút cuộn

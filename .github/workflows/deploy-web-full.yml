@@ -23,6 +23,7 @@ on:
       - 'lib/gui_ghi_am_gemini.dart'
       - 'lib/gui_anh_gemini.dart'
       - 'lib/gui_tom_tat_gemini.dart'
+      - 'lib/gui_mo_rong_gemini.dart'
       - 'lib/ket_qua_ghi_am_the.dart'
       - 'lib/kho_du_lieu.dart'
       - 'lib/kiem_tra_chinh_ta.dart'
