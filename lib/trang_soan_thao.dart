@@ -6077,27 +6077,38 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             capNhat(() {});
           }
 
-          // Chữ thường, đen, cỡ bình thường — chỉ tô sáng (nền vàng) những
-          // đoạn cần nổi bật, và tô ĐỎ riêng con số phút. Trước đây to/đậm
-          // cả tiêu đề lẫn cả câu — nhìn rối, đã bỏ theo góp ý.
-          final kieuChuThuong = DefaultTextStyle.of(context)
-              .style
-              .copyWith(color: Colors.black87, fontWeight: FontWeight.normal);
+          // Cỡ chữ THƯỜNG, cố định tường minh (không thừa hưởng cỡ tiêu đề
+          // to/đậm mặc định của AlertDialog — đó là nguyên nhân chữ bự quá
+          // trước đây). Không dùng "tô sáng" (nền màu) nữa — chỉ đậm/đỏ cho
+          // đúng những chữ cần nổi bật, đủ rõ mà không rối mắt.
+          const kieuTieuDe = TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          );
+          const kieuChuThuong = TextStyle(fontSize: 14, color: Colors.black87);
+          const kieuNoiBat = TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          );
+          const kieuDo = TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Colors.red,
+          );
           return AlertDialog(
             title: laCuoi
                 ? RichText(
                     text: TextSpan(
-                      style: kieuChuThuong.copyWith(fontWeight: FontWeight.bold),
+                      style: kieuTieuDe,
                       children: [
                         const TextSpan(text: 'Sắp chạm giới hạn '),
-                        TextSpan(
-                          text: '$tongPhut phút',
-                          style: const TextStyle(color: Colors.red),
-                        ),
+                        TextSpan(text: '$tongPhut phút', style: kieuDo),
                       ],
                     ),
                   )
-                : const Text('Sắp chạm giới hạn 60 giây'),
+                : Text('Sắp chạm giới hạn 60 giây', style: kieuTieuDe),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -6117,16 +6128,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                               '$_soLanToiDaTuDongTaoTheLienTiep liên tiếp) sắp ghi đủ 60 '
                               'giây, tổng cộng sắp chạm ',
                         ),
-                        TextSpan(
-                          text: '$tongPhut phút',
-                          style: const TextStyle(color: Colors.red),
-                        ),
+                        TextSpan(text: '$tongPhut phút', style: kieuDo),
                         const TextSpan(text: ' không ai bấm gì. '),
-                        const TextSpan(
+                        TextSpan(
                           text: 'Nếu không chọn, tới đúng giây thứ 60 hệ '
                               'thống sẽ TỰ NGỪNG ghi âm luôn, KHÔNG tạo '
                               'thêm thẻ mới nữa',
-                          style: TextStyle(backgroundColor: Colors.yellowAccent),
+                          style: kieuNoiBat,
                         ),
                         const TextSpan(
                           text: ' (để tránh tốn token AI và pin máy vô ích). '
@@ -6143,12 +6151,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                         TextSpan(
                           text: 'Thẻ ghi âm #$soThe sắp ghi đủ 60 giây. ',
                         ),
-                        const TextSpan(
+                        TextSpan(
                           text: 'Bạn có thể không cần làm gì bây giờ cả',
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: kieuDo,
                         ),
                         const TextSpan(
                           text: ' — tới đúng giây thứ 60 nó sẽ tự động chốt '
