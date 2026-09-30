@@ -209,7 +209,22 @@ function huongDanChinhTa(boQuaTruocViTri, layLoiChinhTa, chenDauCau) {
 /// hiện chỉ có tiếng Việt nên luôn truyền 'vi', nhưng để sẵn tham số riêng
 /// (đọc từ `than.ngonNgu` phía client nếu có) — sau này app thêm chọn ngôn
 /// ngữ chỉ cần đổi giá trị gửi lên, không cần sửa lại hàm này.
-async function goiGroqAmThanh(audioBase64, mimeType, maNgonNgu) {
+///
+/// [locHallucination]: CHỈ bật cho luồng THẺ GHI ÂM trong app (không bật
+/// cho "Chuyển file âm thanh thành văn bản" — tệp người dùng tự tải lên có
+/// thể là nhạc/podcast/nhiều giọng, ranh giới "im lặng = hallucination"
+/// không đáng tin như với một lượt ghi âm giọng nói ngắn của chính người
+/// dùng). Bật thì:
+/// 1) Kèm `prompt` ngữ cảnh tiếng Việt ngắn — gợi ý nhẹ để model bớt rơi về
+///    khuôn mẫu "cảm ơn đã xem, nhớ subscribe" nó học được từ transcript
+///    YouTube.
+/// 2) Xin `response_format: verbose_json` thay vì json thường — Groq trả
+///    thêm từng "segment" kèm `no_speech_prob` (xác suất đoạn đó là im
+///    lặng) và `avg_logprob` (độ tự tin của model). Lọc bỏ NHỮNG SEGMENT
+///    model tự đánh giá là im lặng/không chắc trước khi ghép chữ trả về —
+///    đúng cơ chế OpenAI Whisper dùng nội bộ để tự chặn hallucination, chỉ
+///    khác là ở đây ta tự làm vì Groq không tự lọc sẵn.
+async function goiGroqAmThanh(audioBase64, mimeType, maNgonNgu, locHallucination) {
   if (!process.env.GROQ_API_KEY) {
     throw new Error('Chưa cấu hình GROQ_API_KEY.');
   }
@@ -229,6 +244,14 @@ async function goiGroqAmThanh(audioBase64, mimeType, maNgonNgu) {
   bieuMau.append('file', new Blob([bytes], { type: mimeType }), `ghi-am.${phanMoRong}`);
   bieuMau.append('model', 'whisper-large-v3-turbo');
   bieuMau.append('language', maNgonNgu || 'vi');
+  bieuMau.append('temperature', '0'); // Tường minh, dù đây vốn đã là mặc định của API.
+  if (locHallucination) {
+    bieuMau.append(
+      'prompt',
+      'Đây là một đoạn ghi âm giọng nói tiếng Việt đời thường của một người dùng ứng dụng ghi chú, không phải video YouTube.',
+    );
+    bieuMau.append('response_format', 'verbose_json');
+  }
 
   const phanHoi = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
     method: 'POST',
@@ -242,6 +265,23 @@ async function goiGroqAmThanh(audioBase64, mimeType, maNgonNgu) {
   }
 
   const duLieu = await phanHoi.json();
+
+  if (locHallucination && Array.isArray(duLieu?.segments)) {
+    // Ngưỡng tham khảo từ chính cách openai-whisper (bản chạy máy) tự lọc
+    // segment hallucination: no_speech_prob cao (gần chắc chắn là im lặng)
+    // NHƯNG model vẫn "cố" trả chữ, kèm avg_logprob thấp (không tự tin về
+    // chữ đó) — hai điều kiện phải CÙNG đúng mới loại, để không lỡ tay xoá
+    // câu nói thật chỉ vì thu nhỏ tiếng.
+    const chu = duLieu.segments
+      .filter((s) => !(Number(s?.no_speech_prob) > 0.6 && Number(s?.avg_logprob) < -1))
+      .map((s) => (s?.text || '').trim())
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+    if (!chu) throw new Error('Groq không trả về nội dung (có thể ghi âm quá nhỏ hoặc im lặng hoàn toàn).');
+    return chu;
+  }
+
   const chu = (duLieu?.text || '').trim();
   if (!chu) throw new Error('Groq không trả về nội dung (có thể ghi âm quá nhỏ hoặc im lặng hoàn toàn).');
   return chu;
@@ -358,7 +398,7 @@ exports.flowriteAi = async (req, res) => {
   // phí (Groq lại rẻ hơn ~9 lần so với gọi thẳng OpenAI Whisper). Vì vậy
   // nhánh này không cần GEMINI_API_KEY, chỉ cần GROQ_API_KEY.
   if (action === 'ghi_am') {
-    const { audioBase64, mimeType, ngonNgu } = than;
+    const { audioBase64, mimeType, ngonNgu, locHallucination } = than;
     if (typeof audioBase64 !== 'string' || audioBase64.trim() === '') {
       res.status(400).json({ loi: 'Thiếu dữ liệu âm thanh (audioBase64).' });
       return;
@@ -375,7 +415,7 @@ exports.flowriteAi = async (req, res) => {
       return;
     }
     try {
-      const ketQua = await goiGroqAmThanh(audioBase64, mimeType || 'audio/mp4', ngonNgu);
+      const ketQua = await goiGroqAmThanh(audioBase64, mimeType || 'audio/mp4', ngonNgu, locHallucination === true);
       res.status(200).json({ text: ketQua });
     } catch (err) {
       res.status(502).json({ loi: String(err && err.message ? err.message : err) });

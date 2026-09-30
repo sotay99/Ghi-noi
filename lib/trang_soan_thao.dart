@@ -6629,7 +6629,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (_boDieuKhien.theGhiAmLoiTamThoi.remove(soThe)) _boDieuKhien.veLai();
 
     try {
-      final chu = await guiGhiAmChoGemini(duLieu.bytes, duLieu.mime);
+      final chu = await guiGhiAmChoGemini(
+        duLieu.bytes,
+        duLieu.mime,
+        locHallucination: true,
+      );
       if (!mounted) return;
       final viTri = _boDieuKhien.text.indexOf(nhanDangChuyen);
       if (viTri >= 0) {
@@ -10964,6 +10968,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     String? vanBanKetQua;
     String? loi;
     try {
+      // locHallucination CỐ Ý để mặc định (false) — tệp người dùng tự tải
+      // lên có thể là nhạc/podcast/nhiều giọng, không phải một lượt ghi âm
+      // giọng nói ngắn, nên không áp dụng lọc "im lặng = hallucination".
       vanBanKetQua = await guiGhiAmChoGemini(bytes, mimeType);
     } catch (e) {
       loi = e.toString();
