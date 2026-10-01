@@ -1730,6 +1730,25 @@ class _YDinhToi extends Intent {
   const _YDinhToi();
 }
 
+/// Ý định Copy/Cắt/Dán cho Ctrl+C/Ctrl+X/Ctrl+V — CỐ Ý không dùng
+/// `CopySelectionTextIntent`/`PasteTextIntent` có sẵn của Flutter (thử rồi,
+/// không ăn: Action mặc định của EditableText xử lý xong NGAY TẠI chỗ, không
+/// "nhường" ra ngoài cho Action khai báo ở `Actions` bên ngoài như tưởng).
+/// Đi đúng khuôn [_YDinhLuiLai]/[_YDinhToi] đã chạy tốt: tự định nghĩa Intent
+/// RIÊNG, bắt bằng `SingleActivator` ở `Shortcuts` NGAY TRÊN ô soạn thảo
+/// (gần tiêu điểm nhất luôn thắng, bất kể ô văn bản tự xử lý gì bên trong).
+class _YDinhCopy extends Intent {
+  const _YDinhCopy();
+}
+
+class _YDinhCut extends Intent {
+  const _YDinhCut();
+}
+
+class _YDinhPaste extends Intent {
+  const _YDinhPaste();
+}
+
 /// Ý định "Tìm kiếm" cho Ctrl+F — mở/đóng thanh tìm kiếm trong văn bản, cùng
 /// cách khai báo với `_YDinhLuiLai`/`_YDinhToi` ở trên.
 class _YDinhTimKiem extends Intent {
@@ -2663,8 +2682,39 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // nào trước đó. Bôi đen bằng chuột luôn đi qua một khoảnh khắc con trỏ
     // rỗng (bấm xuống trước khi kéo), nên đúng lúc này bắt được mọi lần bắt
     // đầu chọn mới.
-    if (co) _epToanVanKhiCoVungChon = false;
+    if (co) {
+      _epToanVanKhiCoVungChon = false;
+      // Vùng chọn MỚI cũng tự mở lại hàng Copy/Cắt/Dán nếu người dùng vừa
+      // bấm một trong ba nút đó ở lần chọn trước (xem [_anHangCopyCutPaste]).
+      _anHangCopyCutPaste = false;
+    }
     setState(() {});
+  }
+
+  /// Cờ MỘT LẦN: bật ngay khi bấm Copy/Cắt/Dán ở hàng thay 4 nút điều hướng
+  /// tệp (xem [_hienHangCopyCutPaste]/`_nutDieuHuongTep`) — ẩn hàng đó ngay
+  /// sau khi kích hoạt logic bên trong, đúng yêu cầu "bấm vào 1 trong 3 nút
+  /// thì cả 3 nút mất đi ngay". Tự tắt lại (mở hàng ra lần sau) khi có vùng
+  /// chọn MỚI xuất hiện — xem `_khiVungChonCoTheDoi`.
+  bool _anHangCopyCutPaste = false;
+
+  /// Hàng Copy/Cắt/Dán (thay 4 nút điều hướng tệp, hoặc hiện nổi ở góc trên-
+  /// trái khi đã Thu gọn thanh công cụ — xem `_nutDieuHuongTep`/`build`) chỉ
+  /// hiện khi CÓ vùng chọn thật, CHƯA bị ẩn tạm sau một lần bấm, VÀ không
+  /// đang bật trình ghi âm/thanh tìm kiếm-thay thế/chế độ chọn vị trí chèn
+  /// tệp (ba chế độ đó đã có luồng/AppBar riêng, chen vào sẽ đụng chỗ).
+  bool _hienHangCopyCutPaste() =>
+      _coVungChonGanNhat &&
+      !_anHangCopyCutPaste &&
+      !_trinhGhiAmMo &&
+      !_hienThanhTimKiem &&
+      !_dangChonViTriChenFile;
+
+  /// Bấm một trong ba nút Copy/Cắt/Dán ở hàng thay nút điều hướng tệp — ẩn
+  /// hàng ngay (xem [_anHangCopyCutPaste]) rồi mới kích hoạt logic thật.
+  void _bamCopyCutPasteOHangThayNav(void Function() hanhDong) {
+    setState(() => _anHangCopyCutPaste = true);
+    hanhDong();
   }
 
   /// Công tắc "Làm việc với Toàn bộ văn bản"/"Làm việc với Đoạn văn đang
@@ -12724,7 +12774,54 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
+  /// Chiều rộng ước lượng (rộng rãi, có dư) của [_hangCopyCutPaste] — dùng
+  /// để tính `leadingWidth` của AppBar ở nhánh màn rộng khi nó thay chỗ 4 nút
+  /// điều hướng tệp (xem `leadingWidth` trong `build`). `_NutCongCuChu` tự co
+  /// giãn theo chữ nên không có cách tính CHÍNH XÁC tuyệt đối không đo đạc —
+  /// ba chữ "Copy"/"Cut"/"Paste" đều ngắn, 84px/nút (kể cả khoảng cách) là dư
+  /// sức, lỡ thiếu vài pixel thì chữ vẫn hiện được nhờ `overflow: visible`
+  /// của `_NutCongCuChu`, không bị cắt mất chữ.
+  static const _rongHangCopyCutPaste = 84.0 * 3;
+
+  /// Ba nút Copy/Cắt/Dán — ĐÚNG widget/hàm dùng ở Bộ phím nhanh
+  /// (`_NutCongCuChu`/`_phimAoCopy`/`_phimAoCut`/`_phimAoPasteCoLiet`), dùng
+  /// chung cho cả hàng thay 4 nút điều hướng tệp ([_nutDieuHuongTep]) LẪN
+  /// hàng nổi góc trên-trái khi đã Thu gọn thanh công cụ (xem `build`) — một
+  /// nơi duy nhất, tránh lệch hành vi giữa hai chỗ hiện cùng một hàng nút.
+  Widget _hangCopyCutPaste() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _NutCongCuChu(
+          nhan: 'Copy',
+          onTap: () => _bamCopyCutPasteOHangThayNav(_phimAoCopy),
+        ),
+        const SizedBox(width: 6),
+        _NutCongCuChu(
+          nhan: 'Cut',
+          onTap: () => _bamCopyCutPasteOHangThayNav(_phimAoCut),
+        ),
+        const SizedBox(width: 6),
+        _NutCongCuChu(
+          nhan: 'Paste',
+          bLiet: _phimPasteDangLiet,
+          onTap: () => _bamCopyCutPasteOHangThayNav(_phimAoPasteCoLiet),
+        ),
+      ],
+    );
+  }
+
   Widget _nutDieuHuongTep({bool nutThuMucCoChu = false}) {
+    // Có vùng chọn (và không đang vướng trình ghi âm/tìm kiếm/chọn vị trí
+    // chèn tệp) — thay HẲN 4 nút điều hướng bằng Copy/Cắt/Dán, dễ bấm hơn
+    // trên điện thoại ngay khi vừa bôi đen. Bấm 1 trong 3 nút đó thì cả 3
+    // biến mất ngay (`_bamCopyCutPasteOHangThayNav`), trả lại 4 nút cũ.
+    if (_hienHangCopyCutPaste()) {
+      return Padding(
+        padding: const EdgeInsets.only(left: 4),
+        child: _hangCopyCutPaste(),
+      );
+    }
     final ds = _dsGhiChuCungThuMuc();
     final viTriHienTai = ds.indexWhere((g) => g.id == _ghiChuHienTai.id);
     final coTruoc = viTriHienTai > 0;
@@ -12877,13 +12974,21 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           constraints: _kichThuocNutTren,
           padding: EdgeInsets.zero,
         ),
-        IconButton(
-          onPressed: _bamNutLuu,
-          icon: const Icon(Icons.save_outlined, size: 22),
-          tooltip: 'Lưu',
-          visualDensity: VisualDensity.compact,
-          constraints: _kichThuocNutTren,
-          padding: EdgeInsets.zero,
+        // Nút "Lưu" đã bỏ — hệ thống tự lưu sau mỗi lần sửa rồi (`_henLuu`,
+        // hẹn giờ 600ms), bấm tay chỉ còn ý nghĩa "lưu ngay + báo đã lưu",
+        // không phải điểm duy nhất giữ an toàn dữ liệu. Thay bằng nút "Paste"
+        // — ĐÚNG hình dạng/logic/hiệu ứng với nút cùng tên ở Bộ phím nhanh
+        // (cùng widget `_NutCongCuChu`, cùng cờ liệt `_phimPasteDangLiet`,
+        // cùng hàm `_phimAoPasteCoLiet`) để Dán luôn trong tầm tay, kể cả khi
+        // Bộ phím nhanh đang tắt. `_bamNutLuu`/Ctrl+S vẫn còn, chỉ mất nút
+        // hiển thị này.
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: _NutCongCuChu(
+            nhan: 'Paste',
+            bLiet: _phimPasteDangLiet,
+            onTap: _phimAoPasteCoLiet,
+          ),
         ),
         IconButton(
           onPressed: () => setState(() => _anThanhDinhDang = !_anThanhDinhDang),
@@ -13623,7 +13728,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           )
         : AppBar(
             leading: _nutDieuHuongTep(nutThuMucCoChu: true),
-            leadingWidth: _rongNutThuMucCoChu + _canhNutDieuHuongTep * 3 + 4,
+            leadingWidth: _hienHangCopyCutPaste()
+                ? _rongHangCopyCutPaste
+                : _rongNutThuMucCoChu + _canhNutDieuHuongTep * 3 + 4,
             title: (_boPhimNhanhCamUngMo && _boPhimNhanhCamUngAn) ? _hangNutBoPhimNhanhTamAn() : _oTenField(),
             backgroundColor: Colors.white,
             surfaceTintColor: Colors.white,
@@ -13792,6 +13899,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                         const _YDinhDinhDang('xoaDinhDang'),
                     const SingleActivator(LogicalKeyboardKey.keyS, control: true):
                         const _YDinhDinhDang('luu'),
+                    const SingleActivator(LogicalKeyboardKey.keyC, control: true): const _YDinhCopy(),
+                    const SingleActivator(LogicalKeyboardKey.keyX, control: true): const _YDinhCut(),
+                    const SingleActivator(LogicalKeyboardKey.keyV, control: true): const _YDinhPaste(),
                   },
                   child: Actions(
                     actions: {
@@ -13827,36 +13937,34 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           return null;
                         },
                       ),
-                      // Chiếm lại Ctrl+C/Ctrl+X/Ctrl+V (bàn phím vật lý) —
-                      // KHÔNG cần tự khai báo `SingleActivator` nào thêm ở
-                      // `Shortcuts` phía trên: EditableText đã tự dịch ba tổ
-                      // hợp phím này thành đúng ba Intent chuẩn của Flutter
-                      // (`CopySelectionTextIntent`/`PasteTextIntent`) ở tầng
-                      // Shortcuts riêng của nó rồi — `Actions` khai báo gần
-                      // tiêu điểm nhất THẮNG nhờ các Action mặc định của
-                      // EditableText được bọc `Action.overridable`, nên chỉ
-                      // cần ghi đè Ở ĐÂY là đủ, không phải tự bắt phím từ
-                      // đầu. Nhờ vậy nút Copy/Cắt/Dán ở Bộ phím nhanh
-                      // (`_phimAoCopy`/`_phimAoCut`/`_phimAoPaste`) và phím
-                      // tắt vật lý giờ CÙNG đi qua một con đường, cùng giữ
-                      // được định dạng khi dán trong app (xem các hàm đó).
-                      // Không khai báo gì cho chuột phải/bấm giữ — menu nổi
-                      // lên lúc bôi đen (`contextMenuBuilder`) là cơ chế
-                      // khác, cố ý CHƯA đụng tới (rủi ro cao hơn, ảnh hưởng
-                      // tới mọi người dùng, xem thảo luận trong lịch sử).
-                      CopySelectionTextIntent: CallbackAction<CopySelectionTextIntent>(
-                        onInvoke: (intent) {
-                          if (intent.collapseSelection) {
-                            _phimAoCut();
-                          } else {
-                            _phimAoCopy();
-                          }
+                      // Chiếm lại Ctrl+C/Ctrl+X/Ctrl+V (bàn phím vật lý) — qua
+                      // Intent RIÊNG của Flowrite (`_YDinhCopy`/`_YDinhCut`/
+                      // `_YDinhPaste`, bắt ở `Shortcuts` phía trên), KHÔNG
+                      // phải Intent có sẵn của Flutter (đã thử, không ăn —
+                      // xem chú thích khai báo `_YDinhCopy`). Nhờ vậy nút
+                      // Copy/Cắt/Dán ở Bộ phím nhanh và phím tắt vật lý giờ
+                      // CÙNG đi qua một con đường (`_phimAoCopy`/`_phimAoCut`/
+                      // `_phimAoPaste`), cùng giữ được định dạng khi dán
+                      // trong app. Không khai báo gì cho chuột phải/bấm giữ —
+                      // menu nổi lên lúc bôi đen (`contextMenuBuilder`) là cơ
+                      // chế khác, cố ý CHƯA đụng tới (rủi ro cao hơn, ảnh
+                      // hưởng tới mọi người dùng, xem thảo luận trong lịch
+                      // sử).
+                      _YDinhCopy: CallbackAction<_YDinhCopy>(
+                        onInvoke: (_) {
+                          _phimAoCopy();
                           return null;
                         },
                       ),
-                      PasteTextIntent: CallbackAction<PasteTextIntent>(
+                      _YDinhCut: CallbackAction<_YDinhCut>(
                         onInvoke: (_) {
-                          _phimAoPaste();
+                          _phimAoCut();
+                          return null;
+                        },
+                      ),
+                      _YDinhPaste: CallbackAction<_YDinhPaste>(
+                        onInvoke: (_) {
+                          _phimAoPasteCoLiet();
                           return null;
                         },
                       ),
@@ -14192,6 +14300,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 moTa: 'Mở rộng — hiện lại thanh công cụ',
                 onTap: () => setState(() => _thuGonThanhCongCu = false),
               ),
+            ),
+          // Hàng Copy/Cắt/Dán (xem `_nutDieuHuongTep`) thường nằm NGAY TRONG
+          // AppBar — nhưng "Thu gọn" ẩn HẲN AppBar, nên lúc đó nó cần một lối
+          // hiện RIÊNG, nổi góc trên-trái màn hình (đối xứng với nút "🔽 Mở
+          // rộng" ở góc trên-phải). `_hienHangCopyCutPaste()` đã tự loại trừ
+          // đúng lúc trình ghi âm/tìm kiếm-thay thế/chọn vị trí chèn tệp đang
+          // mở, không cần lặp lại điều kiện ở đây.
+          if (_thuGonThanhCongCu && _hienHangCopyCutPaste())
+            Positioned(
+              top: MediaQuery.paddingOf(context).top + 4,
+              left: 8,
+              child: _hangCopyCutPaste(),
             ),
           // (SỬA LỖI mất lối vào "Hiện lại Bộ phím nhanh"/"Đóng lại") Hai nút
           // đó nằm trong AppBar (`_hangNutBoPhimNhanhTamAn`) — "Thu gọn" ẩn
