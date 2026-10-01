@@ -446,16 +446,11 @@ class _NutAnHienDieuHuongConTroState extends State<_NutAnHienDieuHuongConTro>
   }
 }
 
-/// Nút nổi tự thở — dùng chung cho "Mở rộng" (trả lại thanh công cụ sau khi
-/// "Thu gọn", xem `_thuGonThanhCongCu`) VÀ "Hiện" (trả lại hai nút "Hiện lại
-/// Bộ phím nhanh"/"Đóng lại" khi chúng bị thanh công cụ thu gọn che khuất
-/// mất lối vào, xem `_boPhimNhanhCamUngAn`) — cả hai cùng một kiểu hiệu ứng
-/// và cùng công thức thời gian (12 giây một chu kỳ) nên tách chung một
-/// widget, chỉ khác màu/chữ/hành động. Nổi TRÊN chữ đang soạn (không chiếm
+/// Nút nổi tự thở — dùng cho "Mở rộng" (trả lại thanh công cụ sau khi "Thu
+/// gọn", xem `_thuGonThanhCongCu`). Nổi TRÊN chữ đang soạn (không chiếm
 /// đất), độ rõ tự thở tuần hoàn: 20% → 100% (5 giây) → đứng im (1 giây) →
 /// 100% → 20% (5 giây) → đứng im (1 giây) → lặp lại mãi mãi — vẫn LUÔN bấm
-/// được dù đang mờ tới đâu, giống mọi nút `Opacity` khác trong tệp này (xem
-/// giải thích ở `_HangNutBoPhimNhanhTamAn`).
+/// được dù đang mờ tới đâu, giống mọi nút `Opacity` khác trong tệp này.
 class _NutNoiTuTho extends StatefulWidget {
   const _NutNoiTuTho({
     required this.chu,
@@ -1015,160 +1010,6 @@ class _ChamCuoiVanBanState extends State<_ChamCuoiVanBan>
           moTrong: _dk,
         ),
       ),
-    );
-  }
-}
-
-/// Ba nút "Hiện lại Bộ phím nhanh"/"Đóng lại"/con mắt thay chỗ tên tệp khi
-/// Bộ phím nhanh đang TẠM ẨN (xem `_hangNutBoPhimNhanhTamAn`). Có hiệu ứng
-/// mờ-tỏ tuần hoàn: rõ hẳn 3 giây, mờ dần trong 5 giây, mờ hẳn (im lặng)
-/// 1 giây, rõ dần trong 5 giây, rồi lặp lại — mỗi khi 3 nút mờ đi bao
-/// nhiêu phần trăm thì [oTenField] hiện rõ đúng bấy nhiêu phần trăm (bù
-/// trừ 1-1), để người dùng thấy lại tên tệp xen kẽ mà không cần thao tác
-/// gì. Bấm/rê chuột vào NGAY vùng đất của 3 nút vẫn LUÔN hoạt động bình
-/// thường bất kể đang mờ hay rõ tới đâu — `Opacity` (khác `Visibility`)
-/// không tắt hit-test theo độ mờ, nên không cần `IgnorePointer` riêng cho
-/// việc này.
-///
-/// Nút con mắt (ngoài cùng bên phải): bấm-giữ (di động) hoặc rê chuột vào
-/// (`MouseRegion`, máy tính) sẽ NGAY LẬP TỨC ép 3 nút mờ hẳn (0%) và tên
-/// tệp hiện rõ hẳn (100%), đồng thời TẠM DỪNG vòng lặp mờ-tỏ; thả tay/rê
-/// chuột ra thì vòng lặp khởi động lại TỪ ĐẦU (không tiếp tục dở dang).
-///
-/// Tách thành widget riêng (có `vsync` riêng) theo đúng lý do đã ghi ở
-/// `_ChamCuoiVanBan`: không phải thêm `TickerProviderStateMixin` cho cả
-/// màn hình soạn thảo khổng lồ chỉ vì một hiệu ứng nhỏ.
-class _HangNutBoPhimNhanhTamAn extends StatefulWidget {
-  const _HangNutBoPhimNhanhTamAn({
-    required this.onHienLai,
-    required this.onDong,
-    required this.oTenField,
-  });
-
-  final VoidCallback onHienLai;
-  final VoidCallback onDong;
-  final Widget oTenField;
-
-  @override
-  State<_HangNutBoPhimNhanhTamAn> createState() => _HangNutBoPhimNhanhTamAnState();
-}
-
-class _HangNutBoPhimNhanhTamAnState extends State<_HangNutBoPhimNhanhTamAn>
-    with SingleTickerProviderStateMixin {
-  static const _chuKy = Duration(seconds: 14);
-  late final AnimationController _dk;
-  bool _dangGiuNutConMat = false;
-  bool _dangDiChuotVaoNutConMat = false;
-
-  bool get _matDangMo => _dangGiuNutConMat || _dangDiChuotVaoNutConMat;
-
-  @override
-  void initState() {
-    super.initState();
-    _dk = AnimationController(vsync: this, duration: _chuKy)..repeat();
-  }
-
-  @override
-  void dispose() {
-    _dk.dispose();
-    super.dispose();
-  }
-
-  /// Độ rõ của 3 nút tại thời điểm [gia] (0..1, phần trăm đã đi hết chu kỳ
-  /// 14 giây): 0-3s rõ hẳn, 3-8s mờ dần, 8-9s mờ hẳn, 9-14s rõ dần.
-  double _doRoNutTaiThoiDiem(double gia) {
-    final t = gia * 14;
-    if (t < 3) return 1;
-    if (t < 8) return 1 - (t - 3) / 5;
-    if (t < 9) return 0;
-    return (t - 9) / 5;
-  }
-
-  void _kichHoatNutConMat() => setState(() => _dk.stop());
-
-  void _ngungKichHoatNutConMat() {
-    setState(() {});
-    if (!_matDangMo) {
-      _dk.value = 0;
-      _dk.repeat();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _dk,
-      builder: (context, _) {
-        final doRoNut = _matDangMo ? 0.0 : _doRoNutTaiThoiDiem(_dk.value);
-        final doRoTen = 1 - doRoNut;
-        return Stack(
-          alignment: Alignment.centerLeft,
-          children: [
-            Opacity(opacity: doRoTen, child: IgnorePointer(child: widget.oTenField)),
-            Opacity(
-              opacity: doRoNut,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: widget.onHienLai,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green.shade600,
-                        foregroundColor: Colors.white,
-                      ),
-                      child: const Text('Hiện lại Bộ phím nhanh'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: widget.onDong,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade600,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text('Đóng lại'),
-                  ),
-                  const SizedBox(width: 8),
-                  MouseRegion(
-                    onEnter: (_) {
-                      _dangDiChuotVaoNutConMat = true;
-                      _kichHoatNutConMat();
-                    },
-                    onExit: (_) {
-                      _dangDiChuotVaoNutConMat = false;
-                      _ngungKichHoatNutConMat();
-                    },
-                    child: GestureDetector(
-                      onTapDown: (_) {
-                        _dangGiuNutConMat = true;
-                        _kichHoatNutConMat();
-                      },
-                      onTapUp: (_) {
-                        _dangGiuNutConMat = false;
-                        _ngungKichHoatNutConMat();
-                      },
-                      onTapCancel: () {
-                        _dangGiuNutConMat = false;
-                        _ngungKichHoatNutConMat();
-                      },
-                      child: Container(
-                        width: 48,
-                        height: 36,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade700,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Icon(Icons.visibility, color: Colors.white, size: 20),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
     );
   }
 }
@@ -1884,6 +1725,64 @@ class _VeHieuUngThayThe extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _VeHieuUngThayThe cu) => true;
+}
+
+/// Dán văn bản qua đường CHUỘT PHẢI (menu chọn văn bản gốc của hệ thống —
+/// không đi qua `_phimAoPaste`, xem chú thích khai báo hàm đó) khi đang bật
+/// "Tự động thụt đầu dòng mỗi khi xuống hàng": xoá hết dấu cách đứng đầu
+/// đoạn vừa dán vào, để đoạn dán luôn bắt đầu bằng ký tự khác dấu cách.
+///
+/// Chỉ coi [newValue] là một lượt DÁN (không phải gõ tay) khi phần chữ mới
+/// chèn dài HƠN 1 ký tự — gõ tay luôn chèn đúng 1 ký tự một lượt, dán gần
+/// như luôn nhiều hơn 1 (trường hợp dán đúng 1 ký tự bỏ qua, không đáng kể).
+class _XoaCachDauKhiDanLucThutDauDong extends TextInputFormatter {
+  _XoaCachDauKhiDanLucThutDauDong({required this.dangBatTuDongThut});
+
+  final bool Function() dangBatTuDongThut;
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (!dangBatTuDongThut()) return newValue;
+    final cu = oldValue.text;
+    final moi = newValue.text;
+    if (moi.length <= cu.length + 1) return newValue;
+
+    // So khác biệt 2 đầu — ĐÚNG thuật toán đã dùng ở `_apDungChinhSuaNguoiDung`
+    // — tìm đúng đoạn [dau, ketThucChen) vừa được chèn vào.
+    final gioiHan = cu.length < moi.length ? cu.length : moi.length;
+    var dau = 0;
+    while (dau < gioiHan && cu[dau] == moi[dau]) {
+      dau++;
+    }
+    var duoi = 0;
+    final gioiHanDuoi = gioiHan - dau;
+    while (duoi < gioiHanDuoi && cu[cu.length - 1 - duoi] == moi[moi.length - 1 - duoi]) {
+      duoi++;
+    }
+    final ketThucChen = moi.length - duoi;
+    if (dau >= ketThucChen) return newValue;
+
+    var batDauThat = dau;
+    while (batDauThat < ketThucChen && moi[batDauThat] == ' ') {
+      batDauThat++;
+    }
+    if (batDauThat == dau) return newValue; // Không có dấu cách đứng đầu.
+
+    final moiSauKhiXoa = moi.substring(0, dau) + moi.substring(batDauThat);
+    final lech = batDauThat - dau;
+    int dichOffset(int off) {
+      if (off <= dau) return off;
+      return (off - lech).clamp(dau, moiSauKhiXoa.length);
+    }
+
+    return TextEditingValue(
+      text: moiSauKhiXoa,
+      selection: TextSelection(
+        baseOffset: dichOffset(newValue.selection.baseOffset),
+        extentOffset: dichOffset(newValue.selection.extentOffset),
+      ),
+    );
+  }
 }
 
 class TrangSoanThao extends StatefulWidget {
@@ -4748,24 +4647,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// máy/AI tự ghi).
   bool _boPhimNhanhCamUngMo = false;
 
-  /// TẠM ẨN (khác với TẮT hẳn) — cả hai thanh công cụ của Bộ phím nhanh ẩn
-  /// đi, TextField hết `readOnly` để bàn phím ảo hệ thống hiện ra ngay tại
-  /// con trỏ, và vùng tên tệp trên AppBar nhường chỗ cho hai nút "Hiện lại
-  /// Bộ phím nhanh"/"Đóng lại" (xem `_hangNutBoPhimNhanhTamAn`). Chỉ có ý
-  /// nghĩa khi `_boPhimNhanhCamUngMo` đang bật — TẮT hẳn (nút "Đóng") luôn
-  /// đặt lại `false`, để không "mồ côi" ở trạng thái ẩn khi mở lại từ đầu.
-  bool _boPhimNhanhCamUngAn = false;
-
   void _bamNutBoPhimNhanhCamUng() {
-    // Bấm nút này (cả "Đóng" của Bộ phím nhanh lẫn "Đóng lại" khi đang tạm
-    // ẩn — dùng chung callback này) mà micro đang nghe thì tạm tắt-bật lại
-    // y hệt lúc gõ tay một ký tự bất kỳ (chữ đã hiện đứng yên, chữ chưa
+    // Bấm nút này (bật/tắt Bộ phím nhanh) mà micro đang nghe thì tạm tắt-bật
+    // lại y hệt lúc gõ tay một ký tự bất kỳ (chữ đã hiện đứng yên, chữ chưa
     // hiện bị chặn), tránh micro nghe nhầm lúc tay đang bận bấm nút.
     _nguoiDungVuaGo();
     final dangBat = !_boPhimNhanhCamUngMo;
     setState(() {
       _boPhimNhanhCamUngMo = dangBat;
-      _boPhimNhanhCamUngAn = false;
       if (!dangBat) {
         _dieuHuongConTroAn = false;
         _epHienBanPhimAoTrongBoPhimNhanh = false;
@@ -4779,6 +4668,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (dangBat) {
       _batConTroNgay();
       _epConTroHienRaMatThuong();
+      if (mounted) {
+        hienThongBaoGiua(
+          context,
+          'Bàn phím bị khoá - Đang bật bộ phím nhanh cho màn hình cảm ứng',
+        );
+      }
     }
   }
 
@@ -4811,9 +4706,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   ///
   /// (BỎ mẹo chèn+xoá dấu cách) Mẹo cũ nhờ hộ nút dấu cách/Xoá — vẫn có rủi
   /// ro XOÁ MẤT vùng đang được chọn (gõ đè lên selection) trước khi tự xoá
-  /// lại, y hệt lý do đã bỏ mẹo đó ở nút "Ẩn" (`_anBoPhimNhanhCamUng`). Nút
-  /// điều hướng Trái/Phải chỉ ĐỔI VỊ TRÍ con trỏ, không đụng nội dung, nên
-  /// an toàn tuyệt đối với vùng đang chọn.
+  /// lại. Nút điều hướng Trái/Phải chỉ ĐỔI VỊ TRÍ con trỏ, không đụng nội
+  /// dung, nên an toàn tuyệt đối với vùng đang chọn.
   ///
   /// Vẫn giữ trì hoãn 300ms trước khi "bấm" — bàn phím ảo bật/tắt kèm đổi
   /// `readOnly` kéo theo một nhịp layout/resize riêng của hệ điều hành/
@@ -4833,56 +4727,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     });
   }
 
-  /// Nút "Ẩn" (cam) — xem giải thích ở `_boPhimNhanhCamUngAn`. Ép bàn phím
-  /// ảo hiện ra ngay bằng `TextInput.show` — chỉ đổi `readOnly` (qua
-  /// `setState`) có lúc KHÔNG đủ để hệ thống tự mở bàn phím ngay lập tức vì
-  /// tiêu điểm vốn đã nằm sẵn ở `_oChu` từ trước (không có sự kiện focus
-  /// MỚI để hệ thống tự nhận ra mà bật kèm).
-  void _anBoPhimNhanhCamUng() {
-    // Xem giải thích ở `_bamNutBoPhimNhanhCamUng` — cùng lý do.
-    _nguoiDungVuaGo();
-    setState(() => _boPhimNhanhCamUngAn = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _oChu.requestFocus();
-      SystemChannels.textInput.invokeMethod<void>('TextInput.show');
-    });
-    // (BỎ MẸO chèn+xoá dấu cách) Nút "Ẩn" đã tự ép bàn phím ảo hiện ra bằng
-    // `TextInput.show` ở trên rồi — không liên quan gì tới mẹo chèn+xoá
-    // dấu cách (mẹo đó chỉ để ép CON TRỎ NHÁY hiện lại sau khi TOÀN BỘ
-    // trạng thái soạn thảo đổi/dựng lại, dùng cho hai lối "bật"/"hiện lại").
-    // Giữ mẹo đó ở đây từng có tác dụng phụ KHÔNG mong muốn: nếu người dùng
-    // đang BÔI CHỌN một vùng văn bản rồi bấm "Ẩn", chèn dấu cách sẽ XOÁ
-    // MẤT vùng đang chọn đó (gõ đè lên selection) trước khi tự xoá lại dấu
-    // cách — vô tình phá nội dung người dùng đang chọn. Chỉ giữ
-    // `_batConTroNgay()` (khởi động lại nhịp nhấp nháy, không đụng gì tới
-    // nội dung) là đủ.
-    _batConTroNgay();
-  }
-
-  /// Nút "Hiện lại Bộ phím nhanh" (xanh lá) — trả lại đúng trạng thái hiện
-  /// hành của Bộ phím nhanh, ẩn bàn phím ảo hệ thống đi.
-  void _hienLaiBoPhimNhanhCamUng() {
-    // Xem giải thích ở `_bamNutBoPhimNhanhCamUng` — cùng lý do. Dùng CHUNG
-    // cho cả hai nơi có nút "Hiện lại Bộ phím nhanh" (trong AppBar lúc tạm
-    // ẩn, và nút nổi "Hiện" cạnh micro lúc vừa thu gọn vừa tạm ẩn).
-    _nguoiDungVuaGo();
-    setState(() {
-      _boPhimNhanhCamUngAn = false;
-      _anThanhDinhDang = true;
-    });
-    SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
-    _batConTroNgay();
-    _epConTroHienRaMatThuong();
-  }
-
-  /// Nút "bàn phím" (cạnh End, `_xayHangDieuHuongConTro`) — KHÁC HẲN
-  /// `_boPhimNhanhCamUngAn` ("Ẩn"): "Ẩn" nhường HẲN chỗ cho bàn phím ảo
-  /// (thay AppBar bằng 2 nút, ẩn mọi thanh Bộ phím nhanh); nút này thì
-  /// ngược lại — GIỮ NGUYÊN mọi thanh công cụ của Bộ phím nhanh đang hiện,
-  /// chỉ CHO PHÉP THÊM bàn phím ảo hệ thống hiện song song để gõ tay ngay
-  /// cạnh các nút bấm sẵn. `readOnly` của ô soạn thảo (xem `build`) phải
-  /// trừ thêm cờ này ra thì bàn phím ảo mới thật sự hiện được.
+  /// Nút "bàn phím" (cạnh End, `_xayHangDieuHuongConTro`) — cho phép bàn
+  /// phím ảo hệ thống hiện SONG SONG với các thanh công cụ của Bộ phím
+  /// nhanh (giữ nguyên mọi thanh công cụ đang hiện, chỉ CHO PHÉP THÊM bàn
+  /// phím ảo hệ thống hiện song song để gõ tay ngay cạnh các nút bấm sẵn).
+  /// `readOnly` của ô soạn thảo (xem `build`) phải trừ thêm cờ này ra thì
+  /// bàn phím ảo mới thật sự hiện được.
   bool _epHienBanPhimAoTrongBoPhimNhanh = false;
 
   /// Giá trị `_thuGonThanhCongCu` NGAY TRƯỚC lúc bấm nút bàn phím lần 1 —
@@ -5494,9 +5344,22 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 
   /// "Paste" — rỗng bộ nhớ đệm hoặc không đọc được thì im lặng bỏ qua.
+  ///
+  /// Khi "Tự động thụt đầu dòng mỗi khi xuống hàng" đang bật: (1) xoá hết
+  /// dấu cách đứng đầu đoạn SẮP dán (bao nhiêu cũng xoá, để đoạn dán luôn
+  /// bắt đầu bằng ký tự khác dấu cách — tránh cộng dồn với dấu cách tự thụt
+  /// của app), và (2) tạm tắt hẳn tính năng tự thụt trong lúc dán (qua
+  /// [_tamNgungTuDongThutDauDong], xem `_thutDauDongNeuCan`), mở lại ngay
+  /// sau khi dán xong. Việc (2) hiện không có tác dụng quan sát được qua
+  /// đường "Dán" này (hàm tự thụt chỉ chạy cho đúng MỘT ký tự chèn đơn, một
+  /// đoạn dán nhiều ký tự không bao giờ khớp điều kiện đó) — giữ lại cho an
+  /// toàn/đúng y văn, đề phòng dán đúng 1 ký tự hoặc hành vi thay đổi sau
+  /// này. Đường dán CHUỘT PHẢI (menu chọn văn bản gốc của hệ thống, không đi
+  /// qua hàm này) có `_XoaCachDauKhiDanLucThutDauDong` (một
+  /// `TextInputFormatter` gắn ở `TextField`) lo riêng việc (1).
   Future<void> _phimAoPaste() async {
     final data = await Clipboard.getData('text/plain');
-    final chen = data?.text;
+    var chen = data?.text;
     final chon = _boDieuKhien.selection;
     _giuFocusOChuSauKhiBam();
     if (chen == null || chen.isEmpty) return;
@@ -5514,29 +5377,44 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // `Clipboard.getData('text/plain')` riêng, không phụ thuộc biến này.
     final htmlClipboard = await docHtmlTuClipboard();
     final maHoaGoi = _tachGoiDinhDangTuHtml(htmlClipboard);
+
+    final dangBatTuDongThut = widget.caiDat.tuDongThutDauDong;
+    final chenGoc = chen;
+    if (dangBatTuDongThut) {
+      chen = chen.replaceFirst(RegExp(r'^ +'), '');
+      if (chen.isEmpty) return;
+    }
+    final matDinhDangViXoaCach = chen != chenGoc;
+
     // Dán LUÔN phải là một mốc Lùi lại/Tiến tới RIÊNG — xem giải thích ở
     // `_phimAoCut`, cùng cơ chế.
     _henRanhGioiGoTay?.cancel();
     _dangTrongDotGoTay = false;
+    if (dangBatTuDongThut) _tamNgungTuDongThutDauDong = true;
     final moi = vb.replaceRange(batDau, ketThuc, chen);
     _boDieuKhien.value = TextEditingValue(
       text: moi,
       selection: TextSelection.collapsed(offset: batDau + chen.length),
     );
+    if (dangBatTuDongThut) _tamNgungTuDongThutDauDong = false;
     // Đợi `.value =` ở trên chạy XONG toàn bộ dây chuyền sửa văn bản thường
     // (qua `_khiNguoiDungSua` → `_apDungChinhSuaNguoiDung`, đã tự dời mọi
     // vùng định dạng CŨ theo đúng phép chèn) rồi mới THÊM các vùng định dạng
     // MỚI của đoạn vừa dán — không đụng gì vào dây chuyền dời/co giãn đã có,
-    // chỉ cộng thêm sau cùng.
-    if (maHoaGoi != null) {
-      setState(() => _apDungGoiDinhDangTuClipboard(maHoaGoi, chen, batDau));
-    } else if (htmlClipboard != null) {
-      // Không mang đánh dấu riêng của Flowrite — thử "cố gắng tốt nhất" rút
-      // định dạng cơ bản (đậm/nghiêng/gạch chân) từ HTML nguồn ngoài (Google
-      // Docs/Word/trang web...). `_dinhDangTuHtmlNgoai` tự trả về `null` nếu
-      // chữ rút ra không khớp y hệt [chen] — an toàn, không dán sai chữ.
-      final ds = _dinhDangTuHtmlNgoai(htmlClipboard, chen);
-      if (ds != null) setState(() => _themVungDinhDangTuDs(ds, batDau));
+    // chỉ cộng thêm sau cùng. Đã xoá dấu cách đầu (ở trên) thì toạ độ của
+    // gói định dạng (tính theo [chenGoc] CHƯA xoá) không còn khớp nữa — bỏ
+    // qua hẳn định dạng lúc đó, thà mất định dạng còn hơn gán sai chỗ.
+    if (!matDinhDangViXoaCach) {
+      if (maHoaGoi != null) {
+        setState(() => _apDungGoiDinhDangTuClipboard(maHoaGoi, chen!, batDau));
+      } else if (htmlClipboard != null) {
+        // Không mang đánh dấu riêng của Flowrite — thử "cố gắng tốt nhất" rút
+        // định dạng cơ bản (đậm/nghiêng/gạch chân) từ HTML nguồn ngoài (Google
+        // Docs/Word/trang web...). `_dinhDangTuHtmlNgoai` tự trả về `null` nếu
+        // chữ rút ra không khớp y hệt [chen] — an toàn, không dán sai chữ.
+        final ds = _dinhDangTuHtmlNgoai(htmlClipboard, chen!);
+        if (ds != null) setState(() => _themVungDinhDangTuDs(ds, batDau));
+      }
     }
     _cuonToiConTroNeuCan();
     if (mounted) hienThongBaoGiua(context, 'Đã dán văn bản vào từ bộ nhớ đệm');
@@ -8454,7 +8332,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// dấu cách cần chèn NGAY TRƯỚC nội dung sắp tới, để dòng luôn được thụt
   /// đầu dòng bất kể nội dung đó tới từ gõ tay hay giọng nói. Trả về chuỗi
   /// rỗng nếu không rơi vào trường hợp nào hoặc tính năng đang tắt.
+  /// Cờ MỘT LẦN: bật ngay trước khi `_phimAoPaste` chèn chữ vừa dán vào, tắt
+  /// lại ngay sau — chặn `_thutDauDongNeuCan` không cho tự thêm dấu cách
+  /// trong lúc dán, dù qua phím tắt (Ctrl+V) hay nút "Dán" của Bộ phím
+  /// nhanh. Xem chú thích khai báo `_phimAoPaste`.
+  bool _tamNgungTuDongThutDauDong = false;
+
   String _thutDauDongNeuCan(String vanBan, int viTri) {
+    if (_tamNgungTuDongThutDauDong) return '';
     if (!widget.caiDat.tuDongThutDauDong) return '';
     final rong = vanBan.isEmpty;
     final ngayTruocLaXuongDong =
@@ -12887,20 +12772,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
-  /// Thay cho `_oTenField()` khi Bộ phím nhanh đang TẠM ẨN
-  /// (`_boPhimNhanhCamUngAn`) — ba nút "Hiện lại Bộ phím nhanh"/"Đóng
-  /// lại"/nút con mắt chiếm đúng vùng tên tệp, để người dùng luôn thấy
-  /// đường quay lại (hoặc tắt hẳn) ngay trong lúc đang gõ bằng bàn phím ảo
-  /// hệ thống. Bọc trong `_HangNutBoPhimNhanhTamAn` để có hiệu ứng mờ-tỏ
-  /// tuần hoàn kèm tên tệp hiện dần lên xen kẽ — xem widget đó.
-  Widget _hangNutBoPhimNhanhTamAn() {
-    return _HangNutBoPhimNhanhTamAn(
-      onHienLai: _hienLaiBoPhimNhanhCamUng,
-      onDong: _bamNutBoPhimNhanhCamUng,
-      oTenField: _oTenField(),
-    );
-  }
-
   Widget _oTenField() {
     // Đọc lại `_ghiChuHienTai.mau` mỗi lần dựng — không cache riêng, nên
     // đổi màu ở màn hình thư mục (cùng tham chiếu `widget.kho`) hay ở nút
@@ -13052,7 +12923,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           children: [
             Expanded(
               child: Align(
-                alignment: Alignment.centerLeft,
+                // Màn hình rộng: căn GIỮA (đủ chỗ ngang, không cần ép về
+                // trái); màn hình hẹp vẫn ép trái như cũ để nhường chỗ.
+                alignment: manHinhHep ? Alignment.centerLeft : Alignment.center,
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -13231,7 +13104,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         child: Align(
-          alignment: Alignment.centerLeft,
+          alignment: manHinhHep ? Alignment.centerLeft : Alignment.center,
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -13252,9 +13125,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// trên `ThanhCongCu`, khi "Bộ phím nhanh cho màn hình cảm ứng" đang mở.
   /// Nút X đỏ sát mép phải tắt hẳn công cụ, trả lại bàn phím ảo bình
   /// thường.
-  /// "Ẩn" và "Đóng" luôn RỘNG BẰNG NHAU (áp dụng cả màn hình hẹp lẫn rộng)
-  /// — nhãn "Đóng" (4 chữ) tự nhiên rộng hơn "Ẩn" (2 chữ) nếu để tự co theo
-  /// nội dung, nên khoá cứng cùng một độ rộng, đo theo nhãn DÀI HƠN.
+  /// Độ rộng cố định của nút "Đóng" — khoá cứng một độ rộng thay vì để tự
+  /// co theo nội dung, cho đồng bộ với các nút vuông khác trong hàng.
   static const _rongNutAnDong = 64.0;
 
   Widget _xayHangPhimNhanhCamUng() {
@@ -13275,7 +13147,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           children: [
             Expanded(
               child: Align(
-                alignment: Alignment.centerLeft,
+                alignment: manHinhHep ? Alignment.centerLeft : Alignment.center,
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Wrap(
@@ -13319,45 +13191,26 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               ),
             ),
             const SizedBox(width: 8),
-            // Hai nút sát nhau, không khoảng cách giữa: "Ẩn" (cam, tạm ẩn —
-            // xem `_anBoPhimNhanhCamUng`) bên trái, "Đóng" (đỏ, tắt hẳn) bên
-            // phải — cùng bo góc NGOÀI của cụm, góc giữa vuông để dính liền.
+            // Nút "Đóng" (đỏ, tắt hẳn Bộ phím nhanh) — nút "Ẩn" (tạm ẩn, chỉ
+            // nhường chỗ cho bàn phím ảo) đã bỏ hẳn: giờ bật/tắt Bộ phím
+            // nhanh đã dễ dàng ngay ở nút trên màn hình chính rồi, không cần
+            // đường tắt tạm ẩn riêng nữa.
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Tooltip(
-                    message: 'Tạm ẩn Bộ phím nhanh, hiện bàn phím ảo',
-                    child: InkWell(
-                      onTap: () {},
-                      onTapDown: (_) => _anBoPhimNhanhCamUng(),
-                      child: Container(
-                        width: _rongNutAnDong,
-                        color: Colors.orange.shade600,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        alignment: Alignment.center,
-                        child: const Text('Ẩn',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                      ),
-                    ),
+              child: Tooltip(
+                message: 'Đóng bộ phím nhanh cho màn hình cảm ứng',
+                child: InkWell(
+                  onTap: () {},
+                  onTapDown: (_) => _bamNutBoPhimNhanhCamUng(),
+                  child: Container(
+                    width: _rongNutAnDong,
+                    color: Colors.red.shade600,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    alignment: Alignment.center,
+                    child: const Text('Đóng',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                   ),
-                  Tooltip(
-                    message: 'Đóng bộ phím nhanh cho màn hình cảm ứng',
-                    child: InkWell(
-                      onTap: () {},
-                      onTapDown: (_) => _bamNutBoPhimNhanhCamUng(),
-                      child: Container(
-                        width: _rongNutAnDong,
-                        color: Colors.red.shade600,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        alignment: Alignment.center,
-                        child: const Text('Đóng',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ],
@@ -13701,7 +13554,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             // sát mép trái, cùng dòng với Lùi/Tiến/Lưu/Ẩn-hiện-định-dạng.
             // Tên tệp một mình đứng riêng một dòng phía trên (đủ chỗ đọc tên
             // dài, không bị bốn nút kia chèn vào nữa).
-            title: (_boPhimNhanhCamUngMo && _boPhimNhanhCamUngAn) ? _hangNutBoPhimNhanhTamAn() : _oTenField(),
+            title: _oTenField(),
             backgroundColor: Colors.white,
             surfaceTintColor: Colors.white,
             elevation: 1,
@@ -13731,7 +13584,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             leadingWidth: _hienHangCopyCutPaste()
                 ? _rongHangCopyCutPaste
                 : _rongNutThuMucCoChu + _canhNutDieuHuongTep * 3 + 4,
-            title: (_boPhimNhanhCamUngMo && _boPhimNhanhCamUngAn) ? _hangNutBoPhimNhanhTamAn() : _oTenField(),
+            title: _oTenField(),
             backgroundColor: Colors.white,
             surfaceTintColor: Colors.white,
             elevation: 1,
@@ -14084,14 +13937,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           // và vẫn cho chạm để di chuyển con trỏ/chọn vùng
                           // bình thường như tài liệu Flutter đã ghi rõ.
                           keyboardType: TextInputType.multiline,
-                          readOnly: _boPhimNhanhCamUngMo &&
-                              !_boPhimNhanhCamUngAn &&
-                              !_epHienBanPhimAoTrongBoPhimNhanh,
+                          readOnly: _boPhimNhanhCamUngMo && !_epHienBanPhimAoTrongBoPhimNhanh,
                           // Chặn sửa/xoá từng-ký-tự-riêng-lẻ bên trong một
                           // thẻ ghi âm — xem `ChanSuaGiuaThe`.
                           inputFormatters: [
                             ChanSuaGiuaThe(khiCanXoaThe: _khiCanXoaTheTuBanPhim),
                             ChanSuaGiuaTheTichChon(khiDaXoaThe: _khiDaXoaTheTichChon),
+                            _XoaCachDauKhiDanLucThutDauDong(
+                              dangBatTuDongThut: () => widget.caiDat.tuDongThutDauDong,
+                            ),
                           ],
                           textCapitalization: TextCapitalization.sentences,
                           style: _kieuVanBan,
@@ -14190,10 +14044,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               ),
             ),
             if (_dangChonViTriChenFile) _xayThanhChonViTriChenFile(),
-            if (!_dangChonViTriChenFile && _boPhimNhanhCamUngMo && !_boPhimNhanhCamUngAn && !_dieuHuongConTroAn)
+            if (!_dangChonViTriChenFile && _boPhimNhanhCamUngMo && !_dieuHuongConTroAn)
               _xayHangDieuHuongConTro(),
-            if (!_dangChonViTriChenFile && _boPhimNhanhCamUngMo && !_boPhimNhanhCamUngAn) _xayHangCongCuVanBanCamUng(),
-            if (!_dangChonViTriChenFile && _boPhimNhanhCamUngMo && !_boPhimNhanhCamUngAn) _xayHangPhimNhanhCamUng(),
+            if (!_dangChonViTriChenFile && _boPhimNhanhCamUngMo) _xayHangCongCuVanBanCamUng(),
+            if (!_dangChonViTriChenFile && _boPhimNhanhCamUngMo) _xayHangPhimNhanhCamUng(),
             // Bọc riêng bằng ValueListenableBuilder (xem chú thích ở
             // `_songAmTick`) — CHỈ ThanhCongCu dựng lại mỗi lần sóng âm đổi
             // (tới 5 lần/giây lúc ghi âm/nghe), không đụng tới AppBar trình
@@ -14312,29 +14166,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               top: MediaQuery.paddingOf(context).top + 4,
               left: 8,
               child: _hangCopyCutPaste(),
-            ),
-          // (SỬA LỖI mất lối vào "Hiện lại Bộ phím nhanh"/"Đóng lại") Hai nút
-          // đó nằm trong AppBar (`_hangNutBoPhimNhanhTamAn`) — "Thu gọn" ẩn
-          // HẲN AppBar nên chúng biến mất theo, không còn cách quay lại Bộ
-          // phím nhanh. Nút nổi "Hiện" này thay thế đúng một việc: bấm vào
-          // là làm ĐÚNG NHƯ nút "Hiện lại Bộ phím nhanh" (xanh lá) đã ẩn.
-          // `_trinhGhiAmMo` cũng phải tính vào đây y hệt `_thuGonThanhCongCu`
-          // — AppBar của trình ghi âm CŨNG thay hẳn AppBar thường (không có
-          // `_hangNutBoPhimNhanhTamAn`), nên nút "Hiện" ở đó cũng bị che mất
-          // y hệt, cần đúng lối thoát nổi này.
-          if ((_thuGonThanhCongCu || _trinhGhiAmMo) &&
-              _boPhimNhanhCamUngMo &&
-              _boPhimNhanhCamUngAn &&
-              !_dangChonViTriChenFile)
-            Positioned(
-              right: 8,
-              bottom: caoBanPhim + 56,
-              child: _NutNoiTuTho(
-                chu: 'Hiện',
-                mau: Colors.green.shade600,
-                moTa: 'Hiện lại Bộ phím nhanh',
-                onTap: _hienLaiBoPhimNhanhCamUng,
-              ),
             ),
           _nhanDoanSo(caoBanPhim),
         ],

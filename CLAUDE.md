@@ -10,9 +10,10 @@ Android — bàn phím ảo biến mất nhưng khoảng trống nó từng chi�
 LẠI, không co lại cho các thành phần phía trên trôi xuống lấp đầy. Trang
 bị hẹp chiều cao, nhìn xấu. Không mất dữ liệu.
 
-**Cách né tạm thời:** bấm một trong bảy nút "*", bàn phím, Lùi lại, Tiến
-tới (ở Bộ phím nhanh), nút ẩn/hiện điều hướng, Ẩn, Đóng — lỗi tự biến mất
-ngay, không cần tải lại trang.
+**Cách né tạm thời:** bấm một trong các nút "*", bàn phím, Lùi lại, Tiến
+tới (ở Bộ phím nhanh), nút ẩn/hiện điều hướng, Đóng — lỗi tự biến mất
+ngay, không cần tải lại trang. (Nút "Ẩn" từng nằm trong danh sách này đã
+bỏ hẳn khỏi Bộ phím nhanh — xem phần sau của tệp này nếu cần biết lý do.)
 
 **Đã thử (chưa dứt điểm):**
 1. Thêm `didChangeMetrics` (override `WidgetsBindingObserver`, gọi
