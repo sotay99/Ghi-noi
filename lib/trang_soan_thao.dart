@@ -12510,6 +12510,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           lichSu: lichSu,
           layVanBanHienTai: () => _boDieuKhien.text,
           layDoanVanDangChon: _layDoanVanDangChon,
+          caiDat: widget.caiDat,
         ),
       ),
     );

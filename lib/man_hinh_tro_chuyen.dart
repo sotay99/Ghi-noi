@@ -18,10 +18,20 @@
 // này chỉ thêm/xoá thẳng vào đó, nơi gọi tự động "nhớ" theo từng tệp ghi chú
 // mà không cần callback nào thêm (xem `_TrangSoanThaoState._troChuyenTheoTep`).
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 
+import 'cai_dat.dart';
+import 'ghi_am_the.dart';
+import 'gui_ghi_am_gemini.dart';
 import 'gui_tro_chuyen_gemini.dart';
+import 'ket_qua_ghi_am_the.dart';
+import 'lua_chon_phim_tat.dart';
+import 'the_ghi_am.dart' show dinhDangMmSs;
+import 'theo_doi_tap_doi_phim.dart';
 import 'tin_nhan_tro_chuyen.dart';
 
 const _mauChinh = Color(0xFF1A73E8);
@@ -32,7 +42,13 @@ class ManHinhTroChuyen extends StatefulWidget {
     required this.lichSu,
     required this.layVanBanHienTai,
     required this.layDoanVanDangChon,
+    required this.caiDat,
   });
+
+  /// Đọc phím tắt Micro/Ghi âm đã cài (`caiDat.phimTatMicro`/`phimTatGhiAm`)
+  /// — CÙNG phím tắt với trang soạn thảo chính, hoạt động y hệt trong kênh
+  /// chat này (xem `_khiPhimCucBoTroChuyen`).
+  final CaiDat caiDat;
 
   /// Tham chiếu sống — mọi thêm/xoá ở đây đều "lưu" thẳng vào bộ nhớ đệm của
   /// tệp ghi chú đang mở (do nơi gọi cầm List này).
@@ -73,6 +89,201 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   /// — xem `_guiHoacXacNhanSua`.
   int? _dangSuaChiSo;
 
+  // ------------------------------------------------------- Micro/Ghi âm
+
+  /// "Micro (vừa nói vừa ra chữ)" — phiên bản RIÊNG, ĐƠN GIẢN HƠN cho kênh
+  /// chat: không đụng gì tới bộ máy micro phức tạp (neo/vùng-tạm/chốt câu)
+  /// của trang soạn thảo chính — chỉ cần append chữ nhận dạng được vào ô
+  /// nhập, gõ tay thì thắng (xem `_khiONhapDoi`).
+  final SpeechToText _micro = SpeechToText();
+  bool _micKhoiTaoXong = false;
+  bool _micDangNghe = false;
+
+  /// Vị trí BẮT ĐẦU của cụm chữ mic đang "sống" (đang được cập nhật dần)
+  /// trong `_oNhap.text`, và chữ mic đã chèn ở đó tại lần cập nhật GẦN NHẤT
+  /// — mỗi kết quả mới từ `onResult` thay đúng đoạn đó bằng chữ mới (đúng
+  /// kiểu "càng nói càng sửa câu đang nói dở", y hệt core-logic của trang
+  /// soạn thảo, chỉ đơn giản hoá phần offset).
+  int _micDiemBatDau = 0;
+  String _micChuGanNhat = '';
+
+  /// Đặt `true` NGAY TRƯỚC khi tự gán `_oNhap.value` (do mic tự chèn chữ)
+  /// — `_khiONhapDoi` dựa vào cờ này để phân biệt "đổi do mic" (bỏ qua) với
+  /// "đổi do người dùng gõ tay" (chốt lại đoạn mic đang sống, dời neo ra
+  /// sau vị trí gõ).
+  bool _micTuDoiONhap = false;
+
+  void _khiONhapDoi() {
+    if (_micTuDoiONhap || !_micDangNghe) return;
+    // Người dùng vừa gõ tay (hoặc dán/xoá) trong lúc mic đang nghe — gõ tay
+    // THẮNG: coi như cụm chữ mic hiện tại đã chốt xong, lần kết quả mic kế
+    // tiếp sẽ bắt đầu một cụm MỚI ngay tại vị trí con trỏ hiện giờ.
+    final vt = _oNhap.selection.baseOffset;
+    _micDiemBatDau = vt >= 0 ? vt : _oNhap.text.length;
+    _micChuGanNhat = '';
+  }
+
+  Future<void> _batMicChat() async {
+    // Ghi âm và Micro loại trừ nhau — bật cái này thì tự tắt cái kia trước.
+    if (_ghiDangMo) return; // đang có hộp thoại ghi âm mở — không thể bật mic.
+    if (!_micKhoiTaoXong) {
+      _micKhoiTaoXong =
+          await _micro.initialize(onStatus: _khiMicDoiTrangThai, debugLogging: false);
+      if (!_micKhoiTaoXong) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Máy không dùng được micro. Hãy kiểm tra quyền ghi âm.'),
+          ));
+        }
+        return;
+      }
+    }
+    _micDiemBatDau = _oNhap.text.length;
+    _micChuGanNhat = '';
+    setState(() => _micDangNghe = true);
+    try {
+      await _micro.listen(
+        onResult: (ketQua) {
+          if (!_micDangNghe) return;
+          final chen = ketQua.recognizedWords;
+          final vb = _oNhap.text;
+          final batDau = _micDiemBatDau.clamp(0, vb.length);
+          final ketThucCu = (batDau + _micChuGanNhat.length).clamp(batDau, vb.length);
+          final moi = vb.substring(0, batDau) + chen + vb.substring(ketThucCu);
+          _micTuDoiONhap = true;
+          _oNhap.value = TextEditingValue(
+            text: moi,
+            selection: TextSelection.collapsed(offset: batDau + chen.length),
+          );
+          _micTuDoiONhap = false;
+          _micChuGanNhat = chen;
+        },
+        listenOptions: SpeechListenOptions(
+          partialResults: true,
+          listenMode: ListenMode.dictation,
+          cancelOnError: false,
+          autoPunctuation: true,
+        ),
+        listenFor: const Duration(minutes: 10),
+        pauseFor: const Duration(seconds: 8),
+      );
+    } catch (_) {
+      if (mounted) setState(() => _micDangNghe = false);
+    }
+  }
+
+  /// Hệ điều hành tự ngắt nhận dạng sau một khoảng im lặng (`pauseFor`) —
+  /// khác trang soạn thảo chính (tự bật lại ngay cho người dùng thấy như
+  /// luôn bật), ở đây ĐƠN GIẢN HƠN: chỉ cập nhật lại icon nút Gửi cho đúng
+  /// thực tế (không còn nghe nữa), người dùng tự bấm lại nếu muốn nói tiếp.
+  void _khiMicDoiTrangThai(String trangThai) {
+    final dangNghe = trangThai == SpeechToText.listeningStatus;
+    if (mounted && _micDangNghe != dangNghe && !dangNghe) {
+      setState(() => _micDangNghe = false);
+    }
+  }
+
+  Future<void> _tatMicChat() async {
+    await _micro.stop();
+    if (mounted) setState(() => _micDangNghe = false);
+  }
+
+  Future<void> _bamMicChat() async {
+    if (_micDangNghe) {
+      await _tatMicChat();
+    } else {
+      await _batMicChat();
+    }
+  }
+
+  /// Phiên "Ghi âm (nói xong mới ra chữ)" đang mở hay không — xem
+  /// `_moGhiAmChat`.
+  bool _ghiDangMo = false;
+
+  /// Bấm phím tắt Ghi âm. Hộp thoại ghi âm đã mở sẵn thì KHÔNG tới được đây
+  /// — nó không `barrierDismissible` nên chiếm hẳn route hiện tại, và
+  /// `_khiPhimCucBoTroChuyen` đã tự nhường (route của CHÍNH màn hình chat
+  /// không còn "current") cho bộ dò phím tắt CỤC BỘ của chính hộp thoại đó
+  /// (`_KhungGhiAmChat._khiPhimCucBo`, xử lý tạm dừng/tiếp tục). Ở đây chỉ
+  /// còn lo đúng MỘT việc: mic đang nghe thì tắt mic trước (loại trừ nhau),
+  /// rồi mở phiên ghi âm mới.
+  Future<void> _bamGhiAmChat() async {
+    if (_ghiDangMo) return;
+    if (_micDangNghe) await _tatMicChat();
+    await _moGhiAmChat();
+  }
+
+  Future<void> _moGhiAmChat() async {
+    if (!mounted) return;
+    setState(() => _ghiDangMo = true);
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _KhungGhiAmChat(
+        phimTatGhiAm: widget.caiDat.phimTatGhiAm,
+        khiCoVanBan: (chu) {
+          if (!mounted) return;
+          final vb = _oNhap.text;
+          final ghep = vb.isEmpty ? chu : (vb.endsWith(' ') || vb.endsWith('\n') ? '$vb$chu' : '$vb $chu');
+          setState(() => _oNhap.text = ghep);
+          _oNhap.selection = TextSelection.collapsed(offset: _oNhap.text.length);
+        },
+      ),
+    );
+    if (mounted) setState(() => _ghiDangMo = false);
+  }
+
+  /// Phím tắt Micro/Ghi âm TOÀN CỤC của màn hình chat — CÙNG phím tắt với
+  /// trang soạn thảo chính (`caiDat.phimTatMicro`/`phimTatGhiAm`), hoạt
+  /// động y hệt trong lúc đang ở kênh chat này (trang soạn thảo phía sau tự
+  /// nhường vì route của nó không còn "current" nữa lúc này).
+  bool _khopPhimTatTroChuyen(LuaChonPhimTat lc, KeyEvent event) {
+    switch (lc.loai) {
+      case 'tab':
+        return event.logicalKey == LogicalKeyboardKey.tab &&
+            !HardwareKeyboard.instance.isControlPressed &&
+            !HardwareKeyboard.instance.isAltPressed &&
+            !HardwareKeyboard.instance.isShiftPressed &&
+            !HardwareKeyboard.instance.isMetaPressed;
+      case 'ctrl':
+        return HardwareKeyboard.instance.isControlPressed &&
+            !HardwareKeyboard.instance.isAltPressed &&
+            event.logicalKey.keyLabel.toUpperCase() == (lc.phim ?? '').toUpperCase();
+      default:
+        return false;
+    }
+  }
+
+  late final _theoDoiTapDoiTroChuyen =
+      TheoDoiTapDoiPhim(khiTapDoi: _khiHoanTatTapDoiTroChuyen);
+
+  void _khiHoanTatTapDoiTroChuyen(String loai) {
+    if (!mounted) return;
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return;
+    if (widget.caiDat.phimTatMicro.loai == loai) {
+      _bamMicChat();
+    } else if (widget.caiDat.phimTatGhiAm.loai == loai) {
+      _bamGhiAmChat();
+    }
+  }
+
+  bool _khiPhimCucBoTroChuyen(KeyEvent event) {
+    if (!mounted || event is! KeyDownEvent) return false;
+    _theoDoiTapDoiTroChuyen.xuLy(event);
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return false;
+    if (_khopPhimTatTroChuyen(widget.caiDat.phimTatMicro, event)) {
+      _bamMicChat();
+      return true;
+    }
+    if (_khopPhimTatTroChuyen(widget.caiDat.phimTatGhiAm, event)) {
+      _bamGhiAmChat();
+      return true;
+    }
+    return false;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -86,10 +297,16 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
       _dinhKemHienTai = LoaiDinhKemTroChuyen.doanChon;
       _noiDungDoanChonDinhKem = doan;
     }
+    _oNhap.addListener(_khiONhapDoi);
+    HardwareKeyboard.instance.addHandler(_khiPhimCucBoTroChuyen);
   }
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_khiPhimCucBoTroChuyen);
+    _theoDoiTapDoiTroChuyen.dispose();
+    if (_micDangNghe) _micro.stop();
+    _oNhap.removeListener(_khiONhapDoi);
     _oNhap.dispose();
     _cuon.dispose();
     super.dispose();
@@ -437,12 +654,28 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                         enabled: widget.layDoanVanDangChon() != null,
                         child: const Text('Đoạn văn đang chọn'),
                       ),
+                      const PopupMenuDivider(),
+                      PopupMenuItem(
+                        value: 3,
+                        enabled: !_micDangNghe && !_ghiDangMo,
+                        child: const Text('Ghi âm (nói xong mới ra chữ)'),
+                      ),
+                      PopupMenuItem(
+                        value: 4,
+                        enabled: !_micDangNghe && !_ghiDangMo,
+                        child: const Text('Micro (vừa nói vừa ra chữ)'),
+                      ),
                     ],
                     onSelected: (v) {
-                      if (v == 1) {
-                        _chonDinhKemToanVan();
-                      } else {
-                        _chonDinhKemDoanChon();
+                      switch (v) {
+                        case 1:
+                          _chonDinhKemToanVan();
+                        case 2:
+                          _chonDinhKemDoanChon();
+                        case 3:
+                          _moGhiAmChat();
+                        case 4:
+                          _batMicChat();
                       }
                     },
                   ),
@@ -492,7 +725,13 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  _NutGui(dangGui: _dangGui, khiBam: _guiHoacXacNhanSua),
+                  // Mic đang nghe thì nút Gửi đổi hẳn thành ô vuông đỏ
+                  // (biểu thị "dừng micro") — bấm vào là đóng mic lại, KHÔNG
+                  // gửi tin nhắn; gửi thật vẫn luôn cần Ctrl+Enter/nút Gửi
+                  // bình thường sau khi đã tắt mic.
+                  _micDangNghe
+                      ? _NutDungMic(khiBam: _tatMicChat)
+                      : _NutGui(dangGui: _dangGui, khiBam: _guiHoacXacNhanSua),
                 ],
               ),
             ),
@@ -522,6 +761,28 @@ class _NutGui extends StatelessWidget {
         child: const Padding(
           padding: EdgeInsets.all(10),
           child: Icon(Icons.send, color: Colors.white, size: 20),
+        ),
+      ),
+    );
+  }
+}
+
+/// Nút ô vuông đỏ thay chỗ nút Gửi khi Micro đang nghe — bấm để đóng mic.
+class _NutDungMic extends StatelessWidget {
+  const _NutDungMic({required this.khiBam});
+  final VoidCallback khiBam;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.red.shade600,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: khiBam,
+        child: const Padding(
+          padding: EdgeInsets.all(10),
+          child: Icon(Icons.stop_rounded, color: Colors.white, size: 20),
         ),
       ),
     );
@@ -836,6 +1097,419 @@ class _KhungKetQua extends StatelessWidget {
             style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ============================================================ Ghi âm (chat)
+
+/// Số "phút:giây" của một thẻ đang ghi trong kênh chat — đổi màu TÍM từ
+/// giây 45 (việc NHẤP NHÁY của cả dòng do `_NhapNhayGhiAmChat` bên ngoài lo)
+/// — ĐÚNG khuôn `_SoPhutGiayGhiAm` của trang soạn thảo chính.
+class _SoPhutGiayChat extends StatelessWidget {
+  const _SoPhutGiayChat({required this.thoiLuong, required this.style});
+  final Duration thoiLuong;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    final giay = thoiLuong.inSeconds;
+    final chu = dinhDangMmSs(thoiLuong);
+    if (giay < 45) return Text(chu, style: style);
+    return Text(chu, style: style.copyWith(color: Colors.purple.shade700));
+  }
+}
+
+/// Bọc cả dòng trạng thái ghi âm để nhấp nháy khi sắp chạm hạn 60 giây —
+/// ĐÚNG khuôn `_NhapNhayGioiHanGhiAm` của trang soạn thảo chính (từ giây 45
+/// nhấp nháy chu kỳ 500ms, từ giây 55 tăng gấp đôi còn 250ms).
+class _NhapNhayGhiAmChat extends StatefulWidget {
+  const _NhapNhayGhiAmChat({required this.giay, required this.child});
+  final int giay;
+  final Widget child;
+
+  @override
+  State<_NhapNhayGhiAmChat> createState() => _NhapNhayGhiAmChatState();
+}
+
+class _NhapNhayGhiAmChatState extends State<_NhapNhayGhiAmChat> {
+  Timer? _hen;
+  bool _an = false;
+
+  int _vung(int g) => g < 45 ? 0 : (g < 55 ? 1 : 2);
+
+  void _datHen() {
+    _hen?.cancel();
+    if (widget.giay < 45) {
+      _an = false;
+      return;
+    }
+    final chuKy = widget.giay >= 55
+        ? const Duration(milliseconds: 250)
+        : const Duration(milliseconds: 500);
+    _hen = Timer.periodic(chuKy, (_) {
+      if (!mounted) return;
+      setState(() => _an = !_an);
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _datHen();
+  }
+
+  @override
+  void didUpdateWidget(covariant _NhapNhayGhiAmChat oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_vung(oldWidget.giay) != _vung(widget.giay)) _datHen();
+  }
+
+  @override
+  void dispose() {
+    _hen?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.giay < 45) return widget.child;
+    return Opacity(opacity: _an ? 0.2 : 1.0, child: widget.child);
+  }
+}
+
+/// Hộp thoại "Ghi âm (nói xong mới ra chữ)" dành RIÊNG cho kênh chat — Ở
+/// GIỮA MÀN HÌNH (khác AppBar trên đầu của trang soạn thảo chính). Chỉ còn
+/// 3 hành động: phím 1 "Hoàn thành và Chuyển hoá thành văn bản", phím 2
+/// "Hoàn thành và Tạo bản ghi âm mới", phím 5 "Xoá bản này và Đóng" — không
+/// có các phím 3/4/6/7/8/9 của bảng điều khiển trang chính (không có ý
+/// nghĩa gì ở đây: không "phát để nghe lại", không cài đặt tự động/bảng
+/// riêng, không "chọn vị trí chèn vào văn bản"). Thẻ ở đây LUÔN tự động
+/// chuyển hoá thành văn bản khi hoàn thành (nối thẳng vào ô nhập chat qua
+/// `khiCoVanBan`) — không có lựa chọn "chỉ ghi, chưa chuyển" như trang
+/// chính.
+///
+/// Cùng hạn 60 giây/thẻ (tự động chốt + ghi tiếp bằng thẻ mới, tối đa 5 thẻ
+/// liên tiếp không ai bấm gì = 5 phút tổng), cùng hiệu ứng nhấp nháy 45/55
+/// giây, và cùng hộp thoại cảnh báo sắp chạm 5 phút — PORT nguyên luật từ
+/// bảng điều khiển của trang soạn thảo chính (`_BangDieuKhienGhiAm`,
+/// `trang_soan_thao.dart`), không đổi ý nghĩa, chỉ đơn giản hoá phần giao
+/// diện cho vừa một hộp thoại nhỏ.
+class _KhungGhiAmChat extends StatefulWidget {
+  const _KhungGhiAmChat({required this.phimTatGhiAm, required this.khiCoVanBan});
+  final LuaChonPhimTat phimTatGhiAm;
+
+  /// Gọi lại MỖI LẦN một thẻ vừa chuyển hoá xong — nơi gọi (`_moGhiAmChat`)
+  /// tự nối thẳng vào ô nhập chat.
+  final void Function(String chu) khiCoVanBan;
+
+  @override
+  State<_KhungGhiAmChat> createState() => _KhungGhiAmChatState();
+}
+
+class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
+  static const _gioiHanMoiThe = Duration(seconds: 60);
+  static const _canhBaoGiayCuoiCung = Duration(seconds: 30);
+  static const _soLanToiDaTuDongTaoTheLienTiep = 5;
+
+  int _soThe = 1;
+  Duration _thoiLuong = Duration.zero;
+  bool _dangTamDung = false;
+  bool _dangXuLy = false;
+  bool _daSanSang = false;
+  bool _daHienCanhBao5Phut = false;
+  Timer? _dongHo;
+  int _soLanTuDongTaoTheLienTiep = 0;
+
+  late final _theoDoiTapDoi = TheoDoiTapDoiPhim(khiTapDoi: _khiTapDoiCucBo);
+
+  bool get _laTheCuoiCung =>
+      _soLanTuDongTaoTheLienTiep >= _soLanToiDaTuDongTaoTheLienTiep - 1;
+
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_khiPhimCucBo);
+    _batDau();
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_khiPhimCucBo);
+    _theoDoiTapDoi.dispose();
+    _dongHo?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _batDau() async {
+    final ok = await ghiAmTheKhoiTao();
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Không dùng được micro để ghi âm. Hãy kiểm tra quyền.'),
+      ));
+      Navigator.of(context).pop();
+      return;
+    }
+    await ghiAmTheBatDauThe();
+    if (!mounted) return;
+    setState(() => _daSanSang = true);
+    _chayDongHo();
+  }
+
+  void _chayDongHo() {
+    _dongHo?.cancel();
+    _dongHo = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_dangTamDung || _dangXuLy) return;
+      setState(() => _thoiLuong += const Duration(seconds: 1));
+      if (_thoiLuong >= _gioiHanMoiThe) {
+        _hoanThanh(taoTheMoi: !_laTheCuoiCung, auto: true);
+      } else if (_laTheCuoiCung &&
+          !_daHienCanhBao5Phut &&
+          _thoiLuong >= _canhBaoGiayCuoiCung) {
+        _daHienCanhBao5Phut = true;
+        _hienCanhBao5Phut();
+      }
+    });
+  }
+
+  Future<void> _tamDungTiepTuc() async {
+    if (_dangTamDung) {
+      await ghiAmTheTiepTuc();
+    } else {
+      await ghiAmTheTamDung();
+    }
+    if (mounted) setState(() => _dangTamDung = !_dangTamDung);
+  }
+
+  Future<void> _chuyenHoa(KetQuaGhiAmThe kq, int soThe) async {
+    try {
+      final chu = await guiGhiAmChoGemini(kq.bytes, kq.mime, locHallucination: true);
+      if (chu.trim().isNotEmpty) widget.khiCoVanBan(chu.trim());
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Thẻ ghi âm #$soThe chuyển hoá thất bại: $e'),
+        ));
+      }
+    }
+  }
+
+  /// Phím 1 (taoTheMoi: false) hoặc phím 2 (taoTheMoi: true) — [auto] đúng
+  /// khi do CHÍNH đồng hồ tự gọi (hết hạn 60 giây, không ai bấm gì): chỉ
+  /// trường hợp đó mới TĂNG bộ đếm "tự động liên tiếp"; bấm tay luôn RESET
+  /// bộ đếm về 0 (đúng luật của trang soạn thảo chính).
+  Future<void> _hoanThanh({required bool taoTheMoi, bool auto = false}) async {
+    if (_dangXuLy) return;
+    setState(() => _dangXuLy = true);
+    _dongHo?.cancel();
+    final soTheVuaXong = _soThe;
+    final kq = await ghiAmTheKetThucThe();
+    if (kq != null) unawaited(_chuyenHoa(kq, soTheVuaXong));
+
+    if (!taoTheMoi) {
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
+    _soLanTuDongTaoTheLienTiep = auto ? _soLanTuDongTaoTheLienTiep + 1 : 0;
+    await ghiAmTheBatDauThe();
+    if (!mounted) return;
+    setState(() {
+      _soThe++;
+      _thoiLuong = Duration.zero;
+      _dangTamDung = false;
+      _dangXuLy = false;
+      _daHienCanhBao5Phut = false;
+    });
+    _chayDongHo();
+  }
+
+  Future<void> _xoaVaDong() async {
+    if (_dangXuLy) return;
+    setState(() => _dangXuLy = true);
+    _dongHo?.cancel();
+    await ghiAmTheDongHan();
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  void _hienCanhBao5Phut() {
+    final tongPhut =
+        (_gioiHanMoiThe.inSeconds * _soLanToiDaTuDongTaoTheLienTiep) ~/ 60;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, capNhat) => AlertDialog(
+          title: Text('Sắp chạm giới hạn $tongPhut phút'),
+          content: Text(
+            'Thẻ ghi âm #$_soThe (thẻ tự động thứ $_soLanToiDaTuDongTaoTheLienTiep '
+            'liên tiếp) sắp ghi đủ 60 giây. Nếu không chọn, tới đúng giây thứ 60 '
+            'hệ thống sẽ TỰ HOÀN THÀNH và đóng trình ghi âm luôn.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await _tamDungTiepTuc();
+                capNhat(() {});
+              },
+              child: Text(_dangTamDung ? 'Tiếp tục' : 'Tạm dừng'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _hoanThanh(taoTheMoi: false);
+              },
+              child: const Text('Hoàn thành và Đóng ngay'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Đã hiểu'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool _khopPhimTat(LuaChonPhimTat lc, KeyEvent event) {
+    switch (lc.loai) {
+      case 'tab':
+        return event.logicalKey == LogicalKeyboardKey.tab &&
+            !HardwareKeyboard.instance.isControlPressed &&
+            !HardwareKeyboard.instance.isAltPressed &&
+            !HardwareKeyboard.instance.isShiftPressed &&
+            !HardwareKeyboard.instance.isMetaPressed;
+      case 'ctrl':
+        return HardwareKeyboard.instance.isControlPressed &&
+            !HardwareKeyboard.instance.isAltPressed &&
+            event.logicalKey.keyLabel.toUpperCase() == (lc.phim ?? '').toUpperCase();
+      default:
+        return false;
+    }
+  }
+
+  void _khiTapDoiCucBo(String loai) {
+    if (!mounted) return;
+    if (widget.phimTatGhiAm.loai == loai) _tamDungTiepTuc();
+  }
+
+  bool _khiPhimCucBo(KeyEvent event) {
+    if (!mounted) return false;
+    _theoDoiTapDoi.xuLy(event);
+    if (event is! KeyDownEvent) return false;
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return false;
+    if (_khopPhimTat(widget.phimTatGhiAm, event)) {
+      _tamDungTiepTuc();
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.digit1) {
+      _hoanThanh(taoTheMoi: false);
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.digit2) {
+      _hoanThanh(taoTheMoi: true);
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.digit5) {
+      _xoaVaDong();
+      return true;
+    }
+    return false;
+  }
+
+  Widget _hang(String nhanPhim, IconData icon, Color mau, String nhan, VoidCallback? onBam) {
+    final khaDung = onBam != null;
+    return InkWell(
+      onTap: onBam,
+      child: Container(
+        margin: const EdgeInsets.only(top: 8),
+        decoration: BoxDecoration(border: Border.all(color: const Color(0xFFDADCE0))),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 56,
+              child: Text(
+                nhanPhim,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(icon, color: khaDung ? mau : Colors.grey.shade400, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(nhan,
+                  style: TextStyle(color: khaDung ? null : Colors.grey.shade400)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const kieuTrangThai =
+        TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 18);
+    return PopScope(
+      canPop: false,
+      child: AlertDialog(
+        title: Text('Bản Ghi âm số $_soThe'),
+        content: SizedBox(
+          width: 320,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!_daSanSang)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Text('Đang chuẩn bị…'),
+                )
+              else
+                _NhapNhayGhiAmChat(
+                  giay: _thoiLuong.inSeconds,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_dangTamDung ? 'Tạm dừng ' : 'Đang Ghi âm ',
+                          style: kieuTrangThai),
+                      _SoPhutGiayChat(thoiLuong: _thoiLuong, style: kieuTrangThai),
+                    ],
+                  ),
+                ),
+              _hang(
+                'phím 1',
+                Icons.text_snippet_outlined,
+                Colors.green.shade900,
+                'Hoàn thành và Chuyển hoá thành văn bản',
+                _dangXuLy ? null : () => _hoanThanh(taoTheMoi: false),
+              ),
+              _hang(
+                'phím 2',
+                Icons.add_circle_outline,
+                Colors.cyan.shade900,
+                'Hoàn thành và Tạo bản ghi âm mới',
+                _dangXuLy ? null : () => _hoanThanh(taoTheMoi: true),
+              ),
+              _hang(
+                widget.phimTatGhiAm.nhan,
+                _dangTamDung ? Icons.play_circle_outline : Icons.pause_circle_outline,
+                _dangTamDung ? Colors.green.shade800 : Colors.red.shade800,
+                _dangTamDung ? 'Tiếp tục' : 'Tạm dừng',
+                _dangXuLy ? null : _tamDungTiepTuc,
+              ),
+              _hang(
+                'phím 5',
+                Icons.delete_outline,
+                Colors.red.shade900,
+                'Xoá bản này và Đóng',
+                _dangXuLy ? null : _xoaVaDong,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
