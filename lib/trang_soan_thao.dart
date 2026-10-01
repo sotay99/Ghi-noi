@@ -2662,6 +2662,51 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       !_hienThanhTimKiem &&
       !_dangChonViTriChenFile;
 
+  /// Khoá của lớp NỔI chứa hàng Copy/Cắt/Dán (xem `build`) — dùng để đo
+  /// chiều cao/vị trí THẬT của nó trên màn hình trong
+  /// [_cuonTranhThanhCopyCutPasteNoiNeuCan].
+  final _khoaThanhCopyCutPasteNoi = GlobalKey();
+
+  /// Thanh Copy/Cắt/Dán nổi (khi đã Thu gọn thanh công cụ) đè lên khung
+  /// soạn thảo — nếu đầu mút TRÊN của vùng chọn hiện tại đang nằm dưới mép
+  /// dưới của thanh (tức bị thanh che mất), tự cuộn khung soạn thảo LÊN
+  /// thêm để lộ ra, không bao giờ để thanh che mất đoạn đang chọn. Gọi lại
+  /// mỗi lần vùng chọn có thể đổi (listener gắn cùng `_khiVungChonCoTheDoi`
+  /// ở `initState`).
+  void _cuonTranhThanhCopyCutPasteNoiNeuCan() {
+    if (!_thuGonThanhCongCu || !_hienHangCopyCutPaste()) return;
+    final sel = _boDieuKhien.selection;
+    if (!sel.isValid || sel.isCollapsed) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_cuonVanBan.hasClients) return;
+      final hopVanBanObj = _oVanBanKey.currentContext?.findRenderObject();
+      if (hopVanBanObj is! RenderBox || !hopVanBanObj.hasSize) return;
+      final re = _timRenderEditable(hopVanBanObj);
+      if (re == null || !re.hasSize) return;
+      final thanhObj =
+          _khoaThanhCopyCutPasteNoi.currentContext?.findRenderObject();
+      if (thanhObj is! RenderBox || !thanhObj.hasSize) return;
+      final thanhDuoiGlobal =
+          thanhObj.localToGlobal(Offset.zero).dy + thanhObj.size.height;
+
+      // `sel.start` luôn <= `sel.end` bất kể kéo chọn theo hướng nào —
+      // đúng là đầu mút TRÊN (sớm hơn trong văn bản) của vùng chọn.
+      Rect gocCucBo;
+      try {
+        gocCucBo = re.getLocalRectForCaret(TextPosition(offset: sel.start));
+      } catch (_) {
+        return;
+      }
+      final diemTrenGlobal = re.localToGlobal(gocCucBo.topLeft).dy;
+      final biChe = thanhDuoiGlobal - diemTrenGlobal;
+      if (biChe <= 0) return; // đã thấy đủ, thanh không che gì cả
+
+      final dich = (_cuonVanBan.offset - biChe - 4)
+          .clamp(0.0, _cuonVanBan.position.maxScrollExtent);
+      _cuonVanBan.jumpTo(dich);
+    });
+  }
+
   /// Bấm một trong ba nút Copy/Cắt/Dán ở hàng thay nút điều hướng tệp — ẩn
   /// hàng ngay (xem [_anHangCopyCutPaste]) rồi mới kích hoạt logic thật.
   void _bamCopyCutPasteOHangThayNav(void Function() hanhDong) {
@@ -3618,6 +3663,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// thấy y hệt ở một đoạn khác hoặc ở lượt kiểm tra sau.
   final Set<String> _tuChinhTaDaXuLy = {};
 
+  /// Từ/cụm từ đã từng bị "Huỷ đề xuất" ở TỪ ĐIỂN sửa lỗi chính tả của bạn
+  /// (gạch VÀNG, xem `_khiBamTuDien`) — một khi đã huỷ, `_quetTuDienChinhTa`
+  /// không bao giờ gạch vàng lại từ này nữa, VÀ (mục 6: gạch đỏ/gạch vàng
+  /// không dẫm chân lên nhau) AI cũng không được gạch đỏ đè lên nó — xem bộ
+  /// lọc ở `_kiemTraChinhTaMoi`/`_apDungKetQuaToanVan`.
+  final Set<String> _tuTuDienDaHuy = {};
+
   /// Đang có một lượt "Kiểm tra toàn văn bằng AI" chạy dở hay không — chặn
   /// bấm nút này thêm lần nữa trong lúc đang chờ.
   bool _dangKiemTraToanVan = false;
@@ -3869,6 +3921,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // chọn" THẬT SỰ đổi (không phải mỗi lần con trỏ nhích một ký tự), để
     // không rebuild thừa mỗi lần gõ phím.
     _boDieuKhien.addListener(_khiVungChonCoTheDoi);
+    _boDieuKhien.addListener(_cuonTranhThanhCopyCutPasteNoiNeuCan);
 
     WidgetsBinding.instance.addObserver(this);
     // (SỬA LỖI "bãi đất trống" kẹt lại sau khi ẩn bàn phím ảo) Xem giải
@@ -3967,6 +4020,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _conTroDangHien.dispose();
     _oChu.removeListener(_khiFocusConTroDoi);
     _boDieuKhien.removeListener(_khiVungChonCoTheDoi);
+    _boDieuKhien.removeListener(_cuonTranhThanhCopyCutPasteNoiNeuCan);
     _bomDongHoTheGhiAm?.cancel();
     _dangKyMucAmTheGhiAm?.cancel();
     _thoiLuongTheGhiAmDangGhi.dispose();
@@ -4030,15 +4084,36 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void _quetTuDienChinhTa() {
     final vb = _boDieuKhien.text;
     final ketQua = <_LoiTuDien>[];
+    // Mục 5: hai cặp cùng "Từ bị lỗi chính tả hay gặp" (so không phân biệt
+    // hoa/thường) là trạng thái KHÔNG HỢP LỆ (modal đã cảnh báo tại chỗ) —
+    // chỉ cặp XUẤT HIỆN ĐẦU TIÊN trong danh sách được dùng để quét, các cặp
+    // trùng sau đó bị bỏ qua hẳn ở đây (không góp thêm một "nguồn sự thật"
+    // thứ hai cho cùng một từ).
+    final loiDaDung = <String>{};
     for (final c in widget.caiDat.tuDienChinhTa) {
       final loi = c.loi.trim();
       if (loi.isEmpty) continue;
+      final loiThuong = loi.toLowerCase();
+      if (!loiDaDung.add(loiThuong)) continue;
+      // Mục 5: "Từ thay thế vào" giống hệt "Từ bị lỗi" (so không phân biệt
+      // hoa/thường) là trạng thái KHÔNG HỢP LỆ — modal đã cảnh báo tại chỗ,
+      // ở đây coi như chưa khai xong, không dùng để quét.
+      if (c.thayThe.trim().toLowerCase() == loiThuong) continue;
+      // Mục 5: từ đã bị "Huỷ đề xuất" thì không quét vàng lại nữa. Mục 6:
+      // gạch vàng/gạch đỏ không dẫm chân lên nhau — từ đang/đã từng gạch đỏ
+      // (AI) cũng bỏ qua luôn ở đây.
+      if (_tuTuDienDaHuy.contains(loi) || _tuChinhTaDaXuLy.contains(loi)) continue;
       var tu = 0;
       while (true) {
         final i = vb.indexOf(loi, tu);
         if (i < 0) break;
-        ketQua.add(_LoiTuDien(batDau: i, ketThuc: i + loi.length, tu: loi, thayThe: c.thayThe));
-        tu = i + loi.length;
+        final ketThuc = i + loi.length;
+        // Không gạch vàng đè lên vùng ĐANG gạch đỏ của AI.
+        final dungDoAi = _boDieuKhien.loi.any((l) => l.batDau < ketThuc && l.ketThuc > i);
+        if (!dungDoAi) {
+          ketQua.add(_LoiTuDien(batDau: i, ketThuc: ketThuc, tu: loi, thayThe: c.thayThe));
+        }
+        tu = ketThuc;
       }
     }
     ketQua.sort((a, b) => a.batDau.compareTo(b.batDau));
@@ -9244,9 +9319,19 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
 
     // Từ/cụm từ người dùng đã tự tay xử lý (chấp nhận đề xuất, xoá, hoặc huỷ
-    // đề xuất) trước đó thì không báo lỗi lại nữa, dù AI có tìm thấy y hệt.
-    final loiChuaXuLy = ketQua.loi.where((l) => !_tuChinhTaDaXuLy.contains(l.tu)).toList();
-    final loiDich = loiChuaXuLy.map((l) => l.dich(tuViTri)).toList();
+    // đề xuất) trước đó thì không báo lỗi lại nữa, dù AI có tìm thấy y hệt —
+    // cộng thêm từ đã từng bị "Huỷ đề xuất" ở TỪ ĐIỂN (mục 6: gạch đỏ/gạch
+    // vàng không dẫm chân lên nhau, kể cả những từ đã từng có gạch rồi và
+    // huỷ đề xuất rồi).
+    final loiChuaXuLy = ketQua.loi
+        .where((l) => !_tuChinhTaDaXuLy.contains(l.tu) && !_tuTuDienDaHuy.contains(l.tu))
+        .toList();
+    final loiDich = loiChuaXuLy
+        .map((l) => l.dich(tuViTri))
+        // Không gạch đỏ đè lên vùng ĐANG gạch vàng (từ điển) hiện có.
+        .where((l) =>
+            !_boDieuKhien.tuDien.any((d) => d.batDau < l.ketThuc && d.ketThuc > l.batDau))
+        .toList();
     _boDieuKhien.loi.addAll(loiDich);
 
     // Dấu câu mới (mục 3d): chèn thẳng vào bài, không chờ người dùng quyết
@@ -9401,6 +9486,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       case 'chapNhanTatCa':
         _chapNhanTatCaDeXuatTuDien();
       default: // 'huy'
+        // Ghi nhớ CHỮ (không phải vị trí) đã huỷ — xem `_tuTuDienDaHuy`.
+        _tuTuDienDaHuy.add(loi.tu);
         _boDieuKhien.tuDien.remove(loi);
         _boDieuKhien.veLai();
     }
@@ -9699,6 +9786,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           final ketThuc = viTriThuc + goc.tu.length;
           if (ketThuc > vb.length || vb.substring(viTriThuc, ketThuc) != goc.tu) continue;
           if (chongLenVungCam(viTriThuc, ketThuc)) continue;
+          // Gạch đỏ/gạch vàng không dẫm chân lên nhau (mục 6): bỏ qua nếu từ
+          // này đang/đã từng gạch vàng (từ điển) VÀ bỏ qua nếu đang chồng lấn
+          // một vùng gạch vàng hiện có.
+          if (_tuChinhTaDaXuLy.contains(goc.tu) || _tuTuDienDaHuy.contains(goc.tu)) continue;
+          if (_boDieuKhien.tuDien.any((d) => d.batDau < ketThuc && d.ketThuc > viTriThuc)) {
+            continue;
+          }
           _boDieuKhien.loi.add(LoiChinhTa(
             batDau: viTriThuc,
             ketThuc: ketThuc,
@@ -13825,26 +13919,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         bottom: false,
         child: Column(
           children: [
-            // Hàng Copy/Cắt/Dán (xem `_nutDieuHuongTep`/`_hangCopyCutPaste`)
-            // thường nằm NGAY TRONG AppBar — nhưng "Thu gọn" ẩn HẲN AppBar,
-            // nên lúc đó nó cần một chỗ hiện RIÊNG. CHỦ Ý là một ô THẬT
-            // trong `Column` (chiếm chỗ, đẩy khung soạn thảo xuống) — KHÔNG
-            // phải `Positioned` nổi đè lên trên, để không che mất chữ đang
-            // soạn ngay dưới mép trên cùng. `_hienHangCopyCutPaste()` đã tự
-            // loại trừ đúng lúc trình ghi âm/tìm kiếm-thay thế/chọn vị trí
-            // chèn tệp đang mở, không cần lặp lại điều kiện ở đây.
-            if (_thuGonThanhCongCu && _hienHangCopyCutPaste())
-              Material(
-                color: Colors.white,
-                elevation: 2,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: _hangCopyCutPaste(),
-                  ),
-                ),
-              ),
             if (_loi.isNotEmpty)
               Container(
                 width: double.infinity,
@@ -14383,6 +14457,35 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 mau: const Color(0xFF5F6368),
                 moTa: 'Mở rộng — hiện lại thanh công cụ',
                 onTap: () => setState(() => _thuGonThanhCongCu = false),
+              ),
+            ),
+          // Hàng Copy/Cắt/Dán khi đã Thu gọn thanh công cụ — CỐ Ý là một
+          // lớp NỔI (`Positioned`, đè lên khung soạn thảo), KHÔNG chiếm chỗ
+          // thật trong `Column` nữa (khác bản trước). Lý do: nếu nó chiếm
+          // chỗ thật, mỗi lần vùng chọn MỚI xuất hiện (và hàng này lập tức
+          // hiện ra) sẽ đẩy khung soạn thảo xuống NGAY LÚC đang kéo chọn —
+          // khiến điểm đang kéo nhảy sang dòng khác, lệch mất vùng đang
+          // chọn. Nổi đè lên thì khung soạn thảo không hề xê dịch, chỉ cuộn
+          // lên/xuống bình thường — còn việc tránh để nó che mất đúng đoạn
+          // đang chọn thì do [_cuonTranhThanhCopyCutPasteNoiNeuCan] tự lo
+          // (cuộn khung soạn thảo lên thêm khi đầu mút TRÊN của vùng chọn
+          // chạm tới mép dưới của thanh này).
+          if (_thuGonThanhCongCu && _hienHangCopyCutPaste())
+            Positioned(
+              top: MediaQuery.paddingOf(context).top,
+              left: 0,
+              right: 0,
+              child: Material(
+                key: _khoaThanhCopyCutPasteNoi,
+                color: Colors.white,
+                elevation: 4,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: _hangCopyCutPaste(),
+                  ),
+                ),
               ),
             ),
           _nhanDoanSo(caoBanPhim),

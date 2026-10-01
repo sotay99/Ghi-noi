@@ -1,8 +1,12 @@
-// Modal "Từ điển sửa lỗi chính tả của bạn" — mở từ menu "Tài khoản của
+// Trang "Từ điển sửa lỗi chính tả của bạn" — mở từ menu "Tài khoản của
 // bạn", ngay dưới "Cài đặt hiển thị và tự động sửa". Người dùng tự khai các
 // cặp (từ hay gõ sai thường gặp / từ thay vào) — app tự quét văn bản, gạch
 // vàng lượn sóng những từ khớp (xem `_boDieuKhien.tuDien` trong
 // trang_soan_thao.dart), bấm vào để thay/xoá.
+//
+// TOÀN MÀN HÌNH (Navigator.push, có nút X đóng) — ĐÚNG KHUÔN
+// `ManHinhTroChuyen` (màn hình chat với AI), không còn là modal đáy màn
+// hình nhỏ như bản trước (người dùng chê "xấu quá").
 
 import 'dart:async';
 
@@ -10,29 +14,38 @@ import 'package:flutter/material.dart';
 
 import 'cai_dat.dart';
 
+const _mauChinh = Color(0xFF1A73E8);
+
 Future<void> moModalTuDienChinhTa(BuildContext context, CaiDat caiDat) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    builder: (ctx) => _ThanTuDienChinhTa(caiDat: caiDat),
+  return Navigator.of(context).push<void>(
+    MaterialPageRoute(
+      builder: (_) => _ManHinhTuDienChinhTa(caiDat: caiDat),
+    ),
   );
 }
 
-class _ThanTuDienChinhTa extends StatefulWidget {
-  const _ThanTuDienChinhTa({required this.caiDat});
+class _ManHinhTuDienChinhTa extends StatefulWidget {
+  const _ManHinhTuDienChinhTa({required this.caiDat});
   final CaiDat caiDat;
 
   @override
-  State<_ThanTuDienChinhTa> createState() => _ThanTuDienChinhTaState();
+  State<_ManHinhTuDienChinhTa> createState() => _ManHinhTuDienChinhTaState();
 }
 
-class _ThanTuDienChinhTaState extends State<_ThanTuDienChinhTa> {
+class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
   /// Tham chiếu THẬT tới `caiDat.tuDienChinhTa` — thêm/xoá thẳng vào đây là
   /// đã "lưu" cho cả app (trang soạn thảo đọc đúng danh sách này mỗi lần
   /// quét), chỉ cần gọi thêm `luuTuDienChinhTa()` để ghi xuống đĩa.
   late List<CapTuDien> _ds;
   final Map<CapTuDien, TextEditingController> _oLoi = {};
   final Map<CapTuDien, TextEditingController> _oThayThe = {};
+
+  /// Cặp đang hiện cảnh báo "từ thay thế giống hệt từ lỗi" hoặc "từ lỗi bị
+  /// trùng với một cặp khác" (mục 5) — vẽ viền đỏ + dòng chữ đỏ ngay dưới ô
+  /// liên quan, không chặn gõ (chỉ chặn hoàn thành/rời ô, xem `_oNhap`).
+  final Set<CapTuDien> _loiTrungThayThe = {};
+  final Set<CapTuDien> _loiTrungTuLoi = {};
+
   Timer? _henLuu;
 
   @override
@@ -69,7 +82,13 @@ class _ThanTuDienChinhTaState extends State<_ThanTuDienChinhTa> {
     });
   }
 
+  /// Mục 4: nút "+ Thêm cặp từ" chỉ hoạt động khi KHÔNG có cặp nào đang
+  /// rỗng hoàn toàn (cả từ lỗi lẫn từ thay thế đều trống) — có sẵn một cặp
+  /// rỗng rồi thì bắt điền nó trước đã, không cho đẻ thêm cặp rỗng khác.
+  bool get _coCapRong => _ds.any((c) => c.loi.trim().isEmpty && c.thayThe.trim().isEmpty);
+
   void _themCap() {
+    if (_coCapRong) return;
     setState(() {
       final c = CapTuDien(loi: '');
       _ds.add(c);
@@ -83,8 +102,35 @@ class _ThanTuDienChinhTaState extends State<_ThanTuDienChinhTa> {
       _ds.remove(c);
       _oLoi.remove(c)?.dispose();
       _oThayThe.remove(c)?.dispose();
+      _loiTrungThayThe.remove(c);
+      _loiTrungTuLoi.remove(c);
     });
     widget.caiDat.luuTuDienChinhTa();
+  }
+
+  /// Mục 5: kiểm tra lại TOÀN BỘ danh sách sau mỗi lần gõ — cờ trùng từ lỗi
+  /// (so các [CapTuDien.loi] với nhau) và cờ "từ thay thế giống hệt từ lỗi"
+  /// của CHÍNH cặp đó. Không xoá chữ người dùng gõ — chỉ đánh dấu cảnh báo,
+  /// để họ tự sửa.
+  void _kiemTraTrung() {
+    _loiTrungThayThe.clear();
+    _loiTrungTuLoi.clear();
+    final demLoi = <String, int>{};
+    for (final c in _ds) {
+      final loi = c.loi.trim().toLowerCase();
+      if (loi.isEmpty) continue;
+      demLoi[loi] = (demLoi[loi] ?? 0) + 1;
+    }
+    for (final c in _ds) {
+      final loi = c.loi.trim().toLowerCase();
+      final thayThe = c.thayThe.trim().toLowerCase();
+      if (loi.isNotEmpty && thayThe.isNotEmpty && loi == thayThe) {
+        _loiTrungThayThe.add(c);
+      }
+      if (loi.isNotEmpty && (demLoi[loi] ?? 0) > 1) {
+        _loiTrungTuLoi.add(c);
+      }
+    }
   }
 
   Widget _oNhap({
@@ -92,13 +138,14 @@ class _ThanTuDienChinhTaState extends State<_ThanTuDienChinhTa> {
     required TextEditingController controller,
     required String goiY,
     required void Function(String) onChanged,
+    String? canhBao,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(nhan,
             style: const TextStyle(
-                fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF5F6368))),
+                fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF5F6368))),
         const SizedBox(height: 4),
         Row(
           children: [
@@ -106,11 +153,22 @@ class _ThanTuDienChinhTaState extends State<_ThanTuDienChinhTa> {
               child: TextField(
                 controller: controller,
                 onChanged: onChanged,
+                style: const TextStyle(fontSize: 15),
                 decoration: InputDecoration(
                   isDense: true,
-                  border: const OutlineInputBorder(),
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: canhBao != null ? Colors.red.shade400 : const Color(0xFFDADCE0),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: canhBao != null ? Colors.red.shade400 : _mauChinh,
+                      width: 2,
+                    ),
+                  ),
                   hintText: goiY,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
               ),
             ),
@@ -125,26 +183,35 @@ class _ThanTuDienChinhTaState extends State<_ThanTuDienChinhTa> {
             ),
           ],
         ),
+        if (canhBao != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              canhBao,
+              style: TextStyle(fontSize: 12, color: Colors.red.shade600),
+            ),
+          ),
       ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final banPhim = MediaQuery.of(context).viewInsets.bottom;
-    return Padding(
-      padding: EdgeInsets.only(bottom: banPhim),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: _mauChinh,
+        foregroundColor: Colors.white,
+        title: const Text('Từ điển sửa lỗi chính tả của bạn'),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          tooltip: 'Đóng',
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
-            const Text(
-              'Từ điển sửa lỗi chính tả của bạn',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
-            ),
-            const SizedBox(height: 10),
             const Text(
               'App tự quét văn bản — từ nào khớp "Từ bị lỗi chính tả hay '
               'gặp" sẽ được gạch vàng lượn sóng, bấm vào để thay/xoá nhanh. '
@@ -155,20 +222,27 @@ class _ThanTuDienChinhTaState extends State<_ThanTuDienChinhTa> {
             Align(
               alignment: Alignment.centerLeft,
               child: FilledButton.icon(
-                onPressed: _themCap,
+                onPressed: _coCapRong ? null : _themCap,
+                style: FilledButton.styleFrom(backgroundColor: _mauChinh),
                 icon: const Icon(Icons.add),
                 label: const Text('Thêm cặp từ'),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             for (final c in _ds) ...[
-              const Divider(height: 24),
+              const Divider(height: 28),
               _oNhap(
                 nhan: 'Từ bị lỗi chính tả hay gặp',
                 controller: _oLoi[c]!,
                 goiY: 'Ví dụ: vd, mik, ...',
+                canhBao: _loiTrungTuLoi.contains(c)
+                    ? 'Từ này đã có trong một cặp khác — các từ bị lỗi không được trùng nhau.'
+                    : null,
                 onChanged: (gia) {
-                  c.loi = gia;
+                  setState(() {
+                    c.loi = gia;
+                    _kiemTraTrung();
+                  });
                   _datLuu();
                 },
               ),
@@ -177,8 +251,14 @@ class _ThanTuDienChinhTaState extends State<_ThanTuDienChinhTa> {
                 nhan: 'Từ thay thế vào',
                 controller: _oThayThe[c]!,
                 goiY: 'Để trống = đề xuất xoá',
+                canhBao: _loiTrungThayThe.contains(c)
+                    ? 'Từ thay thế không được giống hệt từ bị lỗi ở trên.'
+                    : null,
                 onChanged: (gia) {
-                  c.thayThe = gia;
+                  setState(() {
+                    c.thayThe = gia;
+                    _kiemTraTrung();
+                  });
                   _datLuu();
                 },
               ),

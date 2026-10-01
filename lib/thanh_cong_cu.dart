@@ -305,12 +305,6 @@ class ThanhCongCu extends StatelessWidget {
                           ),
                           _NutCoChuThich(
                             hien: hienChuThich,
-                            chu: 'Trò chuyện với mọi người',
-                            child: _nut(rong, Icons.chat,
-                                'Trò chuyện', 'Trò chuyện', khiBamTroChuyen),
-                          ),
-                          _NutCoChuThich(
-                            hien: hienChuThich,
                             chu: 'Xem thêm lựa chọn',
                             child: _NutThemMenu(
                               rong: rong,
@@ -333,6 +327,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamCaiDatMicro: khiBamCaiDatMicro,
                               khiBamCaiDatHienThi: khiBamCaiDatHienThi,
                               khiBamTuDienChinhTa: khiBamTuDienChinhTa,
+                              khiBamTroChuyen: khiBamTroChuyen,
                             ),
                           ),
                           // Nhân bản nút "Bật/Tắt Bộ phím nhanh cho màn hình
@@ -1214,6 +1209,7 @@ class _NutTaiKhoanMenu extends StatelessWidget {
     required this.khiBamCaiDatMicro,
     required this.khiBamCaiDatHienThi,
     required this.khiBamTuDienChinhTa,
+    required this.khiBamTroChuyen,
   });
 
   final bool rong;
@@ -1222,6 +1218,11 @@ class _NutTaiKhoanMenu extends StatelessWidget {
 
   /// Mục "Từ điển sửa lỗi chính tả của bạn" — mở `moModalTuDienChinhTa`.
   final VoidCallback khiBamTuDienChinhTa;
+
+  /// Mục "Trò chuyện" — dời vào ĐÂY từ thanh công cụ ngoài (trước kia là
+  /// một nút riêng cạnh "Xem thêm lựa chọn"), nằm ngay phía trên "Đăng
+  /// nhập tài khoản", gần cuối menu.
+  final VoidCallback khiBamTroChuyen;
 
   @override
   Widget build(BuildContext context) {
@@ -1260,6 +1261,9 @@ class _NutTaiKhoanMenu extends StatelessWidget {
               case 9:
                 khiBamTuDienChinhTa();
                 break;
+              case 8:
+                khiBamTroChuyen();
+                break;
             }
           },
           itemBuilder: (ctx) {
@@ -1280,6 +1284,10 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                 _mucMenuThem(3, 'Điều khoản sử dụng'),
                 _mucMenuThem(4, 'Bảo mật và quyền riêng tư'),
                 _dividerMenu(),
+                // "Trò chuyện" dời từ thanh công cụ ngoài vào đây, ngay
+                // phía TRÊN "Đăng nhập tài khoản" — cùng nhóm, không có
+                // đường kẻ chia giữa hai mục này.
+                _mucMenuThem(8, 'Trò chuyện'),
                 _mucMenuThem(5, 'Đăng nhập tài khoản'),
               ]),
             ];
