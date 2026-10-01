@@ -696,13 +696,8 @@ const _damGachChanCanXoa = 2.0;
 const _mauGachGiuaThan = Color(0xFFFF8F00); // Thẳng, giữa thân — vàng đậm (Colors.amber.shade800).
 const _mauGachChanTuDien = Colors.amber;
 
-/// Số "phút:giây" của một thẻ đang ghi — THAY cho hộp thoại "sắp chạm 60
-/// giây" cũ (từng làm người dùng rối mắt): đổi màu TÍM từ giây thứ 45, rồi
-/// tự NHẤP NHÁY (ẩn/hiện) TỪNG GIÂY từ giây thứ 55 trở đi, báo hiệu sắp
-/// chạm hạn 60 giây/thẻ. Dùng chung cho cả AppBar của trình ghi âm LẪN
-/// bảng điều khiển — không cần `AnimationController` riêng: cha đã tự vẽ
-/// lại widget này mỗi giây (qua `ValueListenableBuilder<Duration>`), nên
-/// chỉ cần đổi độ mờ theo `giay.isOdd` là nhấp nháy đúng nhịp từng giây.
+/// Số "phút:giây" của một thẻ đang ghi — đổi màu TÍM từ giây thứ 45 (việc
+/// NHẤP NHÁY của cả dòng do `_NhapNhayGioiHanGhiAm` bên ngoài lo, xem đó).
 class _SoPhutGiayGhiAm extends StatelessWidget {
   const _SoPhutGiayGhiAm({required this.thoiLuong, required this.style});
 
@@ -714,12 +709,71 @@ class _SoPhutGiayGhiAm extends StatelessWidget {
     final giay = thoiLuong.inSeconds;
     final chu = dinhDangMmSs(thoiLuong);
     if (giay < 45) return Text(chu, style: style);
-    final kieuTim = style.copyWith(color: Colors.purple.shade700);
-    if (giay < 55) return Text(chu, style: kieuTim);
-    return Opacity(
-      opacity: giay.isOdd ? 0.2 : 1.0,
-      child: Text(chu, style: kieuTim),
-    );
+    return Text(chu, style: style.copyWith(color: Colors.purple.shade700));
+  }
+}
+
+/// Bọc CẢ DÒNG trạng thái ghi âm ("Đang Ghi âm"/"Tạm dừng" + mm:ss) để
+/// nhấp nháy khi sắp chạm hạn 60 giây/thẻ — THAY cho hộp thoại cảnh báo cũ
+/// (từng làm người dùng rối mắt). Từ giây 45: đã nhấp nháy (chu kỳ 500ms).
+/// Từ giây 55: tốc độ nhấp nháy TĂNG GẤP ĐÔI (chu kỳ 250ms), biểu thị sự
+/// gấp gáp. Trước giây 45: hiện bình thường, không nhấp nháy. Dùng chung
+/// cho cả AppBar của trình ghi âm lẫn bảng điều khiển.
+class _NhapNhayGioiHanGhiAm extends StatefulWidget {
+  const _NhapNhayGioiHanGhiAm({required this.giay, required this.child});
+
+  final int giay;
+  final Widget child;
+
+  @override
+  State<_NhapNhayGioiHanGhiAm> createState() => _NhapNhayGioiHanGhiAmState();
+}
+
+class _NhapNhayGioiHanGhiAmState extends State<_NhapNhayGioiHanGhiAm> {
+  Timer? _hen;
+  bool _an = false;
+
+  /// "Vùng tốc độ" hiện tại: 0 = chưa nhấp nháy, 1 = giây 45-54, 2 = giây
+  /// 55 trở đi — chỉ đặt lại hẹn giờ khi CHUYỂN vùng, không phải mỗi giây.
+  int _vung(int g) => g < 45 ? 0 : (g < 55 ? 1 : 2);
+
+  void _datHen() {
+    _hen?.cancel();
+    if (widget.giay < 45) {
+      _an = false;
+      return;
+    }
+    final chuKy = widget.giay >= 55
+        ? const Duration(milliseconds: 250)
+        : const Duration(milliseconds: 500);
+    _hen = Timer.periodic(chuKy, (_) {
+      if (!mounted) return;
+      setState(() => _an = !_an);
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _datHen();
+  }
+
+  @override
+  void didUpdateWidget(covariant _NhapNhayGioiHanGhiAm oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_vung(oldWidget.giay) != _vung(widget.giay)) _datHen();
+  }
+
+  @override
+  void dispose() {
+    _hen?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.giay < 45) return widget.child;
+    return Opacity(opacity: _an ? 0.2 : 1.0, child: widget.child);
   }
 } // Lượn sóng, dưới từ khớp "Từ điển sửa lỗi chính tả của bạn" — vàng.
 
@@ -2689,51 +2743,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       !_hienThanhTimKiem &&
       !_dangChonViTriChenFile;
 
-  /// Khoá của lớp NỔI chứa hàng Copy/Cắt/Dán (xem `build`) — dùng để đo
-  /// chiều cao/vị trí THẬT của nó trên màn hình trong
-  /// [_cuonTranhThanhCopyCutPasteNoiNeuCan].
-  final _khoaThanhCopyCutPasteNoi = GlobalKey();
-
-  /// Thanh Copy/Cắt/Dán nổi (khi đã Thu gọn thanh công cụ) đè lên khung
-  /// soạn thảo — nếu đầu mút TRÊN của vùng chọn hiện tại đang nằm dưới mép
-  /// dưới của thanh (tức bị thanh che mất), tự cuộn khung soạn thảo LÊN
-  /// thêm để lộ ra, không bao giờ để thanh che mất đoạn đang chọn. Gọi lại
-  /// mỗi lần vùng chọn có thể đổi (listener gắn cùng `_khiVungChonCoTheDoi`
-  /// ở `initState`).
-  void _cuonTranhThanhCopyCutPasteNoiNeuCan() {
-    if (!_thuGonThanhCongCu || !_hienHangCopyCutPaste()) return;
-    final sel = _boDieuKhien.selection;
-    if (!sel.isValid || sel.isCollapsed) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_cuonVanBan.hasClients) return;
-      final hopVanBanObj = _oVanBanKey.currentContext?.findRenderObject();
-      if (hopVanBanObj is! RenderBox || !hopVanBanObj.hasSize) return;
-      final re = _timRenderEditable(hopVanBanObj);
-      if (re == null || !re.hasSize) return;
-      final thanhObj =
-          _khoaThanhCopyCutPasteNoi.currentContext?.findRenderObject();
-      if (thanhObj is! RenderBox || !thanhObj.hasSize) return;
-      final thanhDuoiGlobal =
-          thanhObj.localToGlobal(Offset.zero).dy + thanhObj.size.height;
-
-      // `sel.start` luôn <= `sel.end` bất kể kéo chọn theo hướng nào —
-      // đúng là đầu mút TRÊN (sớm hơn trong văn bản) của vùng chọn.
-      Rect gocCucBo;
-      try {
-        gocCucBo = re.getLocalRectForCaret(TextPosition(offset: sel.start));
-      } catch (_) {
-        return;
-      }
-      final diemTrenGlobal = re.localToGlobal(gocCucBo.topLeft).dy;
-      final biChe = thanhDuoiGlobal - diemTrenGlobal;
-      if (biChe <= 0) return; // đã thấy đủ, thanh không che gì cả
-
-      final dich = (_cuonVanBan.offset - biChe - 4)
-          .clamp(0.0, _cuonVanBan.position.maxScrollExtent);
-      _cuonVanBan.jumpTo(dich);
-    });
-  }
-
   /// Bấm một trong ba nút Copy/Cắt/Dán ở hàng thay nút điều hướng tệp — ẩn
   /// hàng ngay (xem [_anHangCopyCutPaste]) rồi mới kích hoạt logic thật.
   void _bamCopyCutPasteOHangThayNav(void Function() hanhDong) {
@@ -3133,7 +3142,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (kIsWeb) {
       cacDong.addAll([
         const TextSpan(
-          text: '\nNếu Micro trục trặc, hãy vào Cài đặt hệ thống\n',
+          text: '\nNếu Micro trục trặc, hãy vào Cài đặt Micro\n',
         ),
         const TextSpan(
           text: 'Đang sử dụng bộ Micro của Thiết bị ',
@@ -3820,13 +3829,23 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       doiGi = true;
     }
 
-    for (var i = 0; i < _tiLeMocTraiDoanSo.length; i++) {
-      final soDoan = doTaiY(vpCao * _tiLeMocTraiDoanSo[i]);
-      if (soDoan == null) continue;
-      if (soDoan != _doanSoMocTrai[i]) {
-        _doanSoMocTrai[i] = soDoan;
-        doiGi = true;
+    // YÊU CẦU MỚI: 5 (hoặc 2, màn hẹp) mốc PHỤ chỉ hoạt động khi tệp có TỪ
+    // 50 đoạn văn trở lên — tệp ngắn thì chúng chỉ thêm rối mắt, không có
+    // mấy ý nghĩa định vị. Mốc CHÍNH ("Đoạn số: N" ở đáy màn hình) KHÔNG
+    // nằm trong điều kiện này, luôn hoạt động bất kể tệp dài ngắn.
+    final coDuMocPhu = _demSoDoanTaiViTri(_boDieuKhien.text, _boDieuKhien.text.length) >= 50;
+    if (coDuMocPhu) {
+      for (var i = 0; i < _tiLeMocTraiDoanSo.length; i++) {
+        final soDoan = doTaiY(vpCao * _tiLeMocTraiDoanSo[i]);
+        if (soDoan == null) continue;
+        if (soDoan != _doanSoMocTrai[i]) {
+          _doanSoMocTrai[i] = soDoan;
+          doiGi = true;
+        }
       }
+    } else if (_doanSoMocTrai.any((v) => v != null)) {
+      _doanSoMocTrai = List<int?>.filled(_tiLeMocTraiDoanSoRong.length, null);
+      doiGi = true;
     }
 
     if (!doiGi) return;
@@ -3948,7 +3967,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // chọn" THẬT SỰ đổi (không phải mỗi lần con trỏ nhích một ký tự), để
     // không rebuild thừa mỗi lần gõ phím.
     _boDieuKhien.addListener(_khiVungChonCoTheDoi);
-    _boDieuKhien.addListener(_cuonTranhThanhCopyCutPasteNoiNeuCan);
 
     WidgetsBinding.instance.addObserver(this);
     // (SỬA LỖI "bãi đất trống" kẹt lại sau khi ẩn bàn phím ảo) Xem giải
@@ -4047,7 +4065,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _conTroDangHien.dispose();
     _oChu.removeListener(_khiFocusConTroDoi);
     _boDieuKhien.removeListener(_khiVungChonCoTheDoi);
-    _boDieuKhien.removeListener(_cuonTranhThanhCopyCutPasteNoiNeuCan);
     _bomDongHoTheGhiAm?.cancel();
     _dangKyMucAmTheGhiAm?.cancel();
     _thoiLuongTheGhiAmDangGhi.dispose();
@@ -4143,10 +4160,29 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         tu = ketThuc;
       }
     }
-    ketQua.sort((a, b) => a.batDau.compareTo(b.batDau));
+    // YÊU CẦU MỚI: hai (hay nhiều) đề xuất từ điển có thể DẪM CHÂN lên nhau
+    // trong cùng một cụm từ (ví dụ "con tr" và "trọ" cùng khớp trong "con
+    // trọ") — chỉ giữ lại ĐÚNG MỘT đề xuất cho mỗi vùng chồng lấn: ưu tiên
+    // đề xuất gạch NHIỀU KÝ TỰ NHẤT; bằng nhau thì ưu tiên đề xuất đứng
+    // TRƯỚC (bên trái) hơn. Thuật toán tham lam chuẩn cho "chọn khoảng
+    // không chồng lấn theo trọng số": xét theo đúng thứ tự ưu tiên đó, chỉ
+    // nhận một đề xuất nếu nó CHƯA chồng lấn đề xuất nào đã nhận trước.
+    final uuTien = List<_LoiTuDien>.of(ketQua)
+      ..sort((a, b) {
+        final doDaiA = a.ketThuc - a.batDau, doDaiB = b.ketThuc - b.batDau;
+        if (doDaiA != doDaiB) return doDaiB.compareTo(doDaiA); // dài hơn trước
+        return a.batDau.compareTo(b.batDau); // bằng nhau thì bên trái trước
+      });
+    final daNhan = <_LoiTuDien>[];
+    for (final c in uuTien) {
+      final chongLan =
+          daNhan.any((d) => c.batDau < d.ketThuc && c.ketThuc > d.batDau);
+      if (!chongLan) daNhan.add(c);
+    }
+    daNhan.sort((a, b) => a.batDau.compareTo(b.batDau));
     _boDieuKhien.tuDien
       ..clear()
-      ..addAll(ketQua);
+      ..addAll(daNhan);
     _boDieuKhien.veLai();
   }
 
@@ -13760,21 +13796,23 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           return ValueListenableBuilder<Duration>(
             valueListenable: _thoiLuongTheGhiAmDangGhi,
             builder: (context, gia, _) {
-              // Số phút:giây tách riêng khỏi dòng chữ (xem `_SoPhutGiayGhiAm`)
-              // — THAY cho hộp thoại "sắp chạm 60 giây" cũ: chính số này tự
-              // đổi màu tím rồi nhấp nháy khi sắp hết hạn, dòng chữ còn lại
-              // giữ nguyên như cũ (chữ "Đang Ghi âm" vẫn lượn sóng như trước).
+              // Cả dòng (chữ + số) nhấp nháy khi sắp chạm hạn 60 giây — xem
+              // `_NhapNhayGioiHanGhiAm` — THAY cho hộp thoại "sắp chạm 60
+              // giây" cũ.
               final kieuSo = TextStyle(
                   color: Colors.red.shade700, fontWeight: FontWeight.bold, fontSize: coChu);
-              return Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_theGhiAmDangTamDung)
-                    Text('Tạm dừng ', style: kieuSo)
-                  else
-                    _ChuLuonSong(chu: 'Đang Ghi âm ', mau: Colors.red.shade700, coChu: coChu),
-                  _SoPhutGiayGhiAm(thoiLuong: gia, style: kieuSo),
-                ],
+              return _NhapNhayGioiHanGhiAm(
+                giay: gia.inSeconds,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_theGhiAmDangTamDung)
+                      Text('Tạm dừng ', style: kieuSo)
+                    else
+                      _ChuLuonSong(chu: 'Đang Ghi âm ', mau: Colors.red.shade700, coChu: coChu),
+                    _SoPhutGiayGhiAm(thoiLuong: gia, style: kieuSo),
+                  ],
+                ),
               );
             },
           );
@@ -14329,24 +14367,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           ],
                           textCapitalization: TextCapitalization.sentences,
                           style: _kieuVanBan,
-                          // "Dòng ảo" phía trên dòng đầu tiên thật — CHỈ khi
-                          // đã Thu gọn thanh công cụ (lúc đó khung Copy/Cắt/
-                          // Dán nổi MỚI có thể xuất hiện đè lên mép trên).
-                          // Không có khoảng đệm này thì lúc đang bôi chọn
-                          // đúng những ký tự ĐẦU TIÊN của dòng ĐẦU TIÊN,
-                          // `_cuonVanBan.offset` đã ở mức 0 (thấp nhất có
-                          // thể) — không còn chỗ nào để cuộn LÊN THÊM nữa
-                          // (clamp chặn ở 0), nên
-                          // `_cuonTranhThanhCopyCutPasteNoiNeuCan` bó tay,
-                          // khung nổi vẫn che mất chữ. Có khoảng đệm này,
-                          // `_cuonVanBan.position.pixels` còn dư ra đúng bấy
-                          // nhiêu để lùi về, luôn đủ chỗ cuộn lên che đúng
-                          // bằng chiều cao khung nổi.
-                          decoration: InputDecoration(
+                          decoration: const InputDecoration(
                             border: InputBorder.none,
-                            contentPadding: _thuGonThanhCongCu
-                                ? const EdgeInsets.only(top: 56)
-                                : EdgeInsets.zero,
                           ),
                           // Sửa LỖI 1 (vùng CHỌN lan ra hết phần trống cuối
                           // dòng khi bôi chọn nhiều dòng): mặc định Flutter
@@ -14525,6 +14547,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 khiBamDanhSachPhimTat: _moDanhSachPhimTat,
                 khiBamTimKiem: () => _hienThanhTimKiem ? _dongTimKiem() : _moTimKiem(),
                 khiBamTroChuyen: _moThongBaoTroChuyenDangNangCap,
+                // Đang Thu gọn thanh công cụ phía trên + có vùng chọn thật
+                // + Bộ phím nhanh KHÔNG mở — tạm thay 4 nút (Hướng dẫn/
+                // Thêm/Tài khoản-Cài đặt/Phím nhanh) bằng Copy/Cắt/Dán ngay
+                // cạnh "Làm việc với AI" (tự sáng sẵn), xem `ThanhCongCu`.
+                thayNutBangCopyCutPaste: _thuGonThanhCongCu &&
+                    _hienHangCopyCutPaste() &&
+                    !_boPhimNhanhCamUngMo,
+                hangCopyCutPaste: _hangCopyCutPaste(),
                   ),
                 ),
                 // (Nút ẩn/hiện 4 nút điều hướng không còn "nhảy" tới đè lên
@@ -14546,41 +14576,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           // (có lối thoát riêng "Hoàn thành-Đóng trình ghi âm"/"Xoá bản này")
           // — ẩn luôn nút nổi này, không thì nó đè lên góc phải của bảng nút
           // trình ghi âm mới.
-          // Hàng Copy/Cắt/Dán khi đã Thu gọn thanh công cụ — CỐ Ý là một
-          // lớp NỔI (`Positioned`, đè lên khung soạn thảo), KHÔNG chiếm chỗ
-          // thật trong `Column` nữa (khác bản trước). Lý do: nếu nó chiếm
-          // chỗ thật, mỗi lần vùng chọn MỚI xuất hiện (và hàng này lập tức
-          // hiện ra) sẽ đẩy khung soạn thảo xuống NGAY LÚC đang kéo chọn —
-          // khiến điểm đang kéo nhảy sang dòng khác, lệch mất vùng đang
-          // chọn. Nổi đè lên thì khung soạn thảo không hề xê dịch, chỉ cuộn
-          // lên/xuống bình thường — còn việc tránh để nó che mất đúng đoạn
-          // đang chọn thì do [_cuonTranhThanhCopyCutPasteNoiNeuCan] tự lo
-          // (cuộn khung soạn thảo lên thêm khi đầu mút TRÊN của vùng chọn
-          // chạm tới mép dưới của thanh này).
-          if (_thuGonThanhCongCu && _hienHangCopyCutPaste())
-            Positioned(
-              top: MediaQuery.paddingOf(context).top,
-              left: 0,
-              right: 0,
-              child: Material(
-                key: _khoaThanhCopyCutPasteNoi,
-                color: Colors.white,
-                elevation: 4,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: _hangCopyCutPaste(),
-                  ),
-                ),
-              ),
-            ),
-          // "Mở rộng" đặt SAU khung Copy/Cắt/Dán nổi trong danh sách con của
-          // Stack này — để nó LUÔN vẽ ĐÈ LÊN TRÊN khung đó (con sau cùng của
-          // Stack luôn ở lớp trên cùng), cùng "lớp layer" với khung nổi và
-          // không bao giờ bị khung nổi che khuất/chặn mất cử chỉ bấm, kể cả
-          // khi khung Copy/Cắt/Dán đang hiện (trước đây thứ tự ngược lại
-          // khiến khung Copy/Cắt/Dán — full-width — đè kín mất nút này).
           if (_thuGonThanhCongCu && !_hienThanhTimKiem && !_trinhGhiAmMo && !_dangChonViTriChenFile)
             Positioned(
               top: MediaQuery.paddingOf(context).top + 4,
@@ -15028,30 +15023,31 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
                       )
                     : ValueListenableBuilder<Duration>(
                         valueListenable: widget.thoiLuong,
-                        // Tách riêng số phút:giây (xem `_SoPhutGiayGhiAm`) —
-                        // y hệt AppBar của trình ghi âm, nó tự đổi màu
-                        // tím/nhấp nháy khi sắp chạm hạn 60 giây, THAY cho
-                        // hộp thoại cảnh báo cũ.
-                        builder: (context, gia, _) => Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              '${_dangTamDung ? 'Tạm dừng' : 'Đang Ghi âm'} ',
-                              style: TextStyle(
-                                color: Colors.red.shade700,
-                                fontWeight: FontWeight.bold,
-                                fontSize: coChu,
+                        // Cả dòng nhấp nháy khi sắp chạm hạn 60 giây — y hệt
+                        // AppBar của trình ghi âm, xem `_NhapNhayGioiHanGhiAm`.
+                        builder: (context, gia, _) => _NhapNhayGioiHanGhiAm(
+                          giay: gia.inSeconds,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${_dangTamDung ? 'Tạm dừng' : 'Đang Ghi âm'} ',
+                                style: TextStyle(
+                                  color: Colors.red.shade700,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: coChu,
+                                ),
                               ),
-                            ),
-                            _SoPhutGiayGhiAm(
-                              thoiLuong: gia,
-                              style: TextStyle(
-                                color: Colors.red.shade700,
-                                fontWeight: FontWeight.bold,
-                                fontSize: coChu,
+                              _SoPhutGiayGhiAm(
+                                thoiLuong: gia,
+                                style: TextStyle(
+                                  color: Colors.red.shade700,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: coChu,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
               ),

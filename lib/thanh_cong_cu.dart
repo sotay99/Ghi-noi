@@ -55,7 +55,19 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamDanhSachPhimTat,
     required this.khiBamTimKiem,
     required this.khiBamTroChuyen,
+    this.thayNutBangCopyCutPaste = false,
+    this.hangCopyCutPaste,
   });
+
+  /// Đang Thu gọn thanh công cụ phía trên VÀ có vùng chọn thật VÀ Bộ phím
+  /// nhanh không mở — tạm thay 4 nút Hướng dẫn/Thêm/Tài khoản-Cài đặt/Phím
+  /// nhanh bằng [hangCopyCutPaste], xem chú thích tại `build`.
+  final bool thayNutBangCopyCutPaste;
+
+  /// Hàng 3 nút Copy/Cắt/Dán — do `trang_soan_thao.dart` dựng sẵn
+  /// (`_hangCopyCutPaste()`) rồi đưa vào đây, chỉ có ý nghĩa khi
+  /// [thayNutBangCopyCutPaste] là `true`.
+  final Widget? hangCopyCutPaste;
 
   final bool bat;
   final bool dangNghe;
@@ -266,7 +278,45 @@ class ThanhCongCu extends StatelessWidget {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.start,
                           crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
+                          // Đang Thu gọn thanh công cụ phía trên VÀ có vùng
+                          // chọn thật VÀ Bộ phím nhanh KHÔNG mở (nếu nó đang
+                          // mở thì bên trong đã có sẵn Copy/Cắt/Dán rồi,
+                          // không cần logic này nữa) — tạm ẩn 4 nút
+                          // Hướng dẫn/Thêm/Tài khoản-Cài đặt/Phím nhanh,
+                          // nhường chỗ cho "Làm việc với AI" (tự sáng nền
+                          // xanh sẵn, xem `_NutAIMenu`, không cần cờ riêng)
+                          // sát mép trái + hàng Copy/Cắt/Dán ngay bên cạnh.
+                          // Bấm 1 trong 3 nút đó thì nơi gọi (`trang_soan_thao.dart`)
+                          // tự ẩn hàng đi, 4 nút cũ hiện lại ngay.
+                          children: (thayNutBangCopyCutPaste && hangCopyCutPaste != null)
+                              ? [
+                                  _NutCoChuThich(
+                                    hien: hienChuThich,
+                                    chu: 'Làm việc với AI',
+                                    child: _NutAIMenu(
+                                      rong: rong,
+                                      khiBamCaiDatKiemTraToanVan: khiBamCaiDatKiemTraToanVan,
+                                      khiBamKiemTraToanVan: khiBamKiemTraToanVan,
+                                      khiBamKiemTraChinhTaToanVan: khiBamKiemTraChinhTaToanVan,
+                                      khiBamKiemTraDauCauToanVan: khiBamKiemTraDauCauToanVan,
+                                      khiBamChuyenFileAmThanh: khiBamChuyenFileAmThanh,
+                                      khiBamChuyenAnhThanhVanBan: khiBamChuyenAnhThanhVanBan,
+                                      khiBamChupAnh: khiBamChupAnh,
+                                      khiBamTomTatToanVan: khiBamTomTatToanVan,
+                                      khiBamMoRongToanVan: khiBamMoRongToanVan,
+                                      khiBamVietLaiToanVan: khiBamVietLaiToanVan,
+                                      khiBamTroChuyenVeVanBan: khiBamTroChuyenVeVanBan,
+                                      layDoanVanDangChon: layDoanVanDangChon,
+                                      coVungChonThatSu: coVungChonThatSu,
+                                      epToanVanKhiCoVungChon: epToanVanKhiCoVungChon,
+                                      khiBamDoiCheDoLamViec: khiBamDoiCheDoLamViec,
+                                      khoaMenuAI: khoaMenuAI,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  hangCopyCutPaste,
+                                ]
+                              : [
                           // Thứ tự mới (mục 10): Hướng dẫn, Làm việc với AI,
                           // Trò chuyện, Thêm lựa chọn, Tài khoản — "Cài đặt"
                           // và "Kiểm tra toàn văn" đã dời vào trong hai menu
