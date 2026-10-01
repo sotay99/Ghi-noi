@@ -13827,6 +13827,39 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           return null;
                         },
                       ),
+                      // Chiếm lại Ctrl+C/Ctrl+X/Ctrl+V (bàn phím vật lý) —
+                      // KHÔNG cần tự khai báo `SingleActivator` nào thêm ở
+                      // `Shortcuts` phía trên: EditableText đã tự dịch ba tổ
+                      // hợp phím này thành đúng ba Intent chuẩn của Flutter
+                      // (`CopySelectionTextIntent`/`PasteTextIntent`) ở tầng
+                      // Shortcuts riêng của nó rồi — `Actions` khai báo gần
+                      // tiêu điểm nhất THẮNG nhờ các Action mặc định của
+                      // EditableText được bọc `Action.overridable`, nên chỉ
+                      // cần ghi đè Ở ĐÂY là đủ, không phải tự bắt phím từ
+                      // đầu. Nhờ vậy nút Copy/Cắt/Dán ở Bộ phím nhanh
+                      // (`_phimAoCopy`/`_phimAoCut`/`_phimAoPaste`) và phím
+                      // tắt vật lý giờ CÙNG đi qua một con đường, cùng giữ
+                      // được định dạng khi dán trong app (xem các hàm đó).
+                      // Không khai báo gì cho chuột phải/bấm giữ — menu nổi
+                      // lên lúc bôi đen (`contextMenuBuilder`) là cơ chế
+                      // khác, cố ý CHƯA đụng tới (rủi ro cao hơn, ảnh hưởng
+                      // tới mọi người dùng, xem thảo luận trong lịch sử).
+                      CopySelectionTextIntent: CallbackAction<CopySelectionTextIntent>(
+                        onInvoke: (intent) {
+                          if (intent.collapseSelection) {
+                            _phimAoCut();
+                          } else {
+                            _phimAoCopy();
+                          }
+                          return null;
+                        },
+                      ),
+                      PasteTextIntent: CallbackAction<PasteTextIntent>(
+                        onInvoke: (_) {
+                          _phimAoPaste();
+                          return null;
+                        },
+                      ),
                     },
                     child: Stack(
                       key: _khungVanBanKey,
