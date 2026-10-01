@@ -2,11 +2,35 @@
 // chú vì đây là tuỳ chọn của NGƯỜI DÙNG về cách app vận hành, không phải nội
 // dung ghi chú của họ.
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'loai_thiet_bi.dart';
 import 'lua_chon_phim_tat.dart';
+
+/// Một cặp từ trong "Từ điển sửa lỗi chính tả của bạn" (xem
+/// `moModalTuDienChinhTa` trong `modal_tu_dien_chinh_ta.dart`) — [loi] là
+/// từ hay gõ sai thường gặp, [thayThe] là
+/// từ thay vào. [thayThe] RỖNG nghĩa là "đề xuất xoá hẳn [loi] đi", không
+/// phải thay bằng chữ nào khác.
+class CapTuDien {
+  CapTuDien({required this.loi, this.thayThe = ''});
+
+  String loi;
+  String thayThe;
+
+  Map<String, dynamic> toJson() => {'loi': loi, 'thayThe': thayThe};
+
+  static CapTuDien? tuJson(dynamic j) {
+    if (j is! Map) return null;
+    final loi = j['loi'];
+    if (loi is! String || loi.trim().isEmpty) return null;
+    final thayThe = j['thayThe'];
+    return CapTuDien(loi: loi, thayThe: thayThe is String ? thayThe : '');
+  }
+}
 
 class CaiDat {
   static const _khoaThoiGianBatLai = 'ghi_noi_thoi_gian_bat_lai_micro_giay';
@@ -211,6 +235,22 @@ class CaiDat {
 
   static const _khoaAnGoiYTaiApk = 'ghi_noi_an_goi_y_tai_apk';
 
+  /// "Từ điển sửa lỗi chính tả của bạn" — danh sách cặp (từ lỗi/từ thay
+  /// thế) người dùng tự khai ở `ManHinhTuDienChinhTa`. Đây là THAM CHIẾU
+  /// THẬT (không phải bản sao) — màn hình đó tự thêm/xoá/sửa thẳng vào danh
+  /// sách này rồi gọi [luuTuDienChinhTa], không cần cơ chế callback riêng.
+  List<CapTuDien> tuDienChinhTa = [];
+
+  static const _khoaTuDienChinhTa = 'ghi_noi_tu_dien_chinh_ta';
+
+  Future<void> luuTuDienChinhTa() async {
+    final kho = await SharedPreferences.getInstance();
+    await kho.setString(
+      _khoaTuDienChinhTa,
+      jsonEncode(tuDienChinhTa.map((e) => e.toJson()).toList()),
+    );
+  }
+
   Future<void> tai() async {
     final kho = await SharedPreferences.getInstance();
     thoiGianBatLaiGiay = kho.getDouble(_khoaThoiGianBatLai) ?? 1.0;
@@ -256,6 +296,18 @@ class CaiDat {
     tuDongChuanHoaNgoac = kho.getBool(_khoaTuDongChuanHoaNgoac) ?? true;
     tuDongDongBangKyTuDacBiet = kho.getBool(_khoaTuDongDongBangKyTuDacBiet) ?? true;
     anGoiYTaiApk = kho.getBool(_khoaAnGoiYTaiApk) ?? false;
+    final tuDienRaw = kho.getString(_khoaTuDienChinhTa);
+    tuDienChinhTa = tuDienRaw == null
+        ? []
+        : (() {
+            try {
+              final ds = jsonDecode(tuDienRaw);
+              if (ds is! List) return <CapTuDien>[];
+              return ds.map(CapTuDien.tuJson).whereType<CapTuDien>().toList();
+            } catch (_) {
+              return <CapTuDien>[];
+            }
+          })();
     final tenThietBiDaLuu = kho.getString(_khoaThietBiChonTay);
     thietBiChonTay = tenThietBiDaLuu == null
         ? null

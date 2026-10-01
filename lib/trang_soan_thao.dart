@@ -43,6 +43,7 @@ import 'lua_chon_phim_tat.dart';
 import 'man_hinh_cai_dat.dart';
 import 'man_hinh_thu_muc.dart';
 import 'modal_cai_dat_kiem_tra_toan_van.dart';
+import 'modal_tu_dien_chinh_ta.dart';
 import 'modal_nghe_lai_ghi_am.dart';
 import 'mo_hinh.dart';
 import 'phien_ban_web_day_du.dart';
@@ -50,6 +51,25 @@ import 'the_ghi_am.dart';
 import 'thanh_cong_cu.dart';
 import 'thong_bao_giua.dart';
 import 'trang_huong_dan.dart';
+
+/// Một từ khớp "Từ điển sửa lỗi chính tả của bạn" tìm được trong bài —
+/// [thayThe] CHÍNH LÀ `CapTuDien.thayThe` tại lúc quét (rỗng nghĩa là "đề
+/// xuất xoá", không phải thay bằng chữ nào khác — xem `CapTuDien`). Giữ lại
+/// [tu] (chữ THẬT tại vị trí này) để còn kiểm tra văn bản có đổi từ lúc quét
+/// tới lúc bấm hay không, giống `LoiChinhTa.tu`.
+class _LoiTuDien {
+  _LoiTuDien({
+    required this.batDau,
+    required this.ketThuc,
+    required this.tu,
+    required this.thayThe,
+  });
+
+  final int batDau;
+  final int ketThuc;
+  final String tu;
+  final String thayThe;
+}
 
 /// Một vùng chữ AI cho là "không phù hợp" (câu từ lủng củng, lạc đề, thừa ý,
 /// lặp lại, quá nhiều lỗi chính tả, hoặc nên thay bằng đoạn khác hay hơn).
@@ -538,11 +558,20 @@ class _NutCongCuChu extends StatelessWidget {
     this.tyLeThuHep,
     this.bLiet = false,
     this.noiBat = false,
+    this.mauChu,
   });
 
   final String nhan;
   final String? moTa;
   final VoidCallback onTap;
+
+  /// Màu chữ riêng, ghi đè màu mặc định — CHỈ áp dụng khi [bLiet]/[noiBat]
+  /// đều không bật (hai cờ đó đã tự quyết màu riêng của chúng, ưu tiên hơn).
+  /// Dùng cho Copy/Cắt/Dán khi hiện ở hàng thay nút điều hướng tệp/nổi góc
+  /// trên-trái (xem `_hangCopyCutPaste`), cố ý tô xanh dương để nổi bật
+  /// đúng NGỮ CẢNH "đang ở phía trên", khác hẳn ba nút cùng tên ở Bộ phím
+  /// nhanh (màu chữ mặc định, không đổi).
+  final Color? mauChu;
 
   /// Vừa DIM màu (báo mắt thấy đang tạm khoá) VỪA chặn cứng mọi cử chỉ
   /// chạm bằng `IgnorePointer` (xem `build`) — không chỉ dừng ở việc để
@@ -591,7 +620,9 @@ class _NutCongCuChu extends StatelessWidget {
       child: Text(nhan,
           style: noiBat
               ? _kieuChu.copyWith(color: Colors.blue.shade900)
-              : (bLiet ? _kieuChu.copyWith(color: Colors.grey.shade400) : _kieuChu),
+              : (bLiet
+                  ? _kieuChu.copyWith(color: Colors.grey.shade400)
+                  : _kieuChu.copyWith(color: mauChu)),
           overflow: TextOverflow.visible,
           softWrap: false),
     );
@@ -663,6 +694,7 @@ const _mauGachChanDeXuat = Colors.green; // Lượn sóng, dưới đoạn ĐỀ
 const _mauGachChanCanXoa = Colors.green; // Lượn sóng, dưới đoạn AI đề xuất xoá — mảnh.
 const _damGachChanCanXoa = 2.0;
 const _mauGachGiuaThan = Color(0xFFFF8F00); // Thẳng, giữa thân — vàng đậm (Colors.amber.shade800).
+const _mauGachChanTuDien = Colors.amber; // Lượn sóng, dưới từ khớp "Từ điển sửa lỗi chính tả của bạn" — vàng.
 
 /// Một vùng [batDau, batDau+dai) cần vẽ đánh dấu AI, cùng màu/độ đậm/kiểu
 /// riêng — CHỈ giữ TOẠ ĐỘ VĂN BẢN (không phải toạ độ điểm ảnh) vì đây là dữ
@@ -1205,6 +1237,11 @@ class _BoDieuKhienChinhTa extends TextEditingController {
   final List<_VungKhongPhuHop> khongPhuHop = [];
   final List<_VungCanXoa> canXoa = [];
 
+  /// Các từ khớp "Từ điển sửa lỗi chính tả của bạn" (`CaiDat.tuDienChinhTa`)
+  /// tìm được trong bài — CŨNG là nguồn duy nhất của sự thật, quét lại mỗi
+  /// lần văn bản đổi (xem `_quetTuDienChinhTa` ở `_TrangSoanThaoState`).
+  final List<_LoiTuDien> tuDien = [];
+
   /// Dấu câu AI vừa tự chèn (mục 3) — chỉ tồn tại trong 4 giây hiệu ứng nhấp
   /// nháy, không phải "nguồn duy nhất của sự thật" như ba danh sách trên,
   /// vì hết hiệu ứng thì chữ đã ở trong [text] rồi, không cần theo dõi nữa.
@@ -1232,6 +1269,7 @@ class _BoDieuKhienChinhTa extends TextEditingController {
   int doDaiTimKiem = 0;
 
   void Function(LoiChinhTa loi, Offset viTriManHinh)? khiBamTuSai;
+  void Function(_LoiTuDien loi, Offset viTriManHinh)? khiBamTuDien;
   void Function(_VungKhongPhuHop vung, Offset viTriManHinh)? khiBamDoanKhongPhuHop;
   void Function(_VungCanXoa vung, Offset viTriManHinh)? khiBamDoanCanXoa;
   void Function(int soThe, Offset viTriManHinh)? khiBamTheGhiAmHoanChinh;
@@ -1362,6 +1400,18 @@ class _BoDieuKhienChinhTa extends TextEditingController {
         ketThuc: l.ketThuc,
         recognizer: TapGestureRecognizer()
           ..onTapDown = (ct) => khiBamTuSai?.call(l, ct.globalPosition),
+      ));
+    }
+
+    for (final t in tuDien) {
+      if (t.batDau < 0 || t.ketThuc > vb.length || t.batDau >= t.ketThuc) continue;
+      // Gạch vàng lượn sóng vẽ ở lớp riêng (`_veDanhDauAi`) — ở đây chỉ giữ
+      // vùng bắt chạm để mở menu, giống `loi` ở trên.
+      vung.add(_VungVe(
+        batDau: t.batDau,
+        ketThuc: t.ketThuc,
+        recognizer: TapGestureRecognizer()
+          ..onTapDown = (ct) => khiBamTuDien?.call(t, ct.globalPosition),
       ));
     }
 
@@ -1761,6 +1811,9 @@ class _XoaCachDauKhiDanLucThutDauDong extends TextInputFormatter {
     }
     final ketThucChen = moi.length - duoi;
     if (dau >= ketThucChen) return newValue;
+    // CHỈ áp dụng khi ký tự NGAY TRƯỚC chỗ vừa chèn (trong văn bản CŨ) ĐÃ
+    // LÀ dấu cách — xem giải thích ở `_phimAoPaste`, cùng quy tắc.
+    if (dau == 0 || cu[dau - 1] != ' ') return newValue;
 
     var batDauThat = dau;
     while (batDauThat < ketThucChen && moi[batDauThat] == ' ') {
@@ -3087,7 +3140,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Widget _veDanhDauAi() {
     if (_boDieuKhien.loi.isEmpty &&
         _boDieuKhien.khongPhuHop.isEmpty &&
-        _boDieuKhien.canXoa.isEmpty) {
+        _boDieuKhien.canXoa.isEmpty &&
+        _boDieuKhien.tuDien.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -3123,6 +3177,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     for (final l in _boDieuKhien.loi) {
       themVung(l.batDau, l.ketThuc, _mauGachChanLoi, _damGachChanLoi);
+    }
+    for (final t in _boDieuKhien.tuDien) {
+      themVung(t.batDau, t.ketThuc, _mauGachChanTuDien, _damGachChanLoi);
     }
     for (final k in _boDieuKhien.khongPhuHop) {
       if (k.nhapNhayMau != null) continue; // Đang nhấp nháy — không vẽ gạch.
@@ -3832,6 +3889,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // lỗi ANR cũ (hàm chỉ làm việc O(k) nhỏ, không quét toàn văn bản).
     _boDieuKhien.addListener(_tinhTrangThaiDinhDangHienTai);
     _boDieuKhien.khiBamTuSai = _khiBamTuSai;
+    _boDieuKhien.khiBamTuDien = _khiBamTuDien;
     _boDieuKhien.khiBamDoanKhongPhuHop = _khiBamDoanKhongPhuHop;
     _boDieuKhien.khiBamDoanCanXoa = _khiBamDoanCanXoa;
     _boDieuKhien.khiBamTheGhiAmHoanChinh = _khiBamTheGhiAmHoanChinh;
@@ -3963,7 +4021,35 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// giản, không cần bọc `kIsWeb` quanh một biến bool vô hại.
   bool _coThayDoiChuaLuu = false;
 
+  /// Quét lại TOÀN BỘ bài theo "Từ điển sửa lỗi chính tả của bạn"
+  /// (`widget.caiDat.tuDienChinhTa`) — dựng lại hẳn `_boDieuKhien.tuDien` từ
+  /// đầu mỗi lần gọi (đơn giản, rẻ với từ điển/bài cỡ thường, không cần cơ
+  /// chế dời offset riêng như `loi` của AI). Gọi lại sau mỗi lần lưu (xem
+  /// `_henLuu`/`_luuVanBan`) và mỗi khi mở một ghi chú (`_moGhiChu`), hoặc
+  /// ngay sau khi đóng modal "Từ điển..." (từ điển có thể vừa đổi).
+  void _quetTuDienChinhTa() {
+    final vb = _boDieuKhien.text;
+    final ketQua = <_LoiTuDien>[];
+    for (final c in widget.caiDat.tuDienChinhTa) {
+      final loi = c.loi.trim();
+      if (loi.isEmpty) continue;
+      var tu = 0;
+      while (true) {
+        final i = vb.indexOf(loi, tu);
+        if (i < 0) break;
+        ketQua.add(_LoiTuDien(batDau: i, ketThuc: i + loi.length, tu: loi, thayThe: c.thayThe));
+        tu = i + loi.length;
+      }
+    }
+    ketQua.sort((a, b) => a.batDau.compareTo(b.batDau));
+    _boDieuKhien.tuDien
+      ..clear()
+      ..addAll(ketQua);
+    _boDieuKhien.veLai();
+  }
+
   Future<void> _luuVanBan() async {
+    _quetTuDienChinhTa();
     final khoiDinhDang = _macDinhDangAi();
     final khoiDinhDangThuCong = _macDinhDangThuCong();
     var noiDungLuu = _boDieuKhien.text;
@@ -4458,6 +4544,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (widget.caiDat.tuDongThemDuongKeChia) {
       _quetVaXayDungDuongKeChia();
     }
+    _quetTuDienChinhTa();
     _viTriChoVietHoa = null;
 
     widget.kho.datGhiChuDangMo(id);
@@ -5379,8 +5466,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final maHoaGoi = _tachGoiDinhDangTuHtml(htmlClipboard);
 
     final dangBatTuDongThut = widget.caiDat.tuDongThutDauDong;
+    // CHỈ xoá dấu cách đứng đầu đoạn dán khi ký tự NGAY TRƯỚC con trỏ (nơi
+    // sắp dán vào) ĐÃ LÀ dấu cách — ký tự khác hoặc không có ký tự gì ở đó
+    // thì giữ nguyên đoạn dán, không đụng gì (xem thêm ở
+    // `_XoaCachDauKhiDanLucThutDauDong`, cùng quy tắc này).
+    final coTheXoaCachDau = dangBatTuDongThut && batDau > 0 && vb[batDau - 1] == ' ';
     final chenGoc = chen;
-    if (dangBatTuDongThut) {
+    if (coTheXoaCachDau) {
       chen = chen.replaceFirst(RegExp(r'^ +'), '');
       if (chen.isEmpty) return;
     }
@@ -9261,6 +9353,112 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henLuu();
   }
 
+  /// Menu của một từ gạch vàng lượn sóng (khớp "Từ điển sửa lỗi chính tả
+  /// của bạn") — ĐÚNG KHUÔN `_khiBamTuSai` ở trên, chỉ khác mục đầu tiên:
+  /// nếu [loi.thayThe] có chữ thì hiện đúng chữ đó, RỖNG thì hiện "Đề xuất
+  /// Xoá" màu đỏ — cả hai trường hợp menu LUÔN có đúng 4 mục.
+  Future<void> _khiBamTuDien(_LoiTuDien loi, Offset viTriManHinh) async {
+    final coThayThe = loi.thayThe.isNotEmpty;
+    final chon = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        viTriManHinh.dx,
+        viTriManHinh.dy,
+        viTriManHinh.dx,
+        viTriManHinh.dy,
+      ),
+      items: [
+        PopupMenuItem(
+          value: 'thay',
+          child: coThayThe
+              ? Text(loi.thayThe)
+              : Text('Đề xuất Xoá', style: TextStyle(color: Colors.red.shade600)),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          value: 'xoa',
+          child: Text('Xoá', style: TextStyle(color: Colors.red.shade600)),
+        ),
+        PopupMenuItem(
+          value: 'huy',
+          child: Text('Huỷ đề xuất', style: TextStyle(color: Colors.green.shade700)),
+        ),
+        const PopupMenuItem(
+          value: 'chapNhanTatCa',
+          child: Text('Chấp nhận tất cả đề xuất của từ điển'),
+        ),
+      ],
+    );
+    if (chon == null || !mounted) return;
+
+    switch (chon) {
+      case 'thay':
+        _luuDiemMoc();
+        _apDungThayTheTuDien(loi, loi.thayThe);
+      case 'xoa':
+        _luuDiemMoc();
+        _apDungThayTheTuDien(loi, '');
+      case 'chapNhanTatCa':
+        _chapNhanTatCaDeXuatTuDien();
+      default: // 'huy'
+        _boDieuKhien.tuDien.remove(loi);
+        _boDieuKhien.veLai();
+    }
+  }
+
+  /// Thay đúng vùng [loi.batDau, loi.ketThuc) bằng [thayBang] — ĐÚNG KHUÔN
+  /// `_apDungThayTheChinhTa`, chỉ khác quét lại hẳn `_boDieuKhien.tuDien` từ
+  /// đầu sau khi sửa (xem `_quetTuDienChinhTa`) thay vì tự dời offset —
+  /// đơn giản hơn, và đúng vì các từ điển khác trong bài không hề di chuyển
+  /// (không như `LoiChinhTa`, chỉ MỘT lượt AI trả về nên không có sẵn cách
+  /// quét lại rẻ như vậy).
+  void _apDungThayTheTuDien(_LoiTuDien loi, String thayBang) {
+    final vb = _boDieuKhien.text;
+    final conKhop =
+        loi.ketThuc <= vb.length && vb.substring(loi.batDau, loi.ketThuc) == loi.tu;
+    if (!conKhop) {
+      _boDieuKhien.tuDien.remove(loi);
+      _boDieuKhien.veLai();
+      return;
+    }
+
+    final moi = vb.replaceRange(loi.batDau, loi.ketThuc, thayBang);
+    _dieuChinhLoiChinhTaSauKhiSua(loi.batDau, loi.ketThuc - loi.batDau, thayBang.length);
+    _dieuChinhVungToanVanSauKhiSua(loi.batDau, loi.ketThuc - loi.batDau, thayBang.length);
+    _gioiHanTreMuSauKhiChen(loi.batDau, thayBang.length, moi);
+
+    final viTri = loi.batDau + thayBang.length;
+    _neo = viTri;
+    _ghiVaoO(moi, viTri);
+    _henLuu();
+    _quetTuDienChinhTa();
+  }
+
+  /// Mục "Chấp nhận tất cả đề xuất của từ điển" — ép MỌI từ gạch vàng lượn
+  /// sóng hiện có chọn ngay mục đầu tiên của chính nó (thay bằng
+  /// [_LoiTuDien.thayThe], hoặc xoá hẳn nếu rỗng). Áp từ PHẢI sang TRÁI để
+  /// toạ độ các đề xuất còn lại (nằm bên trái) không bị lệch khi một đề xuất
+  /// bên phải được áp trước.
+  void _chapNhanTatCaDeXuatTuDien() {
+    if (_boDieuKhien.tuDien.isEmpty) return;
+    _luuDiemMoc();
+    final ds = List<_LoiTuDien>.of(_boDieuKhien.tuDien)
+      ..sort((a, b) => b.batDau.compareTo(a.batDau));
+    for (final loi in ds) {
+      final vb = _boDieuKhien.text;
+      if (loi.ketThuc > vb.length || vb.substring(loi.batDau, loi.ketThuc) != loi.tu) {
+        continue;
+      }
+      final moi = vb.replaceRange(loi.batDau, loi.ketThuc, loi.thayThe);
+      _dieuChinhLoiChinhTaSauKhiSua(loi.batDau, loi.ketThuc - loi.batDau, loi.thayThe.length);
+      _dieuChinhVungToanVanSauKhiSua(loi.batDau, loi.ketThuc - loi.batDau, loi.thayThe.length);
+      _gioiHanTreMuSauKhiChen(loi.batDau, loi.thayThe.length, moi);
+      _ghiVaoO(moi, loi.batDau + loi.thayThe.length);
+    }
+    _henLuu();
+    _quetTuDienChinhTa();
+  }
+
   // ---------------------------------------------------- chèn chữ AI có nhấp nháy
 
   /// Chèn văn bản mới vào đúng vị trí con trỏ, rồi cho nó nhấp nháy xanh/đen
@@ -12674,21 +12872,27 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// hàng nổi góc trên-trái khi đã Thu gọn thanh công cụ (xem `build`) — một
   /// nơi duy nhất, tránh lệch hành vi giữa hai chỗ hiện cùng một hàng nút.
   Widget _hangCopyCutPaste() {
+    // Chữ xanh dương — nổi bật đúng ngữ cảnh "đang ở phía trên", khác ba nút
+    // cùng tên ở Bộ phím nhanh (giữ màu mặc định).
+    const mauChu = Color(0xFF1A73E8);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         _NutCongCuChu(
           nhan: 'Copy',
+          mauChu: mauChu,
           onTap: () => _bamCopyCutPasteOHangThayNav(_phimAoCopy),
         ),
         const SizedBox(width: 6),
         _NutCongCuChu(
           nhan: 'Cut',
+          mauChu: mauChu,
           onTap: () => _bamCopyCutPasteOHangThayNav(_phimAoCut),
         ),
         const SizedBox(width: 6),
         _NutCongCuChu(
           nhan: 'Paste',
+          mauChu: mauChu,
           bLiet: _phimPasteDangLiet,
           onTap: () => _bamCopyCutPasteOHangThayNav(_phimAoPasteCoLiet),
         ),
@@ -13621,6 +13825,26 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         bottom: false,
         child: Column(
           children: [
+            // Hàng Copy/Cắt/Dán (xem `_nutDieuHuongTep`/`_hangCopyCutPaste`)
+            // thường nằm NGAY TRONG AppBar — nhưng "Thu gọn" ẩn HẲN AppBar,
+            // nên lúc đó nó cần một chỗ hiện RIÊNG. CHỦ Ý là một ô THẬT
+            // trong `Column` (chiếm chỗ, đẩy khung soạn thảo xuống) — KHÔNG
+            // phải `Positioned` nổi đè lên trên, để không che mất chữ đang
+            // soạn ngay dưới mép trên cùng. `_hienHangCopyCutPaste()` đã tự
+            // loại trừ đúng lúc trình ghi âm/tìm kiếm-thay thế/chọn vị trí
+            // chèn tệp đang mở, không cần lặp lại điều kiện ở đây.
+            if (_thuGonThanhCongCu && _hienHangCopyCutPaste())
+              Material(
+                color: Colors.white,
+                elevation: 2,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: _hangCopyCutPaste(),
+                  ),
+                ),
+              ),
             if (_loi.isNotEmpty)
               Container(
                 width: double.infinity,
@@ -14078,6 +14302,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 khiBamMicro: _bamNutMicro,
                 khiBamCaiDatMicro: () => _moCaiDat(NhomCaiDat.micro),
                 khiBamCaiDatHienThi: () => _moCaiDat(NhomCaiDat.hienThiVaTuDongSua),
+                khiBamTuDienChinhTa: () async {
+                  await moModalTuDienChinhTa(context, widget.caiDat);
+                  // Từ điển có thể vừa đổi (thêm/sửa/xoá cặp từ) — quét lại
+                  // ngay, không đợi tới lần lưu kế tiếp.
+                  if (mounted) _quetTuDienChinhTa();
+                },
                 khiBamHuongDan: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const ManHinhHuongDan()),
                 ),
@@ -14154,18 +14384,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 moTa: 'Mở rộng — hiện lại thanh công cụ',
                 onTap: () => setState(() => _thuGonThanhCongCu = false),
               ),
-            ),
-          // Hàng Copy/Cắt/Dán (xem `_nutDieuHuongTep`) thường nằm NGAY TRONG
-          // AppBar — nhưng "Thu gọn" ẩn HẲN AppBar, nên lúc đó nó cần một lối
-          // hiện RIÊNG, nổi góc trên-trái màn hình (đối xứng với nút "🔽 Mở
-          // rộng" ở góc trên-phải). `_hienHangCopyCutPaste()` đã tự loại trừ
-          // đúng lúc trình ghi âm/tìm kiếm-thay thế/chọn vị trí chèn tệp đang
-          // mở, không cần lặp lại điều kiện ở đây.
-          if (_thuGonThanhCongCu && _hienHangCopyCutPaste())
-            Positioned(
-              top: MediaQuery.paddingOf(context).top + 4,
-              left: 8,
-              child: _hangCopyCutPaste(),
             ),
           _nhanDoanSo(caoBanPhim),
         ],

@@ -22,6 +22,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamMicro,
     required this.khiBamCaiDatMicro,
     required this.khiBamCaiDatHienThi,
+    required this.khiBamTuDienChinhTa,
     required this.khiBamHuongDan,
     required this.khiBamCaiDatKiemTraToanVan,
     required this.khiBamChuyenFileAmThanh,
@@ -76,6 +77,10 @@ class ThanhCongCu extends StatelessWidget {
   /// (xem `_NutTaiKhoanMenu`, `man_hinh_cai_dat.dart`).
   final VoidCallback khiBamCaiDatMicro;
   final VoidCallback khiBamCaiDatHienThi;
+
+  /// Mục "Từ điển sửa lỗi chính tả của bạn" — ngay dưới "Cài đặt Hiển thị
+  /// và tự động sửa" trong cùng menu — mở `moModalTuDienChinhTa`.
+  final VoidCallback khiBamTuDienChinhTa;
 
   final VoidCallback khiBamHuongDan;
 
@@ -327,6 +332,7 @@ class ThanhCongCu extends StatelessWidget {
                               rong: rong,
                               khiBamCaiDatMicro: khiBamCaiDatMicro,
                               khiBamCaiDatHienThi: khiBamCaiDatHienThi,
+                              khiBamTuDienChinhTa: khiBamTuDienChinhTa,
                             ),
                           ),
                           // Nhân bản nút "Bật/Tắt Bộ phím nhanh cho màn hình
@@ -346,20 +352,12 @@ class ThanhCongCu extends StatelessWidget {
                               Icons.keyboard,
                               'Phím nhanh',
                               'Phím nhanh',
-                              () {
-                                final dangMoTruocKhiBam = boPhimNhanhDangMo;
-                                khiBamBoPhimNhanh();
-                                // Chỉ báo khi BẬT lên (không báo lúc tắt) —
-                                // và chỉ ngay lần vừa bật, không lặp lại mỗi
-                                // khi bộ phím nhanh chỉ đang hiển thị sẵn.
-                                if (!dangMoTruocKhiBam) {
-                                  hienThongBaoGiua(
-                                    context,
-                                    'Bộ phím nhanh dành cho màn hình cảm ứng',
-                                    thoiGian: const Duration(milliseconds: 3500),
-                                  );
-                                }
-                              },
+                              // Thông báo khi BẬT lên giờ do chính
+                              // `khiBamBoPhimNhanh` (_bamNutBoPhimNhanhCamUng
+                              // trong trang_soan_thao.dart) tự hiện — gọi
+                              // thẳng, không tự hiện thêm toast riêng ở đây
+                              // nữa (từng hiện HAI thông báo chồng nhau).
+                              khiBamBoPhimNhanh,
                               mau: boPhimNhanhDangMo
                                   ? const Color(0xFF1A73E8)
                                   : const Color(0xFF5F6368),
@@ -1215,11 +1213,15 @@ class _NutTaiKhoanMenu extends StatelessWidget {
     required this.rong,
     required this.khiBamCaiDatMicro,
     required this.khiBamCaiDatHienThi,
+    required this.khiBamTuDienChinhTa,
   });
 
   final bool rong;
   final VoidCallback khiBamCaiDatMicro;
   final VoidCallback khiBamCaiDatHienThi;
+
+  /// Mục "Từ điển sửa lỗi chính tả của bạn" — mở `moModalTuDienChinhTa`.
+  final VoidCallback khiBamTuDienChinhTa;
 
   @override
   Widget build(BuildContext context) {
@@ -1255,6 +1257,9 @@ class _NutTaiKhoanMenu extends StatelessWidget {
               case 2:
                 khiBamCaiDatHienThi();
                 break;
+              case 9:
+                khiBamTuDienChinhTa();
+                break;
             }
           },
           itemBuilder: (ctx) {
@@ -1270,6 +1275,7 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                 _dividerMenu(),
                 _mucMenuThem(1, 'Cài đặt Micro'),
                 _mucMenuThem(2, 'Cài đặt Hiển thị và tự động sửa'),
+                _mucMenuThem(9, 'Từ điển sửa lỗi chính tả của bạn'),
                 _dividerMenu(),
                 _mucMenuThem(3, 'Điều khoản sử dụng'),
                 _mucMenuThem(4, 'Bảo mật và quyền riêng tư'),
