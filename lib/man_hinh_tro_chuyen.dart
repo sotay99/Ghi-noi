@@ -447,19 +447,47 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                     },
                   ),
                   Expanded(
-                    child: TextField(
-                      controller: _oNhap,
-                      minLines: 1,
-                      maxLines: 5,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _guiHoacXacNhanSua(),
-                      decoration: const InputDecoration(
-                        hintText: 'Nhập câu hỏi...',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(20)),
+                    // Enter = xuống dòng (hành vi mặc định của ô nhiều dòng,
+                    // không còn `onSubmitted`/`TextInputAction.send` — hai
+                    // thứ đó từng khiến Enter gửi luôn). CHỈ Ctrl+Enter mới
+                    // gửi — bắt riêng tổ hợp này bằng `Focus.onKeyEvent`,
+                    // Enter một mình luôn rơi qua cho `TextField` tự xuống
+                    // dòng như bình thường.
+                    child: Focus(
+                      onKeyEvent: (node, event) {
+                        if (event is KeyDownEvent &&
+                            event.logicalKey == LogicalKeyboardKey.enter &&
+                            HardwareKeyboard.instance.isControlPressed) {
+                          _guiHoacXacNhanSua();
+                          return KeyEventResult.handled;
+                        }
+                        return KeyEventResult.ignored;
+                      },
+                      child: ConstrainedBox(
+                        // Co giãn thoải mái theo nội dung gõ, cao tối đa
+                        // khoảng 40% chiều cao màn hình (giống độ cao rộng
+                        // rãi của khung chat) — vượt quá thì tự cuộn bên
+                        // trong ô nhập, không đẩy tràn màn hình.
+                        constraints: BoxConstraints(
+                          maxHeight: (MediaQuery.sizeOf(context).height * 0.4)
+                              .clamp(120.0, 420.0),
                         ),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        isDense: true,
+                        child: TextField(
+                          controller: _oNhap,
+                          minLines: 1,
+                          maxLines: null,
+                          keyboardType: TextInputType.multiline,
+                          textInputAction: TextInputAction.newline,
+                          decoration: const InputDecoration(
+                            hintText: 'Ctrl + Enter để gửi',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(20)),
+                            ),
+                            contentPadding:
+                                EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            isDense: true,
+                          ),
+                        ),
                       ),
                     ),
                   ),

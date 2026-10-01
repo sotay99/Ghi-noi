@@ -5,6 +5,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
 import 'nguon_am_thanh_the_ghi_am.dart';
+import 'tai_ve_bytes.dart';
 
 /// Modal "Nghe bản ghi âm này" — phát lại trực tiếp từ bytes đang giữ trong
 /// bộ nhớ (`_duLieuTheoTheGhiAm`), không ghi ra file tạm. Nguồn phát tạo qua
@@ -112,6 +113,19 @@ class _ModalNgheLaiGhiAmState extends State<_ModalNgheLaiGhiAm> {
     return '$phut:${giay.toString().padLeft(2, '0')}';
   }
 
+  /// Đuôi tệp suy ra từ MIME — ví dụ 'audio/webm' → 'webm'. Không cần chính
+  /// xác tuyệt đối với mọi trình phát ngoài, chỉ cần tệp tải về có đuôi hợp
+  /// lý để người dùng nhận ra loại tệp.
+  String get _duoiTep {
+    final phan = widget.mime.split('/');
+    if (phan.length < 2) return 'audio';
+    return phan[1].split(';').first.trim();
+  }
+
+  Future<void> _taiVeMay() async {
+    await taiVeBytes(widget.bytes, 'ghi-am.$_duoiTep', widget.mime);
+  }
+
   @override
   Widget build(BuildContext context) {
     final tongMili = _tongThoiLuong.inMilliseconds;
@@ -156,6 +170,10 @@ class _ModalNgheLaiGhiAmState extends State<_ModalNgheLaiGhiAm> {
         ],
       ),
       actions: [
+        TextButton(
+          onPressed: _taiVeMay,
+          child: const Text('Tải file ghi âm về máy'),
+        ),
         TextButton(
           onPressed: () async {
             await _player.stop();

@@ -577,6 +577,10 @@ class CaiDat {
     'Ctrl+Shift+C': 'Màu chữ',
     'Ctrl+Shift+H': 'Màu nền chữ',
     'Ctrl+Q': 'Xoá định dạng văn bản',
+    // Dành riêng cho "Gửi" ở khung chat với AI (`man_hinh_tro_chuyen.dart`,
+    // Enter một mình là xuống dòng) — chặn không cho đặt trùng phím tắt
+    // Micro/Ghi âm, để hai phím tắt không giẫm chân nhau.
+    'Ctrl+Enter': 'Gửi tin nhắn trong khung chat với AI',
   };
 
   /// Kiểm tra một lựa chọn Ctrl+<phim> có trùng phím tắt CỐ ĐỊNH nào của

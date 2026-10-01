@@ -321,7 +321,7 @@ class ThanhCongCu extends StatelessWidget {
                           ),
                           _NutCoChuThich(
                             hien: hienChuThich,
-                            chu: 'Tài khoản của bạn',
+                            chu: 'Tài khoản của bạn và Cài đặt',
                             child: _NutTaiKhoanMenu(
                               rong: rong,
                               khiBamCaiDatMicro: khiBamCaiDatMicro,
@@ -339,9 +339,7 @@ class ThanhCongCu extends StatelessWidget {
                           // luôn đồng bộ trạng thái với nhau.
                           _NutCoChuThich(
                             hien: hienChuThich,
-                            chu: boPhimNhanhDangMo
-                                ? 'Tắt Bộ phím nhanh cho màn hình cảm ứng'
-                                : 'Bật Bộ phím nhanh cho màn hình cảm ứng',
+                            chu: 'Phím nhanh cho màn hình cảm ứng',
                             child: _nut(
                               rong,
                               Icons.keyboard,
@@ -373,40 +371,54 @@ class ThanhCongCu extends StatelessWidget {
                   if (!gopMicVaGhiAmThanhMotNut)
                     _NutCoChuThich(
                       hien: hienChuThich,
-                      chu: dangGhiAmThe
-                          ? 'Đang ghi âm — bấm để dừng'
-                          : 'Ghi âm (tạo thẻ ghi âm)',
+                      chu: 'Ghi âm (Nói xong mới ra chữ)',
                       child: _NutGhiAmTron(
                         dangGhiAm: dangGhiAmThe,
                         khiBam: khiBamGhiAmThe,
                       ),
                     ),
 
-                  // Bên phải: sóng âm, rồi micro (hoặc nút gộp) sát mép
-                  // phải. Luôn giữ giao diện tròn quen thuộc, kể cả ở màn
-                  // hình rộng — và không nằm trong dải nền hồng phía trên.
-                  _NutCoChuThich(
-                    hien: hienChuThich && !bat,
-                    chu: 'Hiện chú thích',
-                    vang: true,
-                    child: SongAm(
-                      muc: songAm,
-                      dangNghe: bat && dangNghe,
-                      micDangBat: bat,
-                      khiBamChuThich: khiBamChuThich,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  if (gopMicVaGhiAmThanhMotNut)
+                  // Bên phải: sóng âm (hoặc nút hiện chú thích, cùng vị trí)
+                  // rồi micro (hoặc nút gộp) sát mép phải — GIỮ NGUYÊN thứ tự
+                  // đó cho mọi thiết bị, TRỪ iPhone bản web: ở đó Ghi âm (nút
+                  // gộp micro+ghi âm, iPhone không dùng được micro live) đổi
+                  // sang đứng BÊN TRÁI, còn sóng âm/nút hiện chú thích đổi
+                  // sang đứng sát mép phải — hai đứa đổi chỗ cho nhau, chỉ
+                  // riêng thiết bị này.
+                  if (gopMicVaGhiAmThanhMotNut) ...[
                     _NutCoChuThich(
                       hien: hienChuThich,
-                      chu: 'Ghi âm (micro không dùng được trên iPhone)',
+                      chu: 'Ghi âm (Nói xong mới ra chữ)',
                       child: _NutGhiAmTron(
                         dangGhiAm: dangGhiAmThe,
                         khiBam: khiBamGhiAmThe,
                       ),
-                    )
-                  else
+                    ),
+                    const SizedBox(width: 6),
+                    _NutCoChuThich(
+                      hien: hienChuThich && !bat,
+                      chu: 'Hiện chú thích',
+                      vang: true,
+                      child: SongAm(
+                        muc: songAm,
+                        dangNghe: bat && dangNghe,
+                        micDangBat: bat,
+                        khiBamChuThich: khiBamChuThich,
+                      ),
+                    ),
+                  ] else ...[
+                    _NutCoChuThich(
+                      hien: hienChuThich && !bat,
+                      chu: 'Hiện chú thích',
+                      vang: true,
+                      child: SongAm(
+                        muc: songAm,
+                        dangNghe: bat && dangNghe,
+                        micDangBat: bat,
+                        khiBamChuThich: khiBamChuThich,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
                     _NutCoChuThich(
                       hien: hienChuThich,
                       chu: 'Micro Vừa nói vừa ra chữ',
@@ -418,6 +430,7 @@ class ThanhCongCu extends StatelessWidget {
                         khiBam: sanSang ? khiBamMicro : null,
                       ),
                     ),
+                  ],
                 ],
               ),
             );
@@ -1226,29 +1239,52 @@ class _NutTaiKhoanMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Hai icon (hình người + bánh răng) LUÔN đi sát nhau, ở cả màn hình hẹp
+    // lẫn rộng — chỉ khác là màn hình rộng còn thêm tên "Tài khoản-Cài đặt"
+    // bên cạnh, màn hình hẹp chỉ có hai icon, không chữ.
+    const haiIcon = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.account_circle, size: 18, color: Color(0xFF5F6368)),
+        Icon(Icons.settings, size: 14, color: Color(0xFF5F6368)),
+      ],
+    );
     return Semantics(
       button: true,
-      label: 'Tài khoản của bạn',
+      label: 'Tài khoản của bạn và Cài đặt',
       child: Tooltip(
-        message: 'Tài khoản của bạn',
+        message: 'Tài khoản của bạn và Cài đặt',
         child: PopupMenuButton<int>(
           padding: EdgeInsets.zero,
           splashRadius: 20,
           child: rong
-              ? const _KhungNutRong(
-                  bieuTuong: Icons.account_circle,
-                  nhan: 'Tài khoản',
+              ? Container(
+                  height: 32,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: const Color(0xFFDADCE0)),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      haiIcon,
+                      SizedBox(width: 6),
+                      Text('Tài khoản-Cài đặt',
+                          style: TextStyle(fontSize: 12, color: Color(0xFF5F6368))),
+                    ],
+                  ),
                 )
               : Container(
-                  width: 38,
+                  width: 42,
                   height: 38,
                   alignment: Alignment.center,
                   decoration: const BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.account_circle,
-                      size: 20, color: Color(0xFF5F6368)),
+                  child: haiIcon,
                 ),
           onSelected: (gia) {
             switch (gia) {
