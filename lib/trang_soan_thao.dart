@@ -6918,6 +6918,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           khiXoaVaDong: _huyBanGhiAmDangDoDangVaDong,
           khiCaiDatTuDongChuyenHoa: _moModalCaiDatTuDongChuyenHoa,
           khiCaiDatTuDongMoBang: _moModalCaiDatTuDongMoBangDieuKhien,
+          khiDoiViTri: _batDauDoiViTriTheDangGhi,
         ),
       ),
     ).then((_) {
@@ -7250,6 +7251,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           child: Text('Xoá thẻ ghi âm này',
               style: TextStyle(color: Colors.red.shade600)),
         ),
+        const PopupMenuItem(
+          value: 'doiViTri',
+          child: Text('Thay đổi vị trí của thẻ này'),
+        ),
       ],
     );
     if (chon == null || !mounted) return;
@@ -7262,6 +7267,137 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         await _ngheLaiGhiAmThe(soThe);
       case 'xoa':
         await _hoiXoaTheGhiAm(soThe);
+      case 'doiViTri':
+        _batDauDoiViTriTheGhiAm(soThe);
+    }
+  }
+
+  // --------------------- chọn vị trí mới cho một thẻ ghi âm đã có
+
+  /// Khác `null` nghĩa là đang ở chế độ "Thay đổi vị trí của thẻ này" cho
+  /// đúng thẻ số N đó — tái dùng chung cờ ẩn-hết-thanh-công-cụ
+  /// [_dangChonViTriChenFile] với luồng "chèn kết quả AI" (cùng bản chất:
+  /// chỉ còn khung soạn thảo để di chuyển con trỏ + một thanh riêng ở đáy),
+  /// chỉ khác phần NỘI DUNG/HÀNH ĐỘNG của thanh đó — xem
+  /// `_xayThanhChonViTriChenFile`.
+  int? _soTheDangDoiViTri;
+
+  /// Nhớ lại đúng trạng thái ghi âm (đang ghi tiếp, hay đang tạm dừng)
+  /// NGAY TRƯỚC khi "Phím 9" ép tạm dừng để chọn vị trí cho thẻ đang ghi dở
+  /// — xong hoặc huỷ thì trả lại ĐÚNG trạng thái cũ đó (xem
+  /// `_batDauDoiViTriTheDangGhi`/`_ketThucCheDoDoiViTriThe`). `null` = lần
+  /// "Thay đổi vị trí" này KHÔNG áp dụng cho thẻ đang ghi (áp dụng cho một
+  /// thẻ đã ghi xong từ lâu, không cần khôi phục gì).
+  bool? _dangGhiTruocKhiDoiViTri;
+
+  /// Mục "Thay đổi vị trí của thẻ này" bấm từ MENU của một thẻ đã ghi
+  /// xong — không đụng gì tới trạng thái ghi âm (thẻ đó không còn "đang
+  /// ghi" nữa).
+  void _batDauDoiViTriTheGhiAm(int soThe) {
+    setState(() {
+      _soTheDangDoiViTri = soThe;
+      _dangGhiTruocKhiDoiViTri = null;
+      _dangChonViTriChenFile = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _oChu.requestFocus();
+    });
+  }
+
+  /// "Phím 9" trong bảng điều khiển — CHO THẺ ĐANG GHI DỞ. Nếu thẻ còn đang
+  /// ghi thật (chưa tạm dừng), tự tạm dừng trước rồi mới vào chế độ chọn vị
+  /// trí (báo nhanh giữa màn hình để người dùng biết vì sao đột nhiên ngừng
+  /// ghi) — nhớ lại đúng trạng thái đó để khôi phục khi xong/huỷ. Thẻ đã
+  /// đang tạm dừng sẵn thì không cần làm gì thêm, cứ vào thẳng.
+  Future<void> _batDauDoiViTriTheDangGhi() async {
+    final soThe = _soTheGhiAmDangGhi;
+    if (soThe == null) return;
+    final dangGhiThat = !_theGhiAmDangTamDung;
+    if (dangGhiThat) {
+      await _tamDungTheGhiAmHienTai();
+      if (!mounted) return;
+      hienThongBaoGiua(
+          context, 'Đã Tạm dừng ghi âm - Xin mời chọn vị trí cho thẻ này');
+    }
+    setState(() {
+      _soTheDangDoiViTri = soThe;
+      _dangGhiTruocKhiDoiViTri = dangGhiThat;
+      _dangChonViTriChenFile = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _oChu.requestFocus();
+    });
+  }
+
+  /// Dọn trạng thái chế độ "Thay đổi vị trí" — dùng chung cho cả hai lối ra
+  /// (xong hay huỷ): tắt cờ, và nếu đang áp dụng cho thẻ ĐANG GHI mà trước
+  /// đó đã bị ép tạm dừng, tự ghi tiếp lại đúng như cũ.
+  Future<void> _ketThucCheDoDoiViTriThe() async {
+    final canTiepTucGhi = _dangGhiTruocKhiDoiViTri == true;
+    setState(() {
+      _soTheDangDoiViTri = null;
+      _dangGhiTruocKhiDoiViTri = null;
+      _dangChonViTriChenFile = false;
+    });
+    if (canTiepTucGhi && _soTheGhiAmDangGhi != null && _theGhiAmDangTamDung) {
+      await _tiepTucTheGhiAmHienTai();
+    }
+  }
+
+  /// Bấm "Huỷ — Quay lại" ở thanh chọn vị trí (chế độ đổi vị trí thẻ) —
+  /// không đụng gì tới văn bản, thẻ vẫn y nguyên chỗ cũ.
+  Future<void> _huyDoiViTriThe() => _ketThucCheDoDoiViTriThe();
+
+  /// Bấm "Chuyển tới đây" — tìm lại thẻ hoàn chỉnh mang đúng số
+  /// [_soTheDangDoiViTri] (tìm lại TỪ ĐẦU bằng regex thay vì dùng toạ độ đã
+  /// chụp sẵn — chắc ăn hơn hẳn nếu có sửa chữ khác xen giữa lúc đang chọn
+  /// vị trí), xoá khỏi chỗ cũ rồi chèn lại nguyên văn tại vị trí con trỏ
+  /// hiện tại. Con trỏ đang nằm GIỮA một thẻ ghi âm bất kỳ (kể cả chính nó)
+  /// thì từ chối, báo lý do — không cho lồng thẻ vào nhau.
+  Future<void> _xacNhanDoiViTriThe() async {
+    final soThe = _soTheDangDoiViTri;
+    if (soThe == null) return;
+    final vb = _boDieuKhien.text;
+    Match? khop;
+    for (final m in reTheGhiAmHoanChinh.allMatches(vb)) {
+      if (m.group(1) == soThe.toString()) {
+        khop = m;
+        break;
+      }
+    }
+    if (khop == null) {
+      // Thẻ không còn tồn tại nữa (đã bị xoá/chuyển hoá trong lúc đang
+      // chọn vị trí) — không còn gì để chuyển, thoát chế độ luôn.
+      await _ketThucCheDoDoiViTriThe();
+      return;
+    }
+    final batDau = khop.start, ketThuc = khop.end;
+    final tokenText = vb.substring(batDau, ketThuc);
+    final sel = _boDieuKhien.selection;
+    final vt = sel.isValid ? sel.start : vb.length;
+
+    if (viTriNamGiuaThe(vt, timCacVungTheGhiAm(vb))) {
+      hienThongBaoGiua(
+          context, 'Không thể đặt thẻ ghi âm vào giữa một thẻ khác');
+      return;
+    }
+
+    _luuDiemMoc();
+    var vbMoi = vb.replaceRange(batDau, ketThuc, '');
+    _dieuChinhLoiChinhTaSauKhiSua(batDau, ketThuc - batDau, 0);
+    _dieuChinhVungToanVanSauKhiSua(batDau, ketThuc - batDau, 0);
+    final vtSauXoa =
+        vt > ketThuc ? vt - (ketThuc - batDau) : (vt >= batDau ? batDau : vt);
+
+    vbMoi = vbMoi.replaceRange(vtSauXoa, vtSauXoa, tokenText);
+    _dieuChinhLoiChinhTaSauKhiSua(vtSauXoa, 0, tokenText.length);
+    _dieuChinhVungToanVanSauKhiSua(vtSauXoa, 0, tokenText.length);
+    _ghiVaoO(vbMoi, vtSauXoa + tokenText.length);
+    _henLuu();
+
+    await _ketThucCheDoDoiViTriThe();
+    if (mounted) {
+      hienThongBaoGiua(context, 'Đã chuyển thẻ ghi âm #$soThe tới vị trí mới');
     }
   }
 
@@ -13638,6 +13774,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Widget _xayThanhChonViTriChenFile() {
     final manHinhHep = MediaQuery.sizeOf(context).width < _nguongManHinhHep;
     final rongNutPhimAo = manHinhHep ? 48.0 * 0.85 : 48.0;
+    // Chế độ "Thay đổi vị trí của thẻ ghi âm" (xem `_batDauDoiViTriTheGhiAm`/
+    // `_batDauDoiViTriTheDangGhi`) dùng CHUNG khung thanh này với chế độ
+    // "chèn kết quả AI từ file âm thanh" gốc — chỉ khác lời hướng dẫn, hai
+    // nút hành động, và KHÔNG có hàng dấu cách/xuống dòng/xoá (di chuyển
+    // thẻ không cần gõ thêm chữ nào cả).
+    final dangDoiViTriThe = _soTheDangDoiViTri != null;
     return Material(
       color: Colors.white,
       elevation: 4,
@@ -13656,55 +13798,61 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   color: const Color(0xFFE3F2FD),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text(
-                  'Di chuyển con trỏ tới vị trí muốn chèn văn bản từ AI, rồi bấm '
-                  '"Chèn vào vị trí này". Có vùng đang chọn thì văn bản mới sẽ '
-                  'thay thế đúng vùng đó.',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF1565C0)),
+                child: Text(
+                  dangDoiViTriThe
+                      ? 'Di chuyển con trỏ tới vị trí muốn đặt thẻ ghi âm '
+                          '#${_soTheDangDoiViTri} này, rồi bấm "Chuyển tới đây".'
+                      : 'Di chuyển con trỏ tới vị trí muốn chèn văn bản từ AI, rồi bấm '
+                          '"Chèn vào vị trí này". Có vùng đang chọn thì văn bản mới sẽ '
+                          'thay thế đúng vùng đó.',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF1565C0)),
                 ),
               ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _NutPhimAo(
-                    nhan: '␣',
-                    moTa: 'Dấu cách',
-                    rong: rongNutPhimAo,
-                    onTap: () => _chenKyTuTuPhimAo(' '),
-                  ),
-                  const SizedBox(width: 8),
-                  _NutPhimAo(
-                    nhan: '⏎',
-                    moTa: 'Xuống dòng',
-                    rong: rongNutPhimAo,
-                    onTap: () => _chenKyTuTuPhimAo('\n'),
-                  ),
-                  const SizedBox(width: 8),
-                  _NutPhimAo(
-                    nhan: '⌫',
-                    moTa: 'Xoá — bấm giữ để xoá liên tục',
-                    mauNen: Colors.red.shade50,
-                    mauVien: Colors.red.shade300,
-                    rong: rongNutPhimAo,
-                    lapLai: true,
-                    onTap: _xoaKyTuTuPhimAo,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
+              if (!dangDoiViTriThe) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _NutPhimAo(
+                      nhan: '␣',
+                      moTa: 'Dấu cách',
+                      rong: rongNutPhimAo,
+                      onTap: () => _chenKyTuTuPhimAo(' '),
+                    ),
+                    const SizedBox(width: 8),
+                    _NutPhimAo(
+                      nhan: '⏎',
+                      moTa: 'Xuống dòng',
+                      rong: rongNutPhimAo,
+                      onTap: () => _chenKyTuTuPhimAo('\n'),
+                    ),
+                    const SizedBox(width: 8),
+                    _NutPhimAo(
+                      nhan: '⌫',
+                      moTa: 'Xoá — bấm giữ để xoá liên tục',
+                      mauNen: Colors.red.shade50,
+                      mauVien: Colors.red.shade300,
+                      rong: rongNutPhimAo,
+                      lapLai: true,
+                      onTap: _xoaKyTuTuPhimAo,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+              ],
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: _quayLaiKetQuaFileAmThanh,
-                      child: const Text('Quay lại kết quả AI'),
+                      onPressed:
+                          dangDoiViTriThe ? _huyDoiViTriThe : _quayLaiKetQuaFileAmThanh,
+                      child: Text(dangDoiViTriThe ? 'Huỷ — Quay lại' : 'Quay lại kết quả AI'),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: FilledButton(
-                      onPressed: _chenTaiViTriDaChon,
-                      child: const Text('Chèn vào vị trí này'),
+                      onPressed: dangDoiViTriThe ? _xacNhanDoiViTriThe : _chenTaiViTriDaChon,
+                      child: Text(dangDoiViTriThe ? 'Chuyển tới đây' : 'Chèn vào vị trí này'),
                     ),
                   ),
                 ],
@@ -14020,9 +14168,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // giẫm lên nhau).
       appBar: _hienThanhTimKiem
           ? null
-          : (_trinhGhiAmMo
-              ? _xayAppBarTrinhGhiAmThe()
-              : ((_thuGonThanhCongCu || _dangChonViTriChenFile) ? null : appBar)),
+          : (_dangChonViTriChenFile
+              // Chế độ "chọn vị trí" (chèn kết quả AI, HOẶC "Thay đổi vị
+              // trí của thẻ ghi âm" — kể cả cho thẻ ĐANG ghi dở, phím 9)
+              // LUÔN thắng AppBar của trình ghi âm — "ẩn hết thanh công
+              // cụ, chỉ chừa các nút cần thiết" phải đúng nghĩa tuyệt đối,
+              // không chừa ngoại lệ nào.
+              ? null
+              : (_trinhGhiAmMo
+                  ? _xayAppBarTrinhGhiAmThe()
+                  : (_thuGonThanhCongCu ? null : appBar))),
       // translucent: chỉ NGHE sự kiện chạm để tắt chú thích, không chặn nó
       // đi tiếp xuống nút/ô bên dưới — một cú bấm vừa tắt chú thích vừa làm
       // đúng việc của nút đó (mở cài đặt, bật micro...).
@@ -14766,6 +14921,7 @@ class _BangDieuKhienGhiAm extends StatefulWidget {
     required this.khiXoaVaDong,
     required this.khiCaiDatTuDongChuyenHoa,
     required this.khiCaiDatTuDongMoBang,
+    required this.khiDoiViTri,
   });
 
   /// Số thẻ đang hiện ở đầu bảng ("Bản Ghi âm số N") — `ValueListenable`
@@ -14793,6 +14949,10 @@ class _BangDieuKhienGhiAm extends StatefulWidget {
   final Future<void> Function() khiXoaVaDong;
   final Future<void> Function() khiCaiDatTuDongChuyenHoa;
   final Future<void> Function() khiCaiDatTuDongMoBang;
+
+  /// "Phím 9 — Thay đổi vị trí của thẻ này", CHO THẺ ĐANG GHI — xem
+  /// `_TrangSoanThaoState._batDauDoiViTriTheDangGhi`.
+  final Future<void> Function() khiDoiViTri;
 
   @override
   State<_BangDieuKhienGhiAm> createState() => _BangDieuKhienGhiAmState();
@@ -14848,6 +15008,7 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
     LogicalKeyboardKey.digit6,
     LogicalKeyboardKey.digit7,
     LogicalKeyboardKey.digit8,
+    LogicalKeyboardKey.digit9,
   ];
 
   bool _khiPhimCucBo(KeyEvent event) {
@@ -14928,6 +15089,10 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
     () async => Navigator.of(context).pop(),
     _moCaiDatTuDongChuyenHoa,
     _moCaiDatTuDongMoBang,
+    // Phím 9: đóng hẳn bảng này rồi mới vào chế độ "Thay đổi vị trí" — thẻ
+    // đang ghi có thể vừa bị ép tạm dừng (`_batDauDoiViTriTheDangGhi`), và
+    // chế độ đó cần toàn màn hình soạn thảo, không thể để bảng này che lên.
+    () => _dongRoiGoi(widget.khiDoiViTri),
   ];
 
   Widget _oHang({
@@ -15184,6 +15349,14 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
                         mau: Colors.brown.shade800,
                         nhan: 'Cài đặt tự động Mở bảng điều khiển này',
                         onBam: _cacHanhDongPhimSo[7],
+                        manHinhHep: manHinhHep,
+                      ),
+                      _oHang(
+                        nhanPhim: 'phím 9',
+                        icon: Icons.drag_indicator,
+                        mau: Colors.indigo.shade800,
+                        nhan: 'Thay đổi vị trí của thẻ này',
+                        onBam: _cacHanhDongPhimSo[8],
                         manHinhHep: manHinhHep,
                       ),
                       const SizedBox(height: 8),
