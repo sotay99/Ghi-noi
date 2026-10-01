@@ -7,7 +7,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'thong_bao_giua.dart';
 import 'vong_song_am.dart';
 
 class ThanhCongCu extends StatelessWidget {
@@ -314,7 +313,7 @@ class ThanhCongCu extends StatelessWidget {
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  hangCopyCutPaste,
+                                  hangCopyCutPaste!,
                                 ]
                               : [
                           // Thứ tự mới (mục 10): Hướng dẫn, Làm việc với AI,
