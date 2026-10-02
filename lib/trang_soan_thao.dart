@@ -7443,6 +7443,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     vbMoi = vbMoi.replaceRange(vtSauXoa, vtSauXoa, tokenText);
     _dieuChinhLoiChinhTaSauKhiSua(vtSauXoa, 0, tokenText.length);
     _dieuChinhVungToanVanSauKhiSua(vtSauXoa, 0, tokenText.length);
+    if (dangDoiTheDangGhi) {
+      // `_dieuChinhVungToanVanSauKhiSua` ở bước XOÁ phía trên đã null hoá
+      // `_viTriTokenDangGhiThe` (xoá trọn token là một trong hai trường hợp
+      // nó tự ngừng theo dõi) — nhưng ở đây token KHÔNG mất, chỉ dời sang vị
+      // trí mới, nên phải tự gán lại, nếu không "Hoàn thành & Chuyển hoá"
+      // sau đó sẽ không tìm thấy token nữa (tưởng thẻ đã mất, đứng im mãi).
+      _viTriTokenDangGhiThe = vtSauXoa;
+    }
     _ghiVaoO(vbMoi, vtSauXoa + tokenText.length);
     _henLuu();
 
@@ -13325,18 +13333,20 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// để tính `leadingWidth` của AppBar ở nhánh màn rộng khi nó thay chỗ 4 nút
   /// điều hướng tệp (xem `leadingWidth` trong `build`). `_NutCongCuChu` tự co
   /// giãn theo chữ nên không có cách tính CHÍNH XÁC tuyệt đối không đo đạc —
-  /// ba chữ "Copy"/"Cut"/"Paste" đều ngắn, 84px/nút (kể cả khoảng cách) là dư
-  /// sức, lỡ thiếu vài pixel thì chữ vẫn hiện được nhờ `overflow: visible`
-  /// của `_NutCongCuChu`, không bị cắt mất chữ.
-  static const _rongHangCopyCutPaste = 84.0 * 3;
+  /// hai chữ "Copy"/"Cắt" đều ngắn, 84px/nút (kể cả khoảng cách) là dư sức,
+  /// lỡ thiếu vài pixel thì chữ vẫn hiện được nhờ `overflow: visible` của
+  /// `_NutCongCuChu`, không bị cắt mất chữ.
+  static const _rongHangCopyCutPaste = 84.0 * 2;
 
-  /// Ba nút Copy/Cắt/Dán — ĐÚNG widget/hàm dùng ở Bộ phím nhanh
-  /// (`_NutCongCuChu`/`_phimAoCopy`/`_phimAoCut`/`_phimAoPasteCoLiet`), dùng
-  /// chung cho cả hàng thay 4 nút điều hướng tệp ([_nutDieuHuongTep]) LẪN
-  /// hàng nổi góc trên-trái khi đã Thu gọn thanh công cụ (xem `build`) — một
-  /// nơi duy nhất, tránh lệch hành vi giữa hai chỗ hiện cùng một hàng nút.
+  /// Hai nút Copy/Cắt — ĐÚNG widget/hàm dùng ở Bộ phím nhanh
+  /// (`_NutCongCuChu`/`_phimAoCopy`/`_phimAoCut`), dùng chung cho cả hàng
+  /// thay 4 nút điều hướng tệp ([_nutDieuHuongTep]) LẪN hàng nổi góc
+  /// trên-trái khi đã Thu gọn thanh công cụ (xem `build`) — một nơi duy
+  /// nhất, tránh lệch hành vi giữa hai chỗ hiện cùng một hàng nút. KHÔNG có
+  /// "Dán" ở đây — nút Dán đã luôn hiện sẵn, cố định, ở `_dsNutCongCu`
+  /// (thanh trên cùng), thêm một nút Dán thứ hai ở đây chỉ dư thừa.
   Widget _hangCopyCutPaste() {
-    // Chữ xanh dương — nổi bật đúng ngữ cảnh "đang ở phía trên", khác ba nút
+    // Chữ xanh dương — nổi bật đúng ngữ cảnh "đang ở phía trên", khác hai nút
     // cùng tên ở Bộ phím nhanh (giữ màu mặc định).
     const mauChu = Color(0xFF1A73E8);
     return Row(
@@ -13349,16 +13359,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         ),
         const SizedBox(width: 6),
         _NutCongCuChu(
-          nhan: 'Cut',
+          nhan: 'Cắt',
           mauChu: mauChu,
           onTap: () => _bamCopyCutPasteOHangThayNav(_phimAoCut),
-        ),
-        const SizedBox(width: 6),
-        _NutCongCuChu(
-          nhan: 'Paste',
-          mauChu: mauChu,
-          bLiet: _phimPasteDangLiet,
-          onTap: () => _bamCopyCutPasteOHangThayNav(_phimAoPasteCoLiet),
         ),
       ],
     );
@@ -13524,7 +13527,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: _NutCongCuChu(
-            nhan: 'Paste',
+            nhan: 'Dán',
             bLiet: _phimPasteDangLiet,
             onTap: _phimAoPasteCoLiet,
           ),
@@ -13720,9 +13723,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final khoangCach = manHinhHep ? 0.0 : 8.0;
     final cacNut = <Widget>[
       _NutCongCuChu(nhan: 'Copy', onTap: _phimAoCopy),
-      _NutCongCuChu(nhan: 'Cut', onTap: _phimAoCut),
+      _NutCongCuChu(nhan: 'Cắt', onTap: _phimAoCut),
       _NutCongCuChu(
-        nhan: 'Paste',
+        nhan: 'Dán',
         onTap: _phimAoPasteCoLiet,
         tyLeThuHep: 0.85,
         bLiet: _phimPasteDangLiet,
@@ -13871,12 +13874,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   onTap: () {},
                   onTapDown: (_) => _bamNutBoPhimNhanhCamUng(),
                   child: Container(
-                    width: _rongNutAnDong,
+                    // Màn hình hẹp: thu gọn nhãn "Đóng" thành "X" + bớt độ
+                    // rộng cố định — cho gọn gàng, nhường chỗ ngang cho các
+                    // nút phím ảo bên trái.
+                    width: manHinhHep ? _rongNutAnDong * 0.6 : _rongNutAnDong,
                     color: Colors.red.shade600,
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     alignment: Alignment.center,
-                    child: const Text('Đóng',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                    child: Text(manHinhHep ? 'X' : 'Đóng',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                   ),
                 ),
               ),
@@ -14816,6 +14822,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     _khiBamKiemTraToanVan(loaiKiemTra: 'dau_cau'),
                 dangGhiAmThe: _trinhGhiAmMo,
                 khiBamGhiAmThe: _bamNutGhiAmThe,
+                khiBamChonTatCa: _phimAoChonTatCa,
+                dangChonTatCa: _phimAllVuaChonTatCa,
                 gopMicVaGhiAmThanhMotNut: false,
                 khiBamChepTatCa: () => _chepTatCa(),
                 khiBamChepRoiXoaTatCa: _chepRoiXoaTatCa,
@@ -14823,13 +14831,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 khiBamDanhSachPhimTat: _moDanhSachPhimTat,
                 khiBamTimKiem: () => _hienThanhTimKiem ? _dongTimKiem() : _moTimKiem(),
                 khiBamTroChuyen: _moThongBaoTroChuyenDangNangCap,
-                // Đang Thu gọn thanh công cụ phía trên + có vùng chọn thật
-                // + Bộ phím nhanh KHÔNG mở — tạm thay 4 nút (Hướng dẫn/
-                // Thêm/Tài khoản-Cài đặt/Phím nhanh) bằng Copy/Cắt/Dán ngay
-                // cạnh "Làm việc với AI" (tự sáng sẵn), xem `ThanhCongCu`.
-                thayNutBangCopyCutPaste: _thuGonThanhCongCu &&
-                    _hienHangCopyCutPaste() &&
-                    !_boPhimNhanhCamUngMo,
+                // Có vùng chọn thật — LUÔN tạm thay 4 nút (Hướng dẫn/Thêm/
+                // Tài khoản-Cài đặt/Phím nhanh) bằng Copy/Cắt ngay cạnh "Làm
+                // việc với AI" (tự sáng sẵn), xem `ThanhCongCu`. Không còn
+                // phụ thuộc Thu gọn/Mở rộng thanh công cụ phía trên hay Bộ
+                // phím nhanh đang mở/đóng — hàng này giờ luôn hiện ở thanh
+                // dưới khi có vùng chọn, bất kể các trạng thái đó.
+                thayNutBangCopyCutPaste: _hienHangCopyCutPaste(),
                 hangCopyCutPaste: _hangCopyCutPaste(),
                   ),
                 ),

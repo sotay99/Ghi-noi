@@ -110,6 +110,15 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   int _micDiemBatDau = 0;
   String _micChuGanNhat = '';
 
+  /// Chrome trên Android (web) không gửi `recognizedWords` là "toàn bộ
+  /// utterance tính từ đầu, sạch sẽ" — nó CỘNG DỒN vô hạn, ghép thêm nội
+  /// dung mới vào đuôi của TOÀN BỘ raw đã gửi ở lần gọi trước, nên chuỗi cứ
+  /// phình to dần qua mỗi lần callback. Không trừ phần ĐÃ THẤY này ra là
+  /// nguồn gốc lỗi "chữ chạy lung tung, lặp lại rất nhiều" người dùng báo —
+  /// y hệt lý do `_rawTichLuyChromeAndroid` tồn tại ở trang soạn thảo chính
+  /// (`_khiCoChu`), chỉ là bản này của kênh chat từng QUÊN áp dụng.
+  String _rawTichLuyChromeAndroidChat = '';
+
   /// Đặt `true` NGAY TRƯỚC khi tự gán `_oNhap.value` (do mic tự chèn chữ)
   /// — `_khiONhapDoi` dựa vào cờ này để phân biệt "đổi do mic" (bỏ qua) với
   /// "đổi do người dùng gõ tay" (chốt lại đoạn mic đang sống, dời neo ra
@@ -214,6 +223,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     if (!mounted) return;
     _micDiemBatDau = _oNhap.text.length;
     _micChuGanNhat = '';
+    _rawTichLuyChromeAndroidChat = '';
     setState(() => _micDangNghe = true);
     _datLaiHenTuTatMicChatImLang();
     try {
@@ -221,7 +231,30 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
         onResult: (ketQua) {
           if (!_micDangNghe) return;
           _datLaiHenTuTatMicChatImLang();
-          final chen = ketQua.recognizedWords;
+          // `chen` phải LUÔN LÀ TOÀN BỘ cụm chữ đang nói dở tính từ đầu
+          // utterance (để thay nguyên vẹn đoạn [batDau, ketThucCu) bên
+          // dưới) — Android bản web không gửi `recognizedWords` kiểu đó, nó
+          // CỘNG DỒN VÔ HẠN (ghép thêm đuôi mới vào TOÀN BỘ raw của mọi lần
+          // gọi trước, kể cả phần đã lặp/im ắng), nên phải tự trừ phần raw
+          // đã thấy rồi GHÉP đuôi mới đó vào `_micChuGanNhat` cũ mới ra đúng
+          // cụm chữ thật. Không trừ là nguồn gốc lỗi "chữ chạy lung tung,
+          // lặp lại rất nhiều" — xem `_rawTichLuyChromeAndroidChat`.
+          var chen = ketQua.recognizedWords;
+          if (kIsWeb && _thietBiChoMicChat == ThietBi.android) {
+            final raw = chen;
+            if (raw.startsWith(_rawTichLuyChromeAndroidChat)) {
+              final duoiMoi = raw.substring(_rawTichLuyChromeAndroidChat.length);
+              chen = duoiMoi.isEmpty
+                  ? _micChuGanNhat
+                  : (_micChuGanNhat.isEmpty || _micChuGanNhat.endsWith(' ')
+                      ? '$_micChuGanNhat$duoiMoi'
+                      : '$_micChuGanNhat $duoiMoi');
+            }
+            // else: raw không còn khớp tiền tố đã theo dõi (trình duyệt vừa
+            // âm thầm khởi động lại bộ đệm) — coi nguyên `chen` hiện tại
+            // (raw) là cụm chữ thật, an toàn hơn là trừ nhầm.
+            _rawTichLuyChromeAndroidChat = raw;
+          }
           final vb = _oNhap.text;
           final batDau = _micDiemBatDau.clamp(0, vb.length);
           final ketThucCu = (batDau + _micChuGanNhat.length).clamp(batDau, vb.length);
@@ -348,8 +381,13 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   }
 
   bool _khiPhimCucBoTroChuyen(KeyEvent event) {
-    if (!mounted || event is! KeyDownEvent) return false;
+    if (!mounted) return false;
+    // `xuLy` CẦN thấy cả sự kiện NHẢ (KeyUpEvent) để xác nhận đã buông
+    // phím — lọc hết KeyUp trước khi tới đây (như dòng cũ từng làm) thì dò
+    // "bấm Ctrl/Shift 2 lần" không bao giờ kết luận được, phím tắt kiểu đó
+    // coi như chết hẳn trong kênh chat.
     _theoDoiTapDoiTroChuyen.xuLy(event);
+    if (event is! KeyDownEvent) return false;
     final route = ModalRoute.of(context);
     if (route != null && !route.isCurrent) return false;
     if (_khopPhimTatTroChuyen(widget.caiDat.phimTatMicro, event)) {

@@ -46,6 +46,8 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamKiemTraDauCauToanVan,
     required this.dangGhiAmThe,
     required this.khiBamGhiAmThe,
+    required this.khiBamChonTatCa,
+    this.dangChonTatCa = false,
     this.gopMicVaGhiAmThanhMotNut = false,
     required this.hienChuThich,
     required this.khiBamChuThich,
@@ -59,12 +61,13 @@ class ThanhCongCu extends StatelessWidget {
     this.hangCopyCutPaste,
   });
 
-  /// Đang Thu gọn thanh công cụ phía trên VÀ có vùng chọn thật VÀ Bộ phím
-  /// nhanh không mở — tạm thay 4 nút Hướng dẫn/Thêm/Tài khoản-Cài đặt/Phím
-  /// nhanh bằng [hangCopyCutPaste], xem chú thích tại `build`.
+  /// Có vùng chọn thật — tạm thay 4 nút Hướng dẫn/Thêm/Tài khoản-Cài đặt/
+  /// Phím nhanh bằng [hangCopyCutPaste], xem chú thích tại `build`. Không
+  /// còn phụ thuộc Thu gọn/Mở rộng thanh công cụ phía trên hay Bộ phím
+  /// nhanh đang mở/đóng.
   final bool thayNutBangCopyCutPaste;
 
-  /// Hàng 3 nút Copy/Cắt/Dán — do `trang_soan_thao.dart` dựng sẵn
+  /// Hàng 2 nút Copy/Cắt — do `trang_soan_thao.dart` dựng sẵn
   /// (`_hangCopyCutPaste()`) rồi đưa vào đây, chỉ có ý nghĩa khi
   /// [thayNutBangCopyCutPaste] là `true`.
   final Widget? hangCopyCutPaste;
@@ -179,6 +182,17 @@ class ThanhCongCu extends StatelessWidget {
   /// cả nút micro/ghi âm chung.
   final bool dangGhiAmThe;
   final VoidCallback khiBamGhiAmThe;
+
+  /// Nút "All" — ĐÚNG logic/hiệu ứng với nút cùng tên ở Bộ phím nhanh
+  /// (`_phimAoChonTatCa`/`_phimAllVuaChonTatCa` trong `trang_soan_thao.dart`):
+  /// bấm 2-4 lần chọn dần đoạn văn/cụm đoạn văn/tất cả. Luôn hiện cố định ở
+  /// đây, sát bên trái nút Ghi âm — không mất đi dù thanh dưới đang hiện
+  /// Copy/Cắt (hai khu vực độc lập, không chung chỗ).
+  final VoidCallback khiBamChonTatCa;
+
+  /// `true` = vừa đạt "chọn tất cả" — tô nền xanh dương nổi bật, y hệt
+  /// [dangGhiAmThe] không liên quan gì, đây là cờ RIÊNG của nút All.
+  final bool dangChonTatCa;
 
   /// CHỈ true trên web + iPhone (xem nơi gọi ở `trang_soan_thao.dart`) —
   /// iPhone không dùng live-dictation qua Web Speech API được (WebKit
@@ -418,6 +432,20 @@ class ThanhCongCu extends StatelessWidget {
                     ),
                   ),
 
+                  // Nút "All" — luôn ở đây, sát bên trái nút Ghi âm, cả hai
+                  // khu vực (nhóm 4 nút trái/Copy-Cắt và All/Ghi âm/chú
+                  // thích/Micro bên phải) độc lập nên nút này không bao giờ
+                  // bị Copy/Cắt che mất.
+                  _NutCoChuThich(
+                    hien: hienChuThich,
+                    chu: 'Tạo vùng chọn văn bản',
+                    child: _NutAllTron(
+                      dangChonTatCa: dangChonTatCa,
+                      khiBam: khiBamChonTatCa,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+
                   // Nút Ghi âm riêng chỉ tồn tại khi KHÔNG gộp chung với
                   // micro (iPhone gộp cả hai thành một nút duy nhất bên
                   // phải, xem dưới) — giờ dùng CHUNG `_NutGhiAmTron` với nút
@@ -547,6 +575,57 @@ class _NutGhiAmTron extends StatelessWidget {
                 dangGhiAm ? Icons.stop : Icons.mic_rounded,
                 color: dangGhiAm ? Colors.white : Colors.green.shade800,
                 size: 20,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Nút "All" tròn — to bằng nút Ghi âm/Micro (40x40), chữ "All" thay icon.
+/// Màu: viền xám mặc định, tô nền xanh dương nổi bật khi [dangChonTatCa]
+/// (vừa đạt "chọn tất cả") — ĐÚNG màu/tinh thần `noiBat` của `_NutCongCuChu`
+/// ở Bộ phím nhanh, chỉ đổi khung tròn cho đồng bộ với các nút khác ở đây.
+class _NutAllTron extends StatelessWidget {
+  const _NutAllTron({required this.dangChonTatCa, required this.khiBam});
+
+  final bool dangChonTatCa;
+  final VoidCallback khiBam;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Tạo vùng chọn văn bản',
+      child: Tooltip(
+        message: 'Tạo vùng chọn văn bản',
+        child: Material(
+          color: dangChonTatCa ? Colors.blue.shade100 : Colors.white,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: () {},
+            onTapDown: (_) => khiBam(),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: dangChonTatCa ? Colors.blue.shade400 : Colors.grey.shade400,
+                  width: 2.5,
+                ),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                'All',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: dangChonTatCa ? Colors.blue.shade900 : const Color(0xFF5F6368),
+                ),
               ),
             ),
           ),
