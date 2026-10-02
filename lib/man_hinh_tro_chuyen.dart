@@ -211,17 +211,86 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   }
 
   void _khiONhapDoi() {
-    if (!_micDangNghe) return;
+    if (_micTuDoiONhap) return;
+    // `_micDangNghe` tắt vì gõ tay (`_dangTamTatMicChatDeGo`) VẪN phải tiếp
+    // tục xử lý ở đây — gõ thêm ký tự nữa trong lúc đang đếm ngược chờ bật
+    // lại phải DỜI LẠI đồng hồ đó (y hệt trang soạn thảo chính: gõ liên tục
+    // thì mic chỉ bật lại sau khi tay NGỪNG hẳn đủ số giây, không phải tính
+    // từ ký tự đầu tiên). Mic tắt vì lý do KHÁC (người dùng tự bấm tắt hẳn)
+    // thì không liên quan gì tới đây nữa.
+    if (!_micDangNghe && !_dangTamTatMicChatDeGo) return;
     // Có chữ mới (gõ tay hay mic) — huỷ đếm ngược tự tắt vì im lặng, đặt lại
     // từ đầu, y hệt trang soạn thảo chính.
     _datLaiHenTuTatMicChatImLang();
-    if (_micTuDoiONhap) return;
-    // Người dùng vừa gõ tay (hoặc dán/xoá) trong lúc mic đang nghe — gõ tay
-    // THẮNG: coi như cụm chữ mic hiện tại đã chốt xong, lần kết quả mic kế
-    // tiếp sẽ bắt đầu một cụm MỚI ngay tại vị trí con trỏ hiện giờ.
-    final vt = _oNhap.selection.baseOffset;
-    _micDiemBatDau = vt >= 0 ? vt : _oNhap.text.length;
-    _micChuGanNhat = '';
+    // Người dùng vừa gõ tay (hoặc dán/xoá) — ĐÚNG KHUÔN `_nguoiDungVuaGo` ở
+    // trang soạn thảo chính: gõ tay phải THẮNG hẳn, không chỉ dời lại mốc.
+    // (SỬA LỖI — bản trước chỉ dời `_micDiemBatDau`/`_micChuGanNhat`, KHÔNG
+    // huỷ phiên đang nghe: bộ nhận dạng vẫn giữ nguyên cụm chữ cũ trong bộ
+    // nhớ của NÓ, kết quả trễ bay về sau đó chèn lại cụm cũ tại vị trí mới
+    // — đúng kiểu "Xin chào,Xin chào tôi muốn..." người dùng báo. Cách
+    // đúng: HUỶ hẳn phiên đang nghe ngay (không đợi, không tin kết quả
+    // trễ), tắt mic hẳn (ẩn nút vuông đỏ, hiện lại nút Gửi), rồi tự bật lại
+    // một phiên HOÀN TOÀN MỚI sau đúng số giây đã cài trong Cài đặt Micro.
+    _nguoiDungVuaGoChat();
+  }
+
+  Timer? _henGoXongMicChat;
+
+  /// `true` = mic kênh chat đang TẠM tắt vì vừa gõ tay, đang đếm ngược chờ
+  /// tự bật lại — khác hẳn người dùng tự bấm tắt hẳn. Trong lúc này
+  /// `_micDangNghe` cũng `false` (UI ẩn nút vuông đỏ/hiện nút Gửi, ĐÚNG
+  /// yêu cầu), nhưng cờ riêng này mới là thứ quyết định có tự bật lại hay
+  /// không, và có cho phép gõ tiếp DỜI đồng hồ đếm ngược hay không.
+  bool _dangTamTatMicChatDeGo = false;
+
+  /// Người dùng vừa gõ phím (hoặc dán/xoá) trong lúc Micro kênh chat đang
+  /// nghe HOẶC đang đếm ngược chờ bật lại — ĐÚNG KHUÔN
+  /// `_TrangSoanThaoState._nguoiDungVuaGo`: huỷ hẳn phiên đang nghe (không
+  /// phải chỉ dời mốc), tắt mic hẳn, rồi tự bật lại sau số giây đã cài
+  /// trong Cài đặt Micro (âm = không tự bật lại) — gõ liên tục thì đồng hồ
+  /// cứ dời lại mãi, chỉ thật sự đếm khi tay đã ngừng hẳn.
+  void _nguoiDungVuaGoChat() {
+    if (_micDangNghe) {
+      widget.ghiNhatKyMicro
+          ?.call('[chat] Người dùng gõ tay — huỷ phiên #$_phienNgheMicChat, tắt mic');
+      // Tăng số phiên NGAY — mọi `onResult` của phiên vừa huỷ (kể cả tới
+      // trễ) bị vứt thẳng, không ghi đè gì vào bài nữa.
+      _phienNgheMicChat++;
+      _henBatLaiMicChat?.cancel();
+      // Đặt cờ TRƯỚC khi gọi cancel() — cancel() kích `onStatus` một cách
+      // KHÔNG đồng bộ, `_khiMicDoiTrangThai` đọc đúng cờ `_micDangNghe` này
+      // để quyết định có tự bật lại hay không.
+      _dangTamTatMicChatDeGo = true;
+      setState(() => _micDangNghe = false);
+      // cancel() (không phải stop()) — không đợi một kết quả chốt cuối
+      // cùng bay về rồi đổ nhầm vào chỗ mới, y hệt lý do trang soạn thảo
+      // chính dùng cancel() ở đây.
+      _micro.cancel();
+    } else {
+      widget.ghiNhatKyMicro?.call('[chat] Người dùng gõ tiếp — dời lại đồng hồ chờ bật mic lại');
+    }
+
+    _henGoXongMicChat?.cancel();
+    final giay = widget.caiDat.thoiGianBatLaiGiay;
+    // Người dùng chọn "Không tự động bật lại Micro" trong Cài đặt: cứ tắt
+    // vậy luôn, đợi tự tay bấm lại.
+    if (giay < 0) {
+      _dangTamTatMicChatDeGo = false;
+      return;
+    }
+    _henGoXongMicChat = Timer(
+      Duration(milliseconds: (giay * 1000).round()),
+      _batLaiMicChatSauKhiGoXong,
+    );
+  }
+
+  Future<void> _batLaiMicChatSauKhiGoXong() async {
+    if (!_dangTamTatMicChatDeGo || !mounted) return;
+    _dangTamTatMicChatDeGo = false;
+    widget.ghiNhatKyMicro?.call('[chat] Hết giờ chờ sau khi gõ tay — tự bật lại micro');
+    setState(() => _micDangNghe = true);
+    _datLaiHenTuTatMicChatImLang();
+    await _batPhienNgheMicChat();
   }
 
   /// Ưu tiên tiếng Việt nếu máy có — y hệt
@@ -243,6 +312,11 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   Future<void> _batMicChat() async {
     // Ghi âm và Micro loại trừ nhau — bật cái này thì tự tắt cái kia trước.
     if (_ghiDangMo) return; // đang có hộp thoại ghi âm mở — không thể bật mic.
+    // Người dùng tự bấm bật lại (kể cả đang giữa lúc đếm ngược chờ tự bật
+    // lại sau khi gõ tay) — ý họ là quyết định cuối cùng, huỷ hẳn đếm ngược
+    // cũ, không để nó tự bật lại một lần nữa sau đó.
+    _dangTamTatMicChatDeGo = false;
+    _henGoXongMicChat?.cancel();
     if (!_microChatDungDuocTrenThietBiNay) {
       _hienCanhBaoMicIphoneChat();
       return;
@@ -368,6 +442,8 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   Future<void> _tatMicChat() async {
     _henTuTatMicChatImLang?.cancel();
     _henBatLaiMicChat?.cancel();
+    _henGoXongMicChat?.cancel();
+    _dangTamTatMicChatDeGo = false;
     // Tăng số phiên NGAY — mọi `onResult` còn đang trên đường về từ phiên
     // vừa tắt (kể cả tới trễ) bị vứt thẳng, không ghi đè gì vào bài nữa.
     _phienNgheMicChat++;
@@ -503,6 +579,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     _theoDoiTapDoiTroChuyen.dispose();
     _henTuTatMicChatImLang?.cancel();
     _henBatLaiMicChat?.cancel();
+    _henGoXongMicChat?.cancel();
     if (_micDangNghe) _micro.stop();
     _oNhap.removeListener(_khiONhapDoi);
     _oNhap.dispose();
