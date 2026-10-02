@@ -46,12 +46,20 @@ class ManHinhTroChuyen extends StatefulWidget {
     required this.layVanBanHienTai,
     required this.layDoanVanDangChon,
     required this.caiDat,
+    this.ghiNhatKyMicro,
   });
 
   /// Đọc phím tắt Micro/Ghi âm đã cài (`caiDat.phimTatMicro`/`phimTatGhiAm`)
   /// — CÙNG phím tắt với trang soạn thảo chính, hoạt động y hệt trong kênh
   /// chat này (xem `_khiPhimCucBoTroChuyen`).
   final CaiDat caiDat;
+
+  /// Ghi vào CHUNG một nhật ký với micro trang soạn thảo chính
+  /// (`_ghiNhatKyMicro`, xem "Xem nhật ký micro" trong Cài đặt) — người
+  /// dùng bấm xem/sao chép ngay trong app, không cần console trình duyệt.
+  /// `null` thì coi như không ghi (phòng trường hợp màn hình này được mở
+  /// từ chỗ khác không có sẵn nhật ký để nối vào).
+  final void Function(String dong)? ghiNhatKyMicro;
 
   /// Tham chiếu sống — mọi thêm/xoá ở đây đều "lưu" thẳng vào bộ nhớ đệm của
   /// tệp ghi chú đang mở (do nơi gọi cầm List này).
@@ -149,6 +157,25 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   /// `listen()` DUY NHẤT, dài tới 10 phút) hay bị lặp/lộn chữ hơn hẳn,
   /// không phải do thiếu bước trừ raw (đã có từ trước, không đủ).
   Timer? _henBatLaiMicChat;
+
+  /// Đánh số PHIÊN nghe — y hệt `_phienNgheHienTai` ở trang soạn thảo
+  /// chính. ĐÂY MỚI LÀ MẢNH GHÉP CÒN THIẾU thật sự (không phải việc trừ
+  /// raw cộng dồn, cũng không chỉ là "phiên dài hay ngắn"): trên Android
+  /// bản web, trạng thái "notListening" có thể bắn ra RẤT THƯỜNG XUYÊN —
+  /// kể cả ngay GIỮA một câu đang nói (không phải lúc ngừng nói thật) —
+  /// nên `_batPhienNgheMicChat` có thể bị gọi lại nhiều lần trong khi phiên
+  /// `listen()` TRƯỚC đó trên thực tế vẫn còn đang bắn `onResult` dở (độ
+  /// trễ của tầng JS/trình duyệt). Không có số phiên để phân biệt, CẢ HAI
+  /// closure `onResult` (cũ lẫn mới) cùng đọc/ghi chung
+  /// `_micDiemBatDau`/`_micChuGanNhat` — phiên mới vừa reset hai biến đó
+  /// cho câu nói MỚI, thì kết quả TRỄ của phiên cũ lại ghi đè bằng toàn bộ
+  /// câu CŨ, rồi phiên mới ghi tiếp đè lên theo kiểu khác — hai phiên giẫm
+  /// chân nhau liên tục chính là thứ tạo ra kiểu lặp "phình dần từng chữ
+  /// một" người dùng thấy ("alo Alo Alo Alo bạn Alo bạn có..."). Mỗi
+  /// `onResult` giờ tự kiểm `idPhien` CHỤP SẴN lúc đăng ký — khác
+  /// `_phienNgheMicChat` hiện tại (nghĩa là đã có phiên MỚI hơn bắt đầu từ
+  /// lúc đó) thì vứt thẳng, không đụng gì tới biến chung nữa.
+  int _phienNgheMicChat = 0;
 
   void _datLaiHenTuTatMicChatImLang() {
     _henTuTatMicChatImLang?.cancel();
@@ -251,9 +278,20 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     _micDiemBatDau = _oNhap.text.length;
     _micChuGanNhat = '';
     _rawTichLuyChromeAndroidChat = '';
+    // Chụp số phiên NGAY LÚC đăng ký — xem giải thích đầy đủ ở
+    // `_phienNgheMicChat`. Mỗi lần gọi hàm này (kể cả tự bật lại) là một
+    // phiên MỚI; `onResult` chỉ nhận đúng phiên vừa đăng ký.
+    final idPhien = ++_phienNgheMicChat;
+    widget.ghiNhatKyMicro?.call('[chat] Bắt đầu phiên #$idPhien');
     try {
       await _micro.listen(
         onResult: (ketQua) {
+          if (idPhien != _phienNgheMicChat) {
+            widget.ghiNhatKyMicro?.call(
+                '[chat] onResult phiên CŨ #$idPhien (hiện tại #$_phienNgheMicChat) — vứt: '
+                '"${ketQua.recognizedWords}"');
+            return;
+          }
           if (!_micDangNghe) return;
           _datLaiHenTuTatMicChatImLang();
           // `chen` phải LUÔN LÀ TOÀN BỘ cụm chữ đang nói dở tính từ đầu
@@ -265,6 +303,8 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
           // cụm chữ thật. Không trừ là nguồn gốc lỗi "chữ chạy lung tung,
           // lặp lại rất nhiều" — xem `_rawTichLuyChromeAndroidChat`.
           var chen = ketQua.recognizedWords;
+          widget.ghiNhatKyMicro?.call(
+              '[chat] onResult phiên #$idPhien, xong=${ketQua.finalResult}: "$chen"');
           if (kIsWeb && _thietBiChoMicChat == ThietBi.android) {
             final raw = chen;
             if (raw.startsWith(_rawTichLuyChromeAndroidChat)) {
@@ -279,6 +319,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
             // âm thầm khởi động lại bộ đệm) — coi nguyên `chen` hiện tại
             // (raw) là cụm chữ thật, an toàn hơn là trừ nhầm.
             _rawTichLuyChromeAndroidChat = raw;
+            widget.ghiNhatKyMicro?.call('[chat]   → sau khi trừ raw cộng dồn: "$chen"');
           }
           final vb = _oNhap.text;
           final batDau = _micDiemBatDau.clamp(0, vb.length);
@@ -314,6 +355,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   /// nếu lỡ nhận nhầm trạng thái khác.
   void _khiMicDoiTrangThai(String trangThai) {
     final dangNghe = trangThai == SpeechToText.listeningStatus;
+    widget.ghiNhatKyMicro?.call('[chat] onStatus: "$trangThai" (micDangNghe=$_micDangNghe)');
     if (dangNghe || !mounted) return;
     if (!_micDangNghe) return; // người dùng đã tự bấm tắt — đừng bật lại.
     _henBatLaiMicChat?.cancel();
@@ -325,6 +367,9 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   Future<void> _tatMicChat() async {
     _henTuTatMicChatImLang?.cancel();
     _henBatLaiMicChat?.cancel();
+    // Tăng số phiên NGAY — mọi `onResult` còn đang trên đường về từ phiên
+    // vừa tắt (kể cả tới trễ) bị vứt thẳng, không ghi đè gì vào bài nữa.
+    _phienNgheMicChat++;
     // Đặt cờ `false` TRƯỚC khi gọi `stop()` — `stop()` kích `onStatus`
     // ("notListening") một cách KHÔNG đồng bộ; `_khiMicDoiTrangThai` đọc
     // đúng cờ này để quyết định có bật lại hay không, nên đặt sau dễ lọt

@@ -222,10 +222,20 @@ class ThanhCongCu extends StatelessWidget {
   /// trên) — hiện vẫn là chỗ đặt trước, chỉ hiện thông báo "đang nâng cấp".
   final VoidCallback khiBamTroChuyen;
 
-  /// Ngưỡng bề ngang chuẩn của Material để phân biệt điện thoại (hẹp) với
-  /// máy tính bảng/màn hình gập mở ra (rộng) — đủ chỗ để các nút giãn ra
-  /// thành khung có tên mà không giẫm chân lên nhau.
-  static const _nguongManHinhRong = 600.0;
+  /// Ngưỡng bề ngang để các nút bên trái (Hướng dẫn/Làm việc với AI/Thêm
+  /// lựa chọn/Tài khoản-Cài đặt/Phím nhanh) giãn ra thành khung có TÊN đầy
+  /// đủ, thay vì chỉ icon tròn gọn (`NutNho`).
+  ///
+  /// ĐÃ SỬA (màn hình hẹp vừa — cỡ cửa sổ trình duyệt thu nhỏ trên máy
+  /// tính, ví dụ ~650-750px — tên nút tràn/đè lên cụm All/Ghi âm/Micro bên
+  /// phải): ngưỡng cũ 600px chỉ đủ cho MỘT cột điện thoại dọc, không tính
+  /// tới việc 5 nút bên trái GIÃN TÊN RA cần cỡ 650-700px chỉ riêng chúng,
+  /// trong khi cụm bên phải (All 40 + Ghi âm 40 + sóng âm 34 + Micro 40,
+  /// cộng khoảng cách/đệm) chiếm cỡ 190-200px CỐ ĐỊNH không co lại được —
+  /// cộng cả hai cần khoảng 850-900px mới thật sự thoải mái. Nâng hẳn lên
+  /// 900px: dưới mức đó LUÔN chỉ icon tròn (an toàn, không tràn); từ đó trở
+  /// lên mới đủ chỗ hiện tên đầy đủ.
+  static const _nguongManHinhRong = 900.0;
 
   Widget _nut(
     bool rong,

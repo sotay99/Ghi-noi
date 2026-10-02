@@ -12641,6 +12641,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           layVanBanHienTai: () => _boDieuKhien.text,
           layDoanVanDangChon: _layDoanVanDangChon,
           caiDat: widget.caiDat,
+          // Ghi CHUNG một nhật ký với micro trang soạn thảo chính (xem
+          // "Xem nhật ký micro" trong Cài đặt) — để còn CÓ BẰNG CHỨNG THẬT
+          // mà soát tiếp nếu Micro kênh chat còn lặp/lộn chữ sau các lần
+          // sửa trước, thay vì tiếp tục đoán mò.
+          ghiNhatKyMicro: _ghiNhatKyMicro,
         ),
       ),
     );
