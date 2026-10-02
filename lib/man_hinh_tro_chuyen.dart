@@ -84,6 +84,18 @@ class ManHinhTroChuyen extends StatefulWidget {
 
 class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   final _oNhap = TextEditingController();
+
+  /// (v127) Khoá của chính `TextField` ô nhập — đổi mỗi lần mic tắt để buộc
+  /// Flutter dựng lại hẳn kết nối bàn phím ảo, xem `_lamMoiONhapDeThoatKetBanPhimAo`.
+  GlobalKey _oNhapKey = GlobalKey();
+
+  /// (v127) Hiện nút tròn nhỏ "bật lại Micro" nổi phía trên nút Gửi — xem
+  /// khối `onTap` của `TextField` trong `build`. Chỉ có ý nghĩa khi mic đã
+  /// tắt HOÀN TOÀN do người dùng chạm vào ô để gõ tay (không phải do bấm
+  /// nút vuông đỏ hay do tự tắt hẳn sau N giây — cả hai trường hợp đó
+  /// người dùng đã CHỦ Ý tắt, không cần gợi ý bật lại nổi bật như vậy).
+  bool _hienNutBatLaiMicChat = false;
+
   final _cuon = ScrollController();
   bool _dangGui = false;
   LoaiDinhKemTroChuyen _dinhKemHienTai = LoaiDinhKemTroChuyen.khong;
@@ -236,9 +248,17 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     if (!_micDangNghe || !mounted) return;
     widget.ghiNhatKyMicro?.call(
         '[chat] ${_khoangLamMoiMicChatDoImLang.inSeconds}s không có ký tự mới — '
-        'ứng dụng CHỦ ĐỘNG làm mới phiên nghe (coi như một lượt gõ tay ảo, '
-        'không chờ thiết bị tự ngắt)');
-    _nguoiDungVuaGoChat();
+        'ứng dụng CHỦ ĐỘNG làm mới phiên nghe NGAY (không chờ thiết bị tự ngắt)');
+    // (SỬA LẠI v127) Bản trước gọi `_nguoiDungVuaGoChat()` — đáng tin hơn
+    // nhưng bắt người dùng chờ hẳn "Thời gian tự bật lại Micro" (Cài đặt,
+    // có thể 7-8 giây) trước khi nghe lại được, y hệt độ trễ người dùng
+    // không muốn. Giờ ô nhập đã `readOnly` suốt lúc mic nghe (xem `build`)
+    // — tiền đề gây lỗi (bàn phím thật chỉnh sửa ô trong lúc mic ghi) đã bị
+    // loại bỏ ở tầng khác, nên khôi phục lại cách bật NGAY LẬP TỨC (không
+    // đợi), không cần mượn cơ chế "gõ tay" chậm nữa.
+    _phienNgheMicChat++;
+    _micro.cancel();
+    _lenLichBatLaiMicChat();
   }
 
   void _hienCanhBaoMicIphoneChat() {
@@ -868,6 +888,21 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
       });
     }
     await _micro.stop();
+    // (SỬA LỖI v127 — "tắt mic rồi không hiện lại được bàn phím ảo nữa")
+    // `readOnly` vừa bật lên suốt lúc mic nghe (xem `build`) rồi tắt lại ở
+    // đây CÓ THỂ làm trình duyệt web "liệt" luôn khả năng gắn lại bàn phím
+    // ảo cho đúng phần tử DOM ẩn của `_oNhap` — ĐÚNG HỌ với lỗi kẹt bàn
+    // phím ảo ở Copy/Cắt/Dán/All của trang soạn thảo chính, đã sửa dứt
+    // điểm bằng cách đổi khoá (`GlobalKey`) của chính `TextField` để buộc
+    // Flutter dựng lại hẳn kết nối bàn phím ảo từ đầu. Áp dụng ĐÚNG mẹo đó
+    // ở đây: mỗi lần mic tắt (dù do người dùng bấm, do chạm vào ô, hay do
+    // tự tắt hẳn sau N giây) đều làm mới khoá này.
+    _lamMoiONhapDeThoatKetBanPhimAo();
+  }
+
+  /// Xem giải thích ở `_tatMicChat`.
+  void _lamMoiONhapDeThoatKetBanPhimAo() {
+    if (mounted) setState(() => _oNhapKey = GlobalKey());
   }
 
   Future<void> _bamMicChat() async {
@@ -1176,6 +1211,9 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   /// là "lượt đầu" và tự đính kèm toàn văn lại như cũ, không cần xử lý gì
   /// thêm.
   Future<void> _guiHoacXacNhanSua() async {
+    // (v127) Bấm Gửi thì nút nổi "bật lại Micro" (nếu đang hiện) biến mất
+    // ngay — xem `_hienNutBatLaiMicChat`.
+    if (_hienNutBatLaiMicChat) setState(() => _hienNutBatLaiMicChat = false);
     final chiSo = _dangSuaChiSo;
     if (chiSo != null) {
       setState(() {
@@ -1335,6 +1373,11 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                   PopupMenuButton<int>(
                     tooltip: 'Thêm',
                     icon: const Icon(Icons.add_circle_outline, color: _mauChinh),
+                    // (v127) Bấm nút "+" thì nút nổi "bật lại Micro" (nếu
+                    // đang hiện) biến mất ngay — xem `_hienNutBatLaiMicChat`.
+                    onOpened: () {
+                      if (_hienNutBatLaiMicChat) setState(() => _hienNutBatLaiMicChat = false);
+                    },
                     itemBuilder: (ctx) => [
                       const PopupMenuItem(
                         value: 1,
@@ -1397,38 +1440,38 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                               .clamp(120.0, 420.0),
                         ),
                         child: TextField(
+                          key: _oNhapKey,
                           controller: _oNhap,
                           minLines: 1,
                           maxLines: null,
                           keyboardType: TextInputType.multiline,
                           textInputAction: TextInputAction.newline,
-                          // (THỬ HƯỚNG MỚI — nghi phạm chính của cả chuỗi lỗi
-                          // micro kênh chat: ô nhập vẫn giữ TIÊU ĐIỂM BÀN PHÍM
-                          // THẬT trong lúc mic đang tự gán chữ bằng code — mỗi
-                          // lần gán có thể khiến trình duyệt dội lại một
-                          // thông báo bất đồng bộ (chỉ đổi con trỏ, không đổi
-                          // chữ) mà app hiểu nhầm là người dùng gõ tay, huỷ
-                          // ngay phiên nghe) CẮT ĐỨT hẳn khả năng bàn phím
-                          // thật chỉnh sửa ô này trong SUỐT lúc mic đang nghe
-                          // (`readOnly`) — loại bỏ hẳn tiền đề gây ra lỗi,
-                          // không vá từng triệu chứng nữa. Chạm vào con trỏ
-                          // để DI CHUYỂN vẫn hoạt động bình thường khi
-                          // `readOnly` (Flutter cho phép), chỉ KHÔNG sửa được
-                          // chữ — đúng ý: không có "gõ tay" thật nào xảy ra
-                          // được trong lúc này nữa, nên không còn gì để dội
-                          // lại gây hiểu nhầm.
+                          // Nghi phạm chính của cả chuỗi lỗi micro kênh chat:
+                          // ô nhập vẫn giữ TIÊU ĐIỂM BÀN PHÍM THẬT trong lúc
+                          // mic đang tự gán chữ bằng code — mỗi lần gán có
+                          // thể khiến trình duyệt dội lại một thông báo bất
+                          // đồng bộ (chỉ đổi con trỏ, không đổi chữ) mà app
+                          // hiểu nhầm là người dùng gõ tay, huỷ ngay phiên
+                          // nghe. CẮT ĐỨT hẳn khả năng bàn phím thật chỉnh
+                          // sửa ô này trong SUỐT lúc mic đang nghe (`readOnly`)
+                          // — loại bỏ hẳn tiền đề gây ra lỗi. Chạm vào con
+                          // trỏ để DI CHUYỂN vẫn hoạt động bình thường khi
+                          // `readOnly` (Flutter cho phép), chỉ KHÔNG sửa
+                          // được chữ.
                           //
-                          // Muốn gõ tay khi mic đang nghe: chạm vào ô (bắt
-                          // bằng `onTap`, vẫn bắn được dù `readOnly`) — coi
-                          // như Ý ĐỊNH gõ tay, dùng ĐÚNG khuôn
-                          // `_nguoiDungVuaGoChat()` (đã chứng minh ổn định)
-                          // để huỷ mic ngay, `readOnly` tự về `false` ngay
-                          // sau đó (phụ thuộc `_micDangNghe`), gõ tiếp bình
-                          // thường — mic tự bật lại sau khi tay ngừng đủ số
-                          // giây như cũ.
+                          // (SỬA LẠI v127 — YÊU CẦU MỚI) Trước đây chạm vào ô
+                          // chỉ TẠM huỷ mic rồi tự bật lại sau vài giây —
+                          // nhưng chính việc tự bật lại đó lại ẩn mất bàn
+                          // phím ảo người dùng vừa mở ra để gõ tay. Giờ chạm
+                          // vào ô TẮT HẲN mic (`_tatMicChat`, không tự bật
+                          // lại), và hiện một nút tròn nhỏ nổi phía trên nút
+                          // Gửi để bật lại mic khi cần — xem `_hienNutBatLaiMicChat`.
                           readOnly: _micDangNghe,
                           onTap: () {
-                            if (_micDangNghe) _nguoiDungVuaGoChat();
+                            if (_micDangNghe) {
+                              _tatMicChat();
+                              setState(() => _hienNutBatLaiMicChat = true);
+                            }
                           },
                           decoration: const InputDecoration(
                             hintText: 'Ctrl + Enter để gửi',
@@ -1448,9 +1491,34 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                   // (biểu thị "dừng micro") — bấm vào là đóng mic lại, KHÔNG
                   // gửi tin nhắn; gửi thật vẫn luôn cần Ctrl+Enter/nút Gửi
                   // bình thường sau khi đã tắt mic.
-                  _micDangNgheThat
-                      ? _NutDungMic(khiBam: _tatMicChat)
-                      : _NutGui(dangGui: _dangGui, khiBam: _guiHoacXacNhanSua),
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      _micDangNgheThat
+                          ? _NutDungMic(khiBam: _tatMicChat)
+                          : _NutGui(dangGui: _dangGui, khiBam: _guiHoacXacNhanSua),
+                      // (v127 — YÊU CẦU MỚI) Nổi NGAY PHÍA TRÊN nút Gửi, lớp
+                      // cao hơn mọi thứ khác trong Stack này (vẽ SAU cùng),
+                      // mờ 50% để vẫn thấy mờ mờ những gì ở phía sau nó.
+                      // Chỉ xuất hiện sau khi chạm vào ô nhập để gõ tay lúc
+                      // mic đang nghe (xem `onTap` của `TextField`) — mất
+                      // ngay khi bấm nút này, nút Gửi, hoặc nút "+".
+                      if (_hienNutBatLaiMicChat)
+                        Positioned(
+                          right: 0,
+                          bottom: 48,
+                          child: Opacity(
+                            opacity: 0.5,
+                            child: _NutBatLaiMicChatNoi(
+                              khiBam: () {
+                                setState(() => _hienNutBatLaiMicChat = false);
+                                _batMicChat();
+                              },
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -1502,6 +1570,41 @@ class _NutDungMic extends StatelessWidget {
         child: const Padding(
           padding: EdgeInsets.all(10),
           child: Icon(Icons.stop, color: Colors.white, size: 20),
+        ),
+      ),
+    );
+  }
+}
+
+/// (v127) Nút tròn nhỏ "bật lại Micro" nổi phía trên nút Gửi — ĐÚNG hình
+/// dạng nút Micro ở màn hình chính lúc CHƯA hoạt động (`_NutMicroTron` ở
+/// `thanh_cong_cu.dart`: nền xanh lá nhạt, viền xanh dương đậm, 🎤), chỉ
+/// thu nhỏ hơn một chút cho vừa chỗ nổi phía trên nút Gửi.
+class _NutBatLaiMicChatNoi extends StatelessWidget {
+  const _NutBatLaiMicChatNoi({required this.khiBam});
+  final VoidCallback khiBam;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Bật lại Micro (vừa nói vừa ra chữ)',
+      child: Material(
+        color: Colors.green.shade100,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: () {},
+          onTapDown: (_) => khiBam(),
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.blue.shade900, width: 2),
+            ),
+            alignment: Alignment.center,
+            child: const Text('🎤', style: TextStyle(fontSize: 18)),
+          ),
         ),
       ),
     );

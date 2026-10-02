@@ -1171,7 +1171,11 @@ class _NutCuonMenuState extends State<_NutCuonMenu> {
 /// `controller` này được gán cho `SingleChildScrollView` ở
 /// `_mucCuonDanhSach`, nên hai nút ở đây chắc chắn điều khiển ĐÚNG khung cuộn
 /// chứa danh sách lựa chọn.
-PopupMenuItem<int> _mucDongMenu(ScrollController controller) {
+PopupMenuItem<int> _mucDongMenu(
+  ScrollController controller, {
+  required String tenMenu,
+  required Color mauDamTenMenu,
+}) {
   void cuonToi(double dich) {
     if (!controller.hasClients) return;
     controller.animateTo(
@@ -1195,35 +1199,58 @@ PopupMenuItem<int> _mucDongMenu(ScrollController controller) {
 
   return PopupMenuItem<int>(
     value: -1,
-    height: 28,
+    height: 36,
     padding: EdgeInsets.zero,
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        _NutCuonMenu(
-          icon: Icons.vertical_align_top,
-          onTap: () => cuonToi(0),
-          onHoverTick: () => nhichLen(14),
-        ),
-        const SizedBox(width: 6),
-        _NutCuonMenu(
-          icon: Icons.vertical_align_bottom,
-          onTap: () => cuonToi(
-            controller.hasClients ? controller.position.maxScrollExtent : 0,
+    child: Container(
+      // (YÊU CẦU MỚI) Tên đầy đủ của menu, cùng dòng với nút X — nền ĐẬM
+      // ĐẶC (khác hẳn nền NHẠT của toàn menu, xem các nơi gọi) để phân biệt
+      // rõ đây là "thanh tiêu đề", không phải một mục lựa chọn.
+      color: mauDamTenMenu,
+      padding: const EdgeInsets.only(left: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Expanded(
+            // Bấm vào tên không có tác dụng gì — chặn tại đây bằng
+            // `GestureDetector` của chính nó (ĐÚNG mẹo `_NutCuonMenu` đã
+            // dùng), không thì rơi xuống hành vi mặc định của
+            // `PopupMenuItem` (toàn mục này trả về `value: -1`, tự đóng
+            // menu) giống như bấm trúng X.
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {},
+              child: Text(
+                tenMenu,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ),
-          onHoverTick: () => nhichXuong(14),
-        ),
-        const SizedBox(width: 10),
-        Padding(
-          padding: const EdgeInsets.only(right: 10),
-          child: Container(
-            width: 20,
-            height: 20,
-            decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-            child: const Icon(Icons.close, size: 14, color: Colors.white),
+          _NutCuonMenu(
+            icon: Icons.vertical_align_top,
+            onTap: () => cuonToi(0),
+            onHoverTick: () => nhichLen(14),
           ),
-        ),
-      ],
+          const SizedBox(width: 6),
+          _NutCuonMenu(
+            icon: Icons.vertical_align_bottom,
+            onTap: () => cuonToi(
+              controller.hasClients ? controller.position.maxScrollExtent : 0,
+            ),
+            onHoverTick: () => nhichXuong(14),
+          ),
+          const SizedBox(width: 10),
+          Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+              child: const Icon(Icons.close, size: 14, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -1324,6 +1351,9 @@ class _NutThemMenu extends StatelessWidget {
         child: PopupMenuButton<int>(
           padding: EdgeInsets.zero,
           splashRadius: 20,
+          // (YÊU CẦU MỚI) Nền của menu "Thêm lựa chọn" — đỏ NHẠT, phân biệt
+          // với hai menu khác (AI: xanh lá nhạt, Tài khoản: vàng nhạt).
+          color: Colors.red.shade50,
           child: rong
               ? const _KhungNutRong(
                   bieuTuong: Icons.add_circle_outline,
@@ -1377,7 +1407,7 @@ class _NutThemMenu extends StatelessWidget {
             return [
               // Nút X đỏ đóng menu + hai nút cuộn — luôn ở đầu danh sách,
               // KHÔNG cuộn theo phần còn lại.
-              _mucDongMenu(cuon),
+              _mucDongMenu(cuon, tenMenu: 'Thêm lựa chọn', mauDamTenMenu: Colors.red.shade200),
               _mucCuonDanhSach(ctx, cuon, [
                 // Ba mục đầu — dời từ ba nút riêng trên thanh công cụ trên
                 // (Sao chép tất cả/Xoá tất cả) xuống đây, cộng thêm mục gộp
@@ -1465,6 +1495,8 @@ class _NutTaiKhoanMenu extends StatelessWidget {
         child: PopupMenuButton<int>(
           padding: EdgeInsets.zero,
           splashRadius: 20,
+          // (YÊU CẦU MỚI) Nền của menu "Tài khoản và Cài đặt" — vàng NHẠT.
+          color: Colors.yellow.shade50,
           child: rong
               ? Container(
                   height: 32,
@@ -1513,7 +1545,9 @@ class _NutTaiKhoanMenu extends StatelessWidget {
           itemBuilder: (ctx) {
             final cuon = ScrollController();
             return [
-              _mucDongMenu(cuon),
+              _mucDongMenu(cuon,
+                  tenMenu: 'Tài khoản của bạn và Cài đặt',
+                  mauDamTenMenu: Colors.yellow.shade200),
               _mucCuonDanhSach(ctx, cuon, [
                 // Hai mục mới — CHƯA gắn logic (chờ gắn sau), tạm đặt ở đầu
                 // menu, cùng kiểu dòng với "Cài đặt Micro"/"Cài đặt Hiển thị
@@ -1638,6 +1672,8 @@ class _NutAIMenu extends StatelessWidget {
           key: khoaMenuAI,
           padding: EdgeInsets.zero,
           splashRadius: 20,
+          // (YÊU CẦU MỚI) Nền của menu "Làm việc với AI" — xanh lá NHẠT.
+          color: Colors.green.shade50,
           child: rong
               ? _KhungNutRong(
                   bieuTuong: Icons.smart_toy_outlined,
@@ -1685,7 +1721,7 @@ class _NutAIMenu extends StatelessWidget {
             return [
               // Nút X đỏ đóng menu + hai nút cuộn — luôn ở đầu danh sách,
               // KHÔNG cuộn theo phần còn lại.
-              _mucDongMenu(cuon),
+              _mucDongMenu(cuon, tenMenu: 'Làm việc với AI', mauDamTenMenu: Colors.green.shade200),
               _mucCuonDanhSach(ctx, cuon, [
                 // Ba mục đầu menu — "Chuyển hình ảnh thành văn bản" dời từ
                 // menu "+ Thêm lựa chọn" sang đây (đổi tên mục ảnh) — đã gắn

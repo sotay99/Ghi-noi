@@ -57,6 +57,11 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
 
   Timer? _henLuu;
 
+  /// (YÊU CẦU MỚI) Tự cuộn xuống cuối danh sách sau khi bấm "Thêm cặp từ"
+  /// — cặp mới luôn được `_ds.add` vào CUỐI, nên người dùng thấy ngay cặp
+  /// vừa sinh ra mà không cần tự cuộn tay.
+  final _cuon = ScrollController();
+
   @override
   void initState() {
     super.initState();
@@ -75,6 +80,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
   @override
   void dispose() {
     _henLuu?.cancel();
+    _cuon.dispose();
     for (final o in _oLoi.values) {
       o.dispose();
     }
@@ -108,6 +114,17 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
       _ds.add(c);
       _oLoi[c] = TextEditingController();
       _oThayThe[c] = [TextEditingController()];
+    });
+    // Đợi khung hình kế tiếp (sau khi `ListView` đã dựng thêm cặp mới, biết
+    // được chiều cao thật mới) rồi mới cuộn — cuộn ngay trong `setState` sẽ
+    // tính theo chiều cao CŨ, hụt mất đúng phần vừa thêm.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_cuon.hasClients) return;
+      _cuon.animateTo(
+        _cuon.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
     });
   }
 
@@ -300,6 +317,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
       ),
       body: SafeArea(
         child: ListView(
+          controller: _cuon,
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
             _congTacBatTat(),
