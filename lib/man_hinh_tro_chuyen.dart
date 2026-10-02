@@ -84,6 +84,17 @@ class ManHinhTroChuyen extends StatefulWidget {
 
 class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   final _oNhap = TextEditingController();
+  // (YÊU CẦU MỚI) Bật Micro bằng nút "+" → "Micro (vừa nói vừa ra chữ)" phải
+  // ép được tiêu điểm/con trỏ nhấp nháy vào khung nhập (kéo theo bàn phím ảo
+  // tự bật lên, giống cách bật "bàn phím" trong Bộ phím nhanh) — cần một
+  // `FocusNode` RIÊNG do mình nắm để gọi `requestFocus()` được, `TextField`
+  // không tự cấp một cái ra ngoài nếu không truyền `focusNode` vào.
+  final _focusONhap = FocusNode();
+  // (YÊU CẦU MỚI) Nút tròn nổi "bật Micro" cạnh nút Gửi — hiện ra NGAY khi
+  // bật Micro qua nút "+" lần đầu trong phiên mở kênh chat này, rồi GIỮ
+  // NGUYÊN hiện mãi (không tự ẩn khi mic tắt) cho tới khi thoát hẳn màn
+  // hình chat — mở lại từ đầu thì phải bấm "+" → Micro lại mới hiện lại.
+  bool _hienNutMicNoiChat = false;
   final _cuon = ScrollController();
   bool _dangGui = false;
   LoaiDinhKemTroChuyen _dinhKemHienTai = LoaiDinhKemTroChuyen.khong;
@@ -571,6 +582,22 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   Future<void> _batMicChat() async {
     // Ghi âm và Micro loại trừ nhau — bật cái này thì tự tắt cái kia trước.
     if (_ghiDangMo) return; // đang có hộp thoại ghi âm mở — không thể bật mic.
+    // (YÊU CẦU MỚI) Micro hoạt động tốt nhất khi khung nhập đang có tiêu
+    // điểm/con trỏ nhấp nháy THẬT (kéo theo bàn phím ảo tự hiện) — ép điều
+    // đó mỗi lần bật Micro, bất kể trước đó khung nhập có tiêu điểm hay
+    // không (đã có rồi thì gọi lại vô hại). `requestFocus()` gọi ngay trong
+    // `onSelected` của `PopupMenuButton` có thể bị menu tự ĐÓNG (trả focus
+    // về chỗ khác) GHI ĐÈ ngay sau đó trong cùng khung hình — hoãn sang
+    // `addPostFrameCallback` để là hành động CUỐI CÙNG, thắng được việc đó
+    // (đúng mẹo đã dùng cho `_oChu.requestFocus()` ở trang soạn thảo).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusONhap.requestFocus();
+    });
+    // Nút Micro nổi cạnh nút Gửi: hiện ra từ lần bật Micro đầu tiên trong
+    // phiên mở kênh chat này, giữ nguyên hiện tới khi rời màn hình.
+    if (!_hienNutMicNoiChat && mounted) {
+      setState(() => _hienNutMicNoiChat = true);
+    }
     // Người dùng tự bấm bật lại (kể cả đang giữa lúc đếm ngược chờ tự bật
     // lại sau khi gõ tay) — ý họ là quyết định cuối cùng, huỷ hẳn đếm ngược
     // cũ, không để nó tự bật lại một lần nữa sau đó.
@@ -956,6 +983,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     if (_micDangNghe) _micro.stop();
     _oNhap.removeListener(_khiONhapDoi);
     _oNhap.dispose();
+    _focusONhap.dispose();
     _cuon.dispose();
     super.dispose();
   }
@@ -1355,6 +1383,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                         ),
                         child: TextField(
                           controller: _oNhap,
+                          focusNode: _focusONhap,
                           minLines: 1,
                           maxLines: null,
                           keyboardType: TextInputType.multiline,
@@ -1377,9 +1406,26 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                   // (biểu thị "dừng micro") — bấm vào là đóng mic lại, KHÔNG
                   // gửi tin nhắn; gửi thật vẫn luôn cần Ctrl+Enter/nút Gửi
                   // bình thường sau khi đã tắt mic.
-                  _micDangNgheThat
-                      ? _NutDungMic(khiBam: _tatMicChat)
-                      : _NutGui(dangGui: _dangGui, khiBam: _guiHoacXacNhanSua),
+                  // (YÊU CẦU MỚI) Nút Micro nổi ngay PHÍA TRÊN nút Gửi, lớp
+                  // cao hơn mọi thứ khác (vẽ SAU cùng trong Stack), mờ 50%
+                  // nhưng vẫn bấm được — xem `_hienNutMicNoiChat`.
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      _micDangNgheThat
+                          ? _NutDungMic(khiBam: _tatMicChat)
+                          : _NutGui(dangGui: _dangGui, khiBam: _guiHoacXacNhanSua),
+                      if (_hienNutMicNoiChat)
+                        Positioned(
+                          right: 0,
+                          bottom: 48,
+                          child: Opacity(
+                            opacity: 0.5,
+                            child: _NutMicNoiChat(khiBam: _batMicChat),
+                          ),
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -1431,6 +1477,42 @@ class _NutDungMic extends StatelessWidget {
         child: const Padding(
           padding: EdgeInsets.all(10),
           child: Icon(Icons.stop, color: Colors.white, size: 20),
+        ),
+      ),
+    );
+  }
+}
+
+/// (YÊU CẦU MỚI) Nút tròn nhỏ nổi phía trên nút Gửi — ĐÚNG hình dạng nút
+/// Micro ở màn hình chính lúc CHƯA hoạt động (`_NutMicroTron` ở
+/// `thanh_cong_cu.dart`: nền xanh lá nhạt, viền xanh dương đậm, 🎤), thu nhỏ
+/// hơn một chút cho vừa chỗ nổi phía trên nút Gửi. Bấm vào gọi lại đúng
+/// `_batMicChat()` — không có logic riêng nào khác.
+class _NutMicNoiChat extends StatelessWidget {
+  const _NutMicNoiChat({required this.khiBam});
+  final VoidCallback khiBam;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Micro (vừa nói vừa ra chữ)',
+      child: Material(
+        color: Colors.green.shade100,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: () {},
+          onTapDown: (_) => khiBam(),
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.blue.shade900, width: 2),
+            ),
+            alignment: Alignment.center,
+            child: const Text('🎤', style: TextStyle(fontSize: 18)),
+          ),
         ),
       ),
     );
