@@ -3027,7 +3027,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Khoá của chính TextField và của Stack bọc ngoài nó — `_chamCuoiVanBan`
   /// dùng hai khoá này để tìm thẳng `RenderEditable` THẬT đang vẽ ô soạn
   /// thảo, thay vì tự đo lại bằng một `TextPainter` riêng.
-  final _oVanBanKey = GlobalKey();
+  /// (SỬA LỖI v120) KHÔNG còn `final` — xem `_lamMoiOVanBanDeThoatKetBanPhimAo`.
+  GlobalKey _oVanBanKey = GlobalKey();
   final _khungVanBanKey = GlobalKey();
 
   /// Dò xuống cây RenderObject tìm `RenderEditable` — chính là render object
@@ -3982,6 +3983,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henAnDoanSo?.cancel();
     _henHetLietPastePhimAo?.cancel();
     _henHetCheDoNhanhChonTatCa?.cancel();
+    _henLamMoiOVanBanDeThoatKet?.cancel();
     _oKetQuaFileAmThanh?.dispose();
     _oKetQuaToanVan?.dispose();
     _theoDoiTapDoi.dispose();
@@ -5216,6 +5218,44 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           setState(() => _epAnBanPhimAoKhiGiuFocus = false);
         }
       });
+    });
+
+    // (SỬA LỖI v120 — "cứng đầu", vẫn còn kẹt sau v119, cả ở Dán) Debounce
+    // ở trên (v119) chỉ giảm số lần BẬT/TẮT `readOnly` dồn dập, nhưng không
+    // chặn hẳn gốc rễ: dù chỉ một chu kỳ bật/tắt DUY NHẤT, trình duyệt vẫn
+    // có lúc làm "liệt" hẳn khả năng gắn lại bàn phím ảo cho ĐÚNG phần tử
+    // DOM ẩn mà Flutter Web dùng để đồng bộ — mỗi lần F5 lại "sống" được vì
+    // trang tải lại dựng phần tử DOM đó từ đầu. Thay vì tiếp tục vá
+    // readOnly, giả lập ĐÚNG hiệu ứng "dựng lại từ đầu" đó nhưng CHỈ cho
+    // riêng ô soạn thảo, không mất chữ: đổi `_oVanBanKey` sang một
+    // `GlobalKey` MỚI khiến Flutter coi `TextField` là một widget HOÀN
+    // TOÀN KHÁC ở lần build kế tiếp — huỷ hẳn Element/RenderEditable/kết
+    // nối bàn phím ảo CŨ (đang nghi bị "liệt") rồi dựng lại một kết nối
+    // MỚI từ đầu, trong khi `_boDieuKhien` (nội dung) và `_oChu` (FocusNode)
+    // vẫn giữ nguyên nên không mất chữ/không mất tiêu điểm.
+    //
+    // Chỉ làm việc này SAU 1,5 giây yên (không phải ngay lập tức — tránh
+    // dựng lại giữa lúc người dùng còn đang bấm dồn dập các nút khác), và
+    // CHỈ khi lúc đó bàn phím ảo VẪN đang ẩn thật (đọc lại `viewInsets.bottom`
+    // ngay tại thời điểm hẹn giờ chạy, không dùng giá trị cũ) — nếu người
+    // dùng đã tự chạm vào ô và bàn phím đã hiện lên bình thường trong lúc
+    // chờ, đừng đụng vào gì nữa. Mã phiên `_phienAnBanPhimAo` (dùng lại y
+    // hệt ở trên) đảm bảo chỉ lần bấm GẦN NHẤT mới thật sự kích hoạt.
+    _henLamMoiOVanBanDeThoatKet?.cancel();
+    _henLamMoiOVanBanDeThoatKet = Timer(const Duration(milliseconds: 1500), () {
+      if (!mounted || phien != _phienAnBanPhimAo) return;
+      if (MediaQuery.of(context).viewInsets.bottom > 0) return;
+      _lamMoiOVanBanDeThoatKetBanPhimAo();
+    });
+  }
+
+  Timer? _henLamMoiOVanBanDeThoatKet;
+
+  void _lamMoiOVanBanDeThoatKetBanPhimAo() {
+    if (!mounted) return;
+    setState(() => _oVanBanKey = GlobalKey());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _oChu.requestFocus();
     });
   }
 

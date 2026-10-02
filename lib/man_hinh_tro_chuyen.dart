@@ -108,7 +108,20 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   /// nhập, gõ tay thì thắng (xem `_khiONhapDoi`).
   final SpeechToText _micro = SpeechToText();
   bool _micKhoiTaoXong = false;
+
+  /// Ý ĐỊNH của người dùng (muốn mic đang bật hay không) — BỀN qua khoảng
+  /// hở hệ thống tự ngắt/tự bật lại, y hệt `_TrangSoanThaoState._muonNghe`.
+  /// Không dùng cho UI (xem `_micDangNgheThat`), chỉ dùng để quyết định có
+  /// tự bật lại hay không và để `_khiONhapDoi`/`_apDungTuDongDinhDangChat`
+  /// biết có cần xử lý "gõ tay thắng mic" hay không.
   bool _micDangNghe = false;
+
+  /// Trạng thái THẬT, đồng bộ thời gian thực với `onStatus` — ĐÚNG khuôn
+  /// `_TrangSoanThaoState._dangNghe`: UI (nút vuông đỏ ⇄ nút Gửi) đọc ĐÚNG
+  /// biến này, không đọc `_micDangNghe`, để nhấp nháy ẩn/hiện đúng lúc hệ
+  /// thống tự ngắt rồi tự bật lại — khác hẳn `_micDangNghe` (ý định, không
+  /// đổi suốt khoảng hở đó).
+  bool _micDangNgheThat = false;
 
   /// Vị trí BẮT ĐẦU của cụm chữ mic đang "sống" (đang được cập nhật dần)
   /// trong `_oNhap.text`, và chữ mic đã chèn ở đó tại lần cập nhật GẦN NHẤT
@@ -490,7 +503,10 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
       // KHÔNG đồng bộ, `_khiMicDoiTrangThai` đọc đúng cờ `_micDangNghe` này
       // để quyết định có tự bật lại hay không.
       _dangTamTatMicChatDeGo = true;
-      setState(() => _micDangNghe = false);
+      setState(() {
+        _micDangNghe = false;
+        _micDangNgheThat = false;
+      });
       // cancel() (không phải stop()) — không đợi một kết quả chốt cuối
       // cùng bay về rồi đổ nhầm vào chỗ mới, y hệt lý do trang soạn thảo
       // chính dùng cancel() ở đây.
@@ -551,8 +567,27 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
       return;
     }
     if (!_micKhoiTaoXong) {
-      _micKhoiTaoXong =
-          await _micro.initialize(onStatus: _khiMicDoiTrangThai, debugLogging: false);
+      _micKhoiTaoXong = await _micro.initialize(
+        onStatus: _khiMicDoiTrangThai,
+        // ĐÚNG khuôn `_TrangSoanThaoState._khoiTaoMicro`: trình nhận dạng
+        // bắn lỗi 'nhẹ' (hết câu do im lặng, bận, bị hệ thống chặn bật lại
+        // quá nhanh...) RẤT THƯỜNG XUYÊN, đặc biệt ngay sau mỗi lần tự
+        // ngắt/tự bật lại — và những lỗi đó KHÔNG hề có nghĩa là mic đã
+        // chết hẳn. Trước đây chat KHÔNG có `onError` nào cả — một lỗi bắn
+        // ra mà không kèm đúng sự kiện `onStatus` "notListening" tương ứng
+        // (có thể xảy ra, tuỳ trình duyệt/thiết bị) sẽ làm mic coi như kẹt
+        // luôn, không tự bật lại nữa, dù người dùng không hề tắt — đúng
+        // triệu chứng người dùng báo. Luôn gọi `_lenLichBatLaiMicChat()`
+        // bất kể lỗi gì (y hệt trang soạn thảo chính luôn gọi `_henBatLai()`
+        // trong `onError`, không phân biệt — vô hại nếu phiên NÀY vẫn đang
+        // chạy tốt vì `_khiMicDoiTrangThai` cũng gọi lại y hệt).
+        onError: (loi) {
+          widget.ghiNhatKyMicro?.call('[chat] onError: "${loi.errorMsg}"');
+          if (mounted) setState(() => _micDangNgheThat = false);
+          _lenLichBatLaiMicChat();
+        },
+        debugLogging: false,
+      );
       if (!_micKhoiTaoXong) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -653,6 +688,25 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
           );
           _micTuDoiONhap = false;
           _micChuGanNhat = chen;
+          // (SỬA LỖI "micro quay lại sửa chữ đã hiện ra") Một kết quả FINAL
+          // (`finalResult == true`) nghĩa là CÂU NÓI hiện tại đã xong — y
+          // hệt BƯỚC E ở `_TrangSoanThaoState._khiCoChu`, coi toàn bộ nội
+          // dung hiện có là CHỐT CỨNG: dời hẳn `_micDiemBatDau` tới ngay sau
+          // đoạn vừa chèn và rỗng `_micChuGanNhat`. Trước đây hai biến này
+          // CHỈ reset lúc bắt đầu một PHIÊN `listen()` mới (hệ thống tự ngắt
+          // hẳn, xem `_batPhienNgheMicChat`) — nhưng MỘT phiên `listen()`
+          // (dài tới 10 phút) có thể chứa NHIỀU câu nói, mỗi câu kết thúc
+          // bằng một kết quả FINAL riêng mà vẫn ở NGUYÊN phiên đó. Không dời
+          // mốc ở đây thì câu nói THỨ HAI trong cùng một phiên vẫn thay thế
+          // đúng vùng `[batDau, batDau + độ dài câu THỨ NHẤT)` — tức là ghi
+          // ĐÈ/XOÁ mất câu đã chốt trước đó, đúng triệu chứng người dùng
+          // báo. Rỗng luôn bộ đệm cộng dồn Chrome Android — câu nói MỚI sau
+          // đây là một utterance hoàn toàn khác, không còn gì để trừ.
+          if (ketQua.finalResult) {
+            _micDiemBatDau = batDau + chen.length;
+            _micChuGanNhat = '';
+            _rawTichLuyChromeAndroidChat = '';
+          }
         },
         localeId: _micMaNgonNguChat,
         listenOptions: SpeechListenOptions(
@@ -665,8 +719,29 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
         pauseFor: const Duration(seconds: 8),
       );
     } catch (_) {
-      if (mounted) setState(() => _micDangNghe = false);
+      // (SỬA LỖI "mic đôi khi không tự bật lại") Trước đây lỗi ở đây làm
+      // tắt hẳn `_micDangNghe` — coi như người dùng đã chủ động tắt, không
+      // bao giờ tự bật lại nữa. ĐÚNG khuôn trang soạn thảo chính
+      // (`_batMicro` → `catch (_) { _henBatLai(); }`): một lần `listen()`
+      // ném lỗi KHÔNG có nghĩa ý định người dùng đã đổi — vẫn giữ
+      // `_micDangNghe`, chỉ cập nhật UI thật (ẩn nút vuông) rồi lên lịch
+      // bật lại y hệt lúc hệ thống tự ngắt bình thường.
+      if (mounted) setState(() => _micDangNgheThat = false);
+      _lenLichBatLaiMicChat();
     }
+  }
+
+  /// Lên lịch bật lại một phiên MỚI sau 200ms — dùng chung cho cả hai
+  /// nguồn: hệ thống tự ngắt bình thường (`_khiMicDoiTrangThai`) và
+  /// `listen()`/`initialize()` ném lỗi (`_batPhienNgheMicChat` catch,
+  /// `onError`). Không làm gì nếu người dùng đã tự tắt hẳn ý định nghe
+  /// (`_micDangNghe` false) — tránh bật lại ngoài ý muốn.
+  void _lenLichBatLaiMicChat() {
+    if (!_micDangNghe) return;
+    _henBatLaiMicChat?.cancel();
+    _henBatLaiMicChat = Timer(const Duration(milliseconds: 200), () {
+      if (_micDangNghe && mounted) _batPhienNgheMicChat();
+    });
   }
 
   /// Hệ điều hành/engine tự ngắt phiên `listen()` sau một khoảng — y hệt
@@ -674,15 +749,21 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   /// (`_micDangNghe` vẫn `true`), bật lại ngay một phiên MỚI, không coi là
   /// "đã tắt". Thấy ĐÚNG "notListening" mới bật lại — tránh vòng lặp vô ích
   /// nếu lỡ nhận nhầm trạng thái khác.
+  ///
+  /// (YÊU CẦU MỚI) Cập nhật `_micDangNgheThat` NGAY TẠI ĐÂY, đồng bộ với
+  /// MỌI lần đổi trạng thái thật (cả "bắt đầu nghe" lẫn "ngừng nghe") — ĐÚNG
+  /// khuôn `_TrangSoanThaoState._khiDoiTrangThai` (`_dangNghe`). UI (nút
+  /// vuông đỏ) nhờ vậy tự ẩn/hiện đúng lúc hệ thống tự ngắt rồi tự bật lại,
+  /// không còn đứng yên hiển thị sai suốt khoảng hở đó.
   void _khiMicDoiTrangThai(String trangThai) {
     final dangNghe = trangThai == SpeechToText.listeningStatus;
     widget.ghiNhatKyMicro?.call('[chat] onStatus: "$trangThai" (micDangNghe=$_micDangNghe)');
+    if (mounted && _micDangNgheThat != dangNghe) {
+      setState(() => _micDangNgheThat = dangNghe);
+    }
     if (dangNghe || !mounted) return;
     if (!_micDangNghe) return; // người dùng đã tự bấm tắt — đừng bật lại.
-    _henBatLaiMicChat?.cancel();
-    _henBatLaiMicChat = Timer(const Duration(milliseconds: 200), () {
-      if (_micDangNghe && mounted) _batPhienNgheMicChat();
-    });
+    _lenLichBatLaiMicChat();
   }
 
   Future<void> _tatMicChat() async {
@@ -697,7 +778,12 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     // ("notListening") một cách KHÔNG đồng bộ; `_khiMicDoiTrangThai` đọc
     // đúng cờ này để quyết định có bật lại hay không, nên đặt sau dễ lọt
     // đúng khoảng hở đó, vô tình bật lại mic ngay sau khi người dùng tắt.
-    if (mounted) setState(() => _micDangNghe = false);
+    if (mounted) {
+      setState(() {
+        _micDangNghe = false;
+        _micDangNgheThat = false;
+      });
+    }
     await _micro.stop();
   }
 
@@ -1250,7 +1336,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                   // (biểu thị "dừng micro") — bấm vào là đóng mic lại, KHÔNG
                   // gửi tin nhắn; gửi thật vẫn luôn cần Ctrl+Enter/nút Gửi
                   // bình thường sau khi đã tắt mic.
-                  _micDangNghe
+                  _micDangNgheThat
                       ? _NutDungMic(khiBam: _tatMicChat)
                       : _NutGui(dangGui: _dangGui, khiBam: _guiHoacXacNhanSua),
                 ],
