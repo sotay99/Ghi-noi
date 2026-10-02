@@ -621,6 +621,15 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     // phiên MỚI; `onResult` chỉ nhận đúng phiên vừa đăng ký.
     final idPhien = ++_phienNgheMicChat;
     widget.ghiNhatKyMicro?.call('[chat] Bắt đầu phiên #$idPhien');
+    // (SỬA LỖI v121 — "nút vuông đỏ không còn xuất hiện") Hàm này LUÔN được
+    // gọi với ý định (`_micDangNghe`) đã là `true` từ trước — nhưng trước
+    // đây UI (`_micDangNgheThat`) CHỈ bật lên khi `onStatus` thật sự báo
+    // "listening", một sự kiện KHÔNG đáng tin cậy để chờ (có lúc tới rất
+    // trễ hoặc không tới — y hệt lý do không nên tiếp tục tin tưởng tuyệt
+    // đối vào sự kiện hệ thống ở các lỗi khác đã sửa). Đặt lạc quan NGAY
+    // TẠI ĐÂY, đúng lúc TA chủ động ra lệnh bắt đầu nghe — không cần chờ
+    // xác nhận ngược lại mới cho hiện nút.
+    if (mounted) setState(() => _micDangNgheThat = true);
     try {
       await _micro.listen(
         onResult: (ketQua) {
@@ -631,6 +640,20 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
             return;
           }
           if (!_micDangNghe) return;
+          // (SỬA LỖI v121 — "tự xoá chữ vừa nói khi micro tự tắt") Một số
+          // trình duyệt/thiết bị gửi một kết quả CUỐI (`finalResult: true`)
+          // VỚI CHUỖI RỖNG ngay lúc `pauseFor` cắt phiên do im lặng — không
+          // phải "câu nói rỗng", mà là tín hiệu kỹ thuật "hết, không còn gì
+          // thêm". Xử lý tiếp như một `chen` rỗng BÌNH THƯỜNG (như code cũ
+          // vẫn làm) sẽ THAY THẾ đúng vùng `_micChuGanNhat` (toàn bộ câu vừa
+          // hiện ra) bằng chuỗi rỗng — XOÁ MẤT câu đó. Không có gì mới để
+          // chèn thì dừng ngay, đừng đụng gì vào văn bản đang có.
+          if (ketQua.recognizedWords.isEmpty) {
+            widget.ghiNhatKyMicro?.call(
+                '[chat] onResult phiên #$idPhien, xong=${ketQua.finalResult}: rỗng — bỏ qua, '
+                'không xoá chữ đã hiện ra');
+            return;
+          }
           _datLaiHenTuTatMicChatImLang();
           var chen = ketQua.recognizedWords;
           widget.ghiNhatKyMicro?.call(
@@ -659,6 +682,10 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
             // thật, an toàn hơn là trừ nhầm.
             _rawTichLuyChromeAndroidChat = raw;
             widget.ghiNhatKyMicro?.call('[chat]   → sau khi trừ raw cộng dồn: "$chen"');
+            // Trừ xong ra rỗng (raw mới khớp NGUYÊN VĂN tiền tố đã thấy, tức
+            // chẳng có gì mới) — y hệt lý do ở trên: KHÔNG được dùng chuỗi
+            // rỗng này để thay thế/xoá mất `_micChuGanNhat` hiện có.
+            if (chen.isEmpty) return;
           }
           final vb = _oNhap.text;
           final batDau = _micDiemBatDau.clamp(0, vb.length);

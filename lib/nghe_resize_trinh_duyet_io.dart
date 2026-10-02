@@ -3,3 +3,7 @@
 Object? dangKyNgheResizeTrinhDuyet(void Function() goiLai) => null;
 
 void huyNgheResizeTrinhDuyet(Object? dangKy) {}
+
+Object? dangKyThamDoChieuCaoVienPort(void Function() goiLai) => null;
+
+void huyThamDoChieuCaoVienPort(Object? dangKy) {}

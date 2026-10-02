@@ -31,11 +31,24 @@ lần không xong, sắp hết thời gian dự án. Không tự ý thử thêm 
 khi chưa được yêu cầu. Khi được nhờ sửa lại (khoảng 1 tháng sau, hoặc bất
 cứ khi nào người dùng thấy khó chịu và chủ động nhắc), đọc đúng mục này
 trước — ĐỪNG hỏi người dùng mô tả lại lỗi từ đầu, đã có đủ mô tả và lịch
-sử các hướng đã thử ở trên. Hướng chưa thử: gắn `visualViewport` (thay vì
-`window.onResize` thường) nếu trình duyệt hỗ trợ; hoặc đổi hẳn sang
-`resizeToAvoidBottomInset: true` (để `Scaffold` tự lo, bỏ hẳn cơ chế tự đo
-`caoBanPhim` hiện tại) — rủi ro cao hơn vì có thể phá vỡ lý do ban đầu
-chọn `false`, cần đọc kỹ code trước khi đổi.
+sử các hướng đã thử ở trên.
+
+**Đã thử lần 3 (2026-10-02, v121, người dùng chủ động nhờ sửa lại):** đổi
+tư duy — thay vì tiếp tục thêm một đường NGHE SỰ KIỆN khác (đã có 2, cả
+hai đều có đường "hụt"), chủ động THĂM DÒ (poll) chiều cao viewport thật
+mỗi 300ms qua `visualViewport.height`/`innerHeight` (hàm
+`dangKyThamDoChieuCaoVienPort` ở `nghe_resize_trinh_duyet_web.dart`), lệch
+so với lần đo trước mới `setState`. Cùng tư duy đã dùng để sửa dứt điểm
+lỗi kẹt bàn phím ảo ở Copy/Cắt/Dán/All (đừng tin một sự kiện có thể không
+bắn ra — tự xác minh trực tiếp theo nhịp). Đây KHÔNG phải một sự kiện mới
+có thể "hụt" giống hai lớp cũ — dù trình duyệt không báo gì, vòng lặp vẫn
+tự phát hiện ra chiều cao thật đã đổi ở lượt thăm dò kế tiếp (tối đa trễ
+300ms). Nếu người dùng xác nhận VẪN còn lỗi sau bản này, nghĩa là
+`visualViewport`/`innerHeight` bản thân nó cũng không đổi giá trị trong
+tình huống đó (khác hẳn vấn đề "sự kiện không bắn" đã xác định trước đây)
+— khi đó hướng `resizeToAvoidBottomInset: true` (để `Scaffold` tự lo, bỏ
+hẳn cơ chế tự đo `caoBanPhim` hiện tại) mới còn đáng thử, rủi ro cao hơn vì
+có thể phá vỡ lý do ban đầu chọn `false`, cần đọc kỹ code trước khi đổi.
 
 **Né vấn đề thay vì sửa (2026-09-22):** lỗi này KHÔNG xảy ra ở bản APK
 (chỉ web). Đã thêm dải gợi ý "Tải app APK" (nền xanh dương nhạt, dưới dải

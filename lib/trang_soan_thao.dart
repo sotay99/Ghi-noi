@@ -3640,6 +3640,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// — `null` trên Android/iOS/desktop gốc (không có ý nghĩa gì ở đó).
   Object? _dangKyNgheResizeTrinhDuyet;
 
+  /// (SỬA LỖI v121) Lớp CHỦ ĐỘNG thăm dò, bổ sung — xem
+  /// `dangKyThamDoChieuCaoVienPort`.
+  Object? _dangKyThamDoChieuCaoVienPort;
+
   // ------------------------------------------------- báo "Đoạn số" khi cuộn
 
   /// Khoảng cách (pixel) từ ĐÁY khung nhìn ô soạn thảo tới "mốc CHÍNH" ảo
@@ -3902,6 +3906,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _dangKyNgheResizeTrinhDuyet = dangKyNgheResizeTrinhDuyet(() {
       if (mounted) setState(() {});
     });
+    _dangKyThamDoChieuCaoVienPort = dangKyThamDoChieuCaoVienPort(() {
+      if (mounted) setState(() {});
+    });
     _boDieuKhien.addListener(_khiNguoiDungSua);
     _boDieuKhien.addListener(_capNhatTimKiemNeuDangMo);
     // TextField (Material) không có tham số `onSelectionChanged` — đó là
@@ -3970,6 +3977,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     HardwareKeyboard.instance.removeHandler(_khiGoPhimBatKyTatChuThich);
     WidgetsBinding.instance.removeObserver(this);
     huyNgheResizeTrinhDuyet(_dangKyNgheResizeTrinhDuyet);
+    huyThamDoChieuCaoVienPort(_dangKyThamDoChieuCaoVienPort);
     _hen?.cancel();
     _henLuuTru?.cancel();
     _henGoXong?.cancel();
