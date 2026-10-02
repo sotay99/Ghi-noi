@@ -210,8 +210,237 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     );
   }
 
+  // --------------------- Tự động định dạng khi gõ tay (y hệt trang chính)
+
+  /// Bản chữ GẦN NHẤT đã xử lý xong — dùng để so khác biệt (diff) với
+  /// `_oNhap.text` hiện tại mỗi khi có thay đổi, y hệt `_chuGanNhat` ở
+  /// `_TrangSoanThaoState`. Tự "lành" ngay ở lần gõ kế tiếp nếu có lệch (ví
+  /// dụ ngay sau khi mic vừa chèn chữ, bỏ qua không xử lý ở đây) — không
+  /// đụng gì tới `_micChuGanNhat` (chuyện riêng của mic).
+  String _chuChatGanNhat = '';
+
+  /// Y hệt `_viTriChoVietHoa` ở trang soạn thảo chính, riêng cho ô nhập chat.
+  int? _viTriChoVietHoaChat;
+
+  static final RegExp _laChuCaiChat = RegExp(r'[a-zA-ZÀ-ỹ]');
+  static const Set<String> _kyTuKetCauChoVietHoaChat = {'.', ':', '!', '?'};
+
+  /// Y hệt `_TrangSoanThaoState._kyTuDacBiet`.
+  static const _kyTuDacBietChat = {'.', ',', ';', '?', '!', ':'};
+
+  /// Y hệt `_TrangSoanThaoState._kyTuNgoacCanChuanHoa`.
+  static const _kyTuNgoacCanChuanHoaChat = {'(', ')', '{', '}', '[', ']', '"'};
+
+  int? _viTriChenMotKyTuDonChat(String cu, String chuMoi) {
+    if (chuMoi.length != cu.length + 1) return null;
+    var dau = 0;
+    while (dau < cu.length && cu[dau] == chuMoi[dau]) {
+      dau++;
+    }
+    if (cu.substring(dau) != chuMoi.substring(dau + 1)) return null;
+    return dau;
+  }
+
+  void _kiemTraDanhDauVietHoaChat(String vanBan, int viTriChen) {
+    if (viTriChen <= 0 || viTriChen > vanBan.length) return;
+    if (vanBan[viTriChen - 1] != ' ') return;
+    var i = viTriChen - 1;
+    while (i > 0 && vanBan[i - 1] == ' ') {
+      i--;
+    }
+    if (i == 0) return;
+    if (_kyTuKetCauChoVietHoaChat.contains(vanBan[i - 1])) {
+      _viTriChoVietHoaChat = viTriChen;
+    }
+  }
+
+  (int, String)? _ketQuaVietHoaChoTuVuaGoXongChat(String vanBan, String ktChen) {
+    final vt = _viTriChoVietHoaChat;
+    _viTriChoVietHoaChat = null;
+    if (vt == null) return null;
+    if (ktChen != ' ' && ktChen != '\n') return null;
+    if (vt < 0 || vt >= vanBan.length) return null;
+    final kt = vanBan[vt];
+    if (!_laChuCaiChat.hasMatch(kt)) return null;
+    return (vt, kt.toUpperCase());
+  }
+
+  /// Ghi lại `_oNhap` kèm vị trí con trỏ MỚI mà không cho `_khiONhapDoi` xử
+  /// lý đè lên chính thay đổi này — dùng lại đúng cờ `_micTuDoiONhap` (dù
+  /// tên nói về mic, ý nghĩa thật là "đổi do chính app tự gán, không phải
+  /// người dùng gõ tay").
+  void _ghiLaiVaDatConTroChat(String vanBan, int viTriConTro) {
+    _micTuDoiONhap = true;
+    _oNhap.value = TextEditingValue(
+      text: vanBan,
+      selection: TextSelection.collapsed(offset: viTriConTro),
+    );
+    _micTuDoiONhap = false;
+  }
+
+  /// (Tính năng "Chuẩn hoá các cặp dấu đóng-mở ngoặc") Bản RÚT GỌN của
+  /// `_TrangSoanThaoState._chuanHoaNgoacSauKhiGo` cho ô nhập chat — không
+  /// đụng gì tới lỗi chính tả/vùng toàn văn (chat không có hai khái niệm
+  /// đó), chỉ xoá dấu cách thừa ngay sau dấu mở / ngay trước dấu đóng của
+  /// ĐÚNG MỘT cặp mà ký tự vừa gõ hoàn thành.
+  void _chuanHoaNgoacSauKhiGoChat(String kyTuVuaGo, int vt) {
+    final vb = _oNhap.text;
+    if (vt < 0 || vt >= vb.length || vb[vt] != kyTuVuaGo) return;
+
+    final canXoa = <int>{};
+    void chuanHoaMotCap(int moTai, int dongTai) {
+      if (moTai + 1 < dongTai && vb[moTai + 1] == ' ') canXoa.add(moTai + 1);
+      if (dongTai - 1 > moTai && vb[dongTai - 1] == ' ') canXoa.add(dongTai - 1);
+    }
+
+    if (kyTuVuaGo == '"') {
+      var soDauTruoc = 0;
+      for (var i = 0; i < vt; i++) {
+        if (vb[i] == '"') soDauTruoc++;
+      }
+      if (soDauTruoc.isOdd) {
+        for (var i = vt - 1; i >= 0; i--) {
+          if (vb[i] == '"') {
+            chuanHoaMotCap(i, vt);
+            break;
+          }
+        }
+      }
+    } else {
+      const laMoNgoac = {'(', '{', '['};
+      if (laMoNgoac.contains(kyTuVuaGo)) return;
+      const moUngVoiDong = {')': '(', '}': '{', ']': '['};
+      final moNgoac = moUngVoiDong[kyTuVuaGo]!;
+      final ngan = <int>[];
+      for (var i = 0; i <= vt; i++) {
+        if (vb[i] == moNgoac) {
+          ngan.add(i);
+        } else if (vb[i] == kyTuVuaGo && ngan.isNotEmpty) {
+          final moTai = ngan.removeLast();
+          if (i == vt) chuanHoaMotCap(moTai, i);
+        }
+      }
+    }
+
+    if (canXoa.isEmpty) return;
+    final ds = canXoa.toList()..sort((a, b) => b.compareTo(a));
+    var moi = vb;
+    var neo = _oNhap.selection.end;
+    if (neo < 0) neo = moi.length;
+    for (final v in ds) {
+      moi = moi.replaceRange(v, v + 1, '');
+      if (neo > v) neo--;
+    }
+    _ghiLaiVaDatConTroChat(moi, neo);
+  }
+
+  /// Áp dụng, cho ô nhập chat, ĐÚNG logic ba cài đặt "Tự động thêm dấu chấm
+  /// trước khi xuống dòng" / "Tự động viết hoa ở đầu câu" / "Chuẩn hoá các
+  /// cặp dấu đóng-mở ngoặc" khi BẬT (khi TẮT thì không đổi gì, y hệt trang
+  /// soạn thảo chính), và việc "nhảy dấu câu qua trước dấu cách có sẵn" CHẠY
+  /// NGẦM LUÔN (không qua cài đặt nào) — bản rút gọn của
+  /// `_TrangSoanThaoState._apDungChinhSuaNguoiDung`, bỏ hẳn phần thụt đầu
+  /// dòng/đường kẻ chia/lỗi chính tả vì chat không có các khái niệm đó. Chỉ
+  /// chạy khi đây đúng là một lần gõ tay chèn ĐÚNG một ký tự đơn giản.
+  void _apDungTuDongDinhDangChat(String cu, String chuMoiGoc) {
+    final viTriChenDon = _viTriChenMotKyTuDonChat(cu, chuMoiGoc);
+    if (viTriChenDon == null) {
+      _chuChatGanNhat = chuMoiGoc;
+      return;
+    }
+    var chuMoi = chuMoiGoc;
+    final ktChen = chuMoi[viTriChenDon];
+
+    // (VIỆC 4) Viết hoa đầu câu — CHẠY TRƯỚC mọi thứ khác, đúng thứ tự ưu
+    // tiên của trang soạn thảo chính.
+    if (widget.caiDat.tuDongVietHoaDauCau) {
+      final ketQua = _ketQuaVietHoaChoTuVuaGoXongChat(chuMoi, ktChen);
+      if (ketQua != null) {
+        final (vt, chuHoa) = ketQua;
+        chuMoi = chuMoi.substring(0, vt) + chuHoa + chuMoi.substring(vt + 1);
+      }
+      _kiemTraDanhDauVietHoaChat(chuMoi, viTriChenDon);
+    }
+
+    // (VIỆC 5b) Enter đơn giản — tự thêm dấu chấm trước khi xuống dòng, trừ
+    // các trường hợp loại trừ y hệt trang soạn thảo chính.
+    if (ktChen == '\n' && widget.caiDat.tuDongThemDauCham) {
+      final ktNgayTruoc = viTriChenDon > 0 ? chuMoi[viTriChenDon - 1] : null;
+      final daCoChamRoi = ktNgayTruoc == '.' ||
+          (ktNgayTruoc == ' ' &&
+              viTriChenDon >= 2 &&
+              chuMoi[viTriChenDon - 2] == '.');
+      const kyTuDacBietChoEnter = {
+        ';', '.', ',', '/', ')', '(', '"', "'", '*', ':', '!', '?', '•',
+      };
+      final ktTruocNua = viTriChenDon >= 2 ? chuMoi[viTriChenDon - 2] : null;
+      final laTruongHop6 = ktNgayTruoc == ' ' &&
+          ktTruocNua != null &&
+          kyTuDacBietChoEnter.contains(ktTruocNua);
+      final khongThemDauChamThem = ktNgayTruoc == null ||
+          ktNgayTruoc == '\n' ||
+          (ktNgayTruoc == ' ' && ktTruocNua == '\n') ||
+          (ktNgayTruoc == ' ' && ktTruocNua == null) ||
+          kyTuDacBietChoEnter.contains(ktNgayTruoc) ||
+          laTruongHop6;
+      final themCham = !daCoChamRoi && !khongThemDauChamThem;
+      if (themCham || laTruongHop6) {
+        var moiDau = viTriChenDon;
+        String chenVao;
+        if (themCham) {
+          if (ktNgayTruoc == ' ') moiDau = viTriChenDon - 1;
+          chenVao = '.\n';
+        } else {
+          moiDau = viTriChenDon - 1;
+          chenVao = '\n';
+        }
+        chuMoi = chuMoi.substring(0, moiDau) + chenVao + chuMoi.substring(viTriChenDon + 1);
+        final viTriConTroMoi = moiDau + chenVao.length;
+        _chuChatGanNhat = chuMoi;
+        _ghiLaiVaDatConTroChat(chuMoi, viTriConTroMoi);
+        return;
+      }
+    }
+
+    // (VIỆC 5, chạy NGẦM, không qua cài đặt) Gõ đúng một ký tự đặc biệt
+    // (. , ; ? ! :) ngay sau một dấu cách có sẵn — hoán đổi hai ký tự đó
+    // cho nhau, để dấu câu nằm sát vào chữ trước nó.
+    var chuMoiCuoi = chuMoi;
+    var viTriConTro = viTriChenDon + 1;
+    if (viTriChenDon > 0 &&
+        chuMoi[viTriChenDon - 1] == ' ' &&
+        _kyTuDacBietChat.contains(ktChen)) {
+      chuMoiCuoi = chuMoi.substring(0, viTriChenDon - 1) +
+          ktChen +
+          ' ' +
+          chuMoi.substring(viTriChenDon + 1);
+      viTriConTro = viTriChenDon;
+      if (widget.caiDat.tuDongVietHoaDauCau) {
+        _kiemTraDanhDauVietHoaChat(chuMoiCuoi, viTriChenDon + 1);
+      }
+    }
+
+    _chuChatGanNhat = chuMoiCuoi;
+    if (chuMoiCuoi != chuMoiGoc) {
+      _ghiLaiVaDatConTroChat(chuMoiCuoi, viTriConTro);
+    }
+
+    // (Tính năng "Chuẩn hoá các cặp dấu đóng-mở ngoặc") `_kyTuDacBietChat`
+    // và `_kyTuNgoacCanChuanHoaChat` không giao nhau, nên nếu vừa nhảy dấu
+    // câu ở trên thì chắc chắn KHÔNG rơi vào nhánh này — vị trí ký tự vừa gõ
+    // trong [chuMoiCuoi] luôn vẫn là [viTriChenDon].
+    if (widget.caiDat.tuDongChuanHoaNgoac &&
+        _kyTuNgoacCanChuanHoaChat.contains(ktChen)) {
+      _chuanHoaNgoacSauKhiGoChat(ktChen, viTriChenDon);
+    }
+  }
+
   void _khiONhapDoi() {
     if (_micTuDoiONhap) return;
+    final cuChat = _chuChatGanNhat;
+    final chuMoiChat = _oNhap.text;
+    if (cuChat != chuMoiChat) _apDungTuDongDinhDangChat(cuChat, chuMoiChat);
+
     // `_micDangNghe` tắt vì gõ tay (`_dangTamTatMicChatDeGo`) VẪN phải tiếp
     // tục xử lý ở đây — gõ thêm ký tự nữa trong lúc đang đếm ngược chờ bật
     // lại phải DỜI LẠI đồng hồ đó (y hệt trang soạn thảo chính: gõ liên tục

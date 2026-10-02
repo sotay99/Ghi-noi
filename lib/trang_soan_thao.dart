@@ -5145,6 +5145,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// `build`.
   bool _epAnBanPhimAoKhiGiuFocus = false;
 
+  /// Đếm phiên cho `_giuTieuDiemKhongBatBanPhimAo` — xem giải thích ở đó.
+  int _phienAnBanPhimAo = 0;
+
   /// Giành lại tiêu điểm cho ô soạn thảo sau khi bấm một trong 4 nút
   /// Copy/Cắt/Dán/All ở thanh công cụ dưới hoặc Bộ phím nhanh — xem giải
   /// thích gốc ở `_chenKyTuTuPhimAo`.
@@ -5178,6 +5181,19 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// chỉ cần đủ lâu để vượt qua đúng nhịp hệ thống QUYẾT ĐỊNH có bật bàn
   /// phím hay không lúc field nhận focus, không ảnh hưởng gì tới việc gõ
   /// tay sau đó.
+  ///
+  /// (SỬA LỖI v119) Bấm liên tiếp quá nhanh vào Copy/Cắt/All lúc bàn phím ảo
+  /// đang ẨN trước đây làm hàm này chạy chồng nhiều lần cùng lúc — mỗi lần
+  /// gọi đều tự bật rồi tự tắt `readOnly` qua một cặp `addPostFrameCallback`
+  /// riêng, không lần nào biết tới lần khác. Bật/tắt thuộc tính `readOnly`
+  /// của ô nhập liên tục, dồn dập như vậy có lúc làm trình duyệt (web) đánh
+  /// mất hẳn khả năng tự bật lại bàn phím ảo cho ô đó, phải tải lại trang
+  /// mới hết. Sửa bằng một mã phiên tăng dần (`_phienAnBanPhimAo`): mỗi lần
+  /// gọi hàm này đều lấy một số phiên mới; chỉ lần gọi GẦN NHẤT mới còn giữ
+  /// đúng số phiên hiện tại ở hai mốc kiểm tra bên dưới, nên `readOnly` chỉ
+  /// thật sự bật lên MỘT lần (nếu đang tắt) rồi giữ nguyên suốt các lần bấm
+  /// dồn dập, và chỉ tắt lại đúng MỘT lần, sau khi lần bấm cuối cùng đã yên —
+  /// không còn cảnh bật/tắt xen nhau liên tục nữa.
   void _giuTieuDiemKhongBatBanPhimAo() {
     if (_boPhimNhanhCamUngMo) {
       // Bộ phím nhanh đang mở đã tự lo đúng `readOnly` theo quy tắc riêng
@@ -5188,12 +5204,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       });
       return;
     }
-    setState(() => _epAnBanPhimAoKhiGiuFocus = true);
+    final phien = ++_phienAnBanPhimAo;
+    if (!_epAnBanPhimAoKhiGiuFocus) {
+      setState(() => _epAnBanPhimAoKhiGiuFocus = true);
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      if (!mounted || phien != _phienAnBanPhimAo) return;
       _oChu.requestFocus();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _epAnBanPhimAoKhiGiuFocus = false);
+      Future.delayed(const Duration(milliseconds: 60), () {
+        if (mounted && phien == _phienAnBanPhimAo) {
+          setState(() => _epAnBanPhimAoKhiGiuFocus = false);
+        }
       });
     });
   }
