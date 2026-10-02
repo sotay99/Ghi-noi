@@ -390,89 +390,6 @@ class _NutPhimAoState extends State<_NutPhimAo> {
   }
 }
 
-/// Nút ẩn/hiện 4 nút điều hướng (`_xayHangDieuHuongConTro`) — "nhảy" giữa 3
-/// vị trí khác nhau tuỳ trạng thái (xem `_dieuHuongConTroAn`), mỗi lần
-/// nhảy sang vị trí MỚI thì Flutter dựng lại một `State` MỚI (widget khác
-/// cha, khác vị trí trong cây) nên `initState` chắc chắn được gọi lại đúng
-/// lúc đó — dùng ngay điểm này để chạy hiệu ứng phóng to/thu nhỏ 4 lần
-/// trong 3 giây một lần duy nhất mỗi khi "nhảy", không cần cờ điều khiển
-/// riêng.
-class _NutAnHienDieuHuongConTro extends StatefulWidget {
-  const _NutAnHienDieuHuongConTro({required this.an, required this.onTap});
-
-  final bool an;
-  final VoidCallback onTap;
-
-  @override
-  State<_NutAnHienDieuHuongConTro> createState() => _NutAnHienDieuHuongConTroState();
-}
-
-class _NutAnHienDieuHuongConTroState extends State<_NutAnHienDieuHuongConTro>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _dk;
-
-  @override
-  void initState() {
-    super.initState();
-    _dk = AnimationController(vsync: this, duration: const Duration(seconds: 3))..forward();
-  }
-
-  @override
-  void dispose() {
-    _dk.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _dk,
-      builder: (context, _) {
-        // 4 nhịp phóng to (tới 1.3 lần)/thu nhỏ mượt trong 3 giây, rồi đứng
-        // im hẳn ở 1.0 — |sin| có đúng 4 "nhịp" khi đối số quét từ 0 tới 4π.
-        final tyLe = 1 + 0.3 * math.sin(4 * math.pi * _dk.value).abs();
-        return Tooltip(
-          message: widget.an ? 'Hiện lại 4 nút điều hướng con trỏ' : 'Ẩn 4 nút điều hướng con trỏ',
-          child: InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: () {},
-            onTapDown: (_) => widget.onTap(),
-            child: Transform.scale(
-              scale: tyLe,
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  // Đang ẩn 4 nút điều hướng: nền xanh lá nhạt để dễ nhận ra
-                  // ngay là bấm vào đây sẽ HIỆN LẠI (khác nền xám trung tính
-                  // lúc đang hiện, chỉ đơn thuần là nút RÚT GỌN).
-                  color: widget.an ? Colors.green.shade50 : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: widget.an ? Colors.green.shade300 : Colors.grey.shade400,
-                  ),
-                ),
-                alignment: Alignment.center,
-                // Emoji (Text) thay vì Icon Material — hai icon
-                // `keyboard_arrow_up`/`keyboard_arrow_down` từng bị RỖNG
-                // (không hiện gì) trên bản dựng thật dù code không lỗi, rất
-                // có thể do công cụ "tree-shake" icon của Flutter bỏ sót
-                // (chỉ giữ lại đúng những icon nó dò thấy được dùng) — emoji
-                // đi qua phông chữ hệ thống, không qua cơ chế đó nên chắc
-                // chắn luôn hiện ra.
-                child: Text(
-                  widget.an ? '🔼' : '🔽',
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
 /// Nút nổi tự thở — dùng cho "Mở rộng" (trả lại thanh công cụ sau khi "Thu
 /// gọn", xem `_thuGonThanhCongCu`). Nổi TRÊN chữ đang soạn (không chiếm
 /// đất), độ rõ tự thở tuần hoàn: 20% → 100% (5 giây) → đứng im (1 giây) →
@@ -4907,7 +4824,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     setState(() {
       _boPhimNhanhCamUngMo = dangBat;
       if (!dangBat) {
-        _dieuHuongConTroAn = false;
         _epHienBanPhimAoTrongBoPhimNhanh = false;
         _thuGonTruocKhiEpBanPhimAo = null;
       }
@@ -5532,7 +5448,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (!daGhiGiauDinhDang) {
       await Clipboard.setData(ClipboardData(text: doan));
     }
-    if (mounted) hienThongBaoGiua(context, 'Đã copy vào bộ nhớ đệm');
+    if (mounted) hienThongBaoGiua(context, 'Đã copy vào bộ nhớ đệm', ganTren: true);
   }
 
   /// "Cut" — y hệt Copy rồi xoá vùng vừa chép, ĐI QUA đúng con đường gõ tay
@@ -5572,7 +5488,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _boDieuKhien.value =
         TextEditingValue(text: moi, selection: TextSelection.collapsed(offset: batDau));
     _cuonToiConTroNeuCan();
-    if (mounted) hienThongBaoGiua(context, 'Đã cắt và lưu vào bộ nhớ đệm');
+    if (mounted) hienThongBaoGiua(context, 'Đã cắt và lưu vào bộ nhớ đệm', ganTren: true);
   }
 
   /// Bấm liên tiếp quá nhanh vào "Paste" dễ dán trùng lặp (chạm hai lần
@@ -5673,7 +5589,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       }
     }
     _cuonToiConTroNeuCan();
-    if (mounted) hienThongBaoGiua(context, 'Đã dán văn bản vào từ bộ nhớ đệm');
+    if (mounted) hienThongBaoGiua(context, 'Đã dán văn bản vào từ bộ nhớ đệm', ganTren: true);
   }
 
   /// "All" — 4 mức, đếm số lần bấm liên tiếp trong 2 giây (riêng nút này,
@@ -5722,7 +5638,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (_phimAllVuaChonTatCa) {
       _boDieuKhien.selection = TextSelection(baseOffset: 0, extentOffset: vb.length);
       _cuonToiConTroNeuCan();
-      if (mounted) hienThongBaoGiua(context, 'Đã chọn tất cả');
+      if (mounted) hienThongBaoGiua(context, 'Đã chọn tất cả', ganTren: true);
       _batCheDoNhanhChonTatCa(); // gia hạn thêm 1 giây nữa, tính từ lần bấm này.
       return;
     }
@@ -5739,7 +5655,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _lanBamAllTruoc = null;
       _boDieuKhien.selection = TextSelection(baseOffset: 0, extentOffset: vb.length);
       _cuonToiConTroNeuCan();
-      if (mounted) hienThongBaoGiua(context, 'Đã chọn tất cả');
+      if (mounted) hienThongBaoGiua(context, 'Đã chọn tất cả', ganTren: true);
       _batCheDoNhanhChonTatCa();
       return;
     }
@@ -5758,10 +5674,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (_demBamAll >= 2 && vung.$1 == 0 && vung.$2 == vb.length) {
       _demBamAll = 0;
       _lanBamAllTruoc = null;
-      if (mounted) hienThongBaoGiua(context, 'Đã chọn tất cả');
+      if (mounted) hienThongBaoGiua(context, 'Đã chọn tất cả', ganTren: true);
       _batCheDoNhanhChonTatCa();
     } else if (mounted) {
-      hienThongBaoGiua(context, 'Bấm "All" 2-4 lần để chọn vùng rộng hơn');
+      hienThongBaoGiua(context, 'Bấm "All" 2-4 lần để chọn vùng rộng hơn', ganTren: true);
     }
   }
 
@@ -5954,16 +5870,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (mounted) {
       hienThongBaoGiua(context, 'Bấm End 2 lần để xuống dưới cùng văn bản');
     }
-  }
-
-  /// 4 nút mũi tên điều hướng (`_xayHangDieuHuongConTro`) — "rút gọn" ẩn cả
-  /// hàng đó đi (xem nơi dựng ở `build`), TRỪ nút ẩn/hiện — nút đó "nhảy"
-  /// xuống thanh Copy/Cut/Paste/All ngay bên dưới, luôn về đúng một chỗ
-  /// (không còn phân biệt màn hình hẹp/rộng nữa).
-  bool _dieuHuongConTroAn = false;
-
-  void _bamNutAnHienDieuHuongConTro() {
-    setState(() => _dieuHuongConTroAn = !_dieuHuongConTroAn);
   }
 
   /// Trái/Phải: [dx] = ±1 ký tự. Lên/Xuống: [dy] = ±1 DÒNG HIỂN THỊ (không
@@ -13569,14 +13475,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// bản") — xem `_batDauChonViTriChenFile`.
   bool _dangChonViTriChenFile = false;
 
-  /// Hàng 4 nút mũi tên điều hướng con trỏ (Lên/Xuống/Trái/Phải) — nằm
-  /// NGAY TRÊN hàng Copy/Cut/Paste/All/Home/End (`_xayHangCongCuVanBanCamUng`),
-  /// cùng bật/tắt theo `_boPhimNhanhCamUngMo`. CHỈ dựng khi
-  /// `!_dieuHuongConTroAn` — "rút gọn" thì ẩn HẲN cả hàng này (sẽ ẩn theo
-  /// luôn Home/End, đứng cùng hàng) (xem nơi gọi ở `build`). Nút ẩn/hiện
-  /// KHÔNG còn nằm ở đây nữa — đã dời hẳn xuống hàng
-  /// `_xayHangCongCuVanBanCamUng` (bên phải nút Tiến tới), đứng yên một chỗ
-  /// dù 4 nút này đang hiện hay ẩn, xem `_NutAnHienDieuHuongConTro`.
+  /// Hàng 4 nút mũi tên điều hướng con trỏ (Lên/Xuống/Trái/Phải) — nằm NGAY
+  /// TRÊN hàng phím nhanh cảm ứng (`_xayHangPhimNhanhCamUng`), cùng bật/tắt
+  /// theo `_boPhimNhanhCamUngMo`. LUÔN hiện cùng Bộ phím nhanh — hàng
+  /// Copy/Cut/Paste/All và nút ẩn/hiện riêng của hàng này đã bỏ hẳn (trùng
+  /// với All/Copy/Cắt/Dán ngoài màn hình chính), không còn gì để ẩn/hiện
+  /// nữa.
   Widget _xayHangDieuHuongConTro() {
     final manHinhHep = MediaQuery.sizeOf(context).width < _nguongManHinhHep;
     final khoangCach = manHinhHep ? 0.0 : 8.0;
@@ -13705,89 +13609,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
-  /// Hàng công cụ Copy/Cut/Paste/All/Home/End — nằm NGAY TRÊN hàng phím
-  /// nhanh cảm ứng (`_xayHangPhimNhanhCamUng`), cùng bật/tắt theo
-  /// `_boPhimNhanhCamUngMo`. Giữ NGUYÊN VĂN nhãn tiếng Anh theo yêu cầu,
-  /// không dịch — Home/End có thông báo gợi ý "bấm 2 lần" ngay trong nhãn
-  /// nút để người dùng biết trước, không cần bấm thử.
-  Widget _xayHangCongCuVanBanCamUng() {
-    // Màn hình hẹp: sát các nút vào nhau (không khoảng cách) và ép hẳn về
-    // bên trái — nhường tối đa chỗ ngang để càng nhiều nút lọt vào khung
-    // nhìn cùng lúc càng tốt, đỡ phải cuộn ngang mới thấy hết. Màn hình
-    // rộng giữ khoảng cách 8 như cũ.
-    final manHinhHep = MediaQuery.sizeOf(context).width < _nguongManHinhHep;
-    final khoangCach = manHinhHep ? 0.0 : 8.0;
-    final cacNut = <Widget>[
-      _NutCongCuChu(nhan: 'Copy', onTap: _phimAoCopy),
-      _NutCongCuChu(nhan: 'Cắt', onTap: _phimAoCut),
-      _NutCongCuChu(
-        nhan: 'Dán',
-        onTap: _phimAoPasteCoLiet,
-        tyLeThuHep: 0.85,
-        bLiet: _phimPasteDangLiet,
-      ),
-      _NutCongCuChu(
-        nhan: 'All',
-        moTa: 'Chọn từ — bấm 2-4 lần: đoạn văn/cụm đoạn văn/tất cả',
-        onTap: _phimAoChonTatCa,
-        noiBat: _phimAllVuaChonTatCa,
-      ),
-      // Home/End "đổi chỗ" sang hàng 4 nút điều hướng
-      // (`_xayHangDieuHuongConTro`) — Lùi lại/Tiến tới xuống thay chỗ ở
-      // đây, hình dạng/logic y hệt hai nút cùng tên ở thanh Lùi/Tiến/Lưu
-      // phía trên (`_lui`/`_toi`), chỉ đổi màu nền giống nút Xoá ký tự của
-      // Bộ phím nhanh (đỏ nhạt) để phân biệt đây là bản sao trong Bộ phím
-      // nhanh.
-      // Rút hẹp 15% bề ngang (48 -> 40.8) so với các nút vuông mặc định —
-      // đỡ chiếm chỗ ngang hơn vì đây chỉ là bản sao phụ của hai nút chính
-      // ở thanh Lùi/Tiến/Lưu phía trên.
-      _NutPhimAo(
-        nhan: 'Lùi lại',
-        icon: Icons.undo,
-        moTa: 'Lùi lại (Ctrl + Z)',
-        mauNen: Colors.red.shade50,
-        mauVien: Colors.red.shade300,
-        rong: 48 * 0.85,
-        onTap: _lichSuLui.isEmpty ? () {} : _lui,
-      ),
-      _NutPhimAo(
-        nhan: 'Tiến tới',
-        icon: Icons.redo,
-        moTa: 'Tiến tới (Ctrl + Shift + Z)',
-        mauNen: Colors.red.shade50,
-        mauVien: Colors.red.shade300,
-        rong: 48 * 0.85,
-        onTap: _lichSuToi.isEmpty ? () {} : _toi,
-      ),
-      // Nút ẩn/hiện 4 nút điều hướng — LUÔN ở đây, sát bên phải cùng của
-      // hàng này (bên phải nút Tiến tới), dù 4 nút điều hướng đang hiện hay
-      // đang ẩn — không còn "nhảy" theo trạng thái nữa, xem
-      // `_NutAnHienDieuHuongConTro`.
-      _NutAnHienDieuHuongConTro(an: _dieuHuongConTroAn, onTap: _bamNutAnHienDieuHuongConTro),
-    ];
-    return Material(
-      color: Colors.white,
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        child: Align(
-          alignment: manHinhHep ? Alignment.centerLeft : Alignment.center,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (var i = 0; i < cacNut.length; i++) ...[
-                  if (i > 0) SizedBox(width: khoangCach),
-                  cacNut[i],
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   /// Hàng phím thay thế bàn phím hệ thống — nằm sát mép trên, ngay phía
   /// trên `ThanhCongCu`, khi "Bộ phím nhanh cho màn hình cảm ứng" đang mở.
   /// Nút X đỏ sát mép phải tắt hẳn công cụ, trả lại bàn phím ảo bình
@@ -13856,6 +13677,29 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   ),
                 ),
               ),
+            ),
+            const SizedBox(width: 8),
+            // Lùi lại/Tiến tới — dời từ hàng Copy/Cut/Paste/All (đã bỏ hẳn,
+            // trùng với nút All/Copy/Cắt ngoài màn hình chính) xuống đây,
+            // ngay cạnh "Đóng", cả ba căn phải sát mép phải màn hình.
+            _NutPhimAo(
+              nhan: 'Lùi lại',
+              icon: Icons.undo,
+              moTa: 'Lùi lại (Ctrl + Z)',
+              mauNen: Colors.red.shade50,
+              mauVien: Colors.red.shade300,
+              rong: 48 * 0.85,
+              onTap: _lichSuLui.isEmpty ? () {} : _lui,
+            ),
+            SizedBox(width: khoangCach),
+            _NutPhimAo(
+              nhan: 'Tiến tới',
+              icon: Icons.redo,
+              moTa: 'Tiến tới (Ctrl + Shift + Z)',
+              mauNen: Colors.red.shade50,
+              mauVien: Colors.red.shade300,
+              rong: 48 * 0.85,
+              onTap: _lichSuToi.isEmpty ? () {} : _toi,
             ),
             const SizedBox(width: 8),
             // Nút "Đóng" (đỏ, tắt hẳn Bộ phím nhanh) — nút "Ẩn" (tạm ẩn, chỉ
@@ -14746,9 +14590,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               ),
             ),
             if (_dangChonViTriChenFile) _xayThanhChonViTriChenFile(),
-            if (!_dangChonViTriChenFile && _boPhimNhanhCamUngMo && !_dieuHuongConTroAn)
-              _xayHangDieuHuongConTro(),
-            if (!_dangChonViTriChenFile && _boPhimNhanhCamUngMo) _xayHangCongCuVanBanCamUng(),
+            if (!_dangChonViTriChenFile && _boPhimNhanhCamUngMo) _xayHangDieuHuongConTro(),
             if (!_dangChonViTriChenFile && _boPhimNhanhCamUngMo) _xayHangPhimNhanhCamUng(),
             // Bọc riêng bằng ValueListenableBuilder (xem chú thích ở
             // `_songAmTick`) — CHỈ ThanhCongCu dựng lại mỗi lần sóng âm đổi

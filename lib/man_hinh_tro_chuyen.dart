@@ -398,6 +398,23 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
           }
           final vb = _oNhap.text;
           final batDau = _micDiemBatDau.clamp(0, vb.length);
+          // Trước khi chèn chữ do lời nói ra, luôn đảm bảo có dấu cách TRƯỚC
+          // nó (tách biệt đoạn nói trước/sau, không dính chùm) — TRỪ KHI
+          // ngay trước vị trí chèn đã là dấu cách rồi, hoặc đang ở đầu văn
+          // bản (không có ký tự gì cả) thì không cần thêm nữa. Luôn áp dụng,
+          // không phụ thuộc cài đặt nào — ĐÚNG khuôn trang soạn thảo chính.
+          if (chen.isNotEmpty && batDau > 0 && vb[batDau - 1] != ' ' && vb[batDau - 1] != '\n') {
+            chen = ' $chen';
+          }
+          // "Tự động chèn dấu cách sau mỗi lần nói" (Cài đặt) — ĐÚNG khuôn
+          // trang soạn thảo chính: thêm một dấu cách NGAY SAU cụm chữ vừa
+          // nhận dạng, mỗi lần cập nhật (không đợi câu chốt xong).
+          if (chen.isNotEmpty &&
+              widget.caiDat.tuDongChenKhoangCach &&
+              chen[chen.length - 1] != ' ' &&
+              chen[chen.length - 1] != '\n') {
+            chen = '$chen ';
+          }
           final ketThucCu = (batDau + _micChuGanNhat.length).clamp(batDau, vb.length);
           final moi = vb.substring(0, batDau) + chen + vb.substring(ketThucCu);
           _micTuDoiONhap = true;

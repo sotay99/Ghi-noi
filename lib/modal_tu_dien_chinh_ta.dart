@@ -280,6 +280,20 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
           tooltip: 'Đóng',
           onPressed: () => Navigator.of(context).pop(),
         ),
+        // "+ Thêm cặp từ" luôn ở góc trên bên phải, cùng dòng tiêu đề — lướt
+        // màn hình lên xuống vẫn thấy, không cần cuộn lên tận đầu mới bấm
+        // được.
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              onPressed: _coCapRong ? null : _themCap,
+              tooltip: 'Thêm cặp từ',
+              icon: const Icon(Icons.add_circle_outline),
+              disabledColor: Colors.white38,
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         child: ListView(
@@ -296,16 +310,6 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
               'còn "Chấp nhận tất cả đề xuất của từ điển" chỉ áp dụng từ thay '
               'thế thứ nhất.',
               style: TextStyle(height: 1.5, color: Color(0xFF5F6368)),
-            ),
-            const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: FilledButton.icon(
-                onPressed: _coCapRong ? null : _themCap,
-                style: FilledButton.styleFrom(backgroundColor: _mauChinh),
-                icon: const Icon(Icons.add),
-                label: const Text('Thêm cặp từ'),
-              ),
             ),
             const SizedBox(height: 8),
             for (final c in _ds) ...[

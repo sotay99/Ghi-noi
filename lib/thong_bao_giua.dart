@@ -5,12 +5,16 @@
 import 'package:flutter/material.dart';
 
 void hienThongBaoGiua(BuildContext context, String chu,
-    {Duration thoiGian = const Duration(seconds: 2)}) {
+    {Duration thoiGian = const Duration(seconds: 2), bool ganTren = false}) {
   final overlay = Overlay.of(context);
   late final OverlayEntry entry;
 
   entry = OverlayEntry(
-    builder: (_) => Center(
+    // [ganTren] — dùng cho Copy/Cắt/Dán/All ở thanh công cụ dưới: thông báo
+    // hiện cao hơn giữa màn hình một chút (~15% từ đỉnh, tức ~85% chiều cao
+    // tính từ đáy) để không che khuất đúng chỗ người dùng vừa thao tác.
+    builder: (_) => Align(
+      alignment: ganTren ? const Alignment(0, -0.7) : Alignment.center,
       child: Material(
         color: Colors.transparent,
         child: Container(
