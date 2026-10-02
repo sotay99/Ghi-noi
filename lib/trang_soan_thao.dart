@@ -508,34 +508,47 @@ class _NutDanNoiKhiThuGonState extends State<_NutDanNoiKhiThuGon>
 
   /// Sóng tam giác tuần hoàn 10 giây: 0,5 → 0,1 (5 giây đầu) → 0,5 (5 giây
   /// sau), tuyến tính cả hai chiều, không có đoạn đứng im.
-  double _doRoTaiThoiDiem(double gia) {
+  double _doRoNutTaiThoiDiem(double gia) {
     final t = gia * 10;
     if (t < 5) return 0.5 - 0.08 * t;
     return 0.1 + 0.08 * (t - 5);
   }
+
+  /// (YÊU CẦU MỚI) Chữ "Dán" màu xanh dương, độ rõ ĐỘC LẬP với độ rõ của
+  /// cả nút (nền xám) — luôn cao hơn đúng 0,2 (20 điểm phần trăm): nút
+  /// 50% ↔ chữ 70%, nút 10% ↔ chữ 30%, cùng tăng/giảm đồng bộ ở giữa. Vì
+  /// vậy KHÔNG dùng một `Opacity` DUY NHẤT bọc cả nút (sẽ nhân chung một
+  /// độ rõ cho cả nền lẫn chữ) — gán độ rõ riêng cho từng màu qua
+  /// `withOpacity`.
+  double _doRoChuTaiThoiDiem(double doRoNut) => doRoNut + 0.2;
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _dk,
       builder: (context, _) {
-        return Opacity(
-          opacity: _doRoTaiThoiDiem(_dk.value),
-          child: Tooltip(
-            message: 'Dán',
-            child: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: () {},
-              onTapDown: (_) => widget.onTap(),
-              child: Container(
-                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF5F6368),
-                  borderRadius: BorderRadius.circular(20),
+        final doRoNut = _doRoNutTaiThoiDiem(_dk.value);
+        return Tooltip(
+          message: 'Dán',
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () {},
+            onTapDown: (_) => widget.onTap(),
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF5F6368).withOpacity(doRoNut),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                'Dán',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blue.withOpacity(_doRoChuTaiThoiDiem(doRoNut)),
                 ),
-                alignment: Alignment.center,
-                child: const Text('Dán', style: TextStyle(fontSize: 15, color: Colors.white)),
               ),
             ),
           ),

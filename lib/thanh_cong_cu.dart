@@ -237,6 +237,17 @@ class ThanhCongCu extends StatelessWidget {
   /// lên mới đủ chỗ hiện tên đầy đủ.
   static const _nguongManHinhRong = 900.0;
 
+  /// (YÊU CẦU MỚI) Ngưỡng bề ngang cho "màn hình RẤT hẹp" — hẹp hơn hẳn mốc
+  /// 600px dùng ở các chỗ khác trong app (`_nguongManHinhHep` bên
+  /// `trang_soan_thao.dart`, cho những điều chỉnh NHẸ hơn như co nhỏ nút).
+  /// Đây là mốc riêng, CHỈ dùng cho đúng việc: ở màn hình điện thoại phổ
+  /// biến nhất (bề ngang logic cỡ 360-420px khi dựng đứng — ví dụ máy người
+  /// dùng mô tả, khoảng 8 inch đường chéo), hàng nút bên trái cộng cụm
+  /// All/Ghi âm/sóng âm/Micro bên phải quá chật — ẨN HẲN nút "Hướng dẫn"
+  /// khỏi hàng chính, dồn qua một hàng phụ riêng CHỈ hiện khi đang bật chú
+  /// thích (xem `_hangPhuHuongDanKhiRatHep`).
+  static const _nguongManHinhRatHep = 420.0;
+
   Widget _nut(
     bool rong,
     IconData icon,
@@ -263,8 +274,12 @@ class ThanhCongCu extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, rangBuoc) {
             final rong = rangBuoc.maxWidth >= _nguongManHinhRong;
+            final ratHep = rangBuoc.maxWidth < _nguongManHinhRatHep;
 
-            return Container(
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+            Container(
               // Thấp hết mức còn bấm trúng: 48px vẫn đủ vùng chạm theo chuẩn
               // Material, mà nhường gần hết màn hình cho chữ.
               height: 48,
@@ -354,6 +369,10 @@ class ThanhCongCu extends StatelessWidget {
                           // với nút Thư mục ở thanh trên gần tên tệp
                           // (`_nutDieuHuongTep` trong `trang_soan_thao.dart`),
                           // giữ lại đúng một nút duy nhất.
+                          // (YÊU CẦU MỚI) Màn hình RẤT hẹp: ẩn hẳn nút này
+                          // khỏi hàng chính (hết chật) — dồn qua hàng phụ
+                          // riêng, xem `_hangPhuHuongDanKhiRatHep`.
+                          if (!ratHep)
                           _NutCoChuThich(
                             hien: hienChuThich,
                             chu: 'Hướng dẫn sử dụng',
@@ -528,8 +547,37 @@ class ThanhCongCu extends StatelessWidget {
                   ],
                 ],
               ),
+            ),
+            // (YÊU CẦU MỚI) Màn hình RẤT hẹp mất nút "Hướng dẫn" ở hàng
+            // chính (xem trên) — dồn qua đây: một hàng phụ, ngay sát dưới
+            // hàng chính, CHỈ hiện trong lúc chú thích đang hiện (bật bằng
+            // nút "i"), ẩn lại ngay khi chú thích tắt — đúng yêu cầu, không
+            // chiếm thêm chỗ lúc bình thường.
+            if (ratHep && hienChuThich) _hangPhuHuongDanKhiRatHep(),
+              ],
             );
           },
+        ),
+      ),
+    );
+  }
+
+  /// Hàng phụ CHỈ chứa nút "Hướng dẫn và mẹo sử dụng" — xem
+  /// `_nguongManHinhRatHep`.
+  Widget _hangPhuHuongDanKhiRatHep() {
+    return Container(
+      height: 40,
+      alignment: Alignment.center,
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Color(0xFFE3E3E3), width: 1)),
+      ),
+      child: _NutCoChuThich(
+        hien: hienChuThich,
+        chu: 'Hướng dẫn sử dụng',
+        child: NutNho(
+          bieuTuong: Icons.help_outline_rounded,
+          nhan: 'Hướng dẫn và mẹo sử dụng',
+          khiBam: khiBamHuongDan,
         ),
       ),
     );

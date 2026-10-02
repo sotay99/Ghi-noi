@@ -50,6 +50,38 @@ tình huống đó (khác hẳn vấn đề "sự kiện không bắn" đã xác
 hẳn cơ chế tự đo `caoBanPhim` hiện tại) mới còn đáng thử, rủi ro cao hơn vì
 có thể phá vỡ lý do ban đầu chọn `false`, cần đọc kỹ code trước khi đổi.
 
+**Đã thử lần 4 (2026-10-02, v123):** v121 đỡ hẳn (người dùng xác nhận: chỉ
+cần bấm MỘT nút bất kỳ là hết ngay, không cần bấm nhiều nút/F5 như trước
+nữa) — nhưng vẫn CHƯA hết hoàn toàn. Điều đó cho thấy đúng dự đoán ở lần
+3: `MediaQuery.viewInsets` nội bộ Flutter đã có giá trị ĐÚNG, chỉ thiếu
+một `setState` để vẽ lại — còn phép ĐO JS (`visualViewport.height`/
+`innerHeight`) ở lần 3 KHÔNG hề đổi trong đúng tình huống lỗi này (lý do
+vòng thăm dò không tự phát hiện ra). Sửa ở v123: bỏ hẳn việc so sánh số
+đo, đổi `dangKyThamDoChieuCaoVienPort` thành một "nhịp tim" ép `setState`
+VÔ ĐIỀU KIỆN mỗi 300ms — làm đúng việc một nút bấm tình cờ làm được, tự
+động, không cần đợi người dùng.
+
+**Quyết định (2026-10-02): DỪNG sửa tiếp, dù đã đỡ hơn rất nhiều.** Người
+dùng xác nhận sau v123 lỗi VẪN CÒN (dù bây giờ phải nhẹ hơn RẤT NHIỀU so
+với lúc đầu — không rõ còn tồn đọng ở mức độ nào, cần hỏi lại người dùng
+mô tả hiện tượng mới nếu được nhờ sửa tiếp, ĐỪNG giả định giống mô tả cũ ở
+đầu tệp này) và yêu cầu KHÔNG sửa nữa, hẹn một dịp khác. Đã thử 4 lần:
+1. `didChangeMetrics` (không đủ — Flutter Engine không dịch lại sự kiện
+   cho một số đường ẩn bàn phím ảo qua nút Back).
+2. Nghe thẳng `window.onResize` qua `dart:html` (không đủ — trình duyệt
+   cũng không luôn bắn `resize` cho đúng tình huống này).
+3. Thăm dò (poll) SO SÁNH `visualViewport.height`/`innerHeight` mỗi 300ms,
+   chỉ `setState` khi THẤY LỆCH (đỡ hẳn, nhưng chưa hết — số đo JS không
+   đổi trong tình huống lỗi nên không tự phát hiện ra).
+4. Thăm dò KHÔNG so sánh — ép `setState` vô điều kiện mỗi 300ms (nhịp
+   tim). Đỡ hơn lần 3 nhưng CHƯA xác nhận hết hẳn.
+ĐỪNG lặp lại 4 hướng trên nếu được nhờ sửa tiếp. Hướng CHƯA thử, đáng xem
+trước tiên: đổi khoảng thăm dò 300ms xuống ngắn hơn (ví dụ 100-150ms) xem
+có giảm thêm độ trễ cảm nhận được hay không (rẻ, ít rủi ro); nếu không ăn
+thua nữa mới tới hướng rủi ro cao hơn: `resizeToAvoidBottomInset: true`
+(để `Scaffold` tự lo, bỏ hẳn cơ chế tự đo `caoBanPhim` hiện tại) — có thể
+phá vỡ lý do ban đầu chọn `false`, đọc kỹ code trước khi đổi.
+
 **Né vấn đề thay vì sửa (2026-09-22):** lỗi này KHÔNG xảy ra ở bản APK
 (chỉ web). Đã thêm dải gợi ý "Tải app APK" (nền xanh dương nhạt, dưới dải
 lỗi `_loi`, trong `lib/trang_soan_thao.dart`) — chỉ hiện khi `kIsWeb` VÀ

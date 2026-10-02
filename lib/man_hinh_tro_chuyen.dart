@@ -203,19 +203,26 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     _datLaiHenLamMoiMicChatDoImLang();
   }
 
-  /// (YÊU CẦU MỚI v123) Thay vì bị động CHỜ thiết bị tự ngắt phiên nghe rồi
-  /// mới bật lại (không đáng tin cậy ở kênh chat — có lúc ngắt rồi không
-  /// tự bật lại được, khác hẳn trang soạn thảo chính), ứng dụng giờ CHỦ
-  /// ĐỘNG làm việc đó: hễ 7 giây liên tục không có ký tự mới nào xuất hiện
-  /// (do nói hay do gõ tay đều tính, vì cả hai đều đi qua
-  /// `_datLaiHenTuTatMicChatImLang`), app tự huỷ phiên `listen()` đang chạy
-  /// rồi BẬT LẠI NGAY một phiên hoàn toàn mới — ĐÚNG mô hình "gõ tay thắng
-  /// mic" (`_nguoiDungVuaGoChat`) đã chứng minh hoạt động tốt, chỉ khác là
-  /// không có khoảng tạm dừng hiển thị cho người dùng thấy (không đổi
-  /// `_micDangNghe`/`_micDangNgheThat` — với người dùng, mic coi như chưa
-  /// hề tắt, chỉ là "làm mới" phiên ngầm). Không đụng gì tới cài đặt
-  /// "Khi không nói, tự động tắt micro sau: N giây" (`_henTuTatMicChatImLang`
-  /// ở trên, HOÀN TOÀN riêng, vẫn tắt hẳn không bật lại đúng sau N giây).
+  /// (YÊU CẦU v123, SỬA LẠI Ở v124) Thay vì bị động CHỜ thiết bị tự ngắt
+  /// phiên nghe rồi mới bật lại (không đáng tin cậy ở kênh chat — có lúc
+  /// ngắt rồi không tự bật lại được, khác hẳn trang soạn thảo chính), ứng
+  /// dụng CHỦ ĐỘNG làm việc đó: hễ 7 giây liên tục không có ký tự mới nào
+  /// xuất hiện (do nói hay do gõ tay đều tính, vì cả hai đều đi qua
+  /// `_datLaiHenTuTatMicChatImLang`), coi như MỘT lượt "gõ tay" ảo — gọi
+  /// THẲNG `_nguoiDungVuaGoChat()`.
+  ///
+  /// (SỬA LẠI v124) Bản v123 tự huỷ rồi tự bật lại NGAY LẬP TỨC (không qua
+  /// `_nguoiDungVuaGoChat`, không đổi `_micDangNghe`) — người dùng xác nhận
+  /// bản đó KHÔNG đáng tin cậy bằng cơ chế "gõ tay thắng mic" đã chứng minh
+  /// hoạt động tốt: bật lại NGAY sau khi vừa huỷ có thể chưa đủ thời gian
+  /// để thiết bị/trình duyệt thật sự nhả micro ra, lặp lại nhiều lần có
+  /// lúc còn gây hại hơn chờ thiết bị. Thay vì tự chế lại cơ chế huỷ+bật
+  /// riêng, DÙNG THẲNG LUÔN `_nguoiDungVuaGoChat()` — coi 7 giây im lặng
+  /// như một lượt gõ tay ảo: huỷ hẳn phiên đang nghe, đổi `_micDangNghe`/
+  /// `_micDangNgheThat` về `false` (nút vuông đỏ tạm ẩn, giống lúc gõ tay),
+  /// rồi tự bật lại sau đúng số giây đã cài ở "Thời gian tự bật lại Micro"
+  /// (Cài đặt) — CÙNG một đường, CÙNG độ tin cậy với lúc gõ tay, không có
+  /// đường rẽ riêng nào có thể âm thầm hỏng theo cách khác.
   static const _khoangLamMoiMicChatDoImLang = Duration(seconds: 7);
   Timer? _henLamMoiMicChatDoImLang;
 
@@ -229,16 +236,9 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     if (!_micDangNghe || !mounted) return;
     widget.ghiNhatKyMicro?.call(
         '[chat] ${_khoangLamMoiMicChatDoImLang.inSeconds}s không có ký tự mới — '
-        'ứng dụng CHỦ ĐỘNG làm mới phiên nghe (không chờ thiết bị tự ngắt)');
-    // Huỷ phiên cũ TRƯỚC — mọi `onResult`/`onStatus` của phiên này tới trễ
-    // sau đây đều bị vứt (so `idPhien`) hoặc không còn tác dụng gì (xem
-    // `_khiMicDoiTrangThai`: `_micDangNghe` vẫn `true` suốt nên nếu
-    // `notListening` của phiên vừa huỷ này tới, nó sẽ TỰ lên lịch bật lại
-    // lần nữa qua `_lenLichBatLaiMicChat` — vô hại, trùng lặp vô hại vì
-    // `_batPhienNgheMicChat` sau đó luôn an toàn để gọi lại).
-    _phienNgheMicChat++;
-    _micro.cancel();
-    _lenLichBatLaiMicChat();
+        'ứng dụng CHỦ ĐỘNG làm mới phiên nghe (coi như một lượt gõ tay ảo, '
+        'không chờ thiết bị tự ngắt)');
+    _nguoiDungVuaGoChat();
   }
 
   void _hienCanhBaoMicIphoneChat() {
@@ -493,7 +493,21 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     if (_micTuDoiONhap) return;
     final cuChat = _chuChatGanNhat;
     final chuMoiChat = _oNhap.text;
-    if (cuChat != chuMoiChat) _apDungTuDongDinhDangChat(cuChat, chuMoiChat);
+    // (SỬA LỖI v124 — "micro chỉ cho ra MỘT từ rồi tự tắt/bật lại ngay",
+    // CHỈ xảy ra khi khung nhập đang có tiêu điểm/con trỏ nhấp nháy thật)
+    // `TextEditingController` phát thông báo (gọi listener này) mỗi khi
+    // `value` đổi — kể cả khi CHỈ `selection` đổi, chữ không hề đổi. Khung
+    // nhập đang có tiêu điểm thật thì mỗi lần mic tự gán `_oNhap.value`
+    // (dù đã bọc cờ `_micTuDoiONhap`) có thể khiến trình duyệt/bàn phím ảo
+    // dội lại một thông báo đổi SELECTION riêng (không đổi chữ) tới SAU KHI
+    // cờ đã được trả về `false` — khi đó hàm này tưởng nhầm là "người dùng
+    // vừa gõ tay" (dù chữ không đổi gì cả) và gọi `_nguoiDungVuaGoChat()`,
+    // huỷ ngay phiên đang nghe — đúng triệu chứng "nói nhiều từ nhưng chỉ
+    // vào được một từ". Chặn tại gốc: KHÔNG có gì để làm (không đụng tới
+    // cả tự động định dạng lẫn "gõ tay thắng mic") khi CHỮ chưa hề đổi,
+    // bất kể vì sao hàm này được gọi.
+    if (cuChat == chuMoiChat) return;
+    _apDungTuDongDinhDangChat(cuChat, chuMoiChat);
 
     // `_micDangNghe` tắt vì gõ tay (`_dangTamTatMicChatDeGo`) VẪN phải tiếp
     // tục xử lý ở đây — gõ thêm ký tự nữa trong lúc đang đếm ngược chờ bật
