@@ -564,6 +564,13 @@ class ThanhCongCu extends StatelessWidget {
 
   /// Hàng phụ CHỈ chứa nút "Hướng dẫn và mẹo sử dụng" — xem
   /// `_nguongManHinhRatHep`.
+  ///
+  /// (YÊU CẦU MỚI) KHÔNG bọc `_NutCoChuThich` — nút này LUÔN hiện sẵn tên
+  /// đầy đủ ("? Hướng dẫn và mẹo sử dụng", dùng thẳng `_NutRong` chứ không
+  /// phải `NutNho`), nên không cần và không được hiện thêm dòng chú thích
+  /// dọc phía trên nữa (khác các nút ở hàng chính — những nút đó vẫn luôn
+  /// hiện chú thích như cũ, không đổi gì). Bấm nút "i" bật chú thích cũng
+  /// KHÔNG ảnh hưởng gì tới riêng nút này.
   Widget _hangPhuHuongDanKhiRatHep() {
     return Container(
       height: 40,
@@ -571,14 +578,10 @@ class ThanhCongCu extends StatelessWidget {
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: Color(0xFFE3E3E3), width: 1)),
       ),
-      child: _NutCoChuThich(
-        hien: hienChuThich,
-        chu: 'Hướng dẫn sử dụng',
-        child: NutNho(
-          bieuTuong: Icons.help_outline_rounded,
-          nhan: 'Hướng dẫn và mẹo sử dụng',
-          khiBam: khiBamHuongDan,
-        ),
+      child: _NutRong(
+        bieuTuong: Icons.help_outline_rounded,
+        nhan: 'Hướng dẫn và mẹo sử dụng',
+        khiBam: khiBamHuongDan,
       ),
     );
   }

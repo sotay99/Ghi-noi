@@ -3660,6 +3660,38 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _lichSuToiTheoTep.putIfAbsent(_ghiChuHienTai.id, () => []);
   static const _soLuongLichSuToiDa = 50;
 
+  /// (YÊU CẦU MỚI — bớt hại RAM khi có NHIỀU tệp) Mốc 50/tệp ở trên chỉ
+  /// chặn MỘT tệp phình to — nhưng `_lichSuLuiTheoTep`/`_lichSuToiTheoTep`
+  /// giữ NGUYÊN lịch sử của MỌI tệp đã từng mở trong phiên (cố ý, để quay
+  /// lại tệp cũ vẫn Lùi/Tiến được) — mở càng nhiều tệp, có văn bản lớn,
+  /// thì CẢ HAI Map này cứ phình to mãi suốt phiên làm việc, không tệp nào
+  /// tự nhường chỗ. Mỗi mốc là bản chụp TRỌN VẸN cả văn bản (xem
+  /// `_TrangThaiVanBan`), nên tệp dài + nhiều mốc + nhiều tệp cùng lúc là
+  /// đúng công thức hại RAM người dùng mô tả.
+  ///
+  /// Sửa bằng LRU (Least Recently Used) ở cấp ĐỘ TỆP: chỉ giữ lịch sử của
+  /// `_soLuongTepGiuLichSuToiDa` tệp đã mở GẦN NHẤT — mở thêm một tệp mới
+  /// vượt mốc đó thì tệp ÍT GẦN ĐÂY NHẤT bị xoá sạch lịch sử (Lùi lại về
+  /// tệp đó vẫn mở được bài, chỉ mất mốc Lùi/Tiến riêng của lần sửa trước
+  /// — chấp nhận được, vì đằng nào người dùng cũng đã rời khỏi tệp đó một
+  /// lúc lâu, cỡ chục tệp khác đã mở xen giữa). "Đã dùng gần đây" được
+  /// tính lại mỗi lần MỞ một tệp (`_moGhiChu`) — đủ, không cần tính theo
+  /// mỗi lần gõ chữ bên trong (quá tốn để làm vậy, mà cũng không cần thiết
+  /// — việc cần chặn là SỐ TỆP đồng thời giữ lịch sử, không phải tốc độ
+  /// gõ bên trong một tệp).
+  static const _soLuongTepGiuLichSuToiDa = 12;
+  final List<String> _thuTuMoTepGanDay = [];
+
+  void _ganDauDaMoTepChoLichSu(String id) {
+    _thuTuMoTepGanDay.remove(id);
+    _thuTuMoTepGanDay.add(id);
+    while (_thuTuMoTepGanDay.length > _soLuongTepGiuLichSuToiDa) {
+      final idCu = _thuTuMoTepGanDay.removeAt(0);
+      _lichSuLuiTheoTep.remove(idCu);
+      _lichSuToiTheoTep.remove(idCu);
+    }
+  }
+
   /// Bỏ qua mọi kết quả còn lại của câu nói đang dở.
   ///
   /// Bật lên khi người dùng chạm vào bàn phím giữa chừng: đoạn chữ đã hiện ra
@@ -3964,6 +3996,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void initState() {
     super.initState();
     _ghiChuHienTai = widget.kho.timGhiChu(widget.ghiChuId)!;
+    _ganDauDaMoTepChoLichSu(widget.ghiChuId);
     _thietBiHienTai = widget.caiDat.thietBiChonTay ?? doanThietBi();
     // Chỉ có tác dụng trên web (no-op ở Android/iOS gốc) — hiện đúng cảnh
     // báo CỦA CHÍNH TRÌNH DUYỆT (không tự đặt chữ được) khi bấm F5/đóng
@@ -4640,6 +4673,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // tồn tại nữa thì giữ lại mốc cũ trong Map chỉ tổ chiếm bộ nhớ vô ích.
     _lichSuLuiTheoTep.remove(idVuaXoa);
     _lichSuToiTheoTep.remove(idVuaXoa);
+    _thuTuMoTepGanDay.remove(idVuaXoa);
 
     final conLai = widget.kho.noiDungThuMuc(chaId).ghiChuCon;
     final laTuDongTao = conLai.isEmpty;
@@ -4673,6 +4707,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void _moGhiChu(String id) {
     final g = widget.kho.timGhiChu(id);
     if (g == null) return;
+    _ganDauDaMoTepChoLichSu(id);
 
     setState(() {
       _ghiChuHienTai = g;
