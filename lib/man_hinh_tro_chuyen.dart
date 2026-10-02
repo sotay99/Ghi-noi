@@ -198,6 +198,47 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
         if (_micDangNghe) _tatMicChat();
       },
     );
+    // (YÊU CẦU MỚI v123) Cùng một mốc "vừa có ký tự mới" cũng dời lại luôn
+    // đồng hồ 7 giây bên dưới — xem `_datLaiHenLamMoiMicChatDoImLang`.
+    _datLaiHenLamMoiMicChatDoImLang();
+  }
+
+  /// (YÊU CẦU MỚI v123) Thay vì bị động CHỜ thiết bị tự ngắt phiên nghe rồi
+  /// mới bật lại (không đáng tin cậy ở kênh chat — có lúc ngắt rồi không
+  /// tự bật lại được, khác hẳn trang soạn thảo chính), ứng dụng giờ CHỦ
+  /// ĐỘNG làm việc đó: hễ 7 giây liên tục không có ký tự mới nào xuất hiện
+  /// (do nói hay do gõ tay đều tính, vì cả hai đều đi qua
+  /// `_datLaiHenTuTatMicChatImLang`), app tự huỷ phiên `listen()` đang chạy
+  /// rồi BẬT LẠI NGAY một phiên hoàn toàn mới — ĐÚNG mô hình "gõ tay thắng
+  /// mic" (`_nguoiDungVuaGoChat`) đã chứng minh hoạt động tốt, chỉ khác là
+  /// không có khoảng tạm dừng hiển thị cho người dùng thấy (không đổi
+  /// `_micDangNghe`/`_micDangNgheThat` — với người dùng, mic coi như chưa
+  /// hề tắt, chỉ là "làm mới" phiên ngầm). Không đụng gì tới cài đặt
+  /// "Khi không nói, tự động tắt micro sau: N giây" (`_henTuTatMicChatImLang`
+  /// ở trên, HOÀN TOÀN riêng, vẫn tắt hẳn không bật lại đúng sau N giây).
+  static const _khoangLamMoiMicChatDoImLang = Duration(seconds: 7);
+  Timer? _henLamMoiMicChatDoImLang;
+
+  void _datLaiHenLamMoiMicChatDoImLang() {
+    _henLamMoiMicChatDoImLang?.cancel();
+    _henLamMoiMicChatDoImLang =
+        Timer(_khoangLamMoiMicChatDoImLang, _lamMoiPhienMicChatDoImLang);
+  }
+
+  void _lamMoiPhienMicChatDoImLang() {
+    if (!_micDangNghe || !mounted) return;
+    widget.ghiNhatKyMicro?.call(
+        '[chat] ${_khoangLamMoiMicChatDoImLang.inSeconds}s không có ký tự mới — '
+        'ứng dụng CHỦ ĐỘNG làm mới phiên nghe (không chờ thiết bị tự ngắt)');
+    // Huỷ phiên cũ TRƯỚC — mọi `onResult`/`onStatus` của phiên này tới trễ
+    // sau đây đều bị vứt (so `idPhien`) hoặc không còn tác dụng gì (xem
+    // `_khiMicDoiTrangThai`: `_micDangNghe` vẫn `true` suốt nên nếu
+    // `notListening` của phiên vừa huỷ này tới, nó sẽ TỰ lên lịch bật lại
+    // lần nữa qua `_lenLichBatLaiMicChat` — vô hại, trùng lặp vô hại vì
+    // `_batPhienNgheMicChat` sau đó luôn an toàn để gọi lại).
+    _phienNgheMicChat++;
+    _micro.cancel();
+    _lenLichBatLaiMicChat();
   }
 
   void _hienCanhBaoMicIphoneChat() {
@@ -795,6 +836,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
 
   Future<void> _tatMicChat() async {
     _henTuTatMicChatImLang?.cancel();
+    _henLamMoiMicChatDoImLang?.cancel();
     _henBatLaiMicChat?.cancel();
     _henGoXongMicChat?.cancel();
     _dangTamTatMicChatDeGo = false;
@@ -937,6 +979,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     HardwareKeyboard.instance.removeHandler(_khiPhimCucBoTroChuyen);
     _theoDoiTapDoiTroChuyen.dispose();
     _henTuTatMicChatImLang?.cancel();
+    _henLamMoiMicChatDoImLang?.cancel();
     _henBatLaiMicChat?.cancel();
     _henGoXongMicChat?.cancel();
     if (_micDangNghe) _micro.stop();

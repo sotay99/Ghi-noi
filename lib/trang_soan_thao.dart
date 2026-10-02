@@ -470,6 +470,81 @@ class _NutNoiTuThoState extends State<_NutNoiTuTho> with SingleTickerProviderSta
   }
 }
 
+/// (YÊU CẦU MỚI v123) Nút "Dán" nổi góc trên-TRÁI, chỉ hiện khi đã "Thu
+/// gọn thanh công cụ" (nút Dán cố định ở thanh trên — `_nutDanCongCu` —
+/// cũng biến mất theo lúc đó, không còn cách nào Dán nhanh nữa) — cùng độ
+/// cao với nút nổi "Mở rộng" ở góc trên-phải (`_NutNoiTuTho`), nhưng KHÔNG
+/// dùng lại chính widget đó vì nhịp thở khác hẳn: độ rõ dao động liên tục
+/// giữa 50% và 10%, mỗi chiều đúng 5 giây, KHÔNG có đoạn đứng im — một
+/// sóng tam giác tuần hoàn 10 giây, thay vì nhịp 20%→100%→(đứng im)→20%
+/// của `_NutNoiTuTho`. Logic bấm vào y hệt nút "Dán" cố định cũ
+/// (`_phimAoPasteCoLiet`, cùng cờ liệt `_phimPasteDangLiet` chống dán
+/// trùng khi bấm nhanh hai lần).
+class _NutDanNoiKhiThuGon extends StatefulWidget {
+  const _NutDanNoiKhiThuGon({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  State<_NutDanNoiKhiThuGon> createState() => _NutDanNoiKhiThuGonState();
+}
+
+class _NutDanNoiKhiThuGonState extends State<_NutDanNoiKhiThuGon>
+    with SingleTickerProviderStateMixin {
+  static const _chuKy = Duration(seconds: 10);
+  late final AnimationController _dk;
+
+  @override
+  void initState() {
+    super.initState();
+    _dk = AnimationController(vsync: this, duration: _chuKy)..repeat();
+  }
+
+  @override
+  void dispose() {
+    _dk.dispose();
+    super.dispose();
+  }
+
+  /// Sóng tam giác tuần hoàn 10 giây: 0,5 → 0,1 (5 giây đầu) → 0,5 (5 giây
+  /// sau), tuyến tính cả hai chiều, không có đoạn đứng im.
+  double _doRoTaiThoiDiem(double gia) {
+    final t = gia * 10;
+    if (t < 5) return 0.5 - 0.08 * t;
+    return 0.1 + 0.08 * (t - 5);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _dk,
+      builder: (context, _) {
+        return Opacity(
+          opacity: _doRoTaiThoiDiem(_dk.value),
+          child: Tooltip(
+            message: 'Dán',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: () {},
+              onTapDown: (_) => widget.onTap(),
+              child: Container(
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF5F6368),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                alignment: Alignment.center,
+                child: const Text('Dán', style: TextStyle(fontSize: 15, color: Colors.white)),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// Nút chữ (Copy/Cut/Paste/All/Home/End) của hàng công cụ trên hàng phím
 /// nhanh cảm ứng — CÙNG kiểu dáng `_NutPhimAo` nhưng rộng theo chữ (đệm
 /// ngang) thay vì cỡ vuông cố định 48px, vì nhãn ở đây là CỤM CHỮ tiếng
@@ -14834,6 +14909,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 moTa: 'Mở rộng — hiện lại thanh công cụ',
                 onTap: () => setState(() => _thuGonThanhCongCu = false),
               ),
+            ),
+          // (YÊU CẦU MỚI v123) Thu gọn thanh công cụ làm mất luôn nút "Dán"
+          // cố định (`_nutDanCongCu`, ở thanh trên) — thay bằng một nút nổi
+          // góc trái, cùng độ cao với "Mở rộng" ở góc phải, để Dán vẫn luôn
+          // trong tầm tay. Cùng điều kiện ẩn/hiện với "Mở rộng".
+          if (_thuGonThanhCongCu && !_hienThanhTimKiem && !_trinhGhiAmMo && !_dangChonViTriChenFile)
+            Positioned(
+              top: MediaQuery.paddingOf(context).top + 4,
+              left: 8,
+              child: _NutDanNoiKhiThuGon(onTap: _phimAoPasteCoLiet),
             ),
           _nhanDoanSo(caoBanPhim),
         ],
