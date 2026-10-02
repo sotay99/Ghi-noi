@@ -16,6 +16,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.dangNghe,
     required this.songAm,
     required this.sanSang,
+    this.biKhoaThietBi = false,
     required this.neThanhDieuHuong,
     required this.nhanPhimTat,
     required this.khiBamMicro,
@@ -72,6 +73,12 @@ class ThanhCongCu extends StatelessWidget {
   final bool dangNghe;
   final List<double> songAm;
   final bool sanSang;
+
+  /// Thiết bị này KHÔNG dùng được micro (iPhone bản web) — nút vẫn hiện ra
+  /// y hệt mọi thiết bị khác (không còn gộp chung với Ghi âm), chỉ đổi màu
+  /// (xám, không xanh) và luôn bấm được (để hiện cảnh báo, xem
+  /// `khiBamMicro`/`_hienCanhBaoMicIphone`).
+  final bool biKhoaThietBi;
   final bool neThanhDieuHuong;
 
   /// Đang hiện dòng chữ chú thích dọc phía trên từng nút hay không.
@@ -474,9 +481,10 @@ class ThanhCongCu extends StatelessWidget {
                       child: _NutMicroTron(
                         bat: bat,
                         sanSang: sanSang,
+                        biKhoaThietBi: biKhoaThietBi,
                         mau: mau,
                         nhanPhimTat: nhanPhimTat,
-                        khiBam: sanSang ? khiBamMicro : null,
+                        khiBam: (sanSang || biKhoaThietBi) ? khiBamMicro : null,
                       ),
                     ),
                   ],
@@ -552,6 +560,7 @@ class _NutMicroTron extends StatelessWidget {
   const _NutMicroTron({
     required this.bat,
     required this.sanSang,
+    this.biKhoaThietBi = false,
     required this.mau,
     required this.nhanPhimTat,
     required this.khiBam,
@@ -559,6 +568,7 @@ class _NutMicroTron extends StatelessWidget {
 
   final bool bat;
   final bool sanSang;
+  final bool biKhoaThietBi;
   final ColorScheme mau;
   final String nhanPhimTat;
   final VoidCallback? khiBam;
@@ -567,9 +577,12 @@ class _NutMicroTron extends StatelessWidget {
   Widget build(BuildContext context) {
     // (VIỆC 5) Nền khi CHƯA hoạt động đổi từ xanh đậm (mau.primary) sang
     // xanh lá nhạt — GIỮ NGUYÊN nhánh đỏ khi đang nghe, không đụng tới.
-    final nen = !sanSang
-        ? Colors.grey.shade400
-        : (bat ? Colors.red.shade600 : Colors.green.shade100);
+    // Thiết bị bị khoá (iPhone web) luôn xám, bất kể `sanSang`/`bat`.
+    final nen = biKhoaThietBi
+        ? Colors.grey.shade300
+        : (!sanSang
+            ? Colors.grey.shade400
+            : (bat ? Colors.red.shade600 : Colors.green.shade100));
     // Chụp vào biến local KHÔNG NULL — `khiBam` là field public nên Dart
     // không tự "promote" kiểu của nó dù đã so sánh `!= null` (lỗi build:
     // "potentially null"), phải gán ra biến riêng mới dùng gọn được.
@@ -594,13 +607,19 @@ class _NutMicroTron extends StatelessWidget {
               // (VIỆC 3) Viền xanh dương đậm bao quanh nền — CHỈ ở nhánh
               // CHƯA hoạt động (sanSang && !bat, nền xanh lá nhạt). Nhánh
               // đang nghe (nền đỏ) và nhánh chưa sẵn sàng (nền xám) không có
-              // viền này, giữ nguyên như cũ.
-              decoration: (sanSang && !bat)
+              // viền này, giữ nguyên như cũ. Thiết bị bị khoá (iPhone web)
+              // luôn có viền — xám đậm thay vì xanh dương.
+              decoration: biKhoaThietBi
                   ? BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.blue.shade900, width: 2.5),
+                      border: Border.all(color: Colors.grey.shade700, width: 2.5),
                     )
-                  : null,
+                  : (sanSang && !bat)
+                      ? BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.blue.shade900, width: 2.5),
+                        )
+                      : null,
               // Phần C: đổi icon Material sang emoji 🎤 — giữ NGUYÊN mọi
               // logic/trạng thái (bật/tắt/màu nền), chỉ đổi phần hiển thị.
               // Cùng cách render emoji-làm-icon đã dùng cho nút Ẩn/hiện

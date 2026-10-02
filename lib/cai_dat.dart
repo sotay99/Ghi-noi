@@ -12,23 +12,39 @@ import 'lua_chon_phim_tat.dart';
 
 /// Một cặp từ trong "Từ điển sửa lỗi chính tả của bạn" (xem
 /// `moModalTuDienChinhTa` trong `modal_tu_dien_chinh_ta.dart`) — [loi] là
-/// từ hay gõ sai thường gặp, [thayThe] là
-/// từ thay vào. [thayThe] RỖNG nghĩa là "đề xuất xoá hẳn [loi] đi", không
-/// phải thay bằng chữ nào khác.
+/// từ hay gõ sai thường gặp, [dsThayThe] là danh sách TỐI ĐA 3 từ thay thế
+/// ("thứ nhất/hai/ba", theo đúng thứ tự trong danh sách). [dsThayThe] RỖNG
+/// nghĩa là "đề xuất xoá hẳn [loi] đi", không phải thay bằng chữ nào khác.
+/// [thayThe] (từ thay thế thứ NHẤT, tương thích ngược với dữ liệu cũ) vẫn
+/// giữ làm getter tiện dùng ở những chỗ chỉ cần MỘT đề xuất (ví dụ "Chấp
+/// nhận tất cả đề xuất của từ điển" — luôn chỉ áp dụng từ thứ nhất).
 class CapTuDien {
-  CapTuDien({required this.loi, this.thayThe = ''});
+  CapTuDien({required this.loi, String thayThe = '', List<String>? dsThayThe})
+      : dsThayThe = dsThayThe ?? (thayThe.isEmpty ? [] : [thayThe]);
 
   String loi;
-  String thayThe;
 
-  Map<String, dynamic> toJson() => {'loi': loi, 'thayThe': thayThe};
+  /// Tối đa 3 phần tử, không phần tử nào rỗng.
+  List<String> dsThayThe;
+
+  String get thayThe => dsThayThe.isEmpty ? '' : dsThayThe.first;
+
+  Map<String, dynamic> toJson() => {'loi': loi, 'dsThayThe': dsThayThe};
 
   static CapTuDien? tuJson(dynamic j) {
     if (j is! Map) return null;
     final loi = j['loi'];
     if (loi is! String || loi.trim().isEmpty) return null;
-    final thayThe = j['thayThe'];
-    return CapTuDien(loi: loi, thayThe: thayThe is String ? thayThe : '');
+    final dsRaw = j['dsThayThe'];
+    List<String> ds;
+    if (dsRaw is List) {
+      ds = dsRaw.whereType<String>().where((s) => s.isNotEmpty).take(3).toList();
+    } else {
+      // Dữ liệu cũ (chỉ có "thayThe" dạng một chuỗi).
+      final thayThe = j['thayThe'];
+      ds = (thayThe is String && thayThe.isNotEmpty) ? [thayThe] : [];
+    }
+    return CapTuDien(loi: loi, dsThayThe: ds);
   }
 }
 
@@ -243,6 +259,19 @@ class CaiDat {
 
   static const _khoaTuDienChinhTa = 'ghi_noi_tu_dien_chinh_ta';
 
+  /// Công tắc bật/tắt tổng của "Từ điển sửa lỗi chính tả của bạn" — mặc định
+  /// BẬT. Tắt thì không gạch vàng lượn sóng nữa, nhưng người dùng vẫn xem/
+  /// thêm/sửa/xoá cặp từ bình thường (chỉ phần QUÉT văn bản bị tắt).
+  bool tuDienChinhTaBatHoatDong = true;
+
+  static const _khoaTuDienChinhTaBatHoatDong =
+      'ghi_noi_tu_dien_chinh_ta_bat_hoat_dong';
+
+  Future<void> luuTuDienChinhTaBatHoatDong() async {
+    final kho = await SharedPreferences.getInstance();
+    await kho.setBool(_khoaTuDienChinhTaBatHoatDong, tuDienChinhTaBatHoatDong);
+  }
+
   Future<void> luuTuDienChinhTa() async {
     final kho = await SharedPreferences.getInstance();
     await kho.setString(
@@ -296,6 +325,8 @@ class CaiDat {
     tuDongChuanHoaNgoac = kho.getBool(_khoaTuDongChuanHoaNgoac) ?? true;
     tuDongDongBangKyTuDacBiet = kho.getBool(_khoaTuDongDongBangKyTuDacBiet) ?? true;
     anGoiYTaiApk = kho.getBool(_khoaAnGoiYTaiApk) ?? false;
+    tuDienChinhTaBatHoatDong =
+        kho.getBool(_khoaTuDienChinhTaBatHoatDong) ?? true;
     final tuDienRaw = kho.getString(_khoaTuDienChinhTa);
     tuDienChinhTa = tuDienRaw == null
         ? []

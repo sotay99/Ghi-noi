@@ -62,13 +62,20 @@ class _LoiTuDien {
     required this.batDau,
     required this.ketThuc,
     required this.tu,
-    required this.thayThe,
+    required this.dsThayThe,
   });
 
   final int batDau;
   final int ketThuc;
   final String tu;
-  final String thayThe;
+
+  /// Tối đa 3 đề xuất thay thế ("thứ nhất/hai/ba", đúng thứ tự khai trong
+  /// `CapTuDien.dsThayThe`) — RỖNG nghĩa là "đề xuất xoá".
+  final List<String> dsThayThe;
+
+  /// Đề xuất THỨ NHẤT — dùng cho "Chấp nhận tất cả đề xuất của từ điển"
+  /// (luôn chỉ áp dụng đề xuất đầu tiên) và mọi chỗ cũ chỉ cần MỘT đề xuất.
+  String get thayThe => dsThayThe.isEmpty ? '' : dsThayThe.first;
 }
 
 /// Một vùng chữ AI cho là "không phù hợp" (câu từ lủng củng, lạc đề, thừa ý,
@@ -4126,8 +4133,21 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// `_henLuu`/`_luuVanBan`) và mỗi khi mở một ghi chú (`_moGhiChu`), hoặc
   /// ngay sau khi đóng modal "Từ điển..." (từ điển có thể vừa đổi).
   void _quetTuDienChinhTa() {
-    final vb = _boDieuKhien.text;
     final ketQua = <_LoiTuDien>[];
+    // Công tắc tổng — tắt thì bỏ hẳn việc quét, không gạch vàng chỗ nào cả
+    // (người dùng vẫn xem/sửa danh sách bình thường, chỉ phần quét này tắt).
+    if (!widget.caiDat.tuDienChinhTaBatHoatDong) {
+      _boDieuKhien.tuDien
+        ..clear()
+        ..addAll(ketQua);
+      _boDieuKhien.veLai();
+      return;
+    }
+    final vb = _boDieuKhien.text;
+    // Khớp KHÔNG phân biệt hoa/thường (ví dụ khai "con chó" thì "con ChÓ"
+    // trong bài cũng được gạch vàng) — tìm trên bản chữ thường của cả bài và
+    // cả từ lỗi, nhưng [tu]/vị trí vẫn lấy nguyên văn CHỮ THẬT trong bài.
+    final vbThuong = vb.toLowerCase();
     // Mục 5: hai cặp cùng "Từ bị lỗi chính tả hay gặp" (so không phân biệt
     // hoa/thường) là trạng thái KHÔNG HỢP LỆ (modal đã cảnh báo tại chỗ) —
     // chỉ cặp XUẤT HIỆN ĐẦU TIÊN trong danh sách được dùng để quét, các cặp
@@ -4139,23 +4159,29 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       if (loi.isEmpty) continue;
       final loiThuong = loi.toLowerCase();
       if (!loiDaDung.add(loiThuong)) continue;
-      // Mục 5: "Từ thay thế vào" giống hệt "Từ bị lỗi" (so không phân biệt
-      // hoa/thường) là trạng thái KHÔNG HỢP LỆ — modal đã cảnh báo tại chỗ,
-      // ở đây coi như chưa khai xong, không dùng để quét.
+      // Mục 5: "Từ thay thế thứ nhất" giống hệt "Từ bị lỗi" (so không phân
+      // biệt hoa/thường) là trạng thái KHÔNG HỢP LỆ — modal đã cảnh báo tại
+      // chỗ, ở đây coi như chưa khai xong, không dùng để quét.
       if (c.thayThe.trim().toLowerCase() == loiThuong) continue;
       // Mục 5: từ đã bị "Huỷ đề xuất" thì không quét vàng lại nữa. Mục 6:
       // gạch vàng/gạch đỏ không dẫm chân lên nhau — từ đang/đã từng gạch đỏ
       // (AI) cũng bỏ qua luôn ở đây.
       if (_tuTuDienDaHuy.contains(loi) || _tuChinhTaDaXuLy.contains(loi)) continue;
+      final dsThayThe = c.dsThayThe;
       var tu = 0;
       while (true) {
-        final i = vb.indexOf(loi, tu);
+        final i = vbThuong.indexOf(loiThuong, tu);
         if (i < 0) break;
-        final ketThuc = i + loi.length;
+        final ketThuc = i + loiThuong.length;
         // Không gạch vàng đè lên vùng ĐANG gạch đỏ của AI.
         final dungDoAi = _boDieuKhien.loi.any((l) => l.batDau < ketThuc && l.ketThuc > i);
         if (!dungDoAi) {
-          ketQua.add(_LoiTuDien(batDau: i, ketThuc: ketThuc, tu: loi, thayThe: c.thayThe));
+          ketQua.add(_LoiTuDien(
+            batDau: i,
+            ketThuc: ketThuc,
+            tu: vb.substring(i, ketThuc),
+            dsThayThe: dsThayThe,
+          ));
         }
         tu = ketThuc;
       }
@@ -7333,6 +7359,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// (xong hay huỷ): tắt cờ, và nếu đang áp dụng cho thẻ ĐANG GHI mà trước
   /// đó đã bị ép tạm dừng, tự ghi tiếp lại đúng như cũ.
   Future<void> _ketThucCheDoDoiViTriThe() async {
+    final dangDoiTheDangGhi = _dangGhiTruocKhiDoiViTri != null;
     final canTiepTucGhi = _dangGhiTruocKhiDoiViTri == true;
     setState(() {
       _soTheDangDoiViTri = null;
@@ -7341,6 +7368,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     });
     if (canTiepTucGhi && _soTheGhiAmDangGhi != null && _theGhiAmDangTamDung) {
       await _tiepTucTheGhiAmHienTai();
+    }
+    // "Phím 9" (trong bảng điều khiển ghi âm) đã TỰ ĐÓNG bảng điều khiển
+    // trước khi vào chế độ chọn vị trí — người dùng đang ghi dở thì bảng
+    // điều khiển đó phải tự hiện lại, xong hay huỷ cũng vậy.
+    if (dangDoiTheDangGhi && mounted && _trinhGhiAmMo) {
+      _bamNutHienBangDieuKhienGhiAm();
     }
   }
 
@@ -7358,21 +7391,39 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final soThe = _soTheDangDoiViTri;
     if (soThe == null) return;
     final vb = _boDieuKhien.text;
-    Match? khop;
-    for (final m in reTheGhiAmHoanChinh.allMatches(vb)) {
-      if (m.group(1) == soThe.toString()) {
-        khop = m;
-        break;
+    final dangDoiTheDangGhi = _dangGhiTruocKhiDoiViTri != null;
+    int batDau, ketThuc;
+    String tokenText;
+    if (dangDoiTheDangGhi) {
+      // Thẻ đang ghi dở mang token GIỮ CHỖ chung (không đánh số), không
+      // khớp được với `reTheGhiAmHoanChinh` (chỉ bắt thẻ đã ghi XONG) —
+      // tìm thẳng token giữ chỗ đó.
+      final vt = vb.indexOf(tenTokenDangGhiAm);
+      if (vt == -1) {
+        await _ketThucCheDoDoiViTriThe();
+        return;
       }
+      batDau = vt;
+      ketThuc = vt + tenTokenDangGhiAm.length;
+      tokenText = tenTokenDangGhiAm;
+    } else {
+      Match? khop;
+      for (final m in reTheGhiAmHoanChinh.allMatches(vb)) {
+        if (m.group(1) == soThe.toString()) {
+          khop = m;
+          break;
+        }
+      }
+      if (khop == null) {
+        // Thẻ không còn tồn tại nữa (đã bị xoá/chuyển hoá trong lúc đang
+        // chọn vị trí) — không còn gì để chuyển, thoát chế độ luôn.
+        await _ketThucCheDoDoiViTriThe();
+        return;
+      }
+      batDau = khop.start;
+      ketThuc = khop.end;
+      tokenText = vb.substring(batDau, ketThuc);
     }
-    if (khop == null) {
-      // Thẻ không còn tồn tại nữa (đã bị xoá/chuyển hoá trong lúc đang
-      // chọn vị trí) — không còn gì để chuyển, thoát chế độ luôn.
-      await _ketThucCheDoDoiViTriThe();
-      return;
-    }
-    final batDau = khop.start, ketThuc = khop.end;
-    final tokenText = vb.substring(batDau, ketThuc);
     final sel = _boDieuKhien.selection;
     final vt = sel.isValid ? sel.start : vb.length;
 
@@ -7735,8 +7786,37 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   bool get _microDungDuocTrenThietBiNay =>
       !(kIsWeb && _thietBiHienTai == ThietBi.iphone);
 
+  /// Thông báo CHẶN GIỮA MÀN HÌNH (không tự mất) khi bấm nút Micro ở iPhone
+  /// bản web — y hệt dòng cảnh báo bắt buộc trong kênh chat
+  /// (`_hienCanhBaoMicIphoneChat` ở `man_hinh_tro_chuyen.dart`).
+  void _hienCanhBaoMicIphone() {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Không khả dụng trên iPhone'),
+        content: const Text(
+          'Micro (vừa nói vừa ra chữ) tại điện thoại Iphone không thể khả '
+          'dụng trên môi trường Website, chỉ khả dụng trên môi trường app '
+          'mobile. Nếu bạn cho rằng thiết bị của bạn không phải Iphone, hãy '
+          'bấm vào Cài đặt Micro. Bạn có thể tải app mobile cho Iphone để '
+          'sử dụng tính năng này.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Đã hiểu'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _bamNutMicro() {
-    if (!_microDungDuocTrenThietBiNay) return;
+    if (!_microDungDuocTrenThietBiNay) {
+      _hienCanhBaoMicIphone();
+      return;
+    }
     if (_ghiAmTheDangKhoaMicro) return;
     // Người dùng tự bấm thì ý họ là quyết định cuối cùng — bỏ mọi kế hoạch
     // tự bật lại đang chờ.
@@ -9668,7 +9748,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// nếu [loi.thayThe] có chữ thì hiện đúng chữ đó, RỖNG thì hiện "Đề xuất
   /// Xoá" màu đỏ — cả hai trường hợp menu LUÔN có đúng 4 mục.
   Future<void> _khiBamTuDien(_LoiTuDien loi, Offset viTriManHinh) async {
-    final coThayThe = loi.thayThe.isNotEmpty;
+    final coThayThe = loi.dsThayThe.isNotEmpty;
+    // Mỗi đề xuất ("thứ nhất/hai/ba") thành MỘT mục riêng, LUÔN đứng ĐẦU
+    // danh sách — giá trị mang theo chỉ số (0/1/2) để biết chọn đúng đề
+    // xuất nào.
     final chon = await showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -9678,12 +9761,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         viTriManHinh.dy,
       ),
       items: [
-        PopupMenuItem(
-          value: 'thay',
-          child: coThayThe
-              ? Text(loi.thayThe)
-              : Text('Đề xuất Xoá', style: TextStyle(color: Colors.red.shade600)),
-        ),
+        if (coThayThe)
+          for (var i = 0; i < loi.dsThayThe.length; i++)
+            PopupMenuItem(value: 'thay$i', child: Text(loi.dsThayThe[i]))
+        else
+          PopupMenuItem(
+            value: 'thay0',
+            child: Text('Đề xuất Xoá', style: TextStyle(color: Colors.red.shade600)),
+          ),
         const PopupMenuDivider(),
         PopupMenuItem(
           value: 'xoa',
@@ -9697,19 +9782,29 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           value: 'chapNhanTatCa',
           child: Text('Chấp nhận tất cả đề xuất của từ điển'),
         ),
+        PopupMenuItem(
+          value: 'chapNhanLienQuan',
+          child: Text('Chấp nhận các đề xuất liên quan đến "${loi.tu}"'),
+        ),
       ],
     );
     if (chon == null || !mounted) return;
 
+    if (chon.startsWith('thay')) {
+      final chiSo = int.parse(chon.substring(4));
+      final thayBang = chiSo < loi.dsThayThe.length ? loi.dsThayThe[chiSo] : '';
+      _luuDiemMoc();
+      _apDungThayTheTuDien(loi, thayBang);
+      return;
+    }
     switch (chon) {
-      case 'thay':
-        _luuDiemMoc();
-        _apDungThayTheTuDien(loi, loi.thayThe);
       case 'xoa':
         _luuDiemMoc();
         _apDungThayTheTuDien(loi, '');
       case 'chapNhanTatCa':
         _chapNhanTatCaDeXuatTuDien();
+      case 'chapNhanLienQuan':
+        _chapNhanDeXuatTuDienLienQuan(loi.tu);
       default: // 'huy'
         // Ghi nhớ CHỮ (không phải vị trí) đã huỷ — xem `_tuTuDienDaHuy`.
         _tuTuDienDaHuy.add(loi.tu);
@@ -9755,6 +9850,33 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (_boDieuKhien.tuDien.isEmpty) return;
     _luuDiemMoc();
     final ds = List<_LoiTuDien>.of(_boDieuKhien.tuDien)
+      ..sort((a, b) => b.batDau.compareTo(a.batDau));
+    for (final loi in ds) {
+      final vb = _boDieuKhien.text;
+      if (loi.ketThuc > vb.length || vb.substring(loi.batDau, loi.ketThuc) != loi.tu) {
+        continue;
+      }
+      final moi = vb.replaceRange(loi.batDau, loi.ketThuc, loi.thayThe);
+      _dieuChinhLoiChinhTaSauKhiSua(loi.batDau, loi.ketThuc - loi.batDau, loi.thayThe.length);
+      _dieuChinhVungToanVanSauKhiSua(loi.batDau, loi.ketThuc - loi.batDau, loi.thayThe.length);
+      _gioiHanTreMuSauKhiChen(loi.batDau, loi.thayThe.length, moi);
+      _ghiVaoO(moi, loi.batDau + loi.thayThe.length);
+    }
+    _henLuu();
+    _quetTuDienChinhTa();
+  }
+
+  /// Mục "Chấp nhận các đề xuất liên quan đến "X"" — ĐÚNG KHUÔN
+  /// `_chapNhanTatCaDeXuatTuDien`, chỉ khác giới hạn lại đúng những từ gạch
+  /// vàng mang CHÍNH XÁC chữ [tuMucTieu] (nguyên văn, kể cả hoa/thường —
+  /// đây là chữ THẬT đã khớp trong bài tại lúc bấm, không phải từ khai
+  /// trong từ điển).
+  void _chapNhanDeXuatTuDienLienQuan(String tuMucTieu) {
+    final lienQuan =
+        _boDieuKhien.tuDien.where((l) => l.tu == tuMucTieu).toList();
+    if (lienQuan.isEmpty) return;
+    _luuDiemMoc();
+    final ds = List<_LoiTuDien>.of(lienQuan)
       ..sort((a, b) => b.batDau.compareTo(a.batDau));
     for (final loi in ds) {
       final vb = _boDieuKhien.text;
@@ -14639,9 +14761,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 dangNghe: _dangNghe ||
                     (_soTheGhiAmDangGhi != null && !_theGhiAmDangTamDung),
                 songAm: _songAm,
-                sanSang: _sanSang &&
-                    _microDungDuocTrenThietBiNay &&
-                    !_ghiAmTheDangKhoaMicro,
+                sanSang: _sanSang && !_ghiAmTheDangKhoaMicro,
+                biKhoaThietBi: !_microDungDuocTrenThietBiNay,
                 hienChuThich: _hienChuThich,
                 khiBamChuThich: _khiBamChuThich,
                 nhanPhimTat: widget.caiDat.phimTatMicro.nhan,
@@ -14695,8 +14816,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     _khiBamKiemTraToanVan(loaiKiemTra: 'dau_cau'),
                 dangGhiAmThe: _trinhGhiAmMo,
                 khiBamGhiAmThe: _bamNutGhiAmThe,
-                gopMicVaGhiAmThanhMotNut:
-                    kIsWeb && _thietBiHienTai == ThietBi.iphone,
+                gopMicVaGhiAmThanhMotNut: false,
                 khiBamChepTatCa: () => _chepTatCa(),
                 khiBamChepRoiXoaTatCa: _chepRoiXoaTatCa,
                 khiBamXoaTatCa: () => _xoaTatCa(),

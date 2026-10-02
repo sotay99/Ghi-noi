@@ -25,14 +25,17 @@ import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import 'cai_dat.dart';
+import 'doan_thiet_bi.dart';
 import 'ghi_am_the.dart';
 import 'gui_ghi_am_gemini.dart';
 import 'gui_tro_chuyen_gemini.dart';
 import 'ket_qua_ghi_am_the.dart';
+import 'loai_thiet_bi.dart';
 import 'lua_chon_phim_tat.dart';
 import 'the_ghi_am.dart' show dinhDangMmSs;
 import 'theo_doi_tap_doi_phim.dart';
 import 'tin_nhan_tro_chuyen.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 const _mauChinh = Color(0xFF1A73E8);
 
@@ -113,8 +116,57 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   /// sau vị trí gõ).
   bool _micTuDoiONhap = false;
 
+  /// Luôn soi ĐÚNG thiết bị trong "Cài đặt Micro" (chọn tay hoặc hệ thống tự
+  /// đoán) — y hệt trang soạn thảo chính, không tự có bộ cấu hình riêng.
+  ThietBi get _thietBiChoMicChat => widget.caiDat.thietBiChonTay ?? doanThietBi();
+
+  /// iPhone trên web không dùng được "Micro (vừa nói vừa ra chữ)" — y hệt
+  /// trang soạn thảo chính (`_microDungDuocTrenThietBiNay`).
+  bool get _microChatDungDuocTrenThietBiNay =>
+      !(kIsWeb && _thietBiChoMicChat == ThietBi.iphone);
+
+  String? _micMaNgonNguChat;
+  Timer? _henTuTatMicChatImLang;
+
+  void _datLaiHenTuTatMicChatImLang() {
+    _henTuTatMicChatImLang?.cancel();
+    _henTuTatMicChatImLang = Timer(
+      Duration(seconds: widget.caiDat.thoiGianTuTatMicroGiay),
+      () {
+        if (_micDangNghe) _tatMicChat();
+      },
+    );
+  }
+
+  void _hienCanhBaoMicIphoneChat() {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Không khả dụng trên iPhone'),
+        content: const Text(
+          'Micro (vừa nói vừa ra chữ) tại điện thoại Iphone không thể khả '
+          'dụng trên môi trường Website, chỉ khả dụng trên môi trường app '
+          'mobile. Nếu bạn cho rằng thiết bị của bạn không phải Iphone, hãy '
+          'bấm vào Cài đặt Micro. Bạn có thể tải app mobile cho Iphone để '
+          'sử dụng tính năng này.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Đã hiểu'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _khiONhapDoi() {
-    if (_micTuDoiONhap || !_micDangNghe) return;
+    if (!_micDangNghe) return;
+    // Có chữ mới (gõ tay hay mic) — huỷ đếm ngược tự tắt vì im lặng, đặt lại
+    // từ đầu, y hệt trang soạn thảo chính.
+    _datLaiHenTuTatMicChatImLang();
+    if (_micTuDoiONhap) return;
     // Người dùng vừa gõ tay (hoặc dán/xoá) trong lúc mic đang nghe — gõ tay
     // THẮNG: coi như cụm chữ mic hiện tại đã chốt xong, lần kết quả mic kế
     // tiếp sẽ bắt đầu một cụm MỚI ngay tại vị trí con trỏ hiện giờ.
@@ -123,9 +175,29 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     _micChuGanNhat = '';
   }
 
+  /// Ưu tiên tiếng Việt nếu máy có — y hệt
+  /// `_TrangSoanThaoState._chonTiengViet`.
+  Future<String?> _chonTiengVietChat() async {
+    try {
+      final ds = await _micro.locales();
+      for (final l in ds) {
+        if (l.localeId.replaceAll('-', '_').toLowerCase().startsWith('vi')) {
+          return l.localeId;
+        }
+      }
+    } catch (_) {
+      // Không lấy được danh sách thì cứ để mặc định.
+    }
+    return null;
+  }
+
   Future<void> _batMicChat() async {
     // Ghi âm và Micro loại trừ nhau — bật cái này thì tự tắt cái kia trước.
     if (_ghiDangMo) return; // đang có hộp thoại ghi âm mở — không thể bật mic.
+    if (!_microChatDungDuocTrenThietBiNay) {
+      _hienCanhBaoMicIphoneChat();
+      return;
+    }
     if (!_micKhoiTaoXong) {
       _micKhoiTaoXong =
           await _micro.initialize(onStatus: _khiMicDoiTrangThai, debugLogging: false);
@@ -138,13 +210,17 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
         return;
       }
     }
+    _micMaNgonNguChat = await _chonTiengVietChat();
+    if (!mounted) return;
     _micDiemBatDau = _oNhap.text.length;
     _micChuGanNhat = '';
     setState(() => _micDangNghe = true);
+    _datLaiHenTuTatMicChatImLang();
     try {
       await _micro.listen(
         onResult: (ketQua) {
           if (!_micDangNghe) return;
+          _datLaiHenTuTatMicChatImLang();
           final chen = ketQua.recognizedWords;
           final vb = _oNhap.text;
           final batDau = _micDiemBatDau.clamp(0, vb.length);
@@ -158,6 +234,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
           _micTuDoiONhap = false;
           _micChuGanNhat = chen;
         },
+        localeId: _micMaNgonNguChat,
         listenOptions: SpeechListenOptions(
           partialResults: true,
           listenMode: ListenMode.dictation,
@@ -179,11 +256,13 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   void _khiMicDoiTrangThai(String trangThai) {
     final dangNghe = trangThai == SpeechToText.listeningStatus;
     if (mounted && _micDangNghe != dangNghe && !dangNghe) {
+      _henTuTatMicChatImLang?.cancel();
       setState(() => _micDangNghe = false);
     }
   }
 
   Future<void> _tatMicChat() async {
+    _henTuTatMicChatImLang?.cancel();
     await _micro.stop();
     if (mounted) setState(() => _micDangNghe = false);
   }
@@ -305,6 +384,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_khiPhimCucBoTroChuyen);
     _theoDoiTapDoiTroChuyen.dispose();
+    _henTuTatMicChatImLang?.cancel();
     if (_micDangNghe) _micro.stop();
     _oNhap.removeListener(_khiONhapDoi);
     _oNhap.dispose();
@@ -782,7 +862,7 @@ class _NutDungMic extends StatelessWidget {
         onTap: khiBam,
         child: const Padding(
           padding: EdgeInsets.all(10),
-          child: Icon(Icons.stop_rounded, color: Colors.white, size: 20),
+          child: Icon(Icons.stop, color: Colors.white, size: 20),
         ),
       ),
     );
@@ -1457,7 +1537,20 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
       canPop: false,
       child: AlertDialog(
         title: Text('Bản Ghi âm số $_soThe'),
-        content: SizedBox(
+        content: Focus(
+          autofocus: true,
+          // Chặn hẳn phím Tab khỏi cơ chế di chuyển tiêu điểm (focus
+          // traversal) mặc định của Flutter — ở đây Tab (khi được cài làm
+          // phím tắt Ghi âm) CHỈ có một tác dụng duy nhất là Tạm
+          // dừng/Tiếp tục (xem `_khiPhimCucBo`), không được phép nhảy
+          // giữa các nút trong hộp thoại này.
+          onKeyEvent: (node, event) {
+            if (event.logicalKey == LogicalKeyboardKey.tab) {
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+          },
+          child: SizedBox(
           width: 320,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1480,6 +1573,13 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
                   ),
                 ),
               _hang(
+                widget.phimTatGhiAm.nhan,
+                _dangTamDung ? Icons.play_circle_outline : Icons.pause_circle_outline,
+                _dangTamDung ? Colors.green.shade800 : Colors.red.shade800,
+                _dangTamDung ? 'Tiếp tục' : 'Tạm dừng',
+                _dangXuLy ? null : _tamDungTiepTuc,
+              ),
+              _hang(
                 'phím 1',
                 Icons.text_snippet_outlined,
                 Colors.green.shade900,
@@ -1494,13 +1594,6 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
                 _dangXuLy ? null : () => _hoanThanh(taoTheMoi: true),
               ),
               _hang(
-                widget.phimTatGhiAm.nhan,
-                _dangTamDung ? Icons.play_circle_outline : Icons.pause_circle_outline,
-                _dangTamDung ? Colors.green.shade800 : Colors.red.shade800,
-                _dangTamDung ? 'Tiếp tục' : 'Tạm dừng',
-                _dangXuLy ? null : _tamDungTiepTuc,
-              ),
-              _hang(
                 'phím 5',
                 Icons.delete_outline,
                 Colors.red.shade900,
@@ -1508,6 +1601,7 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
                 _dangXuLy ? null : _xoaVaDong,
               ),
             ],
+          ),
           ),
         ),
       ),

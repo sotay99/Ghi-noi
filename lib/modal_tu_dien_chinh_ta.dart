@@ -1,8 +1,9 @@
 // Trang "Từ điển sửa lỗi chính tả của bạn" — mở từ menu "Tài khoản của
 // bạn", ngay dưới "Cài đặt hiển thị và tự động sửa". Người dùng tự khai các
-// cặp (từ hay gõ sai thường gặp / từ thay vào) — app tự quét văn bản, gạch
-// vàng lượn sóng những từ khớp (xem `_boDieuKhien.tuDien` trong
-// trang_soan_thao.dart), bấm vào để thay/xoá.
+// cặp (từ hay gõ sai thường gặp / tối đa 3 từ thay vào) — app tự quét văn
+// bản, gạch vàng lượn sóng những từ khớp (xem `_boDieuKhien.tuDien` trong
+// trang_soan_thao.dart), bấm vào để thay/xoá. Công tắc ở đầu trang bật/tắt
+// hẳn việc quét (không đụng tới việc xem/sửa danh sách bên dưới).
 //
 // TOÀN MÀN HÌNH (Navigator.push, có nút X đóng) — ĐÚNG KHUÔN
 // `ManHinhTroChuyen` (màn hình chat với AI), không còn là modal đáy màn
@@ -24,6 +25,12 @@ Future<void> moModalTuDienChinhTa(BuildContext context, CaiDat caiDat) {
   );
 }
 
+const _nhanThuThayThe = [
+  'Từ thay thế vào thứ nhất',
+  'Từ thay thế vào thứ hai',
+  'Từ thay thế vào thứ ba',
+];
+
 class _ManHinhTuDienChinhTa extends StatefulWidget {
   const _ManHinhTuDienChinhTa({required this.caiDat});
   final CaiDat caiDat;
@@ -38,7 +45,9 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
   /// quét), chỉ cần gọi thêm `luuTuDienChinhTa()` để ghi xuống đĩa.
   late List<CapTuDien> _ds;
   final Map<CapTuDien, TextEditingController> _oLoi = {};
-  final Map<CapTuDien, TextEditingController> _oThayThe = {};
+
+  /// Mỗi cặp có TỐI ĐA 3 ô — luôn có ít nhất ô "thứ nhất" (dù rỗng).
+  final Map<CapTuDien, List<TextEditingController>> _oThayThe = {};
 
   /// Cặp đang hiện cảnh báo "từ thay thế giống hệt từ lỗi" hoặc "từ lỗi bị
   /// trùng với một cặp khác" (mục 5) — vẽ viền đỏ + dòng chữ đỏ ngay dưới ô
@@ -57,7 +66,9 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
     _ds.sort((a, b) => a.loi.trim().toLowerCase().compareTo(b.loi.trim().toLowerCase()));
     for (final c in _ds) {
       _oLoi[c] = TextEditingController(text: c.loi);
-      _oThayThe[c] = TextEditingController(text: c.thayThe);
+      _oThayThe[c] = (c.dsThayThe.isEmpty ? [''] : c.dsThayThe)
+          .map((s) => TextEditingController(text: s))
+          .toList();
     }
   }
 
@@ -67,8 +78,10 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
     for (final o in _oLoi.values) {
       o.dispose();
     }
-    for (final o in _oThayThe.values) {
-      o.dispose();
+    for (final ds in _oThayThe.values) {
+      for (final o in ds) {
+        o.dispose();
+      }
     }
     super.dispose();
   }
@@ -83,9 +96,10 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
   }
 
   /// Mục 4: nút "+ Thêm cặp từ" chỉ hoạt động khi KHÔNG có cặp nào đang
-  /// rỗng hoàn toàn (cả từ lỗi lẫn từ thay thế đều trống) — có sẵn một cặp
-  /// rỗng rồi thì bắt điền nó trước đã, không cho đẻ thêm cặp rỗng khác.
-  bool get _coCapRong => _ds.any((c) => c.loi.trim().isEmpty && c.thayThe.trim().isEmpty);
+  /// rỗng hoàn toàn (cả từ lỗi lẫn mọi từ thay thế đều trống) — có sẵn một
+  /// cặp rỗng rồi thì bắt điền nó trước đã, không cho đẻ thêm cặp rỗng khác.
+  bool get _coCapRong => _ds.any(
+      (c) => c.loi.trim().isEmpty && _oThayThe[c]!.every((o) => o.text.trim().isEmpty));
 
   void _themCap() {
     if (_coCapRong) return;
@@ -93,7 +107,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
       final c = CapTuDien(loi: '');
       _ds.add(c);
       _oLoi[c] = TextEditingController();
-      _oThayThe[c] = TextEditingController();
+      _oThayThe[c] = [TextEditingController()];
     });
   }
 
@@ -101,17 +115,46 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
     setState(() {
       _ds.remove(c);
       _oLoi.remove(c)?.dispose();
-      _oThayThe.remove(c)?.dispose();
+      for (final o in _oThayThe.remove(c) ?? <TextEditingController>[]) {
+        o.dispose();
+      }
       _loiTrungThayThe.remove(c);
       _loiTrungTuLoi.remove(c);
     });
     widget.caiDat.luuTuDienChinhTa();
   }
 
+  /// Đồng bộ `c.dsThayThe` với nội dung đang gõ của mọi ô thay thế của [c].
+  void _dongBoThayThe(CapTuDien c) {
+    c.dsThayThe = _oThayThe[c]!.map((o) => o.text).toList();
+  }
+
+  /// "+ Thêm Từ thay thế" — thêm một ô mới (thứ hai hoặc thứ ba), tối đa 3.
+  void _themTuThayThe(CapTuDien c) {
+    final ds = _oThayThe[c]!;
+    if (ds.length >= 3) return;
+    setState(() {
+      ds.add(TextEditingController());
+      _dongBoThayThe(c);
+    });
+    _datLuu();
+  }
+
+  /// Xoá HẲN ô thứ hai/ba (không chỉ xoá chữ) — các ô sau tự dồn lên
+  /// (danh sách là List nên xoá đúng vị trí là tự dồn).
+  void _xoaHangTuThayThe(CapTuDien c, int chiSo) {
+    setState(() {
+      _oThayThe[c]!.removeAt(chiSo).dispose();
+      _dongBoThayThe(c);
+      _kiemTraTrung();
+    });
+    _datLuu();
+  }
+
   /// Mục 5: kiểm tra lại TOÀN BỘ danh sách sau mỗi lần gõ — cờ trùng từ lỗi
-  /// (so các [CapTuDien.loi] với nhau) và cờ "từ thay thế giống hệt từ lỗi"
-  /// của CHÍNH cặp đó. Không xoá chữ người dùng gõ — chỉ đánh dấu cảnh báo,
-  /// để họ tự sửa.
+  /// (so các [CapTuDien.loi] với nhau) và cờ "từ thay thế thứ nhất giống hệt
+  /// từ lỗi" của CHÍNH cặp đó. Không xoá chữ người dùng gõ — chỉ đánh dấu
+  /// cảnh báo, để họ tự sửa.
   void _kiemTraTrung() {
     _loiTrungThayThe.clear();
     _loiTrungTuLoi.clear();
@@ -139,6 +182,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
     required String goiY,
     required void Function(String) onChanged,
     String? canhBao,
+    VoidCallback? khiXoaHang,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,11 +218,12 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
             ),
             IconButton(
               icon: const Icon(Icons.close, size: 18),
-              tooltip: 'Xoá chữ này',
-              onPressed: () {
-                controller.clear();
-                onChanged('');
-              },
+              tooltip: khiXoaHang != null ? 'Xoá hàng này' : 'Xoá chữ này',
+              onPressed: khiXoaHang ??
+                  () {
+                    controller.clear();
+                    onChanged('');
+                  },
               visualDensity: VisualDensity.compact,
             ),
           ],
@@ -192,6 +237,34 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
             ),
           ),
       ],
+    );
+  }
+
+  Widget _congTacBatTat() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F3F4),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          const Expanded(
+            child: Text(
+              'Bật hoạt động của từ điển sửa lỗi chính tả',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          Switch(
+            value: widget.caiDat.tuDienChinhTaBatHoatDong,
+            activeThumbColor: _mauChinh,
+            onChanged: (gia) {
+              setState(() => widget.caiDat.tuDienChinhTaBatHoatDong = gia);
+              widget.caiDat.luuTuDienChinhTaBatHoatDong();
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -212,10 +285,16 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
+            _congTacBatTat(),
+            const SizedBox(height: 16),
             const Text(
               'App tự quét văn bản — từ nào khớp "Từ bị lỗi chính tả hay '
               'gặp" sẽ được gạch vàng lượn sóng, bấm vào để thay/xoá nhanh. '
-              'Để trống "Từ thay thế vào" nghĩa là đề xuất xoá hẳn từ đó.',
+              'Để trống "Từ thay thế vào thứ nhất" (và không thêm từ thay '
+              'thế nào khác) nghĩa là đề xuất xoá hẳn từ đó. Có thể thêm tối '
+              'đa 3 từ thay thế cho mỗi cặp — tất cả đều hiện trong đề xuất, '
+              'còn "Chấp nhận tất cả đề xuất của từ điển" chỉ áp dụng từ thay '
+              'thế thứ nhất.',
               style: TextStyle(height: 1.5, color: Color(0xFF5F6368)),
             ),
             const SizedBox(height: 16),
@@ -247,21 +326,34 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
                 },
               ),
               const SizedBox(height: 10),
-              _oNhap(
-                nhan: 'Từ thay thế vào',
-                controller: _oThayThe[c]!,
-                goiY: 'Để trống = đề xuất xoá',
-                canhBao: _loiTrungThayThe.contains(c)
-                    ? 'Từ thay thế không được giống hệt từ bị lỗi ở trên.'
-                    : null,
-                onChanged: (gia) {
-                  setState(() {
-                    c.thayThe = gia;
-                    _kiemTraTrung();
-                  });
-                  _datLuu();
-                },
-              ),
+              for (var i = 0; i < _oThayThe[c]!.length; i++) ...[
+                _oNhap(
+                  nhan: _nhanThuThayThe[i],
+                  controller: _oThayThe[c]![i],
+                  goiY: i == 0 ? 'Để trống = đề xuất xoá' : 'Từ thay thế thêm',
+                  canhBao: i == 0 && _loiTrungThayThe.contains(c)
+                      ? 'Từ thay thế thứ nhất không được giống hệt từ bị lỗi ở trên.'
+                      : null,
+                  khiXoaHang: i == 0 ? null : () => _xoaHangTuThayThe(c, i),
+                  onChanged: (gia) {
+                    setState(() {
+                      _dongBoThayThe(c);
+                      _kiemTraTrung();
+                    });
+                    _datLuu();
+                  },
+                ),
+                const SizedBox(height: 10),
+              ],
+              if (_oThayThe[c]!.length < 3)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () => _themTuThayThe(c),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Thêm Từ thay thế'),
+                  ),
+                ),
               const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerRight,
