@@ -294,30 +294,31 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
           }
           if (!_micDangNghe) return;
           _datLaiHenTuTatMicChatImLang();
-          // `chen` phải LUÔN LÀ TOÀN BỘ cụm chữ đang nói dở tính từ đầu
-          // utterance (để thay nguyên vẹn đoạn [batDau, ketThucCu) bên
-          // dưới) — Android bản web không gửi `recognizedWords` kiểu đó, nó
-          // CỘNG DỒN VÔ HẠN (ghép thêm đuôi mới vào TOÀN BỘ raw của mọi lần
-          // gọi trước, kể cả phần đã lặp/im ắng), nên phải tự trừ phần raw
-          // đã thấy rồi GHÉP đuôi mới đó vào `_micChuGanNhat` cũ mới ra đúng
-          // cụm chữ thật. Không trừ là nguồn gốc lỗi "chữ chạy lung tung,
-          // lặp lại rất nhiều" — xem `_rawTichLuyChromeAndroidChat`.
           var chen = ketQua.recognizedWords;
           widget.ghiNhatKyMicro?.call(
               '[chat] onResult phiên #$idPhien, xong=${ketQua.finalResult}: "$chen"');
+          // Android bản web: `recognizedWords` không phải "toàn bộ utterance
+          // tính từ đầu, sạch sẽ" — nó CỘNG DỒN VÔ HẠN, mỗi lần gọi lại ghép
+          // THÊM đuôi mới vào SAU TOÀN BỘ raw đã gửi ở MỌI lần gọi trước đó
+          // (không phải chỉ lần ngay trước). Bằng chứng từ nhật ký thật:
+          // raw đi "Alo" → "AloAlo" → "AloAloAlo" → "AloAloAloAlo bạn" →
+          // "...Alo bạnAlo bạn có" — phần ĐUÔI MỚI sau khi trừ đúng
+          // phần raw đã thấy ở lần gọi NGAY TRƯỚC luôn là "Alo", "Alo",
+          // "Alo", "Alo bạn", "Alo bạn có"... — TỰ NÓ đã là cụm chữ ĐẦY ĐỦ,
+          // SẠCH của utterance hiện tại rồi, không phải một "từ mới" cần
+          // ghép thêm. (SỬA LẠI LỖI CŨ — bản trước đây GHÉP đuôi này vào
+          // `_micChuGanNhat` cũ, biến một cụm vốn đã đầy đủ thành nhân đôi
+          // liên tục; đây chính là nguồn gốc thật của lỗi lặp chữ, không
+          // phải do thiếu cơ chế phiên.) Giờ dùng THẲNG đuôi mới làm `chen`
+          // — ĐÚNG hệt cách trang soạn thảo chính xử lý `noi` sau khi trừ.
           if (kIsWeb && _thietBiChoMicChat == ThietBi.android) {
             final raw = chen;
             if (raw.startsWith(_rawTichLuyChromeAndroidChat)) {
-              final duoiMoi = raw.substring(_rawTichLuyChromeAndroidChat.length);
-              chen = duoiMoi.isEmpty
-                  ? _micChuGanNhat
-                  : (_micChuGanNhat.isEmpty || _micChuGanNhat.endsWith(' ')
-                      ? '$_micChuGanNhat$duoiMoi'
-                      : '$_micChuGanNhat $duoiMoi');
+              chen = raw.substring(_rawTichLuyChromeAndroidChat.length);
             }
             // else: raw không còn khớp tiền tố đã theo dõi (trình duyệt vừa
-            // âm thầm khởi động lại bộ đệm) — coi nguyên `chen` hiện tại
-            // (raw) là cụm chữ thật, an toàn hơn là trừ nhầm.
+            // âm thầm khởi động lại bộ đệm) — coi nguyên `raw` là cụm chữ
+            // thật, an toàn hơn là trừ nhầm.
             _rawTichLuyChromeAndroidChat = raw;
             widget.ghiNhatKyMicro?.call('[chat]   → sau khi trừ raw cộng dồn: "$chen"');
           }
