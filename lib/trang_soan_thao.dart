@@ -5138,11 +5138,63 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     });
   }
 
-  /// Giành lại tiêu điểm cho ô soạn thảo sau khi bấm một nút của hàng công
-  /// cụ (Copy/Cut/Paste/All/Home/End...) — xem giải thích ở `_chenKyTuTuPhimAo`.
+  /// `true` = tạm ép `_oChu` thành `readOnly` CHỈ để xin focus mà không cho
+  /// bàn phím ảo hệ thống bật lên — xem `_giuTieuDiemKhongBatBanPhimAo`.
+  /// Không liên quan gì tới `readOnly` do Bộ phím nhanh gây ra (đã có cờ
+  /// riêng, không đụng vào), chỉ cộng thêm một điều kiện `readOnly` nữa ở
+  /// `build`.
+  bool _epAnBanPhimAoKhiGiuFocus = false;
+
+  /// Giành lại tiêu điểm cho ô soạn thảo sau khi bấm một trong 4 nút
+  /// Copy/Cắt/Dán/All ở thanh công cụ dưới hoặc Bộ phím nhanh — xem giải
+  /// thích gốc ở `_chenKyTuTuPhimAo`.
+  ///
+  /// YÊU CẦU: bàn phím ảo hệ thống đang HIỆN thì bấm 4 nút này KHÔNG được
+  /// làm nó tự ẩn đi; đang ẨN thì KHÔNG được làm nó tự bật ra. Flutter
+  /// không có cách hỏi thẳng "bàn phím ảo lúc này có đang hiện hay không"
+  /// — tín hiệu đáng tin nhất hiện có là `viewInsets.bottom` (khác 0 nghĩa
+  /// là có thứ gì đó đang chiếm đáy màn hình, tức bàn phím đang hiện thật).
+  /// Giá trị NÀY CÓ THỂ "kẹt" ở 0 (dù bàn phím vừa bị ẩn) khi người dùng ẩn
+  /// bàn phím bằng phím Back của hệ thống — lỗi đã biết, xem CLAUDE.md "Lỗi
+  /// tồn đọng" — nên KHÔNG phân biệt được "đang ẩn thật" với "đang hiện
+  /// nhưng tín hiệu kẹt sai thành ẩn". Theo đúng yêu cầu: KHÔNG CHẮC thì
+  /// coi như ĐANG ẨN (an toàn hơn — lỡ không tự bật lại dù đáng ra phải bật
+  /// còn hơn tự bật bàn phím lên ngoài ý muốn người dùng).
   void _giuFocusOChuSauKhiBam() {
+    final banPhimDangHienThat = MediaQuery.of(context).viewInsets.bottom > 0;
+    if (!banPhimDangHienThat) {
+      _giuTieuDiemKhongBatBanPhimAo();
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _oChu.requestFocus();
+    });
+  }
+
+  /// Xin lại tiêu điểm cho `_oChu` nhưng CHẶN bàn phím ảo hệ thống bật lên —
+  /// dùng lại đúng mẹo đã chứng minh hoạt động ở Bộ phím nhanh: một ô
+  /// `readOnly` vẫn nhận focus được, nhưng hệ thống không tự bật bàn phím
+  /// cho nó. Trả `readOnly` về lại bình thường ngay ở khung hình kế tiếp —
+  /// chỉ cần đủ lâu để vượt qua đúng nhịp hệ thống QUYẾT ĐỊNH có bật bàn
+  /// phím hay không lúc field nhận focus, không ảnh hưởng gì tới việc gõ
+  /// tay sau đó.
+  void _giuTieuDiemKhongBatBanPhimAo() {
+    if (_boPhimNhanhCamUngMo) {
+      // Bộ phím nhanh đang mở đã tự lo đúng `readOnly` theo quy tắc riêng
+      // của nó rồi (`_epHienBanPhimAoTrongBoPhimNhanh`) — không đụng vào,
+      // chỉ xin focus bình thường.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _oChu.requestFocus();
+      });
+      return;
+    }
+    setState(() => _epAnBanPhimAoKhiGiuFocus = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _oChu.requestFocus();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _epAnBanPhimAoKhiGiuFocus = false);
+      });
     });
   }
 
@@ -14483,7 +14535,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           // và vẫn cho chạm để di chuyển con trỏ/chọn vùng
                           // bình thường như tài liệu Flutter đã ghi rõ.
                           keyboardType: TextInputType.multiline,
-                          readOnly: _boPhimNhanhCamUngMo && !_epHienBanPhimAoTrongBoPhimNhanh,
+                          readOnly: (_boPhimNhanhCamUngMo && !_epHienBanPhimAoTrongBoPhimNhanh) ||
+                              _epAnBanPhimAoKhiGiuFocus,
                           // Chặn sửa/xoá từng-ký-tự-riêng-lẻ bên trong một
                           // thẻ ghi âm — xem `ChanSuaGiuaThe`.
                           inputFormatters: [

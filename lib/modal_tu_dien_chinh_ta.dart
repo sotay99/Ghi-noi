@@ -282,15 +282,18 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
         ),
         // "+ Thêm cặp từ" luôn ở góc trên bên phải, cùng dòng tiêu đề — lướt
         // màn hình lên xuống vẫn thấy, không cần cuộn lên tận đầu mới bấm
-        // được.
+        // được. Hiện tên đầy đủ kèm icon, không rút gọn chỉ còn icon.
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: IconButton(
+            child: TextButton.icon(
               onPressed: _coCapRong ? null : _themCap,
-              tooltip: 'Thêm cặp từ',
               icon: const Icon(Icons.add_circle_outline),
-              disabledColor: Colors.white38,
+              label: const Text('Thêm cặp từ'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                disabledForegroundColor: Colors.white38,
+              ),
             ),
           ),
         ],
