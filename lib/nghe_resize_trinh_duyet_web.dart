@@ -52,7 +52,8 @@ Object dangKyThamDoChieuCaoVienPort(void Function() goiLai) {
 }
 
 double? _docChieuCaoVienPortThat() =>
-    html.window.visualViewport?.height ?? html.window.innerHeight?.toDouble();
+    html.window.visualViewport?.height?.toDouble() ??
+    html.window.innerHeight?.toDouble();
 
 void huyThamDoChieuCaoVienPort(Object? dangKy) {
   if (dangKy is Timer) dangKy.cancel();
