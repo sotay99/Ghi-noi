@@ -1402,6 +1402,34 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                           maxLines: null,
                           keyboardType: TextInputType.multiline,
                           textInputAction: TextInputAction.newline,
+                          // (THỬ HƯỚNG MỚI — nghi phạm chính của cả chuỗi lỗi
+                          // micro kênh chat: ô nhập vẫn giữ TIÊU ĐIỂM BÀN PHÍM
+                          // THẬT trong lúc mic đang tự gán chữ bằng code — mỗi
+                          // lần gán có thể khiến trình duyệt dội lại một
+                          // thông báo bất đồng bộ (chỉ đổi con trỏ, không đổi
+                          // chữ) mà app hiểu nhầm là người dùng gõ tay, huỷ
+                          // ngay phiên nghe) CẮT ĐỨT hẳn khả năng bàn phím
+                          // thật chỉnh sửa ô này trong SUỐT lúc mic đang nghe
+                          // (`readOnly`) — loại bỏ hẳn tiền đề gây ra lỗi,
+                          // không vá từng triệu chứng nữa. Chạm vào con trỏ
+                          // để DI CHUYỂN vẫn hoạt động bình thường khi
+                          // `readOnly` (Flutter cho phép), chỉ KHÔNG sửa được
+                          // chữ — đúng ý: không có "gõ tay" thật nào xảy ra
+                          // được trong lúc này nữa, nên không còn gì để dội
+                          // lại gây hiểu nhầm.
+                          //
+                          // Muốn gõ tay khi mic đang nghe: chạm vào ô (bắt
+                          // bằng `onTap`, vẫn bắn được dù `readOnly`) — coi
+                          // như Ý ĐỊNH gõ tay, dùng ĐÚNG khuôn
+                          // `_nguoiDungVuaGoChat()` (đã chứng minh ổn định)
+                          // để huỷ mic ngay, `readOnly` tự về `false` ngay
+                          // sau đó (phụ thuộc `_micDangNghe`), gõ tiếp bình
+                          // thường — mic tự bật lại sau khi tay ngừng đủ số
+                          // giây như cũ.
+                          readOnly: _micDangNghe,
+                          onTap: () {
+                            if (_micDangNghe) _nguoiDungVuaGoChat();
+                          },
                           decoration: const InputDecoration(
                             hintText: 'Ctrl + Enter để gửi',
                             border: OutlineInputBorder(
