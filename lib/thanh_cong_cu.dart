@@ -420,7 +420,7 @@ class ThanhCongCu extends StatelessWidget {
                           ),
                           _NutCoChuThich(
                             hien: hienChuThich,
-                            chu: 'Tài khoản của bạn và Cài đặt',
+                            chu: 'Tài khoản và Cài đặt',
                             child: _NutTaiKhoanMenu(
                               rong: rong,
                               khiBamCaiDatMicro: khiBamCaiDatMicro,
@@ -1489,9 +1489,9 @@ class _NutTaiKhoanMenu extends StatelessWidget {
     );
     return Semantics(
       button: true,
-      label: 'Tài khoản của bạn và Cài đặt',
+      label: 'Tài khoản và Cài đặt',
       child: Tooltip(
-        message: 'Tài khoản của bạn và Cài đặt',
+        message: 'Tài khoản và Cài đặt',
         child: PopupMenuButton<int>(
           padding: EdgeInsets.zero,
           splashRadius: 20,
@@ -1546,7 +1546,7 @@ class _NutTaiKhoanMenu extends StatelessWidget {
             final cuon = ScrollController();
             return [
               _mucDongMenu(cuon,
-                  tenMenu: 'Tài khoản của bạn và Cài đặt',
+                  tenMenu: 'Tài khoản và Cài đặt',
                   mauDamTenMenu: Colors.yellow.shade200),
               _mucCuonDanhSach(ctx, cuon, [
                 // Hai mục mới — CHƯA gắn logic (chờ gắn sau), tạm đặt ở đầu
