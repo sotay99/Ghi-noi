@@ -137,6 +137,19 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   String? _micMaNgonNguChat;
   Timer? _henTuTatMicChatImLang;
 
+  /// Android tự ngắt một PHIÊN `listen()` sau một khoảng — y hệt trang
+  /// soạn thảo chính (`_henBatLai`), bật lại NGAY lúc đó (không coi là
+  /// người dùng tắt mic) để `_micDangNghe` (ý định của người dùng, điều
+  /// khiển UI) không nhầm với trạng thái "đang nghe thật" của TỪNG phiên.
+  /// Quan trọng hơn cả việc giữ UI đúng: mỗi phiên mới lại reset
+  /// `_rawTichLuyChromeAndroidChat` — bộ đệm cộng dồn của Chrome Android
+  /// (xem đó) nhờ vậy không bao giờ phình to qua nhiều phút nói liên tục,
+  /// mà luôn gọn trong PHẠM VI MỘT PHIÊN NGẮN như bên trang soạn thảo
+  /// chính — đây mới là nguyên nhân thật khiến bản kênh chat (một phiên
+  /// `listen()` DUY NHẤT, dài tới 10 phút) hay bị lặp/lộn chữ hơn hẳn,
+  /// không phải do thiếu bước trừ raw (đã có từ trước, không đủ).
+  Timer? _henBatLaiMicChat;
+
   void _datLaiHenTuTatMicChatImLang() {
     _henTuTatMicChatImLang?.cancel();
     _henTuTatMicChatImLang = Timer(
@@ -221,11 +234,23 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     }
     _micMaNgonNguChat = await _chonTiengVietChat();
     if (!mounted) return;
+    setState(() => _micDangNghe = true);
+    _datLaiHenTuTatMicChatImLang();
+    await _batPhienNgheMicChat();
+  }
+
+  /// Bắt đầu đúng MỘT phiên `listen()` — tách riêng khỏi [_batMicChat] để
+  /// còn gọi lại được mỗi khi Android tự ngắt phiên (xem
+  /// `_henBatLaiMicChat`), không chạy lại phần khởi tạo/xin quyền mỗi lần.
+  /// Reset cả ba biến theo-dõi-phiên ngay tại đây — phiên MỚI thì cụm chữ
+  /// "đang sống" của phiên CŨ coi như đã chốt xong (y hệt lúc người dùng tự
+  /// gõ tay chen vào, xem `_khiONhapDoi`), và bộ đệm cộng dồn Chrome Android
+  /// (`_rawTichLuyChromeAndroidChat`) phải rỗng lại — đây chính là tác dụng
+  /// THẬT giúp bộ đệm đó không bao giờ phình to qua nhiều phút nói liên tục.
+  Future<void> _batPhienNgheMicChat() async {
     _micDiemBatDau = _oNhap.text.length;
     _micChuGanNhat = '';
     _rawTichLuyChromeAndroidChat = '';
-    setState(() => _micDangNghe = true);
-    _datLaiHenTuTatMicChatImLang();
     try {
       await _micro.listen(
         onResult: (ketQua) {
@@ -282,22 +307,30 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     }
   }
 
-  /// Hệ điều hành tự ngắt nhận dạng sau một khoảng im lặng (`pauseFor`) —
-  /// khác trang soạn thảo chính (tự bật lại ngay cho người dùng thấy như
-  /// luôn bật), ở đây ĐƠN GIẢN HƠN: chỉ cập nhật lại icon nút Gửi cho đúng
-  /// thực tế (không còn nghe nữa), người dùng tự bấm lại nếu muốn nói tiếp.
+  /// Hệ điều hành/engine tự ngắt phiên `listen()` sau một khoảng — y hệt
+  /// trang soạn thảo chính (`_henBatLai`): nếu người dùng CHƯA tự tắt mic
+  /// (`_micDangNghe` vẫn `true`), bật lại ngay một phiên MỚI, không coi là
+  /// "đã tắt". Thấy ĐÚNG "notListening" mới bật lại — tránh vòng lặp vô ích
+  /// nếu lỡ nhận nhầm trạng thái khác.
   void _khiMicDoiTrangThai(String trangThai) {
     final dangNghe = trangThai == SpeechToText.listeningStatus;
-    if (mounted && _micDangNghe != dangNghe && !dangNghe) {
-      _henTuTatMicChatImLang?.cancel();
-      setState(() => _micDangNghe = false);
-    }
+    if (dangNghe || !mounted) return;
+    if (!_micDangNghe) return; // người dùng đã tự bấm tắt — đừng bật lại.
+    _henBatLaiMicChat?.cancel();
+    _henBatLaiMicChat = Timer(const Duration(milliseconds: 200), () {
+      if (_micDangNghe && mounted) _batPhienNgheMicChat();
+    });
   }
 
   Future<void> _tatMicChat() async {
     _henTuTatMicChatImLang?.cancel();
-    await _micro.stop();
+    _henBatLaiMicChat?.cancel();
+    // Đặt cờ `false` TRƯỚC khi gọi `stop()` — `stop()` kích `onStatus`
+    // ("notListening") một cách KHÔNG đồng bộ; `_khiMicDoiTrangThai` đọc
+    // đúng cờ này để quyết định có bật lại hay không, nên đặt sau dễ lọt
+    // đúng khoảng hở đó, vô tình bật lại mic ngay sau khi người dùng tắt.
     if (mounted) setState(() => _micDangNghe = false);
+    await _micro.stop();
   }
 
   Future<void> _bamMicChat() async {
@@ -423,6 +456,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     HardwareKeyboard.instance.removeHandler(_khiPhimCucBoTroChuyen);
     _theoDoiTapDoiTroChuyen.dispose();
     _henTuTatMicChatImLang?.cancel();
+    _henBatLaiMicChat?.cancel();
     if (_micDangNghe) _micro.stop();
     _oNhap.removeListener(_khiONhapDoi);
     _oNhap.dispose();
@@ -1427,6 +1461,13 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
     if (kq != null) unawaited(_chuyenHoa(kq, soTheVuaXong));
 
     if (!taoTheMoi) {
+      // ĐÃ SỬA (chấm đỏ "đang dùng micro" ở tab trình duyệt kẹt lại mãi dù
+      // đã xong ghi âm) — `ghiAmTheKetThucThe()` chỉ dừng `MediaRecorder`,
+      // KHÔNG nhả `MediaStream` (cố ý dùng lại cho thẻ kế tiếp nếu còn ghi
+      // tiếp — xem `ghi_am_the_web.dart`). Nhánh này đóng hẳn hộp thoại,
+      // không còn thẻ nào sắp ghi tiếp nữa, nên phải tự nhả luôn, y hệt
+      // `_xoaVaDong()` đã làm — thiếu bước này là nguyên nhân thật của lỗi.
+      await ghiAmTheDongHan();
       if (mounted) Navigator.of(context).pop();
       return;
     }

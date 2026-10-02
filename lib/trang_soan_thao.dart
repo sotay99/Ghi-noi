@@ -13329,21 +13329,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
-  /// Chiều rộng ước lượng (rộng rãi, có dư) của [_hangCopyCutPaste] — dùng
-  /// để tính `leadingWidth` của AppBar ở nhánh màn rộng khi nó thay chỗ 4 nút
-  /// điều hướng tệp (xem `leadingWidth` trong `build`). `_NutCongCuChu` tự co
-  /// giãn theo chữ nên không có cách tính CHÍNH XÁC tuyệt đối không đo đạc —
-  /// hai chữ "Copy"/"Cắt" đều ngắn, 84px/nút (kể cả khoảng cách) là dư sức,
-  /// lỡ thiếu vài pixel thì chữ vẫn hiện được nhờ `overflow: visible` của
-  /// `_NutCongCuChu`, không bị cắt mất chữ.
-  static const _rongHangCopyCutPaste = 84.0 * 2;
-
   /// Hai nút Copy/Cắt — ĐÚNG widget/hàm dùng ở Bộ phím nhanh
-  /// (`_NutCongCuChu`/`_phimAoCopy`/`_phimAoCut`), dùng chung cho cả hàng
-  /// thay 4 nút điều hướng tệp ([_nutDieuHuongTep]) LẪN hàng nổi góc
-  /// trên-trái khi đã Thu gọn thanh công cụ (xem `build`) — một nơi duy
-  /// nhất, tránh lệch hành vi giữa hai chỗ hiện cùng một hàng nút. KHÔNG có
-  /// "Dán" ở đây — nút Dán đã luôn hiện sẵn, cố định, ở `_dsNutCongCu`
+  /// (`_NutCongCuChu`/`_phimAoCopy`/`_phimAoCut`). CHỈ còn dùng cho thanh
+  /// công cụ DƯỚI (`ThanhCongCu`, khi có vùng chọn thật) — không còn thay
+  /// chỗ 4 nút điều hướng tệp ở AppBar trên nữa (từng khiến Copy/Cắt hiện
+  /// ra CÙNG LÚC ở cả hai nơi, lỗi người dùng báo). KHÔNG có "Dán" ở đây —
+  /// nút Dán đã luôn hiện sẵn, cố định, ở `_dsNutCongCu`/`_nutDanCongCu`
   /// (thanh trên cùng), thêm một nút Dán thứ hai ở đây chỉ dư thừa.
   Widget _hangCopyCutPaste() {
     // Chữ xanh dương — nổi bật đúng ngữ cảnh "đang ở phía trên", khác hai nút
@@ -13368,16 +13359,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 
   Widget _nutDieuHuongTep({bool nutThuMucCoChu = false}) {
-    // Có vùng chọn (và không đang vướng trình ghi âm/tìm kiếm/chọn vị trí
-    // chèn tệp) — thay HẲN 4 nút điều hướng bằng Copy/Cắt/Dán, dễ bấm hơn
-    // trên điện thoại ngay khi vừa bôi đen. Bấm 1 trong 3 nút đó thì cả 3
-    // biến mất ngay (`_bamCopyCutPasteOHangThayNav`), trả lại 4 nút cũ.
-    if (_hienHangCopyCutPaste()) {
-      return Padding(
-        padding: const EdgeInsets.only(left: 4),
-        child: _hangCopyCutPaste(),
-      );
-    }
+    // Copy/Cắt giờ CHỈ hiện ở thanh công cụ DƯỚI (`ThanhCongCu`) khi có
+    // vùng chọn thật — không còn thay chỗ 4 nút điều hướng tệp ở đây nữa,
+    // tránh hiện ra CÙNG LÚC ở cả hai nơi (lỗi người dùng báo). 4 nút điều
+    // hướng tệp giờ LUÔN hiện, không đổi theo vùng chọn.
     final ds = _dsGhiChuCungThuMuc();
     final viTriHienTai = ds.indexWhere((g) => g.id == _ghiChuHienTai.id);
     final coTruoc = viTriHienTai > 0;
@@ -13499,7 +13484,28 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   // đủ để viền còn ôm khít quanh icon, không dư khoảng trống).
   static const _kichThuocNutTren = BoxConstraints.tightFor(width: 36, height: 36);
 
-  List<Widget> _dsNutCongCu() => [
+  // Nút "Lưu" đã bỏ — hệ thống tự lưu sau mỗi lần sửa rồi (`_henLuu`, hẹn
+  // giờ 600ms), bấm tay chỉ còn ý nghĩa "lưu ngay + báo đã lưu", không phải
+  // điểm duy nhất giữ an toàn dữ liệu. Thay bằng nút "Dán" — ĐÚNG hình
+  // dạng/logic/hiệu ứng với nút cùng tên ở Bộ phím nhanh (cùng widget
+  // `_NutCongCuChu`, cùng cờ liệt `_phimPasteDangLiet`, cùng hàm
+  // `_phimAoPasteCoLiet`) để Dán luôn trong tầm tay, kể cả khi Bộ phím nhanh
+  // đang tắt. `_bamNutLuu`/Ctrl+S vẫn còn, chỉ mất nút hiển thị này.
+  ///
+  /// Màn hình hẹp đặt RIÊNG nút này lên cùng dòng với Tên tệp (sát mép
+  /// phải — xem `build`), nên tách ra một hàm dùng chung thay vì lặp lại.
+  Widget _nutDanCongCu() => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: _NutCongCuChu(
+          nhan: 'Dán',
+          bLiet: _phimPasteDangLiet,
+          onTap: _phimAoPasteCoLiet,
+        ),
+      );
+
+  /// [coDan] = false ở nhánh màn hình hẹp — nút Dán đã dời lên cùng dòng
+  /// Tên tệp riêng (`_nutDanCongCu`), không lặp lại ở đây nữa.
+  List<Widget> _dsNutCongCu({bool coDan = true}) => [
         IconButton(
           onPressed: _lichSuLui.isEmpty ? null : _lui,
           icon: const Icon(Icons.undo, size: 22),
@@ -13516,22 +13522,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           constraints: _kichThuocNutTren,
           padding: EdgeInsets.zero,
         ),
-        // Nút "Lưu" đã bỏ — hệ thống tự lưu sau mỗi lần sửa rồi (`_henLuu`,
-        // hẹn giờ 600ms), bấm tay chỉ còn ý nghĩa "lưu ngay + báo đã lưu",
-        // không phải điểm duy nhất giữ an toàn dữ liệu. Thay bằng nút "Paste"
-        // — ĐÚNG hình dạng/logic/hiệu ứng với nút cùng tên ở Bộ phím nhanh
-        // (cùng widget `_NutCongCuChu`, cùng cờ liệt `_phimPasteDangLiet`,
-        // cùng hàm `_phimAoPasteCoLiet`) để Dán luôn trong tầm tay, kể cả khi
-        // Bộ phím nhanh đang tắt. `_bamNutLuu`/Ctrl+S vẫn còn, chỉ mất nút
-        // hiển thị này.
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: _NutCongCuChu(
-            nhan: 'Dán',
-            bLiet: _phimPasteDangLiet,
-            onTap: _phimAoPasteCoLiet,
-          ),
-        ),
+        if (coDan) _nutDanCongCu(),
         IconButton(
           onPressed: () => setState(() => _anThanhDinhDang = !_anThanhDinhDang),
           // Emoji "chữ" — các nút khác trong hai thanh này đều dùng
@@ -14250,6 +14241,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             // Tên tệp một mình đứng riêng một dòng phía trên (đủ chỗ đọc tên
             // dài, không bị bốn nút kia chèn vào nữa).
             title: _oTenField(),
+            // Nút "Dán" đứng RIÊNG, cùng dòng với Tên tệp, sát mép phải —
+            // đúng yêu cầu người dùng cho màn hình hẹp (trước đây nó nằm
+            // lẫn trong hàng công cụ ở dòng DƯỚI cùng Lùi/Tiến/..., xa tên
+            // tệp). Hàng dưới (`_dsNutCongCu(coDan: false)`) không lặp lại
+            // nó nữa.
+            actions: [_nutDanCongCu()],
             backgroundColor: Colors.white,
             surfaceTintColor: Colors.white,
             elevation: 1,
@@ -14265,7 +14262,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                         alignment: Alignment.centerRight,
                         child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
-                          child: Row(children: _dsNutCongCu()),
+                          child: Row(children: _dsNutCongCu(coDan: false)),
                         ),
                       ),
                     ),
@@ -14276,9 +14273,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           )
         : AppBar(
             leading: _nutDieuHuongTep(nutThuMucCoChu: true),
-            leadingWidth: _hienHangCopyCutPaste()
-                ? _rongHangCopyCutPaste
-                : _rongNutThuMucCoChu + _canhNutDieuHuongTep * 3 + 4,
+            leadingWidth: _rongNutThuMucCoChu + _canhNutDieuHuongTep * 3 + 4,
             title: _oTenField(),
             backgroundColor: Colors.white,
             surfaceTintColor: Colors.white,
