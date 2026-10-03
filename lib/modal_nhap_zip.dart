@@ -75,7 +75,8 @@ class _ModalNhapZipState extends State<ModalNhapZip> {
               padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: Text(
                 'Chỉ hiện các tệp .txt và thư mục có chứa tệp .txt bên trong '
-                'tệp nén này — tệp/thư mục khác đã được ẩn khỏi kết quả.',
+                'tệp vừa chọn — tệp/thư mục khác (nếu tải lên .zip) đã được '
+                'ẩn khỏi kết quả.',
                 style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
               ),
             ),

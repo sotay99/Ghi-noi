@@ -513,4 +513,35 @@ class KhoDuLieu {
       }
     }
   }
+
+  // --------------------------------------------------------- thông tin chi tiết
+
+  /// Số thư mục con/tệp con NGAY TRONG [chaId] (không đệ quy) — dòng "Gồm
+  /// có N thư mục và N tệp tin ở trang đầu" trong modal "Thông tin chi
+  /// tiết".
+  ({int soThuMuc, int soGhiChu}) thongKeTrucTiep(String chaId) {
+    final noiDung = noiDungThuMuc(chaId);
+    return (soThuMuc: noiDung.thuMucCon.length, soGhiChu: noiDung.ghiChuCon.length);
+  }
+
+  /// Cùng vai trò với `thongKeTrucTiep` nhưng đệ quy qua MỌI tầng con bên
+  /// trong — dòng "Tổng tất cả có N thư mục và N tệp tin bên trong", kèm
+  /// luôn tổng dung lượng nội dung văn bản (byte, UTF-8) để tính "Kích
+  /// thước".
+  ({int soThuMuc, int soGhiChu, int tongByte}) thongKeDeQuy(String chaId) {
+    final noiDung = noiDungThuMuc(chaId);
+    var tongThuMuc = noiDung.thuMucCon.length;
+    var tongGhiChu = noiDung.ghiChuCon.length;
+    var tongByte = 0;
+    for (final g in noiDung.ghiChuCon) {
+      tongByte += utf8.encode(g.noiDung).length;
+    }
+    for (final t in noiDung.thuMucCon) {
+      final con = thongKeDeQuy(t.id);
+      tongThuMuc += con.soThuMuc;
+      tongGhiChu += con.soGhiChu;
+      tongByte += con.tongByte;
+    }
+    return (soThuMuc: tongThuMuc, soGhiChu: tongGhiChu, tongByte: tongByte);
+  }
 }

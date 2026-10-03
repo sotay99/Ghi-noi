@@ -2,6 +2,7 @@
 // mục và ghi chú. Bấm vào một ghi chú thì trả id của nó về cho trang soạn
 // thảo qua Navigator.pop; đi dạo rồi quay lại tay không thì trả về null.
 
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -14,6 +15,7 @@ import 'luu_va_chia_se_tep.dart';
 import 'mau_co_ban.dart';
 import 'mo_hinh.dart';
 import 'modal_nhap_zip.dart';
+import 'modal_thong_tin_muc.dart';
 import 'modal_thung_rac.dart';
 import 'tai_ve_ghi_chu.dart';
 import 'thong_bao_giua.dart';
@@ -403,20 +405,24 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     });
   }
 
-  /// "Tải và chia sẻ thư mục này" — nén nguyên thư mục ĐANG ĐỨNG (và mọi
-  /// thứ bên trong) thành .zip rồi tải/chia sẻ, xem `lib/zip_thu_muc.dart`.
-  Future<void> _taiThuMucHienTai() async {
+  /// "Tải và chia sẻ thư mục này" — nén nguyên thư mục [id] (và mọi thứ bên
+  /// trong) thành .zip rồi tải/chia sẻ, xem `lib/zip_thu_muc.dart`. Dùng
+  /// chung cho cả dòng tên thư mục ĐANG ĐỨNG (dòng 3) và từng thư mục con
+  /// trong danh sách (menu ba chấm riêng của nó).
+  Future<void> _taiThuMuc(String id, String ten) async {
     try {
-      final tenGoc = _tenThuMucHienTai;
-      final bytes = nenThuMucThanhZip(_kho, _thuMucHienTaiId, tenGoc);
-      await luuVaChiaSeTep('$tenGoc.zip', bytes, loaiMime: 'application/zip');
+      final bytes = nenThuMucThanhZip(_kho, id, ten);
+      await luuVaChiaSeTep('$ten.zip', bytes, loaiMime: 'application/zip');
     } catch (_) {
       _bao('Không tạo được tệp nén. Thử lại sau.');
     }
   }
 
-  /// "Nhập tệp nén Zip vào đây" — chỉ nhận đúng .zip, đọc xong mở
-  /// `ModalNhapZip` để xem trước rồi mới quyết định đưa vào đâu.
+  Future<void> _taiThuMucHienTai() => _taiThuMuc(_thuMucHienTaiId, _tenThuMucHienTai);
+
+  /// "Nhập ZIP hoặc TXT vào đây" — nhận .zip (xem trước cả cây,
+  /// `phanTichZip`) hoặc .txt (một tệp đơn, không cần giải nén gì), đọc
+  /// xong mở `ModalNhapZip` để xem trước rồi mới quyết định đưa vào đâu.
   ///
   /// (file_picker 13.x — xem chú thích tương tự ở
   /// `_chonVaChuyenFileAmThanh` trong `trang_soan_thao.dart`) dùng hàm TĨNH
@@ -426,7 +432,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     try {
       tep = await FilePicker.pickFile(
         type: FileType.custom,
-        allowedExtensions: ['zip'],
+        allowedExtensions: ['zip', 'txt'],
       );
     } catch (e) {
       _bao('Không mở được hộp thoại chọn tệp: $e');
@@ -437,7 +443,8 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     // `builder:` ở dưới không được trình biên dịch tự "promote" non-null
     // từ check `if (tep == null) return;` phía trên (biến gốc là `tep` có
     // thể gán lại), gán vào biến final mới mới thật sự hết nullable.
-    final tenTepZip = tep.name;
+    final tenTepGoc = tep.name;
+    final laTxt = tenTepGoc.toLowerCase().endsWith('.txt');
 
     Uint8List bytes;
     try {
@@ -448,17 +455,23 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     }
 
     List<NutZip> cay;
-    try {
-      cay = phanTichZip(bytes);
-    } catch (_) {
-      _bao('Tệp nén không hợp lệ.');
-      return;
+    if (laTxt) {
+      // Một tệp .txt đơn — không có gì để giải nén, cây chỉ có đúng 1 nút.
+      final ten = tenTepGoc.substring(0, tenTepGoc.length - 4);
+      cay = [NutZip.tep(ten, utf8.decode(bytes, allowMalformed: true))];
+    } else {
+      try {
+        cay = phanTichZip(bytes);
+      } catch (_) {
+        _bao('Tệp nén không hợp lệ.');
+        return;
+      }
     }
     if (!mounted) return;
 
     final ketQua = await Navigator.of(context).push<KetQuaNhapZip>(
       MaterialPageRoute(
-        builder: (_) => ModalNhapZip(cayGoc: cay, tenTepZip: tenTepZip),
+        builder: (_) => ModalNhapZip(cayGoc: cay, tenTepZip: tenTepGoc),
       ),
     );
     if (ketQua == null || ketQua == KetQuaNhapZip.huy || !mounted) return;
@@ -963,13 +976,19 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                     case 5:
                       _moThungRac();
                       break;
-                    // 4: "Thông tin thư mục này" — chỗ đặt trước, chưa gắn
-                    // logic gì cả.
+                    case 4:
+                      hienThongTinThuMuc(
+                        context,
+                        _kho,
+                        id: _thuMucHienTaiId,
+                        ten: _tenThuMucHienTai,
+                      );
+                      break;
                   }
                 },
                 itemBuilder: (ctx) => const [
                   PopupMenuItem(value: 1, child: Text('Tạo thư mục mới')),
-                  PopupMenuItem(value: 6, child: Text('Nhập tệp nén Zip vào đây')),
+                  PopupMenuItem(value: 6, child: Text('Nhập ZIP hoặc TXT vào đây')),
                   PopupMenuDivider(),
                   PopupMenuItem(value: 2, child: Text('Chọn nhiều')),
                   PopupMenuItem(value: 3, child: Text('Tải và chia sẻ thư mục này')),
@@ -1101,6 +1120,17 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                   case 'mau':
                                     _chonMau(laThuMuc: true, id: t.id);
                                     break;
+                                  case 'tai':
+                                    _taiThuMuc(t.id, t.ten);
+                                    break;
+                                  case 'thong_tin':
+                                    hienThongTinThuMuc(
+                                      context,
+                                      _kho,
+                                      id: t.id,
+                                      ten: t.ten,
+                                    );
+                                    break;
                                   case 'xoa':
                                     _xoaThuMuc(t);
                                     break;
@@ -1122,6 +1152,14 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                 PopupMenuItem(
                                   value: 'mau',
                                   child: Text('Chọn màu Tên Thư mục'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'tai',
+                                  child: Text('Tải và chia sẻ thư mục này'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'thong_tin',
+                                  child: Text('Thông tin thư mục này'),
                                 ),
                                 PopupMenuItem(
                                   value: 'xoa',
@@ -1191,6 +1229,13 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                   case 'mau':
                                     _chonMau(laThuMuc: false, id: g.id);
                                     break;
+                                  case 'thong_tin':
+                                    hienThongTinGhiChu(
+                                      context,
+                                      ten: g.ten,
+                                      noiDung: g.noiDung,
+                                    );
+                                    break;
                                   case 'xoa':
                                     _xoaGhiChu(g);
                                     break;
@@ -1216,6 +1261,10 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                 PopupMenuItem(
                                   value: 'mau',
                                   child: Text('Chọn màu Tên Tệp'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'thong_tin',
+                                  child: Text('Thông tin tệp này'),
                                 ),
                                 PopupMenuItem(
                                   value: 'xoa',
