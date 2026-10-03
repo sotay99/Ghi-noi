@@ -96,6 +96,12 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   // hình chat — mở lại từ đầu thì phải bấm "+" → Micro lại mới hiện lại.
   bool _hienNutMicNoiChat = false;
   final _cuon = ScrollController();
+  // (YÊU CẦU MỚI) Khung nhập đạt chiều cao tối đa phải tự cuộn bên trong để
+  // luôn thấy chữ mới — gõ tay thì `TextField` tự làm điều này (đi qua
+  // đường bàn phím ảo thật), nhưng mic tự gán `_oNhap.value` lại KHÔNG đi
+  // qua đường đó nên không tự cuộn theo — phải tự cuộn tay bằng
+  // `ScrollController` riêng này, xem chỗ gọi ở `onResult`.
+  final _cuonONhap = ScrollController();
   bool _dangGui = false;
   LoaiDinhKemTroChuyen _dinhKemHienTai = LoaiDinhKemTroChuyen.khong;
 
@@ -493,7 +499,19 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     // vào được một từ". Chặn tại gốc: KHÔNG có gì để làm (không đụng tới
     // cả tự động định dạng lẫn "gõ tay thắng mic") khi CHỮ chưa hề đổi,
     // bất kể vì sao hàm này được gọi.
-    if (cuChat == chuMoiChat) return;
+    if (cuChat == chuMoiChat) {
+      // (YÊU CẦU MỚI) Chữ không đổi nhưng con trỏ vừa dời đi nơi khác trong
+      // lúc mic đang nghe — dời luôn neo chèn chữ (`_micDiemBatDau`) theo
+      // con trỏ mới, rỗng `_micChuGanNhat` (coi như bắt đầu một đoạn mới
+      // tại vị trí này) — không thì câu nói tiếp theo vẫn cứ chèn vào vị
+      // trí CŨ (thường là cuối văn bản của lượt nghe trước), bất kể con
+      // trỏ đã dời tới đâu.
+      if (_micDangNghe && _oNhap.selection.isValid) {
+        _micDiemBatDau = _oNhap.selection.start;
+        _micChuGanNhat = '';
+      }
+      return;
+    }
     _apDungTuDongDinhDangChat(cuChat, chuMoiChat);
 
     // `_micDangNghe` tắt vì gõ tay (`_dangTamTatMicChatDeGo`) VẪN phải tiếp
@@ -796,6 +814,15 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
           // làm cho nhánh gõ tay), không chỉ nhánh đó.
           _chuChatGanNhat = moi;
           _micChuGanNhat = chen;
+          // (YÊU CẦU MỚI) Chữ mic vừa chèn có thể đã đẩy khung nhập ra
+          // ngoài tầm nhìn (khung đã đạt chiều cao tối đa, phải tự cuộn
+          // bên trong) — gõ tay thì `TextField` tự cuộn theo caret, mic tự
+          // gán `.value` thì không, phải tự cuộn tay xuống đáy ở đây.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_cuonONhap.hasClients) {
+              _cuonONhap.jumpTo(_cuonONhap.position.maxScrollExtent);
+            }
+          });
           // (SỬA LỖI "micro quay lại sửa chữ đã hiện ra") Một kết quả FINAL
           // (`finalResult == true`) nghĩa là CÂU NÓI hiện tại đã xong — y
           // hệt BƯỚC E ở `_TrangSoanThaoState._khiCoChu`, coi toàn bộ nội
@@ -1047,6 +1074,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     _oNhap.dispose();
     _focusONhap.dispose();
     _cuon.dispose();
+    _cuonONhap.dispose();
     super.dispose();
   }
 
@@ -1446,6 +1474,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                         child: TextField(
                           controller: _oNhap,
                           focusNode: _focusONhap,
+                          scrollController: _cuonONhap,
                           minLines: 1,
                           maxLines: null,
                           keyboardType: TextInputType.multiline,

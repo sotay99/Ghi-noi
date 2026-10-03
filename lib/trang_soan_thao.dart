@@ -3137,15 +3137,26 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Widget _goiYTrong() {
     if (_boDieuKhien.text.isNotEmpty) return const SizedBox.shrink();
     const mauChuMo = Color(0xFF9E9E9E);
+    // (YÊU CẦU MỚI) Màn hình RẤT hẹp ẩn hẳn nút "? Hướng dẫn" khỏi thanh
+    // công cụ (xem `_nguongManHinhRatHep` ở `thanh_cong_cu.dart`) — câu gợi
+    // ý này phải chỉ đúng đường, đổi sang nhắc nút "i" (bấm nút "i" mới
+    // hiện lại nút Hướng dẫn ở hàng phụ) kèm icon tròn có chữ "i", không
+    // còn icon "?" nữa. CHỈ đổi ở màn hình rất hẹp — màn hình thường vẫn
+    // giữ nguyên câu + icon "?" như cũ.
+    final ratHep = MediaQuery.sizeOf(context).width < 420;
     final cacDong = <InlineSpan>[
-      const TextSpan(
+      TextSpan(
         text: 'Gõ chữ và bấm Micro để nói...\n'
             'Thực hiện song song hai việc trên cùng lúc.\n'
-            'Vui lòng đọc hướng dẫn và mẹo sử dụng App (Nút ',
+            '${ratHep ? 'Vui lòng đọc hướng dẫn và mẹo sử dụng App (nút ' : 'Vui lòng đọc hướng dẫn và mẹo sử dụng App (Nút '}',
       ),
       WidgetSpan(
         alignment: PlaceholderAlignment.middle,
-        child: Icon(Icons.help_outline_rounded, size: 16, color: mauChuMo),
+        child: Icon(
+          ratHep ? Icons.info_outline : Icons.help_outline_rounded,
+          size: 16,
+          color: mauChuMo,
+        ),
       ),
       const TextSpan(text: ')'),
     ];
@@ -4948,12 +4959,29 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// máy/AI tự ghi).
   bool _boPhimNhanhCamUngMo = false;
 
+  /// (YÊU CẦU MỚI) Bấm một trong bốn nút "Làm việc với AI"/"Thêm lựa
+  /// chọn"/"Tài khoản và Cài đặt"/"Bật bộ phím nhanh" (CHỈ lúc BẬT, không
+  /// áp dụng cho "Tắt bộ phím nhanh") coi như một cơ hội để tự dọn lỗi "bãi
+  /// đất trống" — ẩn hẳn bàn phím ảo (nó chiếm mất khoảng không rồi mới để
+  /// lại "bãi đất trống" khi ẩn) và đổi khoá (`GlobalKey`) của ô soạn thảo
+  /// để ép Flutter đo lại khung hình từ đầu, ĐÚNG mẹo đã dùng cho lỗi kẹt
+  /// bàn phím ảo ở Copy/Cắt/Dán/All — không chắc sẽ hết hẳn lỗi, chỉ là một
+  /// hướng rẻ, ít rủi ro, đáng thử trước khi mở menu/bật tính năng.
+  void _resetManHinhTruocKhiMoMenu() {
+    if (!mounted) return;
+    SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+    setState(() => _oVanBanKey = GlobalKey());
+  }
+
   void _bamNutBoPhimNhanhCamUng() {
     // Bấm nút này (bật/tắt Bộ phím nhanh) mà micro đang nghe thì tạm tắt-bật
     // lại y hệt lúc gõ tay một ký tự bất kỳ (chữ đã hiện đứng yên, chữ chưa
     // hiện bị chặn), tránh micro nghe nhầm lúc tay đang bận bấm nút.
     _nguoiDungVuaGo();
     final dangBat = !_boPhimNhanhCamUngMo;
+    // (YÊU CẦU MỚI) Bấm BẬT (không áp dụng cho TẮT) coi như một trong các
+    // nút "reset màn hình", xem `_resetManHinhTruocKhiMoMenu`.
+    if (dangBat) _resetManHinhTruocKhiMoMenu();
     setState(() {
       _boPhimNhanhCamUngMo = dangBat;
       if (!dangBat) {
@@ -5068,12 +5096,29 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _epHienBanPhimAoTrongBoPhimNhanh = true;
       _thuGonThanhCongCu = true;
     });
+    hienThongBaoGiua(context, 'Đã mở khoá bàn phím', ganTren: true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _oChu.requestFocus();
       SystemChannels.textInput.invokeMethod<void>('TextInput.show');
     });
     _batConTroNgay();
+    // (YÊU CẦU MỚI) Bấm nút này nhiều lần dồn dập có thể làm trình duyệt
+    // "liệt" khả năng tự bật lại bàn phím ảo — ĐÚNG HỌ với lỗi kẹt bàn
+    // phím ảo ở Copy/Cắt/Dán/All đã sửa dứt điểm bằng cách đổi khoá
+    // (`GlobalKey`) của ô soạn thảo, xem `_lamMoiOVanBanDeThoatKetBanPhimAo`.
+    // Áp dụng đúng mẹo đó: sau 1,5 giây, nếu bàn phím ảo VẪN chưa hiện
+    // (đọc lại `viewInsets.bottom` tại thời điểm hẹn giờ chạy) thì đổi khoá
+    // rồi xin focus + show lại.
+    _henLamMoiOVanBanDeThoatKet?.cancel();
+    _henLamMoiOVanBanDeThoatKet = Timer(const Duration(milliseconds: 1500), () {
+      if (!mounted || !_epHienBanPhimAoTrongBoPhimNhanh) return;
+      if (MediaQuery.of(context).viewInsets.bottom > 0) return;
+      _lamMoiOVanBanDeThoatKetBanPhimAo();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) SystemChannels.textInput.invokeMethod<void>('TextInput.show');
+      });
+    });
   }
 
   /// Danh sách ký tự trong bảng "*" (`_moBangKyTuDacBiet`) — đúng nguyên
@@ -7997,6 +8042,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _batMicro();
       _datNeoTaiConTro();
     }
+    // (YÊU CẦU MỚI) Bấm nút Micro áp dụng ĐÚNG quy tắc đã dùng cho 4 nút
+    // Copy/Cắt/Dán/All: bàn phím ảo đang hiện thì tiếp tục hiện, đang ẩn thì
+    // tiếp tục ẩn — không tự bật/tắt ngoài ý muốn — kèm cơ chế tự reset nếu
+    // trình duyệt lỡ "liệt" khả năng bật lại bàn phím ảo.
+    _giuFocusOChuSauKhiBam();
   }
 
   /// Bàn phím vật lý bấm đúng phím tắt đang cài (Tab một mình hoặc Ctrl +
@@ -14899,6 +14949,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       'riêng của Flowrite thay vì bàn phím mặc định của máy.',
                 ),
                 khiBamBoPhimNhanh: _bamNutBoPhimNhanhCamUng,
+                khiMoMenuCanReset: _resetManHinhTruocKhiMoMenu,
                 boPhimNhanhDangMo: _boPhimNhanhCamUngMo,
                 noiBatBoPhimNhanh:
                     kIsWeb && (_thietBiHienTai == ThietBi.android || _thietBiHienTai == ThietBi.iphone),

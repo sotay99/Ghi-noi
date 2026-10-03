@@ -59,7 +59,14 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamTroChuyen,
     this.thayNutBangCopyCutPaste = false,
     this.hangCopyCutPaste,
+    required this.khiMoMenuCanReset,
   });
+
+  /// (YÊU CẦU MỚI) Gọi NGAY khi một trong ba menu thả xuống (Làm việc với
+  /// AI/Thêm lựa chọn/Tài khoản và Cài đặt) vừa mở — ép màn hình đo lại và
+  /// ngăn bàn phím ảo tự bật lên, một trong các nỗ lực chống lỗi "bãi đất
+  /// trống", xem `_resetManHinhTruocKhiMoMenu` ở `trang_soan_thao.dart`.
+  final VoidCallback khiMoMenuCanReset;
 
   /// Có vùng chọn thật — tạm thay 4 nút Hướng dẫn/Thêm/Tài khoản-Cài đặt/
   /// Phím nhanh bằng [hangCopyCutPaste], xem chú thích tại `build`. Không
@@ -356,6 +363,7 @@ class ThanhCongCu extends StatelessWidget {
                                       epToanVanKhiCoVungChon: epToanVanKhiCoVungChon,
                                       khiBamDoiCheDoLamViec: khiBamDoiCheDoLamViec,
                                       khoaMenuAI: khoaMenuAI,
+                                      khiMoMenu: khiMoMenuCanReset,
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -400,6 +408,7 @@ class ThanhCongCu extends StatelessWidget {
                               epToanVanKhiCoVungChon: epToanVanKhiCoVungChon,
                               khiBamDoiCheDoLamViec: khiBamDoiCheDoLamViec,
                               khoaMenuAI: khoaMenuAI,
+                              khiMoMenu: khiMoMenuCanReset,
                             ),
                           ),
                           _NutCoChuThich(
@@ -416,6 +425,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamXoaTatCa: khiBamXoaTatCa,
                               khiBamDanhSachPhimTat: khiBamDanhSachPhimTat,
                               khiBamTimKiem: khiBamTimKiem,
+                              khiMoMenu: khiMoMenuCanReset,
                             ),
                           ),
                           _NutCoChuThich(
@@ -427,6 +437,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamCaiDatHienThi: khiBamCaiDatHienThi,
                               khiBamTuDienChinhTa: khiBamTuDienChinhTa,
                               khiBamTroChuyen: khiBamTroChuyen,
+                              khiMoMenu: khiMoMenuCanReset,
                             ),
                           ),
                           // Nhân bản nút "Bật/Tắt Bộ phím nhanh cho màn hình
@@ -1313,6 +1324,7 @@ class _NutThemMenu extends StatelessWidget {
     required this.khiBamXoaTatCa,
     required this.khiBamDanhSachPhimTat,
     required this.khiBamTimKiem,
+    required this.khiMoMenu,
   });
 
   final bool rong;
@@ -1341,6 +1353,9 @@ class _NutThemMenu extends StatelessWidget {
   /// xem `_NutTaiKhoanMenu`), không còn ở đây nữa.
   final VoidCallback khiBamTimKiem;
 
+  /// Xem `ThanhCongCu.khiMoMenuCanReset`.
+  final VoidCallback khiMoMenu;
+
   @override
   Widget build(BuildContext context) {
     return Semantics(
@@ -1349,6 +1364,7 @@ class _NutThemMenu extends StatelessWidget {
       child: Tooltip(
         message: 'Thêm',
         child: PopupMenuButton<int>(
+          onOpened: khiMoMenu,
           padding: EdgeInsets.zero,
           splashRadius: 20,
           // (YÊU CẦU MỚI) Nền của menu "Thêm lựa chọn" — đỏ NHẠT, phân biệt
@@ -1461,6 +1477,7 @@ class _NutTaiKhoanMenu extends StatelessWidget {
     required this.khiBamCaiDatHienThi,
     required this.khiBamTuDienChinhTa,
     required this.khiBamTroChuyen,
+    required this.khiMoMenu,
   });
 
   final bool rong;
@@ -1474,6 +1491,9 @@ class _NutTaiKhoanMenu extends StatelessWidget {
   /// một nút riêng cạnh "Xem thêm lựa chọn"), nằm ngay phía trên "Đăng
   /// nhập tài khoản", gần cuối menu.
   final VoidCallback khiBamTroChuyen;
+
+  /// Xem `ThanhCongCu.khiMoMenuCanReset`.
+  final VoidCallback khiMoMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -1493,6 +1513,7 @@ class _NutTaiKhoanMenu extends StatelessWidget {
       child: Tooltip(
         message: 'Tài khoản và Cài đặt',
         child: PopupMenuButton<int>(
+          onOpened: khiMoMenu,
           padding: EdgeInsets.zero,
           splashRadius: 20,
           // (YÊU CẦU MỚI) Nền của menu "Tài khoản và Cài đặt" — vàng NHẠT.
@@ -1602,7 +1623,11 @@ class _NutAIMenu extends StatelessWidget {
     required this.epToanVanKhiCoVungChon,
     required this.khiBamDoiCheDoLamViec,
     required this.khoaMenuAI,
+    required this.khiMoMenu,
   });
+
+  /// Xem `ThanhCongCu.khiMoMenuCanReset`.
+  final VoidCallback khiMoMenu;
 
   final bool rong;
   final VoidCallback khiBamCaiDatKiemTraToanVan;
@@ -1670,6 +1695,7 @@ class _NutAIMenu extends StatelessWidget {
         message: 'Làm việc với AI',
         child: PopupMenuButton<int>(
           key: khoaMenuAI,
+          onOpened: khiMoMenu,
           padding: EdgeInsets.zero,
           splashRadius: 20,
           // (YÊU CẦU MỚI) Nền của menu "Làm việc với AI" — xanh lá NHẠT.
