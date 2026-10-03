@@ -646,6 +646,13 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   /// không bị "xung đột" nếu đang nghe mà người dùng vẫn bấm nút này (một
   /// phiên MỚI sạch, bộ đệm/neo reset lại từ đầu).
   void _bamNutMicNoiChat() {
+    // (YÊU CẦU MỚI) Ép tiêu điểm/con trỏ nhấp nháy + bàn phím ảo hiện ra,
+    // ĐÚNG HỆT cách nút Micro trong "+" đã làm (`_batMicChat`) — áp dụng
+    // cho CẢ HAI nhánh dưới đây, vì nhánh "đang nghe → ép tắt/bật lại"
+    // (`_nguoiDungVuaGoChat`) không tự làm việc này.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusONhap.requestFocus();
+    });
     if (_micDangNghe) {
       _nguoiDungVuaGoChat();
     } else {
@@ -1565,7 +1572,13 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                       // "+" ít nhất một lần trong phiên mở kênh chat này) —
                       // KHÔNG còn phụ thuộc việc mục Micro trong nút "+" có
                       // đang mờ xám (liệt) hay không.
-                      if (_hienNutMicNoiChat)
+                      //
+                      // (YÊU CẦU MỚI) Trừ khi thiết bị không dùng được Micro
+                      // kênh chat (web + iPhone, xem
+                      // `_microChatDungDuocTrenThietBiNay`) — lúc đó nút nổi
+                      // này thừa thãi hẳn, ẩn luôn, không cho hiện lên dù
+                      // `_hienNutMicNoiChat` đã từng bật.
+                      if (_hienNutMicNoiChat && _microChatDungDuocTrenThietBiNay)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Opacity(

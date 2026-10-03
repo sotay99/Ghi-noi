@@ -2,6 +2,7 @@
 // mục và ghi chú. Bấm vào một ghi chú thì trả id của nó về cho trang soạn
 // thảo qua Navigator.pop; đi dạo rồi quay lại tay không thì trả về null.
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -9,8 +10,15 @@ import 'kho_du_lieu.dart';
 import 'mau_co_ban.dart';
 import 'mo_hinh.dart';
 import 'tai_ve_ghi_chu.dart';
+import 'thong_bao_giua.dart';
 
 enum _LoaiChoDan { catThuMuc, catGhiChu, chepThuMuc, chepGhiChu }
+
+/// (YÊU CẦU MỚI) "Ngôi nhà chung" — một mức ẢO đứng TRÊN `thuMucGoc` thật,
+/// chứa 3 "bộ nhớ" lớn (Nội bộ/Đám mây/Chia sẻ). Không phải id thư mục thật
+/// trong `KhoDuLieu` — chỉ dùng để `_thuMucHienTaiId` nhận biết đang ở mức
+/// này, build() rẽ nhánh riêng, KHÔNG bao giờ đưa vào `_kho.noiDungThuMuc`.
+const _ngoiNhaChung = '#ngoi-nha-chung#';
 
 class ManHinhThuMuc extends StatefulWidget {
   const ManHinhThuMuc({
@@ -27,7 +35,7 @@ class ManHinhThuMuc extends StatefulWidget {
 }
 
 class _ManHinhThuMucState extends State<ManHinhThuMuc> {
-  String _thuMucHienTaiId = thuMucGoc;
+  String _thuMucHienTaiId = _ngoiNhaChung;
   final List<String> _duongDan = []; // Ngăn xếp id thư mục cha, để quay lại.
 
   String? _choDanId;
@@ -36,9 +44,22 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
 
   KhoDuLieu get _kho => widget.kho;
 
+  /// (YÊU CẦU MỚI) Tên thư mục "Bộ nhớ nội bộ" — khác nhau giữa bản web
+  /// (đọc từ Trình duyệt web) và bản APK/iOS (đọc thẳng từ máy).
+  String get _tenBoNhoNoiBo => kIsWeb
+      ? 'Bộ nhớ nội bộ trong Trình duyệt web của thiết bị'
+      : 'Bộ nhớ nội bộ trong thiết bị';
+
   String get _tenThuMucHienTai {
+    if (_thuMucHienTaiId == _ngoiNhaChung) return 'Chọn nơi lưu trữ';
     if (_thuMucHienTaiId == thuMucGoc) return 'Ghi chú của tôi';
     return _kho.timThuMuc(_thuMucHienTaiId)?.ten ?? 'Ghi chú của tôi';
+  }
+
+  /// (YÊU CẦU MỚI) "Bộ nhớ trên đám mây"/"Bộ nhớ được chia sẻ với bạn" —
+  /// để dành cho sau này (đăng nhập Google), chưa làm gì cả ngoài báo biết.
+  void _baoDangNangCap() {
+    hienThongBaoGiua(context, 'Tính năng đang nâng cấp');
   }
 
   void _moThuMuc(String id) {
@@ -410,10 +431,42 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       );
   }
 
+  /// (YÊU CẦU MỚI) Nội dung của mức "Ngôi nhà chung" — ba "bộ nhớ" lớn.
+  /// Chỉ "Bộ nhớ nội bộ" có thật (dẫn vào đúng cây thư mục đã làm xong từ
+  /// trước, neo tại `thuMucGoc`); hai cái sau để dành cho sau này (đăng
+  /// nhập Google), bấm vào chỉ báo "đang nâng cấp", không điều hướng đi
+  /// đâu cả.
+  Widget _danhSachNgoiNhaChung() {
+    return ListView(
+      children: [
+        ListTile(
+          leading: Icon(Icons.folder, color: Colors.amber.shade700),
+          title: Text(_tenBoNhoNoiBo),
+          onTap: () => _moThuMuc(thuMucGoc),
+        ),
+        ListTile(
+          leading: Icon(Icons.folder, color: Colors.amber.shade700),
+          title: const Text('Bộ nhớ trên đám mây'),
+          onTap: _baoDangNangCap,
+        ),
+        ListTile(
+          leading: Icon(Icons.folder, color: Colors.amber.shade700),
+          title: const Text('Bộ nhớ được chia sẻ với bạn'),
+          onTap: _baoDangNangCap,
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final noiDung = _kho.noiDungThuMuc(_thuMucHienTaiId);
-    final trong = noiDung.thuMucCon.isEmpty && noiDung.ghiChuCon.isEmpty;
+    // (YÊU CẦU MỚI) "Ngôi nhà chung" không phải thư mục thật trong `_kho` —
+    // KHÔNG đưa `_ngoiNhaChung` vào `noiDungThuMuc` (id không tồn tại).
+    final laNgoiNhaChung = _thuMucHienTaiId == _ngoiNhaChung;
+    final noiDung = laNgoiNhaChung ? null : _kho.noiDungThuMuc(_thuMucHienTaiId);
+    final trong = noiDung == null
+        ? false
+        : noiDung.thuMucCon.isEmpty && noiDung.ghiChuCon.isEmpty;
 
     return PopScope(
       canPop: _duongDan.isEmpty,
@@ -429,7 +482,11 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                   icon: const Icon(Icons.arrow_back),
                   onPressed: _veThuMucCha,
                 ),
-          actions: [
+          // (YÊU CẦU MỚI) "Ngôi nhà chung" chỉ để CHỌN một trong 3 bộ nhớ —
+          // không có gì để thêm/sửa ở chính mức này, ẩn hẳn các nút đó.
+          actions: laNgoiNhaChung
+              ? const []
+              : [
             IconButton(
               onPressed: _themGhiChu,
               icon: const Icon(Icons.note_add_outlined),
@@ -464,7 +521,9 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
           children: [
             if (_duongDan.isNotEmpty) _thanhDiaChi(),
             Expanded(
-              child: trong
+              child: laNgoiNhaChung
+                  ? _danhSachNgoiNhaChung()
+                  : trong
                   ? const Center(
                       child: Text(
                         'Thư mục trống',
@@ -473,7 +532,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                     )
                   : ListView(
                       children: [
-                        for (final t in noiDung.thuMucCon)
+                        for (final t in noiDung!.thuMucCon)
                           ListTile(
                             // Vàng rực để phân biệt ngay với icon ghi chú
                             // (xám) — liếc mắt là biết đâu là thư mục.
@@ -533,7 +592,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                               ],
                             ),
                           ),
-                        for (final g in noiDung.ghiChuCon)
+                        for (final g in noiDung!.ghiChuCon)
                           ListTile(
                             leading: const Icon(Icons.description_outlined),
                             title: Text(

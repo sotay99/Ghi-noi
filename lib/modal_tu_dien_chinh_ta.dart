@@ -111,11 +111,12 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
   /// cặp rỗng hoàn toàn (cả từ lỗi lẫn mọi từ thay thế đều trống) — bấm vào
   /// lúc đó giờ CUỘN tới ĐÚNG cặp rỗng ấy (hiện ra giữa màn hình) thay vì
   /// thêm cặp mới, xem `_themCap`.
+  bool _laCapRong(CapTuDien c) =>
+      c.loi.trim().isEmpty && _oThayThe[c]!.every((o) => o.text.trim().isEmpty);
+
   CapTuDien? get _capRong {
     for (final c in _ds) {
-      if (c.loi.trim().isEmpty && _oThayThe[c]!.every((o) => o.text.trim().isEmpty)) {
-        return c;
-      }
+      if (_laCapRong(c)) return c;
     }
     return null;
   }
@@ -227,7 +228,17 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
     required void Function(String) onChanged,
     String? canhBao,
     VoidCallback? khiXoaHang,
+    // (YÊU CẦU MỚI) Cặp từ đang RỖNG hoàn toàn — viền xanh dương đậm ở mọi
+    // trường của cặp đó để nổi bật hẳn lên so với các cặp khác, giúp nhận
+    // ra ngay cặp nào còn đang bỏ trống. `canhBao` (viền đỏ, trùng từ) vẫn
+    // ưu tiên hơn nếu cả hai cùng xảy ra — dù thực tế cặp rỗng thì không
+    // thể nào trùng được gì.
+    bool noiBatRong = false,
   }) {
+    final mauVien = canhBao != null
+        ? Colors.red.shade400
+        : (noiBatRong ? Colors.blue.shade700 : const Color(0xFFDADCE0));
+    final doRongVien = canhBao != null ? 1.0 : (noiBatRong ? 2.0 : 1.0);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -245,13 +256,13 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
                 decoration: InputDecoration(
                   isDense: true,
                   border: OutlineInputBorder(
-                    borderSide: BorderSide(
-                      color: canhBao != null ? Colors.red.shade400 : const Color(0xFFDADCE0),
-                    ),
+                    borderSide: BorderSide(color: mauVien, width: doRongVien),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderSide: BorderSide(
-                      color: canhBao != null ? Colors.red.shade400 : _mauChinh,
+                      color: canhBao != null
+                          ? Colors.red.shade400
+                          : (noiBatRong ? Colors.blue.shade700 : _mauChinh),
                       width: 2,
                     ),
                   ),
@@ -377,6 +388,11 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
                 nhan: 'Từ bị lỗi chính tả hay gặp',
                 controller: _oLoi[c]!,
                 goiY: 'Ví dụ: vd, mik, ...',
+                // (YÊU CẦU MỚI) Cặp rỗng hoàn toàn (xem `_capRong`) — viền
+                // xanh dương đậm ở MỌI trường trong cặp đó, phân biệt với
+                // các cặp còn lại. Tự hết ngay khi cặp không còn rỗng nữa
+                // (gõ bất kỳ trường nào), tự hiện lại nếu xoá hết về rỗng.
+                noiBatRong: _laCapRong(c),
                 canhBao: _loiTrungTuLoi.contains(c)
                     ? 'Từ này đã có trong một cặp khác — các từ bị lỗi không được trùng nhau.'
                     : null,
@@ -394,6 +410,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
                   nhan: _nhanThuThayThe[i],
                   controller: _oThayThe[c]![i],
                   goiY: i == 0 ? 'Để trống = đề xuất xoá' : 'Từ thay thế thêm',
+                  noiBatRong: _laCapRong(c),
                   canhBao: i == 0 && _loiTrungThayThe.contains(c)
                       ? 'Từ thay thế thứ nhất không được giống hệt từ bị lỗi ở trên.'
                       : null,
