@@ -4962,15 +4962,25 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// (YÊU CẦU MỚI) Bấm một trong bốn nút "Làm việc với AI"/"Thêm lựa
   /// chọn"/"Tài khoản và Cài đặt"/"Bật bộ phím nhanh" (CHỈ lúc BẬT, không
   /// áp dụng cho "Tắt bộ phím nhanh") coi như một cơ hội để tự dọn lỗi "bãi
-  /// đất trống" — ẩn hẳn bàn phím ảo (nó chiếm mất khoảng không rồi mới để
-  /// lại "bãi đất trống" khi ẩn) và đổi khoá (`GlobalKey`) của ô soạn thảo
-  /// để ép Flutter đo lại khung hình từ đầu, ĐÚNG mẹo đã dùng cho lỗi kẹt
-  /// bàn phím ảo ở Copy/Cắt/Dán/All — không chắc sẽ hết hẳn lỗi, chỉ là một
-  /// hướng rẻ, ít rủi ro, đáng thử trước khi mở menu/bật tính năng.
+  /// đất trống" — KHOÁ HẲN bàn phím ảo không cho hiện lên (không chỉ gọi
+  /// 'TextInput.hide' một lần — chạm/focus rơi lại vào ô soạn thảo ngay
+  /// trong lúc menu/Bộ phím nhanh đang mở ra vẫn có thể kéo bàn phím ảo
+  /// bật lên lại; mượn đúng cờ `readOnly` tạm thời `_epAnBanPhimAoKhiGiuFocus`
+  /// đã dùng cho Copy/Cắt/Dán/All để KHOÁ thật trong một khoảng ngắn) và
+  /// đổi khoá (`GlobalKey`) của ô soạn thảo để ép Flutter đo lại khung hình
+  /// từ đầu, ĐÚNG mẹo đã dùng cho lỗi kẹt bàn phím ảo ở Copy/Cắt/Dán/All —
+  /// không chắc sẽ hết hẳn lỗi "bãi đất trống", chỉ là một hướng rẻ, ít rủi
+  /// ro, đáng thử — gọi làm bước CUỐI CÙNG trước khi mở menu/bật tính năng.
   void _resetManHinhTruocKhiMoMenu() {
     if (!mounted) return;
     SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
-    setState(() => _oVanBanKey = GlobalKey());
+    setState(() {
+      _oVanBanKey = GlobalKey();
+      _epAnBanPhimAoKhiGiuFocus = true;
+    });
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) setState(() => _epAnBanPhimAoKhiGiuFocus = false);
+    });
   }
 
   void _bamNutBoPhimNhanhCamUng() {

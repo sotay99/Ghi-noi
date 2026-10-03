@@ -163,6 +163,13 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   /// sau vị trí gõ).
   bool _micTuDoiONhap = false;
 
+  /// Selection CUỐI CÙNG mà chính app (mic hoặc tự động định dạng) vừa tự
+  /// đặt cho `_oNhap` — dùng ở `_khiONhapDoi` để phân biệt một thông báo
+  /// "chữ không đổi, chỉ selection đổi" là PHANTOM (dội lại đúng selection
+  /// mình vừa đặt, bỏ qua) hay THẬT (người dùng vừa chạm/dời con trỏ sang
+  /// một vị trí khác hẳn, phải dời neo chèn chữ của mic theo).
+  TextSelection? _micSelectionVuaGan;
+
   /// Luôn soi ĐÚNG thiết bị trong "Cài đặt Micro" (chọn tay hoặc hệ thống tự
   /// đoán) — y hệt trang soạn thảo chính, không tự có bộ cấu hình riêng.
   ThietBi get _thietBiChoMicChat => widget.caiDat.thietBiChonTay ?? doanThietBi();
@@ -318,11 +325,10 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   /// người dùng gõ tay").
   void _ghiLaiVaDatConTroChat(String vanBan, int viTriConTro) {
     _micTuDoiONhap = true;
-    _oNhap.value = TextEditingValue(
-      text: vanBan,
-      selection: TextSelection.collapsed(offset: viTriConTro),
-    );
+    final selectionMoi = TextSelection.collapsed(offset: viTriConTro);
+    _oNhap.value = TextEditingValue(text: vanBan, selection: selectionMoi);
     _micTuDoiONhap = false;
+    _micSelectionVuaGan = selectionMoi;
   }
 
   /// (Tính năng "Chuẩn hoá các cặp dấu đóng-mở ngoặc") Bản RÚT GỌN của
@@ -506,7 +512,20 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
       // tại vị trí này) — không thì câu nói tiếp theo vẫn cứ chèn vào vị
       // trí CŨ (thường là cuối văn bản của lượt nghe trước), bất kể con
       // trỏ đã dời tới đâu.
-      if (_micDangNghe && _oNhap.selection.isValid) {
+      // (SỬA LỖI v132 — "chữ lặp lại liên tục, nhân đôi") Nhánh này cũng
+      // chạy cho MỌI thông báo dội lại PHANTOM sau khi mic tự gán chữ
+      // (bình thường, không phải do người dùng dời con trỏ — xảy ra rất
+      // thường xuyên, không chỉ lúc thật sự dời con trỏ) — selection lúc đó
+      // vẫn y hệt vị trí mic VỪA tự đặt. Trước đây cứ thấy hợp lệ là dời
+      // neo, nên dời NHẦM ở hầu hết các lần, phá vỡ phép tính vùng thay thế
+      // (`ketThucCu`) khiến `onResult` kế tiếp chèn thêm một bản sao của cả
+      // cụm đã có — đúng triệu chứng "Xin" → "XinXin" → nhân đôi dần. CHỈ
+      // dời neo khi selection THẬT SỰ khác với vị trí mic tự đặt gần nhất
+      // (`_micSelectionVuaGan`) — đó mới là dấu hiệu người dùng chạm/dời
+      // con trỏ thật.
+      if (_micDangNghe &&
+          _oNhap.selection.isValid &&
+          _oNhap.selection != _micSelectionVuaGan) {
         _micDiemBatDau = _oNhap.selection.start;
         _micChuGanNhat = '';
       }
@@ -792,12 +811,11 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
           }
           final ketThucCu = (batDau + _micChuGanNhat.length).clamp(batDau, vb.length);
           final moi = vb.substring(0, batDau) + chen + vb.substring(ketThucCu);
+          final selectionMoi = TextSelection.collapsed(offset: batDau + chen.length);
           _micTuDoiONhap = true;
-          _oNhap.value = TextEditingValue(
-            text: moi,
-            selection: TextSelection.collapsed(offset: batDau + chen.length),
-          );
+          _oNhap.value = TextEditingValue(text: moi, selection: selectionMoi);
           _micTuDoiONhap = false;
+          _micSelectionVuaGan = selectionMoi;
           // (SỬA LỖI — "nói nhiều từ nhưng chỉ vào được một từ rồi tự
           // tắt/bật lại ngay") `_khiONhapDoi` tin `_chuChatGanNhat` luôn
           // đúng bằng `_oNhap.text` NGAY SAU lần đổi chữ gần nhất, bất kể vì
