@@ -638,6 +638,21 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     return null;
   }
 
+  /// (YÊU CẦU MỚI) Bấm nút Micro nổi cạnh nút Gửi: đang TẮT thì bật ngay
+  /// (gọi thẳng `_batMicChat`); đang BẬT thì ÉP tắt rồi tự bật lại NGAY —
+  /// ĐÚNG HỆT cơ chế đã có sẵn cho lúc người dùng gõ tay/dời con trỏ trong
+  /// lúc mic đang nghe (`_nguoiDungVuaGoChat`, xem `_khiONhapDoi`) — không
+  /// làm gì mới, chỉ mượn lại cơ chế đã chứng minh ổn định đó. Giúp mic
+  /// không bị "xung đột" nếu đang nghe mà người dùng vẫn bấm nút này (một
+  /// phiên MỚI sạch, bộ đệm/neo reset lại từ đầu).
+  void _bamNutMicNoiChat() {
+    if (_micDangNghe) {
+      _nguoiDungVuaGoChat();
+    } else {
+      _batMicChat();
+    }
+  }
+
   Future<void> _batMicChat() async {
     // Ghi âm và Micro loại trừ nhau — bật cái này thì tự tắt cái kia trước.
     if (_ghiDangMo) return; // đang có hộp thoại ghi âm mở — không thể bật mic.
@@ -1545,17 +1560,17 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      // (YÊU CẦU MỚI) Mục "Micro (vừa nói vừa ra chữ)" trong
-                      // nút "+" mờ xám (`enabled: !_micDangNghe && !_ghiDangMo`)
-                      // thì nút nổi này cũng phải ẩn đi — bấm vào lúc đó vô
-                      // nghĩa (mic đang nghe rồi, hoặc đang có hộp ghi âm mở).
-                      // Sáng lại ngay khi điều kiện đó hết.
-                      if (_hienNutMicNoiChat && !_micDangNghe && !_ghiDangMo)
+                      // (YÊU CẦU MỚI — TRẢ VỀ NHƯ CŨ) Nút nổi này hiện/ẩn chỉ
+                      // phụ thuộc `_hienNutMicNoiChat` (đã bật Micro qua nút
+                      // "+" ít nhất một lần trong phiên mở kênh chat này) —
+                      // KHÔNG còn phụ thuộc việc mục Micro trong nút "+" có
+                      // đang mờ xám (liệt) hay không.
+                      if (_hienNutMicNoiChat)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Opacity(
                             opacity: 0.5,
-                            child: _NutMicNoiChat(khiBam: _batMicChat),
+                            child: _NutMicNoiChat(khiBam: _bamNutMicNoiChat),
                           ),
                         ),
                       _micDangNgheThat

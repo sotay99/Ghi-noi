@@ -345,6 +345,17 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
       body: SafeArea(
         child: ListView(
           controller: _cuon,
+          // (SỬA LỖI — "bấm Thêm cặp từ không tự cuộn tới cặp rỗng")
+          // `Scrollable.ensureVisible` cần context CỦA ĐÚNG WIDGET đích đã
+          // THẬT SỰ được dựng (`currentContext` khác `null`) — nhưng
+          // `ListView` (dù dùng constructor `children:` liệt kê sẵn) vẫn ẢO
+          // HOÁ (chỉ dựng Element cho phần trong viewport + vùng đệm mặc
+          // định ~250px) như `ListView.builder`. Cặp rỗng/cặp vừa thêm nằm
+          // xa ngoài vùng đệm đó thì `_khoaCap[c]!.currentContext` vẫn
+          // `null` ngay cả sau khung hình kế tiếp — cuộn im lặng không làm
+          // gì. Ép `cacheExtent` cực lớn để TOÀN BỘ danh sách luôn được
+          // dựng sẵn (danh sách cặp từ không đủ lớn để lo tốn bộ nhớ).
+          cacheExtent: 100000,
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
             _congTacBatTat(),

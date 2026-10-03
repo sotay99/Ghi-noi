@@ -4999,19 +4999,28 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// kích thước sau khi ẩn, mà việc dựng lại cả `TextField` từ đầu (dù chỉ
   /// một khung hình) cũng tự nó là một nguồn gây giật/hở hình, phản tác
   /// dụng ở đúng tình huống này.
+  /// (YÊU CẦU MỚI — LUÔN áp dụng, không chỉ lúc bàn phím ảo đang hiện)
+  /// Màn hình không tự biết được nó có đang dính lỗi "bãi đất trống" hay
+  /// không — nên cửa sổ ép `setState` liên tục gần 2 giây này giờ LUÔN
+  /// chạy mỗi lần bấm 1 trong 4 nút, bất kể bàn phím ảo lúc đó đang hiện
+  /// hay đang ẩn. Phần ẨN BÀN PHÍM ẢO THẬT (`TextInput.hide` + khoá tạm
+  /// `_epAnBanPhimAoKhiGiuFocus`) vẫn CHỈ làm khi bàn phím ảo đang hiện —
+  /// gọi 'TextInput.hide' lúc nó đã ẩn sẵn không có tác dụng gì, chỉ thêm
+  /// việc.
   void _resetManHinhTruocKhiMoMenu() {
     if (!mounted) return;
-    if (MediaQuery.of(context).viewInsets.bottom == 0) return;
-    SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
-    setState(() => _epAnBanPhimAoKhiGiuFocus = true);
+    if (MediaQuery.of(context).viewInsets.bottom > 0) {
+      SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+      setState(() => _epAnBanPhimAoKhiGiuFocus = true);
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted) setState(() => _epAnBanPhimAoKhiGiuFocus = false);
+      });
+    }
     for (var tre = 30; tre <= 1800; tre += 50) {
       Future.delayed(Duration(milliseconds: tre), () {
         if (mounted) setState(() {});
       });
     }
-    Future.delayed(const Duration(milliseconds: 600), () {
-      if (mounted) setState(() => _epAnBanPhimAoKhiGiuFocus = false);
-    });
   }
 
   void _bamNutBoPhimNhanhCamUng() {
