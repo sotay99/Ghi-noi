@@ -506,28 +506,33 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     // cả tự động định dạng lẫn "gõ tay thắng mic") khi CHỮ chưa hề đổi,
     // bất kể vì sao hàm này được gọi.
     if (cuChat == chuMoiChat) {
-      // (YÊU CẦU MỚI) Chữ không đổi nhưng con trỏ vừa dời đi nơi khác trong
-      // lúc mic đang nghe — dời luôn neo chèn chữ (`_micDiemBatDau`) theo
-      // con trỏ mới, rỗng `_micChuGanNhat` (coi như bắt đầu một đoạn mới
-      // tại vị trí này) — không thì câu nói tiếp theo vẫn cứ chèn vào vị
-      // trí CŨ (thường là cuối văn bản của lượt nghe trước), bất kể con
-      // trỏ đã dời tới đâu.
-      // (SỬA LỖI v132 — "chữ lặp lại liên tục, nhân đôi") Nhánh này cũng
-      // chạy cho MỌI thông báo dội lại PHANTOM sau khi mic tự gán chữ
-      // (bình thường, không phải do người dùng dời con trỏ — xảy ra rất
-      // thường xuyên, không chỉ lúc thật sự dời con trỏ) — selection lúc đó
-      // vẫn y hệt vị trí mic VỪA tự đặt. Trước đây cứ thấy hợp lệ là dời
-      // neo, nên dời NHẦM ở hầu hết các lần, phá vỡ phép tính vùng thay thế
-      // (`ketThucCu`) khiến `onResult` kế tiếp chèn thêm một bản sao của cả
-      // cụm đã có — đúng triệu chứng "Xin" → "XinXin" → nhân đôi dần. CHỈ
-      // dời neo khi selection THẬT SỰ khác với vị trí mic tự đặt gần nhất
-      // (`_micSelectionVuaGan`) — đó mới là dấu hiệu người dùng chạm/dời
-      // con trỏ thật.
+      // (YÊU CẦU MỚI, SỬA LỖI v132/v133 — "chữ lặp lại liên tục, nhân đôi")
+      // Chữ không đổi nhưng con trỏ vừa dời đi nơi khác trong lúc mic đang
+      // nghe. Nhánh này cũng chạy cho MỌI thông báo dội lại PHANTOM sau khi
+      // mic tự gán chữ (rất thường xuyên, selection lúc đó vẫn y hệt vị trí
+      // mic VỪA tự đặt) — CHỈ coi là người dùng chạm/dời con trỏ THẬT khi
+      // selection khác với vị trí mic tự đặt gần nhất (`_micSelectionVuaGan`).
+      //
+      // (SỬA LỖI v133 — bản vá trước CHỈ dời neo `_micDiemBatDau` tại chỗ,
+      // không đụng gì tới phiên `listen()` đang chạy) Bộ nhận dạng của máy
+      // là MỘT phiên `listen()` LIÊN TỤC từ lúc bắt đầu nghe — nó không hề
+      // biết người dùng vừa dời con trỏ, vẫn coi toàn bộ những gì đã/đang
+      // nói là MỘT utterance DUY NHẤT kéo dài xuyên qua lúc dời con trỏ.
+      // Cứ chỉ dời neo cục bộ mà không báo cho bộ nhận dạng thì câu
+      // (`chen`) nó trả về sau đó vẫn mang theo nguyên cụm chữ CŨ (đã nằm
+      // sẵn ở vị trí cũ) lồng ở ĐẦU, rồi mình lại chèn nguyên cụm đó một
+      // lần nữa vào vị trí MỚI — nhân đôi đúng như log người dùng gửi.
+      // Cách đúng — ĐÚNG HỆT khi người dùng gõ tay chen vào lúc mic đang
+      // nghe: coi việc dời con trỏ như MỘT LƯỢT GÕ TAY ảo, gọi thẳng
+      // `_nguoiDungVuaGoChat()` — HUỶ hẳn phiên đang nghe (`cancel()`,
+      // không đợi kết quả trễ), tự bật lại một phiên HOÀN TOÀN MỚI sau
+      // đúng số giây đã cài ở Cài đặt Micro. Phiên mới có bộ đệm/neo sạch
+      // từ đầu (xem `_batPhienNgheMicChat`, nay neo đúng tại vị trí con trỏ
+      // MỚI), không còn gì của utterance cũ lẫn vào.
       if (_micDangNghe &&
           _oNhap.selection.isValid &&
           _oNhap.selection != _micSelectionVuaGan) {
-        _micDiemBatDau = _oNhap.selection.start;
-        _micChuGanNhat = '';
+        _nguoiDungVuaGoChat();
       }
       return;
     }
@@ -711,7 +716,14 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   /// (`_rawTichLuyChromeAndroidChat`) phải rỗng lại — đây chính là tác dụng
   /// THẬT giúp bộ đệm đó không bao giờ phình to qua nhiều phút nói liên tục.
   Future<void> _batPhienNgheMicChat() async {
-    _micDiemBatDau = _oNhap.text.length;
+    // (YÊU CẦU MỚI) Neo tại ĐÚNG vị trí con trỏ hiện tại — không phải luôn
+    // luôn cuối văn bản. Quan trọng nhất ở lượt TỰ BẬT LẠI sau khi người
+    // dùng vừa dời con trỏ (qua `_nguoiDungVuaGoChat`, xem `_khiONhapDoi`):
+    // phiên MỚI phải chèn đúng tại vị trí con trỏ MỚI đó, không phải quay
+    // về cuối văn bản như trước.
+    final selection = _oNhap.selection;
+    _micDiemBatDau =
+        selection.isValid ? selection.start : _oNhap.text.length;
     _micChuGanNhat = '';
     _rawTichLuyChromeAndroidChat = '';
     // Chụp số phiên NGAY LÚC đăng ký — xem giải thích đầy đủ ở

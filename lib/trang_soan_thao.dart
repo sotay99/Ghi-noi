@@ -4968,16 +4968,37 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// bật lên lại; mượn đúng cờ `readOnly` tạm thời `_epAnBanPhimAoKhiGiuFocus`
   /// đã dùng cho Copy/Cắt/Dán/All để KHOÁ thật trong một khoảng ngắn) và
   /// đổi khoá (`GlobalKey`) của ô soạn thảo để ép Flutter đo lại khung hình
-  /// từ đầu, ĐÚNG mẹo đã dùng cho lỗi kẹt bàn phím ảo ở Copy/Cắt/Dán/All —
-  /// không chắc sẽ hết hẳn lỗi "bãi đất trống", chỉ là một hướng rẻ, ít rủi
-  /// ro, đáng thử — gọi làm bước CUỐI CÙNG trước khi mở menu/bật tính năng.
+  /// từ đầu, ĐÚNG mẹo đã dùng cho lỗi kẹt bàn phím ảo ở Copy/Cắt/Dán/All.
+  ///
+  /// (SỬA LỖI — "bấm 4 nút này lại làm 'bãi đất trống' DỄ hiện ra hơn, chứ
+  /// không reset được gì") Người dùng xác nhận: hoàn toàn không sao khi bàn
+  /// phím ảo ĐANG ẨN từ trước; chỉ hỏng khi bàn phím ảo ĐANG HIỆN — chính
+  /// việc TA chủ động ép ẩn nó đi (`TextInput.hide`) là THỨ TẠO RA tiền đề
+  /// của lỗi (y hệt lúc người dùng tự ẩn bàn phím ảo bằng nút Back, xem
+  /// CLAUDE.md), rồi bỏ đó chờ "nhịp tim" 300ms (`dangKyThamDoChieuCaoVienPort`)
+  /// tự dọn — có khoảng hở ngắn nhìn thấy được trước khi nhịp tim kịp chạy.
+  /// Sửa hai việc:
+  /// 1. KHÔNG làm gì cả (bỏ hẳn hàm này) nếu bàn phím ảo đang ẨN sẵn — không
+  ///    có gì để "ẩn" thì cũng không có gì để tạo ra khoảng hở, đừng tự tạo
+  ///    việc.
+  /// 2. Đang HIỆN thì vẫn phải ẩn (menu/Bộ phím nhanh cần full màn hình),
+  ///    nhưng ngay sau đó tự ép `setState` NGAY (không đợi nhịp tim) vài lần
+  ///    liên tiếp trong 400ms đầu — dọn sạch khoảng hở trước khi mắt người
+  ///    dùng kịp thấy, đúng việc nhịp tim vẫn làm nhưng chủ động làm NGAY
+  ///    hơn là bị động chờ.
   void _resetManHinhTruocKhiMoMenu() {
     if (!mounted) return;
+    if (MediaQuery.of(context).viewInsets.bottom == 0) return;
     SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
     setState(() {
       _oVanBanKey = GlobalKey();
       _epAnBanPhimAoKhiGiuFocus = true;
     });
+    for (final tre in [60, 120, 200, 300, 400]) {
+      Future.delayed(Duration(milliseconds: tre), () {
+        if (mounted) setState(() {});
+      });
+    }
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) setState(() => _epAnBanPhimAoKhiGiuFocus = false);
     });
