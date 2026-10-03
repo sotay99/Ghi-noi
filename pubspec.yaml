@@ -22,6 +22,9 @@ dependencies:
   # không giải được. Nâng lên 13.x (dùng win32 ^6.x) theo đúng gợi ý CI đưa
   # ra để hết xung đột.
   file_picker: ^13.1.0
+  # Nén/giải nén .zip cho "Tải và chia sẻ thư mục này"/"Nhập tệp nén Zip vào
+  # đây" — thuần Dart, chạy được cả trên web (không cần dart:io).
+  archive: ^3.6.1
   # Mục "Chụp ảnh (camera)" (menu "Làm việc với AI") — mở thẳng camera thiết
   # bị (ImageSource.camera), khác `file_picker` chỉ mở được bộ chọn tệp có
   # sẵn. Hỗ trợ cả Android lẫn Web (trên Web mở input file có capture, trình

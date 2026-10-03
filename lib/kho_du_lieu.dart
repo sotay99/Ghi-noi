@@ -483,4 +483,34 @@ class KhoDuLieu {
     }
     return ban;
   }
+
+  // -------------------------------------------------------------- nhập zip
+
+  /// Tên đọc từ trong một tệp .zip ngoài có thể mang ký tự app này cấm
+  /// (`kyTuCamTrongTen`) hoặc dài quá giới hạn — làm sạch trước khi đặt,
+  /// cùng bộ quy tắc với `loiTenKhongHopLe`.
+  String _tenAnToanTuZip(String tenTho) {
+    var s = tenTho.replaceAll(kyTuCamTrongTen, '_').trim();
+    if (s.isEmpty) s = 'Không tên';
+    if (s.length > doDaiTenToiDa) s = s.substring(0, doDaiTenToiDa);
+    return s;
+  }
+
+  /// Đưa một cây đã xem trước (`NutZip`, xem `lib/zip_thu_muc.dart` và
+  /// `ModalNhapZip`) vào THẬT trong [chaId] — đệ quy, tự đổi tên kiểu
+  /// " (N)" nếu trùng tên với mục đang có, CÙNG cơ chế khôi phục từ Thùng
+  /// rác (`tenKhongTrung`).
+  void nhapCayZip(List<NutZip> cay, String chaId) {
+    for (final nut in cay) {
+      final tenAnToan = _tenAnToanTuZip(nut.ten);
+      if (nut.laThuMuc) {
+        final t = taoThuMucMoi(chaId);
+        t.ten = tenKhongTrung(tenAnToan, chaId, boQuaIdThuMuc: t.id);
+        nhapCayZip(nut.con, t.id);
+      } else {
+        final g = taoGhiChuMoi(chaId, noiDungBanDau: nut.noiDung ?? '');
+        g.ten = tenKhongTrung(tenAnToan, chaId, boQuaIdGhiChu: g.id);
+      }
+    }
+  }
 }

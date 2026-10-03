@@ -6,6 +6,24 @@
 /// tại sẵn, không đổi tên/xoá/di chuyển được.
 const String thuMucGoc = 'goc';
 
+/// Một "nút" trong cây ĐÃ LỌC đọc được từ một tệp .zip nhập vào — CHƯA phải
+/// dữ liệu thật trong `KhoDuLieu`, chỉ dùng để xem trước trong
+/// `ModalNhapZip` rồi mới quyết định đưa vào thư mục nào (xem
+/// `KhoDuLieu.nhapCayZip`). Chỉ giữ tệp `.txt` và thư mục có chứa `.txt` ở
+/// đâu đó bên trong — mọi thứ khác đã bị lọc bỏ trước khi tới đây.
+class NutZip {
+  NutZip.thuMuc(this.ten, this.con) : noiDung = null;
+  NutZip.tep(this.ten, String noiDung)
+      : noiDung = noiDung,
+        con = const [];
+
+  final String ten;
+  final String? noiDung;
+  final List<NutZip> con;
+
+  bool get laThuMuc => noiDung == null;
+}
+
 class ThuMuc {
   ThuMuc({
     required this.id,

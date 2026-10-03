@@ -2,16 +2,22 @@
 // mục và ghi chú. Bấm vào một ghi chú thì trả id của nó về cho trang soạn
 // thảo qua Navigator.pop; đi dạo rồi quay lại tay không thì trả về null.
 
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'kho_du_lieu.dart';
+import 'luu_va_chia_se_tep.dart';
 import 'mau_co_ban.dart';
 import 'mo_hinh.dart';
+import 'modal_nhap_zip.dart';
 import 'modal_thung_rac.dart';
 import 'tai_ve_ghi_chu.dart';
 import 'thong_bao_giua.dart';
+import 'zip_thu_muc.dart';
 
 /// (YÊU CẦU MỚI) "Ngôi nhà chung" — một mức ẢO đứng TRÊN `thuMucGoc` thật,
 /// chứa 3 "bộ nhớ" lớn (Nội bộ/Đám mây/Chia sẻ). Không phải id thư mục thật
@@ -53,6 +59,11 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   bool _dangChonNhieu = false;
   final Set<String> _dsThuMucDaChon = {};
   final Set<String> _dsGhiChuDaChon = {};
+
+  // (YÊU CẦU MỚI) Cây đã xem trước ở `ModalNhapZip`, đang chờ người dùng đi
+  // tìm một thư mục khác rồi bấm "Đưa vào chỗ này" — `null` là không có gì
+  // đang chờ.
+  List<NutZip>? _zipDangChoNhap;
 
   KhoDuLieu get _kho => widget.kho;
 
@@ -392,6 +403,89 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     });
   }
 
+  /// "Tải và chia sẻ thư mục này" — nén nguyên thư mục ĐANG ĐỨNG (và mọi
+  /// thứ bên trong) thành .zip rồi tải/chia sẻ, xem `lib/zip_thu_muc.dart`.
+  Future<void> _taiThuMucHienTai() async {
+    try {
+      final tenGoc = _tenThuMucHienTai;
+      final bytes = nenThuMucThanhZip(_kho, _thuMucHienTaiId, tenGoc);
+      await luuVaChiaSeTep('$tenGoc.zip', bytes, loaiMime: 'application/zip');
+    } catch (_) {
+      _bao('Không tạo được tệp nén. Thử lại sau.');
+    }
+  }
+
+  /// "Nhập tệp nén Zip vào đây" — chỉ nhận đúng .zip, đọc xong mở
+  /// `ModalNhapZip` để xem trước rồi mới quyết định đưa vào đâu.
+  ///
+  /// (file_picker 13.x — xem chú thích tương tự ở
+  /// `_chonVaChuyenFileAmThanh` trong `trang_soan_thao.dart`) dùng hàm TĨNH
+  /// `FilePicker.pickFile()`, không còn qua `.platform`/`.pickFiles()`.
+  Future<void> _nhapZip() async {
+    PlatformFile? tep;
+    try {
+      tep = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: ['zip'],
+      );
+    } catch (e) {
+      _bao('Không mở được hộp thoại chọn tệp: $e');
+      return;
+    }
+    if (tep == null) return;
+
+    Uint8List bytes;
+    try {
+      bytes = await tep.readAsBytes();
+    } catch (e) {
+      _bao('Không đọc được nội dung tệp vừa chọn: $e');
+      return;
+    }
+
+    List<NutZip> cay;
+    try {
+      cay = phanTichZip(bytes);
+    } catch (_) {
+      _bao('Tệp nén không hợp lệ.');
+      return;
+    }
+    if (!mounted) return;
+
+    final ketQua = await Navigator.of(context).push<KetQuaNhapZip>(
+      MaterialPageRoute(
+        builder: (_) => ModalNhapZip(cayGoc: cay, tenTepZip: tep.name),
+      ),
+    );
+    if (ketQua == null || ketQua == KetQuaNhapZip.huy || !mounted) return;
+
+    if (ketQua == KetQuaNhapZip.dayVaoHienTai) {
+      setState(() => _kho.nhapCayZip(cay, _thuMucHienTaiId));
+      await _kho.luu();
+      if (mounted) {
+        hienThongBaoGiua(context, 'Đã nhập tệp nén vào thư mục', ganTren: true);
+      }
+    } else {
+      // chonViTriKhac — chờ người dùng tự đi tìm chỗ, xem thanh ghim đáy
+      // "Đưa vào chỗ này" (`_zipDangChoNhap`).
+      setState(() => _zipDangChoNhap = cay);
+    }
+  }
+
+  Future<void> _dayZipVaoDay() async {
+    final cay = _zipDangChoNhap;
+    if (cay == null) return;
+    setState(() {
+      _kho.nhapCayZip(cay, _thuMucHienTaiId);
+      _zipDangChoNhap = null;
+    });
+    await _kho.luu();
+    if (mounted) {
+      hienThongBaoGiua(context, 'Đã nhập tệp nén vào thư mục', ganTren: true);
+    }
+  }
+
+  void _huyZipDangChoNhap() => setState(() => _zipDangChoNhap = null);
+
   /// Đặt bộ nhớ tạm cho MỘT mục đơn (từ menu ba chấm của đúng một tệp/thư
   /// mục) — danh sách chỉ có 1 phần tử, dùng chung máy "dán" với "Chọn
   /// nhiều" ở dưới.
@@ -556,14 +650,19 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                Checkbox(
-                  value: daChonHet,
-                  onChanged: (v) => _datChonTatCa(v ?? false, noiDung),
-                ),
-                const Text('Chọn tất cả'),
-              ],
+            // (YÊU CẦU MỚI) Bấm vào chữ "Chọn tất cả" cũng tác động luôn
+            // checkbox bên cạnh, không chỉ riêng bấm vào ô vuông.
+            InkWell(
+              onTap: () => _datChonTatCa(!daChonHet, noiDung),
+              child: Row(
+                children: [
+                  Checkbox(
+                    value: daChonHet,
+                    onChanged: (v) => _datChonTatCa(v ?? false, noiDung),
+                  ),
+                  const Text('Chọn tất cả'),
+                ],
+              ),
             ),
             TextButton(
               onPressed: _huyChonNhieu,
@@ -847,18 +946,25 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                     case 1:
                       _themThuMuc();
                       break;
+                    case 6:
+                      _nhapZip();
+                      break;
                     case 2:
                       _batDauChonNhieu();
+                      break;
+                    case 3:
+                      _taiThuMucHienTai();
                       break;
                     case 5:
                       _moThungRac();
                       break;
-                    // 3-4: "Tải và chia sẻ thư mục này", "Thông tin thư mục
-                    // này" — chỗ đặt trước, chưa gắn logic gì cả.
+                    // 4: "Thông tin thư mục này" — chỗ đặt trước, chưa gắn
+                    // logic gì cả.
                   }
                 },
                 itemBuilder: (ctx) => const [
                   PopupMenuItem(value: 1, child: Text('Tạo thư mục mới')),
+                  PopupMenuItem(value: 6, child: Text('Nhập tệp nén Zip vào đây')),
                   PopupMenuDivider(),
                   PopupMenuItem(value: 2, child: Text('Chọn nhiều')),
                   PopupMenuItem(value: 3, child: Text('Tải và chia sẻ thư mục này')),
@@ -930,13 +1036,20 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                       children: [
                         for (final t in noiDung!.thuMucCon)
                           ListTile(
-                            // (YÊU CẦU MỚI) "Chọn nhiều": checkbox thay hẳn
-                            // icon thư mục — không còn mở được gì khác,
-                            // chỉ chọn/bỏ chọn.
+                            // (YÊU CẦU MỚI) "Chọn nhiều": thêm checkbox ở
+                            // ngoài cùng bên trái, nhưng vẫn giữ icon thư
+                            // mục bên cạnh — không còn mở được gì khác, chỉ
+                            // chọn/bỏ chọn.
                             leading: _dangChonNhieu
-                                ? Checkbox(
-                                    value: _dsThuMucDaChon.contains(t.id),
-                                    onChanged: (_) => _toggleChonThuMuc(t.id),
+                                ? Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Checkbox(
+                                        value: _dsThuMucDaChon.contains(t.id),
+                                        onChanged: (_) => _toggleChonThuMuc(t.id),
+                                      ),
+                                      Icon(Icons.folder, color: Colors.amber.shade700),
+                                    ],
                                   )
                                 // Vàng rực để phân biệt ngay với icon ghi
                                 // chú (xám) — liếc mắt là biết đâu là thư
@@ -1015,9 +1128,15 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                         for (final g in noiDung!.ghiChuCon)
                           ListTile(
                             leading: _dangChonNhieu
-                                ? Checkbox(
-                                    value: _dsGhiChuDaChon.contains(g.id),
-                                    onChanged: (_) => _toggleChonGhiChu(g.id),
+                                ? Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Checkbox(
+                                        value: _dsGhiChuDaChon.contains(g.id),
+                                        onChanged: (_) => _toggleChonGhiChu(g.id),
+                                      ),
+                                      const Icon(Icons.description_outlined),
+                                    ],
                                   )
                                 : const Icon(Icons.description_outlined),
                             // (YÊU CẦU MỚI) Vừa nhảy tới đây qua nút "Vị trí
@@ -1142,6 +1261,44 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                         FilledButton(
                           onPressed: _dan,
                           child: const Text('Dán'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            // (YÊU CẦU MỚI) Đang chờ "Chọn vị trí khác" cho một tệp .zip
+            // vừa nhập — đi dạo thoải mái, bấm "Đưa vào chỗ này" ở ĐÚNG nơi
+            // muốn, cùng kiểu với thanh "Dán" ở trên.
+            if (!_dangChonNhieu && _zipDangChoNhap != null)
+              Material(
+                color: const Color(0xFFE8F0FE),
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.unarchive_outlined,
+                          size: 18,
+                          color: Color(0xFF1A73E8),
+                        ),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Đang chờ nhập tệp nén — đưa vào đây?',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _huyZipDangChoNhap,
+                          child: const Text('Huỷ'),
+                        ),
+                        FilledButton(
+                          onPressed: _dayZipVaoDay,
+                          child: const Text('Đưa vào chỗ này'),
                         ),
                       ],
                     ),
