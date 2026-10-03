@@ -283,15 +283,11 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
                 _dong6Micro(),
               ]
             : [
-                // Nhóm HIỂN THỊ & TỰ ĐỘNG SỬA — các dòng AI sửa chữ đứng
-                // trước (chính tả, dấu câu, dấu cách, dấu chấm, viết hoa,
-                // chuẩn hoá ngoặc — cùng chủ đề "AI/tự động chỉnh câu chữ"),
-                // rồi các dòng thuần hiển thị đứng sau (thụt đầu dòng, đường
-                // kẻ chia đoạn, chấm cuối văn bản — cùng chủ đề "trình bày").
-                _dong4AI(),
-                const Divider(height: 40),
-                _dong4bChenDauCauAI(),
-                const Divider(height: 40),
+                // Nhóm HIỂN THỊ & TỰ ĐỘNG SỬA — (YÊU CẦU MỚI) hai dòng AI
+                // tốn hạn mức gọi API (chính tả, dấu câu) dời xuống CUỐI
+                // CÙNG; các dòng thuần hiển thị/tự động sửa cục bộ (dấu
+                // cách, dấu chấm, viết hoa, chuẩn hoá ngoặc, thụt đầu dòng,
+                // đường kẻ chia đoạn, chấm cuối văn bản) lên trước.
                 _dong3TuDongChen(),
                 const Divider(height: 40),
                 _dong4cTuDongThemDauCham(),
@@ -305,6 +301,10 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
                 _dong4eTuDongThemDuongKeChia(),
                 const Divider(height: 40),
                 _dong4gChamCuoiVanBan(),
+                const Divider(height: 40),
+                _dong4AI(),
+                const Divider(height: 40),
+                _dong4bChenDauCauAI(),
               ],
       ),
     );

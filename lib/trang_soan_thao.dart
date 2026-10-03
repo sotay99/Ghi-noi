@@ -4674,9 +4674,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final ke = laTuDongTao ? widget.kho.taoGhiChuMoi(chaId) : conLai.first;
     await widget.kho.luu();
     if (!mounted) return;
+    hienThongBaoGiua(context, 'Đã di chuyển vào Thùng rác', ganTren: true);
     _moGhiChu(ke.id);
     if (laTuDongTao) {
-      _bao('Đã chuyển vào thùng rác — đang ở trong tệp "${ke.ten}" do hệ '
+      _bao('Đã chuyển vào thùng rác — đang ở trong tệp "${ke.ten}" do hệ'
           'thống tự tạo.');
     } else {
       _baoDangOTrongTep(ke.ten);

@@ -13,8 +13,6 @@ import 'modal_thung_rac.dart';
 import 'tai_ve_ghi_chu.dart';
 import 'thong_bao_giua.dart';
 
-enum _LoaiChoDan { catThuMuc, catGhiChu, chepThuMuc, chepGhiChu }
-
 /// (YÊU CẦU MỚI) "Ngôi nhà chung" — một mức ẢO đứng TRÊN `thuMucGoc` thật,
 /// chứa 3 "bộ nhớ" lớn (Nội bộ/Đám mây/Chia sẻ). Không phải id thư mục thật
 /// trong `KhoDuLieu` — chỉ dùng để `_thuMucHienTaiId` nhận biết đang ở mức
@@ -39,9 +37,22 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   String _thuMucHienTaiId = _ngoiNhaChung;
   final List<String> _duongDan = []; // Ngăn xếp id thư mục cha, để quay lại.
 
-  String? _choDanId;
-  _LoaiChoDan? _choDanLoai;
+  // (YÊU CẦU MỚI) Bộ nhớ tạm "cắt/sao chép" — giữ DANH SÁCH để hỗ trợ cả
+  // "Chọn nhiều" (nhiều mục cùng lúc) lẫn một mục đơn lẻ (danh sách 1 phần
+  // tử) qua đúng MỘT cơ chế. `_choDanLaCat` phân biệt cắt (di chuyển) hay
+  // sao chép — không còn cần enum riêng cho từng loại x từng kiểu mục.
+  List<String> _choDanThuMucIds = [];
+  List<String> _choDanGhiChuIds = [];
+  bool _choDanLaCat = false;
   String _choDanTen = '';
+  bool get _coDangChoDan =>
+      _choDanThuMucIds.isNotEmpty || _choDanGhiChuIds.isNotEmpty;
+
+  // (YÊU CẦU MỚI) "Chọn nhiều" — chế độ tích chọn nhiều thư mục/ghi chú
+  // cùng lúc để Sao chép/Cắt/Chuyển vào thùng rác một lượt.
+  bool _dangChonNhieu = false;
+  final Set<String> _dsThuMucDaChon = {};
+  final Set<String> _dsGhiChuDaChon = {};
 
   KhoDuLieu get _kho => widget.kho;
 
@@ -320,9 +331,18 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
         _timGhiChuTrongCay(t.id).any((g) => g.id == widget.idGhiChuDangMo);
     setState(() => _kho.chuyenThuMucVaoThungRac(t.id));
     await _kho.luu();
-    if (coGhiChuDangMoBenTrong && mounted) {
+    if (!mounted) return;
+    _baoDaChuyenVaoThungRac();
+    if (coGhiChuDangMoBenTrong) {
       _bao('Ghi chú đang mở nằm trong thư mục vừa chuyển vào thùng rác.');
     }
+  }
+
+  /// Thông báo nhanh dùng chung cho MỌI lượt "Chuyển vào thùng rác" — cao
+  /// ~85% màn hình (`ganTren: true`), ĐÚNG hệt thông báo Copy/Cắt/Dán/All ở
+  /// thanh công cụ soạn thảo.
+  void _baoDaChuyenVaoThungRac() {
+    hienThongBaoGiua(context, 'Đã di chuyển vào Thùng rác', ganTren: true);
   }
 
   /// Xuất ghi chú thành một tệp .txt rồi mở màn hình chia sẻ của máy — dạng
@@ -343,7 +363,9 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     final laDangMo = g.id == widget.idGhiChuDangMo;
     setState(() => _kho.chuyenGhiChuVaoThungRac(g.id));
     await _kho.luu();
-    if (laDangMo && mounted) {
+    if (!mounted) return;
+    _baoDaChuyenVaoThungRac();
+    if (laDangMo) {
       _bao('Ghi chú đang mở vừa chuyển vào thùng rác.');
     }
   }
@@ -370,52 +392,233 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     });
   }
 
-  void _dat(_LoaiChoDan loai, String id, String ten) {
+  /// Đặt bộ nhớ tạm cho MỘT mục đơn (từ menu ba chấm của đúng một tệp/thư
+  /// mục) — danh sách chỉ có 1 phần tử, dùng chung máy "dán" với "Chọn
+  /// nhiều" ở dưới.
+  void _dat({required bool laCat, required bool laThuMuc, required String id, required String ten}) {
     setState(() {
-      _choDanLoai = loai;
-      _choDanId = id;
+      _choDanLaCat = laCat;
+      _choDanThuMucIds = laThuMuc ? [id] : [];
+      _choDanGhiChuIds = laThuMuc ? [] : [id];
       _choDanTen = ten;
     });
   }
 
   void _huyChoDan() {
     setState(() {
-      _choDanId = null;
-      _choDanLoai = null;
+      _choDanThuMucIds = [];
+      _choDanGhiChuIds = [];
     });
   }
 
   Future<void> _dan() async {
-    if (_choDanId == null || _choDanLoai == null) return;
-    final id = _choDanId!;
-
-    switch (_choDanLoai!) {
-      case _LoaiChoDan.catThuMuc:
+    if (!_coDangChoDan) return;
+    for (final id in _choDanThuMucIds) {
+      if (_choDanLaCat) {
         if (id == _thuMucHienTaiId) {
           _bao('Không thể chuyển vào chính nó.');
-          return;
+          continue;
         }
         if (!_kho.diChuyenThuMuc(id, _thuMucHienTaiId)) {
           _bao('Không thể chuyển thư mục vào chính con cháu của nó.');
-          return;
+          continue;
         }
-        break;
-      case _LoaiChoDan.catGhiChu:
-        _kho.diChuyenGhiChu(id, _thuMucHienTaiId);
-        break;
-      case _LoaiChoDan.chepThuMuc:
+      } else {
         _kho.saoChepThuMuc(id, _thuMucHienTaiId);
-        break;
-      case _LoaiChoDan.chepGhiChu:
+      }
+    }
+    for (final id in _choDanGhiChuIds) {
+      if (_choDanLaCat) {
+        _kho.diChuyenGhiChu(id, _thuMucHienTaiId);
+      } else {
         _kho.saoChepGhiChu(id, _thuMucHienTaiId);
-        break;
+      }
     }
 
     setState(() {
-      _choDanId = null;
-      _choDanLoai = null;
+      _choDanThuMucIds = [];
+      _choDanGhiChuIds = [];
     });
     await _kho.luu();
+  }
+
+  // ------------------------------------------------------- "Chọn nhiều"
+
+  void _batDauChonNhieu() {
+    setState(() {
+      _dangChonNhieu = true;
+      _dsThuMucDaChon.clear();
+      _dsGhiChuDaChon.clear();
+    });
+  }
+
+  void _huyChonNhieu() {
+    setState(() {
+      _dangChonNhieu = false;
+      _dsThuMucDaChon.clear();
+      _dsGhiChuDaChon.clear();
+    });
+  }
+
+  void _toggleChonThuMuc(String id) {
+    setState(() {
+      if (!_dsThuMucDaChon.remove(id)) _dsThuMucDaChon.add(id);
+    });
+  }
+
+  void _toggleChonGhiChu(String id) {
+    setState(() {
+      if (!_dsGhiChuDaChon.remove(id)) _dsGhiChuDaChon.add(id);
+    });
+  }
+
+  void _datChonTatCa(
+    bool chon,
+    ({List<ThuMuc> thuMucCon, List<GhiChuFile> ghiChuCon})? noiDung,
+  ) {
+    setState(() {
+      if (chon) {
+        _dsThuMucDaChon.addAll((noiDung?.thuMucCon ?? const []).map((t) => t.id));
+        _dsGhiChuDaChon.addAll((noiDung?.ghiChuCon ?? const []).map((g) => g.id));
+      } else {
+        _dsThuMucDaChon.clear();
+        _dsGhiChuDaChon.clear();
+      }
+    });
+  }
+
+  String _tenMucDangChonDuyNhat() {
+    if (_dsThuMucDaChon.isNotEmpty) {
+      return _kho.timThuMuc(_dsThuMucDaChon.first)?.ten ?? '1 mục';
+    }
+    if (_dsGhiChuDaChon.isNotEmpty) {
+      return _kho.timGhiChu(_dsGhiChuDaChon.first)?.ten ?? '1 mục';
+    }
+    return '1 mục';
+  }
+
+  /// "Sao chép"/"Cắt (di chuyển)" ở thanh hành động "Chọn nhiều" — gửi cả
+  /// lô vào ĐÚNG bộ nhớ tạm dùng chung với thao tác một mục đơn (xem
+  /// `_dat`/`_dan`), rồi thoát luôn chế độ "Chọn nhiều".
+  void _datNhieu({required bool laCat}) {
+    final tong = _dsThuMucDaChon.length + _dsGhiChuDaChon.length;
+    final ten = tong == 1 ? _tenMucDangChonDuyNhat() : '$tong mục';
+    setState(() {
+      _choDanLaCat = laCat;
+      _choDanThuMucIds = _dsThuMucDaChon.toList();
+      _choDanGhiChuIds = _dsGhiChuDaChon.toList();
+      _choDanTen = ten;
+      _dangChonNhieu = false;
+      _dsThuMucDaChon.clear();
+      _dsGhiChuDaChon.clear();
+    });
+  }
+
+  /// "Chuyển vào thùng rác" ở thanh hành động "Chọn nhiều" — không hỏi xác
+  /// nhận, giống hệt khi làm với một mục đơn.
+  Future<void> _xoaNhieuVaoThungRac() async {
+    final coGhiChuDangMo = _dsGhiChuDaChon.contains(widget.idGhiChuDangMo) ||
+        _dsThuMucDaChon.any(
+          (id) => _timGhiChuTrongCay(id).any((g) => g.id == widget.idGhiChuDangMo),
+        );
+    for (final id in _dsThuMucDaChon) {
+      _kho.chuyenThuMucVaoThungRac(id);
+    }
+    for (final id in _dsGhiChuDaChon) {
+      _kho.chuyenGhiChuVaoThungRac(id);
+    }
+    setState(() {
+      _dangChonNhieu = false;
+      _dsThuMucDaChon.clear();
+      _dsGhiChuDaChon.clear();
+    });
+    await _kho.luu();
+    if (!mounted) return;
+    _baoDaChuyenVaoThungRac();
+    if (coGhiChuDangMo) {
+      _bao('Ghi chú đang mở nằm trong mục vừa chuyển vào thùng rác.');
+    }
+  }
+
+  /// Thanh ghim TRÊN CÙNG khi đang "Chọn nhiều" — thay hẳn cho 3 dòng
+  /// thường (quay lại/địa chỉ/tên thư mục), vì lúc này KHÔNG điều hướng đi
+  /// đâu cả, chỉ tích chọn.
+  Widget _thanhChonNhieu(
+    ({List<ThuMuc> thuMucCon, List<GhiChuFile> ghiChuCon})? noiDung,
+  ) {
+    final tongSo = (noiDung?.thuMucCon.length ?? 0) + (noiDung?.ghiChuCon.length ?? 0);
+    final daChonHet = tongSo > 0 &&
+        (_dsThuMucDaChon.length + _dsGhiChuDaChon.length) == tongSo;
+    return Material(
+      color: const Color(0xFFF1F3F4),
+      child: SafeArea(
+        bottom: false,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Checkbox(
+                  value: daChonHet,
+                  onChanged: (v) => _datChonTatCa(v ?? false, noiDung),
+                ),
+                const Text('Chọn tất cả'),
+              ],
+            ),
+            TextButton(
+              onPressed: _huyChonNhieu,
+              style: TextButton.styleFrom(foregroundColor: Colors.red.shade600),
+              child: const Text('Hủy chọn nhiều'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Thanh ghim ĐÁY khi đang "Chọn nhiều" — 3 nút liệt sẵn, chỉ sáng lên khi
+  /// có ít nhất 1 mục được tích chọn; tự co giãn/xuống dòng theo bề ngang
+  /// màn hình (`Wrap`, không phải `Row` cứng).
+  Widget _thanhHanhDongChonNhieu() {
+    final coChon = _dsThuMucDaChon.isNotEmpty || _dsGhiChuDaChon.isNotEmpty;
+    return Material(
+      color: const Color(0xFFF1F3F4),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              TextButton.icon(
+                onPressed: coChon ? () => _datNhieu(laCat: false) : null,
+                icon: const Icon(Icons.copy_outlined, size: 18),
+                label: const Text('Sao chép'),
+              ),
+              TextButton.icon(
+                onPressed: coChon ? () => _datNhieu(laCat: true) : null,
+                icon: const Icon(Icons.cut_outlined, size: 18),
+                label: const Text('Cắt (di chuyển)'),
+              ),
+              TextButton.icon(
+                onPressed: coChon ? _xoaNhieuVaoThungRac : null,
+                icon: Icon(
+                  Icons.delete_outline,
+                  size: 18,
+                  color: coChon ? Colors.red.shade600 : null,
+                ),
+                label: Text(
+                  'Chuyển vào thùng rác',
+                  style: TextStyle(color: coChon ? Colors.red.shade600 : null),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   /// Toàn bộ đường đi từ gốc tới thư mục đang xem, gốc luôn ở vị trí 0.
@@ -644,12 +847,14 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                     case 1:
                       _themThuMuc();
                       break;
+                    case 2:
+                      _batDauChonNhieu();
+                      break;
                     case 5:
                       _moThungRac();
                       break;
-                    // 2-4: "Chọn nhiều", "Tải và chia sẻ thư mục này",
-                    // "Thông tin thư mục này" — chỗ đặt trước, chưa gắn
-                    // logic gì cả.
+                    // 3-4: "Tải và chia sẻ thư mục này", "Thông tin thư mục
+                    // này" — chỗ đặt trước, chưa gắn logic gì cả.
                   }
                 },
                 itemBuilder: (ctx) => const [
@@ -680,9 +885,14 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
         : noiDung.thuMucCon.isEmpty && noiDung.ghiChuCon.isEmpty;
 
     return PopScope(
-      canPop: _duongDan.isEmpty,
+      canPop: !_dangChonNhieu && _duongDan.isEmpty,
       onPopInvokedWithResult: (daThoat, ketQua) {
-        if (!daThoat) _veThuMucCha();
+        if (daThoat) return;
+        if (_dangChonNhieu) {
+          _huyChonNhieu();
+        } else {
+          _veThuMucCha();
+        }
       },
       child: Scaffold(
         // (YÊU CẦU MỚI) Bỏ hẳn `AppBar` — ba dòng ngang giờ xếp lại thành:
@@ -693,12 +903,19 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
         //     cũ, chỉ dời xuống hàng riêng trong `body` thay vì `appBar:`).
         // Không còn `AppBar` tự lo khoảng né status bar nữa — `SafeArea`
         // bọc ngoài `body` để thay việc đó.
+        // (YÊU CẦU MỚI) "Chọn nhiều" thay hẳn 3 dòng trên cùng bằng MỘT
+        // thanh "Chọn tất cả"/"Hủy chọn nhiều" — không điều hướng, chỉ tích
+        // chọn.
         body: SafeArea(
           child: Column(
           children: [
-            _thanhQuayLaiVaViTriTep(),
-            if (_duongDan.isNotEmpty) _thanhDiaChi(),
-            _dongTenThuMucVaNutThem(laNgoiNhaChung: laNgoiNhaChung),
+            if (_dangChonNhieu)
+              _thanhChonNhieu(noiDung)
+            else ...[
+              _thanhQuayLaiVaViTriTep(),
+              if (_duongDan.isNotEmpty) _thanhDiaChi(),
+              _dongTenThuMucVaNutThem(laNgoiNhaChung: laNgoiNhaChung),
+            ],
             Expanded(
               child: laNgoiNhaChung
                   ? _danhSachNgoiNhaChung()
@@ -713,9 +930,18 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                       children: [
                         for (final t in noiDung!.thuMucCon)
                           ListTile(
-                            // Vàng rực để phân biệt ngay với icon ghi chú
-                            // (xám) — liếc mắt là biết đâu là thư mục.
-                            leading: Icon(Icons.folder, color: Colors.amber.shade700),
+                            // (YÊU CẦU MỚI) "Chọn nhiều": checkbox thay hẳn
+                            // icon thư mục — không còn mở được gì khác,
+                            // chỉ chọn/bỏ chọn.
+                            leading: _dangChonNhieu
+                                ? Checkbox(
+                                    value: _dsThuMucDaChon.contains(t.id),
+                                    onChanged: (_) => _toggleChonThuMuc(t.id),
+                                  )
+                                // Vàng rực để phân biệt ngay với icon ghi
+                                // chú (xám) — liếc mắt là biết đâu là thư
+                                // mục.
+                                : Icon(Icons.folder, color: Colors.amber.shade700),
                             // Vừa được khôi phục từ Thùng rác và nhảy tới
                             // đây — nhấp nháy để thu hút chú ý, dùng lại
                             // đúng hiệu ứng `_ChuMucNhayNhay`.
@@ -733,8 +959,12 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                         ? TextStyle(color: Color(t.mau!))
                                         : null,
                                   ),
-                            onTap: () => _moThuMuc(t.id),
-                            trailing: PopupMenuButton<String>(
+                            onTap: _dangChonNhieu
+                                ? () => _toggleChonThuMuc(t.id)
+                                : () => _moThuMuc(t.id),
+                            trailing: _dangChonNhieu
+                                ? null
+                                : PopupMenuButton<String>(
                               onSelected: (v) {
                                 switch (v) {
                                   case 'doi_ten':
@@ -745,10 +975,10 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                     );
                                     break;
                                   case 'cat':
-                                    _dat(_LoaiChoDan.catThuMuc, t.id, t.ten);
+                                    _dat(laCat: true, laThuMuc: true, id: t.id, ten: t.ten);
                                     break;
                                   case 'chep':
-                                    _dat(_LoaiChoDan.chepThuMuc, t.id, t.ten);
+                                    _dat(laCat: false, laThuMuc: true, id: t.id, ten: t.ten);
                                     break;
                                   case 'mau':
                                     _chonMau(laThuMuc: true, id: t.id);
@@ -765,7 +995,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                 ),
                                 PopupMenuItem(
                                   value: 'cat',
-                                  child: Text('Cắt'),
+                                  child: Text('Cắt (di chuyển)'),
                                 ),
                                 PopupMenuItem(
                                   value: 'chep',
@@ -784,7 +1014,12 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                           ),
                         for (final g in noiDung!.ghiChuCon)
                           ListTile(
-                            leading: const Icon(Icons.description_outlined),
+                            leading: _dangChonNhieu
+                                ? Checkbox(
+                                    value: _dsGhiChuDaChon.contains(g.id),
+                                    onChanged: (_) => _toggleChonGhiChu(g.id),
+                                  )
+                                : const Icon(Icons.description_outlined),
                             // (YÊU CẦU MỚI) Vừa nhảy tới đây qua nút "Vị trí
                             // Tệp đang soạn thảo" — phóng to/thu nhỏ vài lần
                             // để thu hút chú ý, ĐÚNG hệt hiệu ứng tên thư
@@ -805,8 +1040,12 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                   ),
                             selected: g.id == widget.idGhiChuDangMo,
                             selectedTileColor: const Color(0xFFE8F0FE),
-                            onTap: () => Navigator.of(context).pop(g.id),
-                            trailing: PopupMenuButton<String>(
+                            onTap: _dangChonNhieu
+                                ? () => _toggleChonGhiChu(g.id)
+                                : () => Navigator.of(context).pop(g.id),
+                            trailing: _dangChonNhieu
+                                ? null
+                                : PopupMenuButton<String>(
                               onSelected: (v) {
                                 switch (v) {
                                   case 'doi_ten':
@@ -817,10 +1056,10 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                     );
                                     break;
                                   case 'cat':
-                                    _dat(_LoaiChoDan.catGhiChu, g.id, g.ten);
+                                    _dat(laCat: true, laThuMuc: false, id: g.id, ten: g.ten);
                                     break;
                                   case 'chep':
-                                    _dat(_LoaiChoDan.chepGhiChu, g.id, g.ten);
+                                    _dat(laCat: false, laThuMuc: false, id: g.id, ten: g.ten);
                                     break;
                                   case 'tai_ve':
                                     _taiVeGhiChu(g);
@@ -840,7 +1079,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                 ),
                                 PopupMenuItem(
                                   value: 'cat',
-                                  child: Text('Cắt'),
+                                  child: Text('Cắt (di chuyển)'),
                                 ),
                                 PopupMenuItem(
                                   value: 'chep',
@@ -864,12 +1103,16 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                       ],
                     ),
             ),
-            // (YÊU CẦU MỚI) Ghim ở ĐÁY, chỉ hiện đúng tại thư mục gốc của
-            // Bộ nhớ nội bộ — chú thích riêng-tư khác nhau giữa web (lưu
-            // trong trình duyệt, mất khi xoá Tệp và dữ liệu trang web) và
-            // app APK/iOS (lưu thẳng trên máy).
-            if (_thuMucHienTaiId == thuMucGoc) _thanhChuThichBoNhoNoiBo(),
-            if (_choDanId != null)
+            // (YÊU CẦU MỚI) "Chọn nhiều" thay hẳn mọi thanh ghim đáy khác
+            // (chú thích gốc/dán) bằng MỘT thanh hành động riêng.
+            if (_dangChonNhieu) _thanhHanhDongChonNhieu(),
+            // Ghim ở ĐÁY, chỉ hiện đúng tại thư mục gốc của Bộ nhớ nội bộ —
+            // chú thích riêng-tư khác nhau giữa web (lưu trong trình
+            // duyệt, mất khi xoá Tệp và dữ liệu trang web) và app APK/iOS
+            // (lưu thẳng trên máy).
+            if (!_dangChonNhieu && _thuMucHienTaiId == thuMucGoc)
+              _thanhChuThichBoNhoNoiBo(),
+            if (!_dangChonNhieu && _coDangChoDan)
               Material(
                 color: const Color(0xFFE8F0FE),
                 child: SafeArea(
