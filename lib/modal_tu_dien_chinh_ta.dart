@@ -255,6 +255,12 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
                 style: const TextStyle(fontSize: 15),
                 decoration: InputDecoration(
                   isDense: true,
+                  // (SỬA LỖI — "không thấy gì khác biệt") Chỉ đổi màu/độ dày
+                  // viền thì quá mờ để nhận ra ngay, đặc biệt lúc không
+                  // focus — tô luôn NỀN xanh nhạt cho cặp đang rỗng, không
+                  // thể nào không thấy.
+                  filled: noiBatRong,
+                  fillColor: noiBatRong ? Colors.blue.shade50 : null,
                   border: OutlineInputBorder(
                     borderSide: BorderSide(color: mauVien, width: doRongVien),
                   ),

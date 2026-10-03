@@ -44,6 +44,33 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
 
   KhoDuLieu get _kho => widget.kho;
 
+  @override
+  void initState() {
+    super.initState();
+    // (YÊU CẦU MỚI) Có nhớ từ lần mở trước (trong CÙNG phiên app) thì vào
+    // đúng chỗ đó; chưa có gì (lần đầu, hoặc vừa F5/mở lại app) thì mặc
+    // định đi thẳng tới thư mục đang chứa tệp mở ở trang soạn thảo.
+    final nhoId = _nhoThuMucId;
+    final nhoDuongDan = _nhoDuongDan;
+    if (nhoId != null && nhoDuongDan != null) {
+      _thuMucHienTaiId = nhoId;
+      _duongDan.addAll(nhoDuongDan);
+    } else {
+      final thuMucId = _thuMucChuaTepDangSoanThao;
+      _thuMucHienTaiId = thuMucId;
+      _duongDan.addAll(_duongDanToiThuMuc(thuMucId));
+    }
+  }
+
+  @override
+  void dispose() {
+    // Ghi lại NGAY LÚC rời màn hình — lần mở kế tiếp (vẫn trong phiên app
+    // này) đọc lại đúng ở `initState`.
+    _nhoThuMucId = _thuMucHienTaiId;
+    _nhoDuongDan = List<String>.from(_duongDan);
+    super.dispose();
+  }
+
   /// (YÊU CẦU MỚI) Tên thư mục "Bộ nhớ nội bộ" — khác nhau giữa bản web
   /// (đọc từ Trình duyệt web) và bản APK/iOS (đọc thẳng từ máy).
   String get _tenBoNhoNoiBo => kIsWeb
@@ -52,14 +79,69 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
 
   String get _tenThuMucHienTai {
     if (_thuMucHienTaiId == _ngoiNhaChung) return 'Chọn nơi lưu trữ';
-    if (_thuMucHienTaiId == thuMucGoc) return 'Ghi chú của tôi';
-    return _kho.timThuMuc(_thuMucHienTaiId)?.ten ?? 'Ghi chú của tôi';
+    // (YÊU CẦU MỚI) Đứng NGAY tại gốc Bộ nhớ nội bộ (không phải một thư mục
+    // con nào bên trong) — đổi tên hiển thị, xem màu ở `_dongTenThuMuc`.
+    if (_thuMucHienTaiId == thuMucGoc) return 'Bộ nhớ Nội bộ';
+    return _kho.timThuMuc(_thuMucHienTaiId)?.ten ?? 'Bộ nhớ Nội bộ';
   }
 
   /// (YÊU CẦU MỚI) "Bộ nhớ trên đám mây"/"Bộ nhớ được chia sẻ với bạn" —
   /// để dành cho sau này (đăng nhập Google), chưa làm gì cả ngoài báo biết.
   void _baoDangNangCap() {
     hienThongBaoGiua(context, 'Tính năng đang nâng cấp');
+  }
+
+  // (YÊU CẦU MỚI) Bộ nhớ đệm "đang đứng ở đâu" — chỉ là biến `static` sống
+  // trong RAM của phiên app hiện tại: F5 (web) hay tắt/mở lại app là mất,
+  // ĐÚNG ý yêu cầu "dễ dàng bị xoá". Ghi lại ở `dispose()`, đọc lại ở
+  // `initState()` của LẦN MỞ SAU — same type (`ManHinhThuMuc`) nhưng là một
+  // instance State hoàn toàn mới mỗi lần Navigator.push, nên không thể
+  // dùng field thường (field thường mất theo State khi màn hình đóng).
+  static String? _nhoThuMucId;
+  static List<String>? _nhoDuongDan;
+
+  /// Id thư mục cha của ghi chú đang mở ở trang soạn thảo — `null` nếu ghi
+  /// chú đó không còn tồn tại (đã bị xoá) hay không rõ, lúc đó coi như gốc.
+  String get _thuMucChuaTepDangSoanThao =>
+      _kho.timGhiChu(widget.idGhiChuDangMo)?.chaId ?? thuMucGoc;
+
+  /// Dựng lại cả đường dẫn (ngăn xếp `_duongDan`, KHÔNG gồm chính [id]) từ
+  /// "Ngôi nhà chung" đi xuống tới ĐÚNG thư mục [id] — dùng cho cả việc nhớ
+  /// vị trí cũ và nút "Vị trí Tệp đang soạn thảo".
+  List<String> _duongDanToiThuMuc(String id) {
+    final chuoi = <String>[];
+    var hienTai = id;
+    while (hienTai != thuMucGoc) {
+      chuoi.add(hienTai);
+      final t = _kho.timThuMuc(hienTai);
+      if (t == null) break; // Thư mục đã bị xoá — dừng, coi như tới đây.
+      hienTai = t.chaId;
+    }
+    chuoi.add(thuMucGoc);
+    final ds = chuoi.reversed.toList()..removeLast();
+    return [_ngoiNhaChung, ...ds];
+  }
+
+  /// Id ghi chú vừa được nhảy tới qua "Vị trí Tệp đang soạn thảo" — tên của
+  /// nó trong danh sách được phóng to/thu nhỏ vài lần để thu hút chú ý, ĐÚNG
+  /// hệt hiệu ứng tên thư mục ở thanh địa chỉ (`_ChuMucNhayNhay`). Mỗi lần
+  /// bấm nút lại tăng [_demLanNhayToiTep] để đổi `key`, hiệu ứng tự chạy lại
+  /// dù đang nhảy tới ĐÚNG ghi chú vừa rồi.
+  String? _idGhiChuCanNhayNhay;
+  int _demLanNhayToiTep = 0;
+
+  void _veTrangSoanThao() => Navigator.of(context).pop();
+
+  void _toiViTriTepDangSoanThao() {
+    final thuMucId = _thuMucChuaTepDangSoanThao;
+    setState(() {
+      _thuMucHienTaiId = thuMucId;
+      _duongDan
+        ..clear()
+        ..addAll(_duongDanToiThuMuc(thuMucId));
+      _idGhiChuCanNhayNhay = widget.idGhiChuDangMo;
+      _demLanNhayToiTep++;
+    });
   }
 
   void _moThuMuc(String id) {
@@ -375,7 +457,11 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     ];
 
     for (var i = 1; i < chuoi.length; i++) {
-      final ten = _kho.timThuMuc(chuoi[i])?.ten ?? '?';
+      // (YÊU CẦU MỚI) Gốc Bộ nhớ nội bộ không có tên thật trong `_kho` (nó
+      // không phải một `ThuMuc` được lưu) — hiện "Nội bộ", chữ ĐỎ, phân
+      // biệt hẳn với tên các thư mục con (xanh dương) phía sau.
+      final laGocNoiBo = chuoi[i] == thuMucGoc;
+      final ten = laGocNoiBo ? 'Nội bộ' : (_kho.timThuMuc(chuoi[i])?.ten ?? '?');
       final laCuoiCung = i == chuoi.length - 1;
       manh.add(const Padding(
         padding: EdgeInsets.symmetric(horizontal: 2),
@@ -391,7 +477,11 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                 child: _ChuMucNhayNhay(
                   key: ValueKey('deang-${chuoi[i]}'),
                   chu: _rutGon(ten),
-                  kieuChu: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  kieuChu: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: laGocNoiBo ? Colors.red.shade700 : null,
+                  ),
                 ),
               )
             : InkWell(
@@ -400,7 +490,10 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                   child: Text(
                     _rutGon(ten),
-                    style: const TextStyle(fontSize: 13, color: Color(0xFF1A73E8)),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: laGocNoiBo ? Colors.red.shade700 : const Color(0xFF1A73E8),
+                    ),
                   ),
                 ),
               ),
@@ -439,22 +532,118 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   Widget _danhSachNgoiNhaChung() {
     return ListView(
       children: [
+        // (YÊU CẦU MỚI) Icon riêng cho từng "bộ nhớ" — hình dạng/ý nghĩa
+        // khác hẳn nhau, không còn dùng chung icon thư mục vàng cho cả ba.
         ListTile(
-          leading: Icon(Icons.folder, color: Colors.amber.shade700),
+          leading: Icon(Icons.smartphone, color: Colors.blue.shade700),
           title: Text(_tenBoNhoNoiBo),
           onTap: () => _moThuMuc(thuMucGoc),
         ),
         ListTile(
-          leading: Icon(Icons.folder, color: Colors.amber.shade700),
+          leading: Icon(Icons.cloud_outlined, color: Colors.lightBlue.shade400),
           title: const Text('Bộ nhớ trên đám mây'),
           onTap: _baoDangNangCap,
         ),
         ListTile(
-          leading: Icon(Icons.folder, color: Colors.amber.shade700),
+          leading: Icon(Icons.folder_shared_outlined, color: Colors.green.shade600),
           title: const Text('Bộ nhớ được chia sẻ với bạn'),
           onTap: _baoDangNangCap,
         ),
       ],
+    );
+  }
+
+  /// (YÊU CẦU MỚI) Thanh ngang TRÊN TẤT CẢ — luôn hiện bất kể đang ở Ngôi
+  /// nhà chung hay trong bất kỳ thư mục nào. "Quay lại Trang soạn thảo"
+  /// (trái) đóng hẳn màn hình này; "Vị trí Tệp đang soạn thảo" (phải) nhảy
+  /// thẳng tới thư mục chứa tệp đang mở.
+  Widget _thanhQuayLaiVaViTriTep() {
+    return Material(
+      color: const Color(0xFFF1F3F4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          TextButton.icon(
+            onPressed: _veTrangSoanThao,
+            icon: const Icon(Icons.arrow_back, size: 18),
+            label: const Text('Quay lại Trang soạn thảo'),
+          ),
+          TextButton.icon(
+            onPressed: _toiViTriTepDangSoanThao,
+            icon: const Icon(Icons.my_location, size: 18),
+            label: const Text('Vị trí Tệp đang soạn thảo'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// (YÊU CẦU MỚI) Dòng tên thư mục hiện tại + các nút thêm/sửa — y hệt
+  /// `AppBar` cũ (title/leading/actions), chỉ dời vào hẳn trong `body` làm
+  /// dòng thứ BA, dưới thanh địa chỉ.
+  Widget _dongTenThuMucVaNutThem({required bool laNgoiNhaChung}) {
+    return Material(
+      elevation: 1,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Row(
+          children: [
+            if (_duongDan.isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _veThuMucCha,
+              ),
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(left: _duongDan.isEmpty ? 16 : 0),
+                child: Text(
+                  _tenThuMucHienTai,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w500,
+                    // (YÊU CẦU MỚI) Đứng ngay gốc Bộ nhớ nội bộ — chữ đỏ,
+                    // phân biệt với tên các thư mục con bên trong.
+                    color: _thuMucHienTaiId == thuMucGoc ? Colors.red.shade700 : null,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+            // (YÊU CẦU MỚI) "Ngôi nhà chung" chỉ để CHỌN một trong 3 bộ
+            // nhớ — không có gì để thêm/sửa ở chính mức này.
+            if (!laNgoiNhaChung) ...[
+              IconButton(
+                onPressed: _themGhiChu,
+                icon: const Icon(Icons.note_add_outlined),
+                tooltip: 'Thêm ghi chú',
+              ),
+              PopupMenuButton<int>(
+                icon: const Icon(Icons.more_vert),
+                tooltip: 'Thêm',
+                onSelected: (v) {
+                  switch (v) {
+                    case 1:
+                      _themThuMuc();
+                      break;
+                    // 2-5: "Chọn nhiều", "Tải và chia sẻ thư mục này",
+                    // "Thông tin thư mục này", "Thùng rác" — chỗ đặt
+                    // trước, chưa gắn logic gì cả.
+                  }
+                },
+                itemBuilder: (ctx) => const [
+                  PopupMenuItem(value: 1, child: Text('Tạo thư mục mới')),
+                  PopupMenuDivider(),
+                  PopupMenuItem(value: 2, child: Text('Chọn nhiều')),
+                  PopupMenuItem(value: 3, child: Text('Tải và chia sẻ thư mục này')),
+                  PopupMenuItem(value: 4, child: Text('Thông tin thư mục này')),
+                  PopupMenuDivider(),
+                  PopupMenuItem(value: 5, child: Text('Thùng rác')),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -474,52 +663,20 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
         if (!daThoat) _veThuMucCha();
       },
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(_tenThuMucHienTai),
-          leading: _duongDan.isEmpty
-              ? null
-              : IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: _veThuMucCha,
-                ),
-          // (YÊU CẦU MỚI) "Ngôi nhà chung" chỉ để CHỌN một trong 3 bộ nhớ —
-          // không có gì để thêm/sửa ở chính mức này, ẩn hẳn các nút đó.
-          actions: laNgoiNhaChung
-              ? const []
-              : [
-            IconButton(
-              onPressed: _themGhiChu,
-              icon: const Icon(Icons.note_add_outlined),
-              tooltip: 'Thêm ghi chú',
-            ),
-            PopupMenuButton<int>(
-              icon: const Icon(Icons.more_vert),
-              tooltip: 'Thêm',
-              onSelected: (v) {
-                switch (v) {
-                  case 1:
-                    _themThuMuc();
-                    break;
-                  // 2-5: "Chọn nhiều", "Tải và chia sẻ thư mục này",
-                  // "Thông tin thư mục này", "Thùng rác" — chỗ đặt trước,
-                  // chưa gắn logic gì cả.
-                }
-              },
-              itemBuilder: (ctx) => const [
-                PopupMenuItem(value: 1, child: Text('Tạo thư mục mới')),
-                PopupMenuDivider(),
-                PopupMenuItem(value: 2, child: Text('Chọn nhiều')),
-                PopupMenuItem(value: 3, child: Text('Tải và chia sẻ thư mục này')),
-                PopupMenuItem(value: 4, child: Text('Thông tin thư mục này')),
-                PopupMenuDivider(),
-                PopupMenuItem(value: 5, child: Text('Thùng rác')),
-              ],
-            ),
-          ],
-        ),
-        body: Column(
+        // (YÊU CẦU MỚI) Bỏ hẳn `AppBar` — ba dòng ngang giờ xếp lại thành:
+        // (1) thanh "Quay lại Trang soạn thảo"/"Vị trí Tệp đang soạn thảo"
+        //     — TRÊN TẤT CẢ, luôn hiện bất kể đang ở đâu;
+        // (2) thanh địa chỉ (chỉ hiện khi không ở Ngôi nhà chung);
+        // (3) dòng tên thư mục hiện tại + các nút thêm/sửa (y hệt AppBar
+        //     cũ, chỉ dời xuống hàng riêng trong `body` thay vì `appBar:`).
+        // Không còn `AppBar` tự lo khoảng né status bar nữa — `SafeArea`
+        // bọc ngoài `body` để thay việc đó.
+        body: SafeArea(
+          child: Column(
           children: [
+            _thanhQuayLaiVaViTriTep(),
             if (_duongDan.isNotEmpty) _thanhDiaChi(),
+            _dongTenThuMucVaNutThem(laNgoiNhaChung: laNgoiNhaChung),
             Expanded(
               child: laNgoiNhaChung
                   ? _danhSachNgoiNhaChung()
@@ -595,12 +752,24 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                         for (final g in noiDung!.ghiChuCon)
                           ListTile(
                             leading: const Icon(Icons.description_outlined),
-                            title: Text(
-                              g.ten,
-                              style: g.mau != null
-                                  ? TextStyle(color: Color(g.mau!))
-                                  : null,
-                            ),
+                            // (YÊU CẦU MỚI) Vừa nhảy tới đây qua nút "Vị trí
+                            // Tệp đang soạn thảo" — phóng to/thu nhỏ vài lần
+                            // để thu hút chú ý, ĐÚNG hệt hiệu ứng tên thư
+                            // mục ở thanh địa chỉ (`_ChuMucNhayNhay`).
+                            title: g.id == _idGhiChuCanNhayNhay
+                                ? _ChuMucNhayNhay(
+                                    key: ValueKey('nhay-tep-$_demLanNhayToiTep'),
+                                    chu: g.ten,
+                                    kieuChu: TextStyle(
+                                      color: g.mau != null ? Color(g.mau!) : null,
+                                    ),
+                                  )
+                                : Text(
+                                    g.ten,
+                                    style: g.mau != null
+                                        ? TextStyle(color: Color(g.mau!))
+                                        : null,
+                                  ),
                             selected: g.id == widget.idGhiChuDangMo,
                             selectedTileColor: const Color(0xFFE8F0FE),
                             onTap: () => Navigator.of(context).pop(g.id),
@@ -699,6 +868,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                 ),
               ),
           ],
+          ),
         ),
       ),
     );
