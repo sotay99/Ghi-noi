@@ -182,6 +182,23 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   /// không phải do thiếu bước trừ raw (đã có từ trước, không đủ).
   Timer? _henBatLaiMicChat;
 
+  /// (SỬA LỖI "bão tự bật lại micro vô hạn") Đếm số lần LIÊN TIẾP
+  /// `_lenLichBatLaiMicChat` phải lên lịch bật lại mà KHÔNG CÓ một `onResult`
+  /// nào của phiên đó lọt qua được (kể cả kết quả rỗng) — nghĩa là phiên vừa
+  /// mở đã chết ngay, trình nhận dạng của máy/trình duyệt đang kẹt hẳn, bật
+  /// lại cũng vô ích. Không có giới hạn nào trước đây: mỗi phiên hỏng chỉ sau
+  /// 200ms lại mở tiếp một phiên MỚI, cũng hỏng ngay, lặp lại VÔ HẠN — vừa
+  /// ngốn máy vừa (đúng lỗi người dùng báo) giữ `_micDangNghe` mãi `true` nên
+  /// mục "Micro (vừa nói vừa ra chữ)" trong nút "+" cứ mờ xám, không bấm lại
+  /// được, CHỈ gõ tay (qua `_nguoiDungVuaGoChat`, tự đặt `_micDangNghe` về
+  /// `false`) mới thoát ra được. Reset về 0 mỗi khi có MỘT `onResult` thật sự
+  /// chạy tới cho phiên hiện tại (dấu hiệu chắc chắn: trình nhận dạng vẫn
+  /// sống, không phải đang kẹt) — vượt quá [_soLanBatLaiLienTucToiDa] mà vẫn
+  /// chưa thấy `onResult` nào thì coi như chịu, tắt hẳn mic, trả quyền tự
+  /// bấm lại cho người dùng (xem `_lenLichBatLaiMicChat`).
+  int _soLanBatLaiLienTucKhongKetQua = 0;
+  static const _soLanBatLaiLienTucToiDa = 6;
+
   /// Đánh số PHIÊN nghe — y hệt `_phienNgheHienTai` ở trang soạn thảo
   /// chính. ĐÂY MỚI LÀ MẢNH GHÉP CÒN THIẾU thật sự (không phải việc trừ
   /// raw cộng dồn, cũng không chỉ là "phiên dài hay ngắn"): trên Android
@@ -582,6 +599,9 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   Future<void> _batMicChat() async {
     // Ghi âm và Micro loại trừ nhau — bật cái này thì tự tắt cái kia trước.
     if (_ghiDangMo) return; // đang có hộp thoại ghi âm mở — không thể bật mic.
+    // Người dùng tự tay bật lại — một lượt thử MỚI, cho đủ hạn mức bật lại
+    // liên tục từ đầu, không tính dồn với những lần thất bại trước đó.
+    _soLanBatLaiLienTucKhongKetQua = 0;
     // (YÊU CẦU MỚI) Micro hoạt động tốt nhất khi khung nhập đang có tiêu
     // điểm/con trỏ nhấp nháy THẬT (kéo theo bàn phím ảo tự hiện) — ép điều
     // đó mỗi lần bật Micro, bất kể trước đó khung nhập có tiêu điểm hay
@@ -681,6 +701,11 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
             return;
           }
           if (!_micDangNghe) return;
+          // (SỬA LỖI "bão tự bật lại micro vô hạn") Có `onResult` thật sự
+          // lọt tới đây cho đúng phiên hiện tại — bằng chứng chắc chắn
+          // trình nhận dạng vẫn sống, không phải đang kẹt — reset bộ đếm
+          // bật lại liên tiếp, xem `_soLanBatLaiLienTucKhongKetQua`.
+          _soLanBatLaiLienTucKhongKetQua = 0;
           // (SỬA LỖI v121 — "tự xoá chữ vừa nói khi micro tự tắt") Một số
           // trình duyệt/thiết bị gửi một kết quả CUỐI (`finalResult: true`)
           // VỚI CHUỖI RỖNG ngay lúc `pauseFor` cắt phiên do im lặng — không
@@ -821,6 +846,28 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   /// (`_micDangNghe` false) — tránh bật lại ngoài ý muốn.
   void _lenLichBatLaiMicChat() {
     if (!_micDangNghe) return;
+    _soLanBatLaiLienTucKhongKetQua++;
+    widget.ghiNhatKyMicro?.call(
+        '[chat] Lên lịch bật lại lần $_soLanBatLaiLienTucKhongKetQua liên tiếp '
+        'chưa có onResult nào');
+    if (_soLanBatLaiLienTucKhongKetQua > _soLanBatLaiLienTucToiDa) {
+      widget.ghiNhatKyMicro?.call(
+          '[chat] Bật lại $_soLanBatLaiLienTucToiDa lần liên tiếp vẫn không '
+          'nghe được gì — chịu, tắt hẳn mic');
+      _soLanBatLaiLienTucKhongKetQua = 0;
+      _henBatLaiMicChat?.cancel();
+      if (mounted) {
+        setState(() {
+          _micDangNghe = false;
+          _micDangNgheThat = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Micro liên tục không bật lại được — đã tắt. Hãy thử bấm lại.'),
+        ));
+      }
+      return;
+    }
     _henBatLaiMicChat?.cancel();
     _henBatLaiMicChat = Timer(const Duration(milliseconds: 200), () {
       if (_micDangNghe && mounted) _batPhienNgheMicChat();
