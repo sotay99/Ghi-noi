@@ -433,6 +433,11 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       return;
     }
     if (tep == null) return;
+    // Gán qua biến `final` — khúc `tep.name` dùng TRONG closure của
+    // `builder:` ở dưới không được trình biên dịch tự "promote" non-null
+    // từ check `if (tep == null) return;` phía trên (biến gốc là `tep` có
+    // thể gán lại), gán vào biến final mới mới thật sự hết nullable.
+    final tenTepZip = tep.name;
 
     Uint8List bytes;
     try {
@@ -453,7 +458,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
 
     final ketQua = await Navigator.of(context).push<KetQuaNhapZip>(
       MaterialPageRoute(
-        builder: (_) => ModalNhapZip(cayGoc: cay, tenTepZip: tep.name),
+        builder: (_) => ModalNhapZip(cayGoc: cay, tenTepZip: tenTepZip),
       ),
     );
     if (ketQua == null || ketQua == KetQuaNhapZip.huy || !mounted) return;
