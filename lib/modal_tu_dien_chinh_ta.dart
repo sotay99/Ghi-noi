@@ -62,6 +62,11 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
   /// vừa sinh ra mà không cần tự cuộn tay.
   final _cuon = ScrollController();
 
+  /// (YÊU CẦU MỚI) Một `GlobalKey` cho đầu mỗi cặp — dùng để cuộn tới ĐÚNG
+  /// cặp đó (`Scrollable.ensureVisible`), cả khi cặp đã có từ trước lẫn cặp
+  /// vừa thêm mới, xem `_themCap`.
+  final Map<CapTuDien, GlobalKey> _khoaCap = {};
+
   @override
   void initState() {
     super.initState();
@@ -74,6 +79,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
       _oThayThe[c] = (c.dsThayThe.isEmpty ? [''] : c.dsThayThe)
           .map((s) => TextEditingController(text: s))
           .toList();
+      _khoaCap[c] = GlobalKey();
     }
   }
 
@@ -101,31 +107,51 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
     });
   }
 
-  /// Mục 4: nút "+ Thêm cặp từ" chỉ hoạt động khi KHÔNG có cặp nào đang
-  /// rỗng hoàn toàn (cả từ lỗi lẫn mọi từ thay thế đều trống) — có sẵn một
-  /// cặp rỗng rồi thì bắt điền nó trước đã, không cho đẻ thêm cặp rỗng khác.
-  bool get _coCapRong => _ds.any(
-      (c) => c.loi.trim().isEmpty && _oThayThe[c]!.every((o) => o.text.trim().isEmpty));
+  /// (YÊU CẦU MỚI) Không còn làm nút "+ Thêm cặp từ" bị LIỆT khi đang có một
+  /// cặp rỗng hoàn toàn (cả từ lỗi lẫn mọi từ thay thế đều trống) — bấm vào
+  /// lúc đó giờ CUỘN tới ĐÚNG cặp rỗng ấy (hiện ra giữa màn hình) thay vì
+  /// thêm cặp mới, xem `_themCap`.
+  CapTuDien? get _capRong {
+    for (final c in _ds) {
+      if (c.loi.trim().isEmpty && _oThayThe[c]!.every((o) => o.text.trim().isEmpty)) {
+        return c;
+      }
+    }
+    return null;
+  }
+
+  void _cuonToiCap(CapTuDien c) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _khoaCap[c]?.currentContext;
+      if (ctx == null) return;
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+        alignment: 0.5,
+      );
+    });
+  }
 
   void _themCap() {
-    if (_coCapRong) return;
+    // Đang có sẵn một cặp rỗng — bắt điền nó trước đã, không đẻ thêm cặp
+    // rỗng khác: cuộn tới đúng cặp đó cho người dùng thấy ngay.
+    final capRong = _capRong;
+    if (capRong != null) {
+      _cuonToiCap(capRong);
+      return;
+    }
+    final c = CapTuDien(loi: '');
     setState(() {
-      final c = CapTuDien(loi: '');
       _ds.add(c);
       _oLoi[c] = TextEditingController();
       _oThayThe[c] = [TextEditingController()];
+      _khoaCap[c] = GlobalKey();
     });
     // Đợi khung hình kế tiếp (sau khi `ListView` đã dựng thêm cặp mới, biết
     // được chiều cao thật mới) rồi mới cuộn — cuộn ngay trong `setState` sẽ
     // tính theo chiều cao CŨ, hụt mất đúng phần vừa thêm.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_cuon.hasClients) return;
-      _cuon.animateTo(
-        _cuon.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOut,
-      );
-    });
+    _cuonToiCap(c);
   }
 
   void _xoaCap(CapTuDien c) {
@@ -137,6 +163,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
       }
       _loiTrungThayThe.remove(c);
       _loiTrungTuLoi.remove(c);
+      _khoaCap.remove(c);
     });
     widget.caiDat.luuTuDienChinhTa();
   }
@@ -304,7 +331,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: TextButton.icon(
-              onPressed: _coCapRong ? null : _themCap,
+              onPressed: _themCap,
               icon: const Icon(Icons.add_circle_outline),
               label: const Text('Thêm cặp từ'),
               style: TextButton.styleFrom(
@@ -334,7 +361,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
             ),
             const SizedBox(height: 8),
             for (final c in _ds) ...[
-              const Divider(height: 28),
+              KeyedSubtree(key: _khoaCap[c], child: const Divider(height: 28)),
               _oNhap(
                 nhan: 'Từ bị lỗi chính tả hay gặp',
                 controller: _oLoi[c]!,

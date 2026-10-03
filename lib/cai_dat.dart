@@ -110,12 +110,13 @@ class CaiDat {
   bool ghimThanhDinhDang = false;
 
   /// Có tự gọi AI kiểm tra chính tả mỗi khi có đoạn văn mới hay không.
-  /// Mặc định BẬT.
-  bool kiemTraChinhTaBangAI = true;
+  /// (YÊU CẦU MỚI) Mặc định TẮT — người dùng mới cài app lần đầu không bị
+  /// tốn hạn mức AI ngoài ý muốn, tự bật lên khi thật sự cần.
+  bool kiemTraChinhTaBangAI = false;
 
   /// Có tự gọi AI chèn dấu câu còn thiếu vào giữa các đoạn văn hay không.
-  /// Mặc định BẬT.
-  bool tuDongChenDauCauBangAI = true;
+  /// (YÊU CẦU MỚI) Mặc định TẮT — cùng lý do với `kiemTraChinhTaBangAI`.
+  bool tuDongChenDauCauBangAI = false;
 
   /// Mức độ dài của từng đoạn văn được AI đề xuất khi "Kiểm tra toàn văn",
   /// chỉ số 0-4 tương ứng Rất ngắn/Ngắn/Trung bình/Dài/Rất dài. Mặc định 2
@@ -284,7 +285,7 @@ class CaiDat {
     final kho = await SharedPreferences.getInstance();
     thoiGianBatLaiGiay = kho.getDouble(_khoaThoiGianBatLai) ?? 1.0;
     tuDongChenKhoangCach = kho.getBool(_khoaTuDongChenCach) ?? true;
-    kiemTraChinhTaBangAI = kho.getBool(_khoaKiemTraChinhTaAI) ?? true;
+    kiemTraChinhTaBangAI = kho.getBool(_khoaKiemTraChinhTaAI) ?? false;
     phimTatMicro = LuaChonPhimTat.tuLuu(
       kho.getString(_khoaPhimTatMicroLoai),
       kho.getString(_khoaPhimTatMicroPhimCtrl),
@@ -300,7 +301,7 @@ class CaiDat {
         .clamp(gioiHanDuoiNguongTuDongGuiTheGhiAm, gioiHanTrenNguongTuDongGuiTheGhiAm);
     tuDongMoBangDieuKhienGhiAm = kho.getBool(_khoaTuDongMoBangDieuKhienGhiAm);
     ghimThanhDinhDang = kho.getBool(_khoaGhimThanhDinhDang) ?? false;
-    tuDongChenDauCauBangAI = kho.getBool(_khoaTuDongChenDauCau) ?? true;
+    tuDongChenDauCauBangAI = kho.getBool(_khoaTuDongChenDauCau) ?? false;
     mucDoDaiDeXuat = (kho.getInt(_khoaMucDoDaiDeXuat) ?? 2).clamp(0, 4);
     cauLenhTuyChinhKiemTraToanVan = kho.getString(_khoaCauLenhTuyChinhKiemTraToanVan) ?? '';
     final mc = kho.getInt(_khoaMauChuGanNhat);

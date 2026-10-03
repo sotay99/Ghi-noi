@@ -4976,30 +4976,40 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// việc TA chủ động ép ẩn nó đi (`TextInput.hide`) là THỨ TẠO RA tiền đề
   /// của lỗi (y hệt lúc người dùng tự ẩn bàn phím ảo bằng nút Back, xem
   /// CLAUDE.md), rồi bỏ đó chờ "nhịp tim" 300ms (`dangKyThamDoChieuCaoVienPort`)
-  /// tự dọn — có khoảng hở ngắn nhìn thấy được trước khi nhịp tim kịp chạy.
-  /// Sửa hai việc:
+  /// tự dọn — có khoảng hở nhìn thấy được trước khi nhịp tim kịp chạy. Sửa:
   /// 1. KHÔNG làm gì cả (bỏ hẳn hàm này) nếu bàn phím ảo đang ẨN sẵn — không
   ///    có gì để "ẩn" thì cũng không có gì để tạo ra khoảng hở, đừng tự tạo
   ///    việc.
   /// 2. Đang HIỆN thì vẫn phải ẩn (menu/Bộ phím nhanh cần full màn hình),
-  ///    nhưng ngay sau đó tự ép `setState` NGAY (không đợi nhịp tim) vài lần
-  ///    liên tiếp trong 400ms đầu — dọn sạch khoảng hở trước khi mắt người
-  ///    dùng kịp thấy, đúng việc nhịp tim vẫn làm nhưng chủ động làm NGAY
-  ///    hơn là bị động chờ.
+  ///    nhưng ngay sau đó tự ép `setState` NGAY (không đợi nhịp tim) LIÊN
+  ///    TỤC trong gần 2 giây — dọn sạch khoảng hở trước khi mắt người dùng
+  ///    kịp thấy, đúng việc nhịp tim vẫn làm nhưng chủ động làm NGAY hơn là
+  ///    bị động chờ.
+  ///
+  /// (SỬA LỖI — "phải bấm lần 2/3 mới hết") Bản vá đầu chỉ ép `setState` vài
+  /// lần rải trong 400ms đầu — không đủ: khoá bàn phím ảo trên thiết bị
+  /// thật có lúc mất hơn 400ms để thật sự "nhả" khoảng không đã chiếm (hệ
+  /// điều hành chạy hiệu ứng trượt xuống chứ không biến mất ngay tức khắc).
+  /// Bấm lần 2/3 "vô tình" hết vì nó rơi đúng lúc hiệu ứng đã xong, không
+  /// phải vì bản thân việc bấm lại có tác dụng gì đặc biệt. Kéo dài cửa sổ
+  /// ép `setState` ra gần 2 giây, dày hơn (mỗi 50ms) để chắc chắn bắt kịp
+  /// bất kể hiệu ứng ẩn bàn phím ảo chạy chậm tới đâu. Cũng bỏ hẳn việc đổi
+  /// `GlobalKey` ở đây — mẹo đó dùng cho lỗi KHÁC (bàn phím ảo "liệt" không
+  /// bật lại được, xem Copy/Cắt/Dán/All), không liên quan tới việc ĐO LẠI
+  /// kích thước sau khi ẩn, mà việc dựng lại cả `TextField` từ đầu (dù chỉ
+  /// một khung hình) cũng tự nó là một nguồn gây giật/hở hình, phản tác
+  /// dụng ở đúng tình huống này.
   void _resetManHinhTruocKhiMoMenu() {
     if (!mounted) return;
     if (MediaQuery.of(context).viewInsets.bottom == 0) return;
     SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
-    setState(() {
-      _oVanBanKey = GlobalKey();
-      _epAnBanPhimAoKhiGiuFocus = true;
-    });
-    for (final tre in [60, 120, 200, 300, 400]) {
+    setState(() => _epAnBanPhimAoKhiGiuFocus = true);
+    for (var tre = 30; tre <= 1800; tre += 50) {
       Future.delayed(Duration(milliseconds: tre), () {
         if (mounted) setState(() {});
       });
     }
-    Future.delayed(const Duration(milliseconds: 500), () {
+    Future.delayed(const Duration(milliseconds: 600), () {
       if (mounted) setState(() => _epAnBanPhimAoKhiGiuFocus = false);
     });
   }

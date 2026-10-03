@@ -1545,7 +1545,12 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      if (_hienNutMicNoiChat)
+                      // (YÊU CẦU MỚI) Mục "Micro (vừa nói vừa ra chữ)" trong
+                      // nút "+" mờ xám (`enabled: !_micDangNghe && !_ghiDangMo`)
+                      // thì nút nổi này cũng phải ẩn đi — bấm vào lúc đó vô
+                      // nghĩa (mic đang nghe rồi, hoặc đang có hộp ghi âm mở).
+                      // Sáng lại ngay khi điều kiện đó hết.
+                      if (_hienNutMicNoiChat && !_micDangNghe && !_ghiDangMo)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Opacity(
