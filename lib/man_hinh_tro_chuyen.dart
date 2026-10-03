@@ -755,6 +755,21 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
             selection: TextSelection.collapsed(offset: batDau + chen.length),
           );
           _micTuDoiONhap = false;
+          // (SỬA LỖI — "nói nhiều từ nhưng chỉ vào được một từ rồi tự
+          // tắt/bật lại ngay") `_khiONhapDoi` tin `_chuChatGanNhat` luôn
+          // đúng bằng `_oNhap.text` NGAY SAU lần đổi chữ gần nhất, bất kể vì
+          // sao chữ đổi (xem chú thích ở đó) — nhưng ở đây mic tự gán
+          // `_oNhap.value` lại KHÔNG cập nhật `_chuChatGanNhat` theo, vẫn để
+          // nó đứng yên ở giá trị CŨ (từ trước khi mic chèn chữ này). Một
+          // thông báo dội lại từ trình duyệt/bàn phím ảo tới SAU, dù chữ
+          // không hề đổi thêm gì nữa, sẽ bị `_khiONhapDoi` so `cuChat` (giá
+          // trị cũ, stale) với `chuMoiChat` (đã có "Xin" mic vừa chèn) ra
+          // KHÁC NHAU — hiểu lầm thành một lượt gõ tay chèn nguyên cụm "Xin"
+          // vào, gọi `_nguoiDungVuaGoChat()`, huỷ ngay phiên đang nghe. Phải
+          // đồng bộ `_chuChatGanNhat` theo `_oNhap.text` ở MỌI nơi tự gán chữ
+          // (y hệt `_apDungTuDongDinhDangChat`/`_ghiLaiVaDatConTroChat` đã
+          // làm cho nhánh gõ tay), không chỉ nhánh đó.
+          _chuChatGanNhat = moi;
           _micChuGanNhat = chen;
           // (SỬA LỖI "micro quay lại sửa chữ đã hiện ra") Một kết quả FINAL
           // (`finalResult == true`) nghĩa là CÂU NÓI hiện tại đã xong — y
@@ -1406,24 +1421,35 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                   // (biểu thị "dừng micro") — bấm vào là đóng mic lại, KHÔNG
                   // gửi tin nhắn; gửi thật vẫn luôn cần Ctrl+Enter/nút Gửi
                   // bình thường sau khi đã tắt mic.
-                  // (YÊU CẦU MỚI) Nút Micro nổi ngay PHÍA TRÊN nút Gửi, lớp
-                  // cao hơn mọi thứ khác (vẽ SAU cùng trong Stack), mờ 50%
-                  // nhưng vẫn bấm được — xem `_hienNutMicNoiChat`.
-                  Stack(
-                    clipBehavior: Clip.none,
+                  // (YÊU CẦU MỚI) Nút Micro nổi ngay PHÍA TRÊN nút Gửi, mờ
+                  // 50% nhưng vẫn bấm được — xem `_hienNutMicNoiChat`.
+                  // (SỬA LỖI — "bấm vào không có tác dụng gì") Trước đây dùng
+                  // `Stack` + `Positioned(bottom: 48, ...)` để nút nổi VƯỢT
+                  // RA NGOÀI khung của nút Gửi — vẽ ra thì đúng (nhìn thấy),
+                  // nhưng KHÔNG bấm được: `RenderBox.hitTest` (bước ĐẦU
+                  // TIÊN `Stack` nhận được từ `Row` cha) chỉ kiểm điểm bấm
+                  // có nằm trong kích thước CỦA CHÍNH Stack đó không — kích
+                  // thước đó co theo đúng nút Gửi (nhỏ hơn hẳn), còn nút nổi
+                  // nằm HOÀN TOÀN NGOÀI vùng đó nên never được hỏi tới, bất
+                  // kể `clipBehavior: Clip.none` (chỉ ảnh hưởng việc VẼ, không
+                  // ảnh hưởng việc TÍNH vùng bấm). Đổi qua `Column` xếp dọc
+                  // thật — kích thước tự bao trọn cả hai nút, không còn phần
+                  // nào "vượt khung" nữa, bấm được bình thường.
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      _micDangNgheThat
-                          ? _NutDungMic(khiBam: _tatMicChat)
-                          : _NutGui(dangGui: _dangGui, khiBam: _guiHoacXacNhanSua),
                       if (_hienNutMicNoiChat)
-                        Positioned(
-                          right: 0,
-                          bottom: 48,
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
                           child: Opacity(
                             opacity: 0.5,
                             child: _NutMicNoiChat(khiBam: _batMicChat),
                           ),
                         ),
+                      _micDangNgheThat
+                          ? _NutDungMic(khiBam: _tatMicChat)
+                          : _NutGui(dangGui: _dangGui, khiBam: _guiHoacXacNhanSua),
                     ],
                   ),
                 ],
