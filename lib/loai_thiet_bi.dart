@@ -15,7 +15,8 @@ extension ThongTinThietBi on ThietBi {
   String get moTa => switch (this) {
         ThietBi.android => 'Điện thoại/máy tính bảng Android.',
         ThietBi.pc => 'Windows, macOS hoặc Linux.',
-        ThietBi.iphone => 'iPhone/iPad — micro tạm thời chưa dùng được.',
+        ThietBi.iphone =>
+          'iPhone/iPad — Micro (vừa nói vừa ra chữ) sẽ không khả dụng trên website.',
       };
 
   IconData get bieuTuong => switch (this) {

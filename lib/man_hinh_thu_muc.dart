@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'kho_du_lieu.dart';
 import 'mau_co_ban.dart';
 import 'mo_hinh.dart';
+import 'modal_thung_rac.dart';
 import 'tai_ve_ghi_chu.dart';
 import 'thong_bao_giua.dart';
 
@@ -127,7 +128,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   /// hệt hiệu ứng tên thư mục ở thanh địa chỉ (`_ChuMucNhayNhay`). Mỗi lần
   /// bấm nút lại tăng [_demLanNhayToiTep] để đổi `key`, hiệu ứng tự chạy lại
   /// dù đang nhảy tới ĐÚNG ghi chú vừa rồi.
-  String? _idGhiChuCanNhayNhay;
+  String? _idMucCanNhayNhay;
   int _demLanNhayToiTep = 0;
 
   void _veTrangSoanThao() => Navigator.of(context).pop();
@@ -139,7 +140,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       _duongDan
         ..clear()
         ..addAll(_duongDanToiThuMuc(thuMucId));
-      _idGhiChuCanNhayNhay = widget.idGhiChuDangMo;
+      _idMucCanNhayNhay = widget.idGhiChuDangMo;
       _demLanNhayToiTep++;
     });
   }
@@ -311,20 +312,16 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     return ketQua;
   }
 
+  /// "Chuyển vào thùng rác" — không hỏi xác nhận gì cả, đưa thẳng vào Thùng
+  /// rác Nội bộ (xem `lib/modal_thung_rac.dart`), khôi phục được trong 30
+  /// ngày.
   Future<void> _xoaThuMuc(ThuMuc t) async {
-    final coNoiDung = _kho.thuMuc.any((x) => x.chaId == t.id) ||
-        _kho.ghiChu.any((x) => x.chaId == t.id);
-    final dongY = await _hoiXoa(
-      ten: t.ten,
-      canhBao: coNoiDung ? ' và toàn bộ nội dung bên trong nó' : '',
-    );
-    if (dongY != true) return;
-    final xoaCaGhiChuDangMo =
+    final coGhiChuDangMoBenTrong =
         _timGhiChuTrongCay(t.id).any((g) => g.id == widget.idGhiChuDangMo);
-    setState(() => _kho.xoaThuMuc(t.id));
+    setState(() => _kho.chuyenThuMucVaoThungRac(t.id));
     await _kho.luu();
-    if (xoaCaGhiChuDangMo && mounted) {
-      _bao('Ghi chú đang mở nằm trong thư mục vừa xoá.');
+    if (coGhiChuDangMoBenTrong && mounted) {
+      _bao('Ghi chú đang mở nằm trong thư mục vừa chuyển vào thùng rác.');
     }
   }
 
@@ -343,37 +340,34 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   }
 
   Future<void> _xoaGhiChu(GhiChuFile g) async {
-    final dongY = await _hoiXoa(ten: g.ten, canhBao: '');
-    if (dongY != true) return;
     final laDangMo = g.id == widget.idGhiChuDangMo;
-    setState(() => _kho.xoaGhiChu(g.id));
+    setState(() => _kho.chuyenGhiChuVaoThungRac(g.id));
     await _kho.luu();
     if (laDangMo && mounted) {
-      _bao('Ghi chú đang mở vừa bị xoá.');
+      _bao('Ghi chú đang mở vừa chuyển vào thùng rác.');
     }
   }
 
-  Future<bool?> _hoiXoa({required String ten, required String canhBao}) {
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.delete_outline, size: 28),
-        title: const Text('Xoá?'),
-        content: Text('Xoá "$ten"$canhBao. Không lấy lại được.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Không'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style:
-                FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
-            child: const Text('Xoá'),
-          ),
-        ],
-      ),
+  /// Mở modal "Thùng rác Bộ nhớ Nội bộ" — xem `lib/modal_thung_rac.dart`.
+  /// Nếu người dùng chọn "Đến vị trí vừa được khôi phục" thì modal trả về
+  /// đúng id mục vừa khôi phục, còn mình nhảy tới đó ngay (dùng lại đúng
+  /// hiệu ứng/luồng của "Vị trí Tệp đang soạn thảo").
+  Future<void> _moThungRac() async {
+    final ketQua = await Navigator.of(context).push<({bool laThuMuc, String id})>(
+      MaterialPageRoute(builder: (_) => ModalThungRac(kho: _kho)),
     );
+    if (ketQua == null || !mounted) return;
+    final thuMucId = ketQua.laThuMuc
+        ? (_kho.timThuMuc(ketQua.id)?.chaId ?? thuMucGoc)
+        : (_kho.timGhiChu(ketQua.id)?.chaId ?? thuMucGoc);
+    setState(() {
+      _thuMucHienTaiId = thuMucId;
+      _duongDan
+        ..clear()
+        ..addAll(_duongDanToiThuMuc(thuMucId));
+      _idMucCanNhayNhay = ketQua.id;
+      _demLanNhayToiTep++;
+    });
   }
 
   void _dat(_LoaiChoDan loai, String id, String ten) {
@@ -578,6 +572,31 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     );
   }
 
+  /// (YÊU CẦU MỚI) Thanh ghim đáy màn hình, chỉ hiện ở gốc Bộ nhớ nội bộ —
+  /// chữ co giãn/tự xuống dòng theo bề ngang màn hình (`Wrap`/`Text` thường
+  /// trong `Padding` co giãn tự nhiên, không cần ép chiều cao cố định).
+  Widget _thanhChuThichBoNhoNoiBo() {
+    final chu = kIsWeb
+        ? 'Bộ nhớ nội bộ này lưu tại trình duyệt web này của thiết bị, '
+            'riêng tư tuyệt đối, nếu xoá Tệp và dữ liệu trang web thì bộ '
+            'nhớ nội bộ này sẽ bị xoá theo'
+        : 'Bộ nhớ nội bộ này lưu tại thiết bị, riêng tư và an toàn.';
+    return Material(
+      color: const Color(0xFFF1F3F4),
+      child: SafeArea(
+        top: false,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Text(
+            chu,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// (YÊU CẦU MỚI) Dòng tên thư mục hiện tại + các nút thêm/sửa — y hệt
   /// `AppBar` cũ (title/leading/actions), chỉ dời vào hẳn trong `body` làm
   /// dòng thứ BA, dưới thanh địa chỉ.
@@ -625,9 +644,12 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                     case 1:
                       _themThuMuc();
                       break;
-                    // 2-5: "Chọn nhiều", "Tải và chia sẻ thư mục này",
-                    // "Thông tin thư mục này", "Thùng rác" — chỗ đặt
-                    // trước, chưa gắn logic gì cả.
+                    case 5:
+                      _moThungRac();
+                      break;
+                    // 2-4: "Chọn nhiều", "Tải và chia sẻ thư mục này",
+                    // "Thông tin thư mục này" — chỗ đặt trước, chưa gắn
+                    // logic gì cả.
                   }
                 },
                 itemBuilder: (ctx) => const [
@@ -637,7 +659,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                   PopupMenuItem(value: 3, child: Text('Tải và chia sẻ thư mục này')),
                   PopupMenuItem(value: 4, child: Text('Thông tin thư mục này')),
                   PopupMenuDivider(),
-                  PopupMenuItem(value: 5, child: Text('Thùng rác')),
+                  PopupMenuItem(value: 5, child: Text('Thùng rác Nội bộ')),
                 ],
               ),
             ],
@@ -694,12 +716,23 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                             // Vàng rực để phân biệt ngay với icon ghi chú
                             // (xám) — liếc mắt là biết đâu là thư mục.
                             leading: Icon(Icons.folder, color: Colors.amber.shade700),
-                            title: Text(
-                              t.ten,
-                              style: t.mau != null
-                                  ? TextStyle(color: Color(t.mau!))
-                                  : null,
-                            ),
+                            // Vừa được khôi phục từ Thùng rác và nhảy tới
+                            // đây — nhấp nháy để thu hút chú ý, dùng lại
+                            // đúng hiệu ứng `_ChuMucNhayNhay`.
+                            title: t.id == _idMucCanNhayNhay
+                                ? _ChuMucNhayNhay(
+                                    key: ValueKey('nhay-tep-$_demLanNhayToiTep'),
+                                    chu: t.ten,
+                                    kieuChu: TextStyle(
+                                      color: t.mau != null ? Color(t.mau!) : null,
+                                    ),
+                                  )
+                                : Text(
+                                    t.ten,
+                                    style: t.mau != null
+                                        ? TextStyle(color: Color(t.mau!))
+                                        : null,
+                                  ),
                             onTap: () => _moThuMuc(t.id),
                             trailing: PopupMenuButton<String>(
                               onSelected: (v) {
@@ -744,7 +777,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                 ),
                                 PopupMenuItem(
                                   value: 'xoa',
-                                  child: Text('Xoá'),
+                                  child: Text('Chuyển vào thùng rác'),
                                 ),
                               ],
                             ),
@@ -756,7 +789,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                             // Tệp đang soạn thảo" — phóng to/thu nhỏ vài lần
                             // để thu hút chú ý, ĐÚNG hệt hiệu ứng tên thư
                             // mục ở thanh địa chỉ (`_ChuMucNhayNhay`).
-                            title: g.id == _idGhiChuCanNhayNhay
+                            title: g.id == _idMucCanNhayNhay
                                 ? _ChuMucNhayNhay(
                                     key: ValueKey('nhay-tep-$_demLanNhayToiTep'),
                                     chu: g.ten,
@@ -823,7 +856,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                 ),
                                 PopupMenuItem(
                                   value: 'xoa',
-                                  child: Text('Xoá'),
+                                  child: Text('Chuyển vào thùng rác'),
                                 ),
                               ],
                             ),
@@ -831,6 +864,11 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                       ],
                     ),
             ),
+            // (YÊU CẦU MỚI) Ghim ở ĐÁY, chỉ hiện đúng tại thư mục gốc của
+            // Bộ nhớ nội bộ — chú thích riêng-tư khác nhau giữa web (lưu
+            // trong trình duyệt, mất khi xoá Tệp và dữ liệu trang web) và
+            // app APK/iOS (lưu thẳng trên máy).
+            if (_thuMucHienTaiId == thuMucGoc) _thanhChuThichBoNhoNoiBo(),
             if (_choDanId != null)
               Material(
                 color: const Color(0xFFE8F0FE),

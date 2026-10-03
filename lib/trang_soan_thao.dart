@@ -4652,36 +4652,19 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
-  /// "Xoá Tệp văn bản này" — hỏi xác nhận, xoá xong nhảy sang một tệp khác
-  /// còn lại trong CÙNG thư mục nếu còn, hoặc tự tạo "Ghi chú N" (hệt tên tự
-  /// gợi ý mặc định) nếu đây là tệp CUỐI CÙNG của thư mục — rồi làm việc
-  /// ngay ở tệp đó, kèm thông báo giữa màn hình.
+  /// "Chuyển vào thùng rác" — KHÔNG hỏi xác nhận (khôi phục được trong 30
+  /// ngày qua Thùng rác Nội bộ ở cây thư mục, xem `lib/modal_thung_rac.dart`
+  /// và `lib/kho_du_lieu.dart`), xong nhảy sang một tệp khác còn lại trong
+  /// CÙNG thư mục nếu còn, hoặc tự tạo "Ghi chú N" (hệt tên tự gợi ý mặc
+  /// định) nếu đây là tệp CUỐI CÙNG của thư mục — rồi làm việc ngay ở tệp
+  /// đó, kèm thông báo giữa màn hình.
   Future<void> _xoaTepHienTaiTuThanhCongCu() async {
-    final dongY = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Xoá tệp văn bản này?'),
-        content: Text('Ghi chú "${_ghiChuHienTai.ten}" sẽ bị xoá VĨNH VIỄN, '
-            'không thể phục hồi lại được. Bạn có chắc chắn muốn xoá không?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Không, giữ lại'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text('Xoá', style: TextStyle(color: Colors.red.shade600)),
-          ),
-        ],
-      ),
-    );
-    if (dongY != true || !mounted) return;
-
     final chaId = _ghiChuHienTai.chaId;
     final idVuaXoa = _ghiChuHienTai.id;
-    widget.kho.xoaGhiChu(idVuaXoa);
+    widget.kho.chuyenGhiChuVaoThungRac(idVuaXoa);
     // Dọn luôn bộ nhớ đệm Lùi lại/Tiến tới của tệp vừa xoá — tệp không còn
-    // tồn tại nữa thì giữ lại mốc cũ trong Map chỉ tổ chiếm bộ nhớ vô ích.
+    // hiện ra ở cây thư mục nữa thì giữ lại mốc cũ trong Map chỉ tổ chiếm
+    // bộ nhớ vô ích.
     _lichSuLuiTheoTep.remove(idVuaXoa);
     _lichSuToiTheoTep.remove(idVuaXoa);
     _thuTuMoTepGanDay.remove(idVuaXoa);
@@ -4693,7 +4676,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (!mounted) return;
     _moGhiChu(ke.id);
     if (laTuDongTao) {
-      _bao('Đã xoá tệp — đang ở trong tệp "${ke.ten}" do hệ thống tự tạo.');
+      _bao('Đã chuyển vào thùng rác — đang ở trong tệp "${ke.ten}" do hệ '
+          'thống tự tạo.');
     } else {
       _baoDangOTrongTep(ke.ten);
     }
@@ -13666,7 +13650,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         },
         itemBuilder: (ctx) => const [
           PopupMenuItem(value: 'taoMoi', child: Text('Tạo Tệp văn bản mới')),
-          PopupMenuItem(value: 'xoa', child: Text('Xoá Tệp văn bản này')),
+          PopupMenuItem(value: 'xoa', child: Text('Chuyển vào thùng rác')),
           PopupMenuItem(value: 'mau', child: Text('Chọn màu Tên Tệp')),
         ],
         child: Container(

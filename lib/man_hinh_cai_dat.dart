@@ -501,7 +501,8 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Chọn thiết bị',
+                    'Chọn thiết bị - Micro (vừa nói vừa ra chữ) sẽ hoạt động '
+                    'ổn định với Đúng thiết bị đang chọn',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),

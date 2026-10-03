@@ -62,11 +62,18 @@ class KhoDuLieu {
       for (final g in (j['ghiChu'] as List<dynamic>? ?? const [])) {
         ghiChu.add(GhiChuFile.fromJson(g as Map<String, dynamic>));
       }
+      // (THÙNG RÁC) Quét dọn các mục quá hạn 30 ngày ngay lúc nạp — xem chú
+      // thích ở `donDepThungRacQuaHan`.
+      if (donDepThungRacQuaHan()) await luu();
+
       final dangMo = kho.getString(_khoaGhiChuDangMo);
-      if (dangMo != null && timGhiChu(dangMo) != null) return dangMo;
-      // Ghi chú lần trước mở đã bị xoá — mở tạm ghi chú đầu tiên tìm thấy,
-      // không có cái nào thì tạo mới.
-      if (ghiChu.isNotEmpty) return ghiChu.first.id;
+      if (dangMo != null && timGhiChu(dangMo)?.thoiGianXoa == null) {
+        return dangMo;
+      }
+      // Ghi chú lần trước mở đã bị xoá/chuyển vào thùng rác — mở tạm ghi chú
+      // ĐANG HOẠT ĐỘNG đầu tiên tìm thấy, không có cái nào thì tạo mới.
+      final conHoatDong = ghiChu.where((g) => g.thoiGianXoa == null);
+      if (conHoatDong.isNotEmpty) return conHoatDong.first.id;
       final moi = taoGhiChuMoi(thuMucGoc);
       await luu();
       return moi.id;
@@ -118,9 +125,15 @@ class KhoDuLieu {
   ({List<ThuMuc> thuMucCon, List<GhiChuFile> ghiChuCon}) noiDungThuMuc(
     String chaId,
   ) {
-    final tm = thuMuc.where((t) => t.chaId == chaId).toList()
+    // (THÙNG RÁC) Mục đang nằm trong thùng rác (`thoiGianXoa != null`)
+    // KHÔNG hiện ra ở đây dù `chaId` vẫn còn giữ nguyên vị trí cũ.
+    final tm = thuMuc
+        .where((t) => t.chaId == chaId && t.thoiGianXoa == null)
+        .toList()
       ..sort((a, b) => a.ten.toLowerCase().compareTo(b.ten.toLowerCase()));
-    final gc = ghiChu.where((g) => g.chaId == chaId).toList()
+    final gc = ghiChu
+        .where((g) => g.chaId == chaId && g.thoiGianXoa == null)
+        .toList()
       ..sort((a, b) => a.ten.toLowerCase().compareTo(b.ten.toLowerCase()));
     return (thuMucCon: tm, ghiChuCon: gc);
   }
@@ -135,6 +148,7 @@ class KhoDuLieu {
     final tmTrung = thuMuc.any(
       (t) =>
           t.chaId == chaId &&
+          t.thoiGianXoa == null &&
           t.id != boQuaIdThuMuc &&
           t.ten.toLowerCase() == trung,
     );
@@ -142,6 +156,7 @@ class KhoDuLieu {
     return ghiChu.any(
       (g) =>
           g.chaId == chaId &&
+          g.thoiGianXoa == null &&
           g.id != boQuaIdGhiChu &&
           g.ten.toLowerCase() == trung,
     );
@@ -288,13 +303,16 @@ class KhoDuLieu {
     g.capNhat = DateTime.now();
   }
 
-  // ------------------------------------------------------------------ xoá
+  // ------------------------------------------------------------ xoá vĩnh viễn
 
+  /// Xoá THẬT, không qua thùng rác — chỉ dùng cho "Xoá vĩnh viễn" trong
+  /// Thùng rác và cho việc tự dọn mục quá hạn 30 ngày.
   void xoaGhiChu(String id) {
     ghiChu.removeWhere((g) => g.id == id);
   }
 
-  /// Xoá cả thư mục con và ghi chú bên trong, đệ quy.
+  /// Xoá THẬT cả thư mục con và ghi chú bên trong, đệ quy — cùng vai trò với
+  /// `xoaGhiChu` ở trên, không qua thùng rác.
   void xoaThuMuc(String id) {
     final conThuMuc =
         thuMuc.where((t) => t.chaId == id).map((t) => t.id).toList();
@@ -303,6 +321,99 @@ class KhoDuLieu {
     }
     ghiChu.removeWhere((g) => g.chaId == id);
     thuMuc.removeWhere((t) => t.id == id);
+  }
+
+  // --------------------------------------------------------- thùng rác nội bộ
+
+  /// "Chuyển vào thùng rác" — không hỏi xác nhận, không xoá thật, chỉ đánh
+  /// dấu thời điểm. Thư mục con/ghi chú bên trong KHÔNG bị đánh dấu theo —
+  /// chúng vẫn giữ nguyên `chaId` cũ, chỉ là không còn đường nào lần tới
+  /// (thư mục chứa chúng đang ẩn) cho tới khi thư mục này được khôi phục.
+  void chuyenThuMucVaoThungRac(String id) {
+    final t = timThuMuc(id);
+    if (t == null) return;
+    t.thoiGianXoa = DateTime.now();
+  }
+
+  void chuyenGhiChuVaoThungRac(String id) {
+    final g = timGhiChu(id);
+    if (g == null) return;
+    g.thoiGianXoa = DateTime.now();
+  }
+
+  /// Toàn bộ mục đang nằm trong thùng rác (thư mục lẫn ghi chú), mới xoá
+  /// nhất xếp trước — dùng để vẽ modal "Thùng rác Bộ nhớ Nội bộ".
+  List<({bool laThuMuc, String id, String ten, int? mau, DateTime thoiGianXoa})>
+      get mucTrongThungRac {
+    final ds = <({bool laThuMuc, String id, String ten, int? mau, DateTime thoiGianXoa})>[];
+    for (final t in thuMuc) {
+      if (t.thoiGianXoa != null) {
+        ds.add((laThuMuc: true, id: t.id, ten: t.ten, mau: t.mau, thoiGianXoa: t.thoiGianXoa!));
+      }
+    }
+    for (final g in ghiChu) {
+      if (g.thoiGianXoa != null) {
+        ds.add((laThuMuc: false, id: g.id, ten: g.ten, mau: g.mau, thoiGianXoa: g.thoiGianXoa!));
+      }
+    }
+    ds.sort((a, b) => b.thoiGianXoa.compareTo(a.thoiGianXoa));
+    return ds;
+  }
+
+  /// true nếu [chaId] còn là một chỗ đứng hợp lệ để khôi phục về — gốc luôn
+  /// hợp lệ; một thư mục thật thì phải còn tồn tại VÀ không tự nó cũng đang
+  /// nằm trong thùng rác.
+  bool _choDungHopLe(String chaId) {
+    if (chaId == thuMucGoc) return true;
+    final t = timThuMuc(chaId);
+    return t != null && t.thoiGianXoa == null;
+  }
+
+  /// Khôi phục một thư mục từ thùng rác về đúng vị trí cũ — hết chỗ cũ (đã
+  /// bị xoá mất) thì về thẳng gốc Bộ nhớ nội bộ. Đổi tên tự động nếu đụng
+  /// trùng tên ngay tại nơi về. Trả về id thư mục cha THẬT SỰ đã về (để màn
+  /// hình nhảy tới đúng chỗ).
+  String khoiPhucThuMuc(String id) {
+    final t = timThuMuc(id)!;
+    final noiVe = _choDungHopLe(t.chaId) ? t.chaId : thuMucGoc;
+    t.chaId = noiVe;
+    t.ten = tenKhongTrung(t.ten, noiVe, boQuaIdThuMuc: id);
+    t.thoiGianXoa = null;
+    return noiVe;
+  }
+
+  String khoiPhucGhiChu(String id) {
+    final g = timGhiChu(id)!;
+    final noiVe = _choDungHopLe(g.chaId) ? g.chaId : thuMucGoc;
+    g.chaId = noiVe;
+    g.ten = tenKhongTrung(g.ten, noiVe, boQuaIdGhiChu: id);
+    g.thoiGianXoa = null;
+    return noiVe;
+  }
+
+  /// Số ngày một mục được giữ trong thùng rác trước khi tự xoá vĩnh viễn.
+  static const soNgayGiuTrongThungRac = 30;
+
+  /// Quét thùng rác, xoá vĩnh viễn mọi mục quá hạn — gọi một lần mỗi khi
+  /// nạp app/trang (xem `tai()`), đủ để thùng rác không phình to mãi mà
+  /// không cần quét liên tục tốn tài nguyên lúc app đang chạy. Trả về true
+  /// nếu có xoá gì (để `tai()` biết cần `luu()` lại).
+  bool donDepThungRacQuaHan() {
+    final han = DateTime.now().subtract(const Duration(days: soNgayGiuTrongThungRac));
+    var coXoa = false;
+    for (final t in thuMuc.where((t) => t.thoiGianXoa != null).toList()) {
+      if (t.thoiGianXoa!.isBefore(han)) {
+        xoaThuMuc(t.id);
+        coXoa = true;
+      }
+    }
+    for (final g in ghiChu.where((g) => g.thoiGianXoa != null).toList()) {
+      if (g.thoiGianXoa!.isBefore(han)) {
+        xoaGhiChu(g.id);
+        coXoa = true;
+      }
+    }
+    return coXoa;
   }
 
   // ------------------------------------------------------------ di chuyển
