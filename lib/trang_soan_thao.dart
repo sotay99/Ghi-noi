@@ -4142,6 +4142,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henHetLietPastePhimAo?.cancel();
     _henHetCheDoNhanhChonTatCa?.cancel();
     _henLamMoiOVanBanDeThoatKet?.cancel();
+    _henTatReadOnlyNhanh?.cancel();
     _dangXuLyEntry?.remove();
     _oKetQuaFileAmThanh?.dispose();
     _oKetQuaToanVan?.dispose();
@@ -5443,39 +5444,51 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || phien != _phienAnBanPhimAo) return;
       _oChu.requestFocus();
-      Future.delayed(const Duration(milliseconds: 60), () {
+    });
+
+    // (SỬA LỖI — nhánh thử nghiệm) Thiết bị đã gắn bàn phím vật lý: không
+    // có gì để "thoát kẹt" cả (xem giải thích đầy đủ ở nhánh dưới) — chỉ
+    // cần trả `readOnly` về bình thường THẬT NHANH sau khi đã yên tay, để
+    // không ảnh hưởng gì tới việc gõ tiếp bằng bàn phím vật lý. Debounce
+    // riêng, ngắn (60ms, y hệt con số gốc trước khi sửa) — KHÔNG dùng
+    // chung hẹn giờ 450ms của nhánh bàn phím ảo bên dưới, vì nhánh đó còn
+    // phải chờ rồi dựng lại ô soạn thảo, còn ở đây không có gì phải chờ.
+    if (_coBanPhimVatLy) {
+      _henTatReadOnlyNhanh?.cancel();
+      _henTatReadOnlyNhanh = Timer(const Duration(milliseconds: 60), () {
         if (mounted && phien == _phienAnBanPhimAo) {
           setState(() => _epAnBanPhimAoKhiGiuFocus = false);
         }
       });
-    });
+      return;
+    }
 
-    // (SỬA LỖI v120 — "cứng đầu", vẫn còn kẹt sau v119, cả ở Dán) Debounce
-    // ở trên (v119) chỉ giảm số lần BẬT/TẮT `readOnly` dồn dập, nhưng không
-    // chặn hẳn gốc rễ: dù chỉ một chu kỳ bật/tắt DUY NHẤT, trình duyệt vẫn
-    // có lúc làm "liệt" hẳn khả năng gắn lại bàn phím ảo cho ĐÚNG phần tử
-    // DOM ẩn mà Flutter Web dùng để đồng bộ — mỗi lần F5 lại "sống" được vì
-    // trang tải lại dựng phần tử DOM đó từ đầu. Thay vì tiếp tục vá
-    // readOnly, giả lập ĐÚNG hiệu ứng "dựng lại từ đầu" đó nhưng CHỈ cho
-    // riêng ô soạn thảo, không mất chữ: đổi `_oVanBanKey` sang một
-    // `GlobalKey` MỚI khiến Flutter coi `TextField` là một widget HOÀN
-    // TOÀN KHÁC ở lần build kế tiếp — huỷ hẳn Element/RenderEditable/kết
-    // nối bàn phím ảo CŨ (đang nghi bị "liệt") rồi dựng lại một kết nối
-    // MỚI từ đầu, trong khi `_boDieuKhien` (nội dung) và `_oChu` (FocusNode)
-    // vẫn giữ nguyên nên không mất chữ/không mất tiêu điểm.
+    // (SỬA LỖI v120 — "cứng đầu", vẫn còn kẹt sau v119, cả ở Dán) Bật/tắt
+    // `readOnly` liên tục, dồn dập có lúc làm trình duyệt (web) đánh mất
+    // hẳn khả năng tự bật lại bàn phím ảo cho ĐÚNG phần tử DOM ẩn mà
+    // Flutter Web dùng để đồng bộ — mỗi lần F5 lại "sống" được vì trang tải
+    // lại dựng phần tử DOM đó từ đầu. Giả lập ĐÚNG hiệu ứng "dựng lại từ
+    // đầu" đó nhưng CHỈ cho riêng ô soạn thảo, không mất chữ: đổi
+    // `_oVanBanKey` sang một `GlobalKey` MỚI khiến Flutter coi `TextField`
+    // là một widget HOÀN TOÀN KHÁC ở lần build kế tiếp — huỷ hẳn
+    // Element/RenderEditable/kết nối bàn phím ảo CŨ (đang nghi bị "liệt")
+    // rồi dựng lại một kết nối MỚI từ đầu, trong khi `_boDieuKhien` (nội
+    // dung) và `_oChu` (FocusNode) vẫn giữ nguyên nên không mất chữ/không
+    // mất tiêu điểm. Xem thêm bước dọn kết nối cấp thấp ở
+    // `_lamMoiOVanBanDeThoatKetBanPhimAo`.
     //
-    // (SỬA LỖI — nhánh thử nghiệm) Thiết bị đã gắn bàn phím vật lý (xem
-    // `_coBanPhimVatLy`) thì KHÔNG dựng lại ô soạn thảo nữa — bàn phím ảo
-    // trên màn hình hầu như luôn ẨN trên thiết bị này dù người dùng có
-    // đang gõ hay không (nó không cần tới bàn phím ảo), nên phép đo
-    // `viewInsets.bottom` không còn đáng tin, và cái lỗi "kẹt bàn phím ảo"
-    // mà việc dựng lại này sinh ra để né CŨNG KHÔNG THỂ xảy ra ở đây (có
-    // triệu hồi bàn phím ảo bao giờ đâu mà kẹt). Dựng lại trong tình huống
-    // này chỉ còn lại tác dụng phụ: cắt đứt tạm thời kết nối nhận phím vật
-    // lý, đúng lúc người dùng có thể vẫn đang gõ — bỏ hẳn, không chỉ rút
-    // ngắn thời gian chờ.
-    if (_coBanPhimVatLy) return;
-
+    // (SỬA LỖI — nhánh thử nghiệm, phát hiện thêm) `readOnly` ở trên tắt
+    // lại sau đúng 60ms kể từ MỖI lần bấm — nếu người dùng bấm liên tiếp
+    // cách nhau CHẬM hơn 60ms nhưng vẫn khá nhanh (vài trăm ms, kiểu bấm
+    // dồn dập bằng tay), `readOnly` sẽ kịp tắt rồi bật lại NHIỀU LẦN, mỗi
+    // lần là một chu kỳ bật/tắt THẬT — đúng kiểu hành vi mà chính ghi chú
+    // v119/v120 ở trên đã cảnh báo có thể làm trình duyệt liệt. Sửa: gộp
+    // việc tắt `readOnly` vào ĐÚNG hẹn giờ yên [_treDungLaiOVanBanMs] bên
+    // dưới — trong suốt một đợt bấm dồn dập, `readOnly` chỉ bật lên MỘT
+    // lần ở đầu đợt, giữ nguyên `true` liên tục, và chỉ tắt lại khi hẹn
+    // giờ đó thật sự chạy (nghĩa là người dùng đã yên tay đủ lâu) — không
+    // còn nháy giữa chừng nữa.
+    //
     // Chỉ làm việc này SAU một khoảng yên (không phải ngay lập tức — tránh
     // dựng lại giữa lúc người dùng còn đang bấm dồn dập các nút khác), và
     // CHỈ khi lúc đó bàn phím ảo VẪN đang ẩn thật (đọc lại `viewInsets.bottom`
@@ -5503,10 +5516,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _dangXuLyEntry?.remove();
       _dangXuLyEntry = null;
       if (!mounted || phien != _phienAnBanPhimAo) return;
+      if (mounted) setState(() => _epAnBanPhimAoKhiGiuFocus = false);
       if (MediaQuery.of(context).viewInsets.bottom > 0) return;
       _lamMoiOVanBanDeThoatKetBanPhimAo();
     });
   }
+
+  /// Debounce riêng, ngắn, cho việc trả `readOnly` về bình thường trên
+  /// thiết bị có bàn phím vật lý — xem `_giuTieuDiemKhongBatBanPhimAo`.
+  Timer? _henTatReadOnlyNhanh;
 
   /// Khoảng yên trước khi dựng lại ô soạn thảo để thoát kẹt bàn phím ảo —
   /// xem giải thích ở `_giuTieuDiemKhongBatBanPhimAo`.
@@ -5529,9 +5547,21 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// NGAY TRƯỚC khi đổi key, rồi trả lại đúng chỗ đó ở khung hình kế tiếp
   /// (sau khi `Scrollable` mới đã gắn xong) — không đụng gì tới mục đích
   /// ban đầu của việc đổi key (thoát kẹt kết nối bàn phím ảo).
+  ///
+  /// (SỬA LỖI — nhánh thử nghiệm, "mức 2") Đổi `GlobalKey` chỉ dọn lại
+  /// Element/RenderEditable ở tầng Flutter — nếu chỗ "liệt" thật ra nằm sâu
+  /// hơn, ở tầng kết nối giữa engine và bàn phím ảo của hệ thống (cái mà
+  /// `SystemChannels.textInput` quản lý), đổi key không chắc chạm tới
+  /// được. Gọi thẳng `TextInput.clearClient` TRƯỚC khi đổi key — lệnh cấp
+  /// thấp này buộc engine "quên" hẳn mọi client đang gắn (kể cả một client
+  /// cũ đang nghi bị liệt), cho `TextField` mới dựng lên một kết nối HOÀN
+  /// TOÀN MỚI thay vì có thể lỡ thừa hưởng lại đúng cái đang hỏng. Không
+  /// mất chữ/tiêu điểm — đây là lệnh dọn đường ống, không đụng gì tới nội
+  /// dung hay `FocusNode`.
   void _lamMoiOVanBanDeThoatKetBanPhimAo() {
     if (!mounted) return;
     final cuonCu = _cuonVanBan.hasClients ? _cuonVanBan.offset : null;
+    SystemChannels.textInput.invokeMethod<void>('TextInput.clearClient');
     setState(() => _oVanBanKey = GlobalKey());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
