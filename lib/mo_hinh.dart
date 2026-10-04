@@ -24,6 +24,21 @@ class NutZip {
   bool get laThuMuc => noiDung == null;
 }
 
+/// Một "nguồn" đã đọc xong, SẴN SÀNG hiện trong `ModalNhapZip` — một tệp
+/// .txt rời (đúng 1 `NutZip.tep`) hoặc một tệp .zip (có thể nhiều mục ở
+/// gốc). [tenNguon] là tên tệp GỐC (zip hay txt) — hiện ở modal để phân
+/// biệt nhiều tệp zip với nhau khi nhập nhiều tệp cùng lúc.
+class NguonNhap {
+  NguonNhap.tepTxtRoi(this.tenNguon, NutZip tep)
+      : laZip = false,
+        goc = [tep];
+  NguonNhap.zip(this.tenNguon, this.goc) : laZip = true;
+
+  final String tenNguon;
+  final bool laZip;
+  final List<NutZip> goc;
+}
+
 class ThuMuc {
   ThuMuc({
     required this.id,

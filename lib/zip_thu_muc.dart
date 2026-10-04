@@ -11,6 +11,11 @@ import 'package:archive/archive.dart';
 import 'kho_du_lieu.dart';
 import 'mo_hinh.dart';
 
+/// Tệp .txt nặng hơn mức này (dù đọc rời hay đọc được từ trong .zip) làm
+/// app giật/lag khi mở — coi như KHÔNG hợp lệ, cùng cách xử lý với mọi
+/// định dạng khác không phải .txt.
+const gioiHanTxtByte = 2 * 1024 * 1024;
+
 /// Nén nguyên THƯ MỤC làm gốc trong archive (không nén trần nội dung ra
 /// ngay gốc) — giải nén ra là thấy ngay một thư mục tên [tenGoc], không lẫn
 /// vào các tệp khác đang có sẵn ở nơi giải nén.
@@ -57,14 +62,23 @@ List<NutZip> _dungThanhCay(_NoiTam nut) {
 /// (không cần một bước "tỉa" riêng — chỉ dựng Map từ đường dẫn của mỗi .txt
 /// tìm thấy).
 ///
-/// Ném lỗi nếu [bytes] không phải một .zip đọc được.
-List<NutZip> phanTichZip(Uint8List bytes) {
+/// Ném lỗi nếu [bytes] không phải một .zip đọc được. `coTepQuaNang` là
+/// true nếu có ít nhất 1 tệp .txt bị bỏ qua vì nặng hơn `gioiHanTxtByte`
+/// (coi như không hợp lệ, giống mọi định dạng khác) — modal xem trước
+/// dùng cờ này để ghi chú thêm cho người dùng biết.
+({List<NutZip> cay, bool coTepQuaNang}) phanTichZip(Uint8List bytes) {
   final archive = ZipDecoder().decodeBytes(bytes);
   final goc = _NoiTam();
+  var coTepQuaNang = false;
 
   for (final f in archive.files) {
     if (!f.isFile) continue;
     if (!f.name.toLowerCase().endsWith('.txt')) continue;
+    final noiDungBytes = f.content as List<int>;
+    if (noiDungBytes.length > gioiHanTxtByte) {
+      coTepQuaNang = true;
+      continue;
+    }
     final phan = f.name.split('/').where((p) => p.isNotEmpty).toList();
     if (phan.isEmpty) continue;
 
@@ -74,9 +88,8 @@ List<NutZip> phanTichZip(Uint8List bytes) {
     }
     final tenTepDayDu = phan.last;
     final ten = tenTepDayDu.substring(0, tenTepDayDu.length - 4);
-    final noiDungBytes = f.content as List<int>;
     hienTai.conTep[ten] = utf8.decode(noiDungBytes, allowMalformed: true);
   }
 
-  return _dungThanhCay(goc);
+  return (cay: _dungThanhCay(goc), coTepQuaNang: coTepQuaNang);
 }

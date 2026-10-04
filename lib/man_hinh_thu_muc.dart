@@ -2,6 +2,7 @@
 // mục và ghi chú. Bấm vào một ghi chú thì trả id của nó về cho trang soạn
 // thảo qua Navigator.pop; đi dạo rồi quay lại tay không thì trả về null.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -67,6 +68,45 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   // đang chờ.
   List<NutZip>? _zipDangChoNhap;
 
+  // (YÊU CẦU MỚI) Mục "vừa dán/nhập/khôi phục" — icon nhấp nháy (hiện/ẩn
+  // mỗi giây) trong 10 giây rồi im lặng hẳn. `static` để sống qua các lần
+  // Navigator.push/pop khác nhau của CHÍNH màn hình này trong một phiên
+  // (giống `_nhoThuMucId`), KHÔNG lưu xuống đĩa — mất khi F5/mở lại app
+  // cũng không sao, chỉ là hiệu ứng thu hút chú ý tạm thời.
+  static final Map<String, DateTime> _thoiDiemMucMoi = {};
+  Timer? _nhipNhayNhay;
+
+  void _danhDauMucMoi(Iterable<String> ids) {
+    if (ids.isEmpty) return;
+    final luc = DateTime.now();
+    for (final id in ids) {
+      _thoiDiemMucMoi[id] = luc;
+    }
+    _dambaoNhipDangChay();
+  }
+
+  void _dambaoNhipDangChay() {
+    if (_nhipNhayNhay != null || _thoiDiemMucMoi.isEmpty) return;
+    _nhipNhayNhay = Timer.periodic(const Duration(seconds: 1), (_) {
+      final luc = DateTime.now();
+      _thoiDiemMucMoi.removeWhere((_, t) => luc.difference(t).inSeconds >= 10);
+      if (_thoiDiemMucMoi.isEmpty) {
+        _nhipNhayNhay?.cancel();
+        _nhipNhayNhay = null;
+      }
+      if (mounted) setState(() {});
+    });
+  }
+
+  /// true nếu icon của [id] nên VẼ RA ở đúng lúc này (nhấp nháy — xen kẽ
+  /// hiện/ẩn mỗi giây trong 10 giây đầu, mục không nằm trong danh sách thì
+  /// luôn vẽ bình thường).
+  bool _hienIconLucNay(String id) {
+    final t = _thoiDiemMucMoi[id];
+    if (t == null) return true;
+    return DateTime.now().difference(t).inSeconds.isEven;
+  }
+
   KhoDuLieu get _kho => widget.kho;
 
   @override
@@ -85,6 +125,9 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       _thuMucHienTaiId = thuMucId;
       _duongDan.addAll(_duongDanToiThuMuc(thuMucId));
     }
+    // Có mục đang nhấp nháy từ lần mở trước (vẫn trong phiên app này) —
+    // tiếp tục đếm nhịp luôn, đừng chờ tới lần `_danhDauMucMoi` kế tiếp.
+    _dambaoNhipDangChay();
   }
 
   @override
@@ -93,6 +136,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     // này) đọc lại đúng ở `initState`.
     _nhoThuMucId = _thuMucHienTaiId;
     _nhoDuongDan = List<String>.from(_duongDan);
+    _nhipNhayNhay?.cancel();
     super.dispose();
   }
 
@@ -364,11 +408,12 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   /// (phải xin quyền lưu trữ nặng nề), nên đi qua màn hình chia sẻ sẵn có của
   /// máy — người dùng chọn "Lưu vào máy"/"Tệp" hoặc gửi thẳng đi nơi khác.
   Future<void> _taiVeGhiChu(GhiChuFile g) async {
+    hienThongBaoGiua(context, 'Đang tải file TXT về thiết bị');
     try {
       final tenTep = '${g.ten.trim().isEmpty ? 'Ghi chú' : g.ten.trim()}.txt';
       await luuVaChiaSeGhiChu(tenTep, g.noiDung, g.ten);
     } catch (_) {
-      _bao('Không xuất được tệp. Thử lại sau.');
+      if (mounted) _bao('Không xuất được tệp. Thử lại sau.');
     }
   }
 
@@ -403,6 +448,10 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       _idMucCanNhayNhay = ketQua.id;
       _demLanNhayToiTep++;
     });
+    // (YÊU CẦU MỚI) Hiệu ứng nhấp nháy icon 10 giây bắt đầu NGAY LÚC bấm
+    // "Đến vị trí vừa được khôi phục" — không phải lúc khôi phục thật ở
+    // modal Thùng rác.
+    _danhDauMucMoi([ketQua.id]);
   }
 
   /// "Tải và chia sẻ thư mục này" — nén nguyên thư mục [id] (và mọi thứ bên
@@ -410,27 +459,29 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   /// chung cho cả dòng tên thư mục ĐANG ĐỨNG (dòng 3) và từng thư mục con
   /// trong danh sách (menu ba chấm riêng của nó).
   Future<void> _taiThuMuc(String id, String ten) async {
+    hienThongBaoGiua(
+      context,
+      'Đang tải file nén Zip về thiết bị, hãy giải nén file Zip để có thể '
+      'sử dụng ở các thiết bị',
+    );
     try {
       final bytes = nenThuMucThanhZip(_kho, id, ten);
       await luuVaChiaSeTep('$ten.zip', bytes, loaiMime: 'application/zip');
     } catch (_) {
-      _bao('Không tạo được tệp nén. Thử lại sau.');
+      if (mounted) _bao('Không tạo được tệp nén. Thử lại sau.');
     }
   }
 
   Future<void> _taiThuMucHienTai() => _taiThuMuc(_thuMucHienTaiId, _tenThuMucHienTai);
 
-  /// "Nhập ZIP hoặc TXT vào đây" — nhận .zip (xem trước cả cây,
-  /// `phanTichZip`) hoặc .txt (một tệp đơn, không cần giải nén gì), đọc
-  /// xong mở `ModalNhapZip` để xem trước rồi mới quyết định đưa vào đâu.
-  ///
-  /// (file_picker 13.x — xem chú thích tương tự ở
-  /// `_chonVaChuyenFileAmThanh` trong `trang_soan_thao.dart`) dùng hàm TĨNH
-  /// `FilePicker.pickFile()`, không còn qua `.platform`/`.pickFiles()`.
+  /// "Nhập ZIP hoặc TXT vào đây" — cho chọn NHIỀU tệp .zip/.txt cùng lúc
+  /// (`FilePicker.pickFiles()`). Đúng 1 tệp .txt (≤2 MB) thì bỏ hẳn modal
+  /// xem trước, đưa thẳng vào thư mục đang đứng; mọi trường hợp khác (1
+  /// .zip, hoặc 2+ tệp bất kỳ loại) đều qua `ModalNhapZip` (nền tím nhạt).
   Future<void> _nhapZip() async {
-    PlatformFile? tep;
+    List<PlatformFile> teps;
     try {
-      tep = await FilePicker.pickFile(
+      teps = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['zip', 'txt'],
       );
@@ -438,64 +489,117 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       _bao('Không mở được hộp thoại chọn tệp: $e');
       return;
     }
-    if (tep == null) return;
-    // Gán qua biến `final` — khúc `tep.name` dùng TRONG closure của
-    // `builder:` ở dưới không được trình biên dịch tự "promote" non-null
-    // từ check `if (tep == null) return;` phía trên (biến gốc là `tep` có
-    // thể gán lại), gán vào biến final mới mới thật sự hết nullable.
-    final tenTepGoc = tep.name;
-    final laTxt = tenTepGoc.toLowerCase().endsWith('.txt');
+    if (teps.isEmpty) return;
 
-    Uint8List bytes;
-    try {
-      bytes = await tep.readAsBytes();
-    } catch (e) {
-      _bao('Không đọc được nội dung tệp vừa chọn: $e');
+    // Đúng 1 tệp .txt — bỏ hẳn modal, đưa thẳng vào thư mục đang đứng.
+    if (teps.length == 1 && teps.single.name.toLowerCase().endsWith('.txt')) {
+      final tep = teps.single;
+      Uint8List bytes;
+      try {
+        bytes = await tep.readAsBytes();
+      } catch (e) {
+        _bao('Không đọc được nội dung tệp vừa chọn: $e');
+        return;
+      }
+      if (bytes.length > gioiHanTxtByte) {
+        if (mounted) {
+          hienThongBaoGiua(context, 'Không cho nhập tệp TXT quá 2 MB');
+        }
+        return;
+      }
+      final ten = tep.name.substring(0, tep.name.length - 4);
+      final noiDung = utf8.decode(bytes, allowMalformed: true);
+      if (!mounted) return;
+      List<String> ids = [];
+      setState(() {
+        ids = _kho.nhapCayZip([NutZip.tep(ten, noiDung)], _thuMucHienTaiId);
+      });
+      _danhDauMucMoi(ids);
+      await _kho.luu();
+      if (mounted) {
+        hienThongBaoGiua(context, 'Đã nhập tệp vào thư mục', ganTren: true);
+      }
       return;
     }
 
-    List<NutZip> cay;
-    if (laTxt) {
-      // Một tệp .txt đơn — không có gì để giải nén, cây chỉ có đúng 1 nút.
-      final ten = tenTepGoc.substring(0, tenTepGoc.length - 4);
-      cay = [NutZip.tep(ten, utf8.decode(bytes, allowMalformed: true))];
-    } else {
+    // Còn lại: đọc hết TỪNG tệp, mỗi .zip thành một "nguồn" riêng (tên gốc
+    // giữ lại để phân biệt), mỗi .txt rời cũng vậy — rồi LUÔN qua modal
+    // xem trước.
+    final nguon = <NguonNhap>[];
+    var coTepQuaNang = false;
+    for (final tep in teps) {
+      Uint8List bytes;
       try {
-        cay = phanTichZip(bytes);
-      } catch (_) {
-        _bao('Tệp nén không hợp lệ.');
-        return;
+        bytes = await tep.readAsBytes();
+      } catch (e) {
+        _bao('Không đọc được "${tep.name}": $e');
+        continue;
       }
+      if (tep.name.toLowerCase().endsWith('.txt')) {
+        if (bytes.length > gioiHanTxtByte) {
+          coTepQuaNang = true;
+          continue;
+        }
+        final ten = tep.name.substring(0, tep.name.length - 4);
+        nguon.add(NguonNhap.tepTxtRoi(
+          tep.name,
+          NutZip.tep(ten, utf8.decode(bytes, allowMalformed: true)),
+        ));
+      } else {
+        try {
+          final ketQua = phanTichZip(bytes);
+          if (ketQua.coTepQuaNang) coTepQuaNang = true;
+          nguon.add(NguonNhap.zip(tep.name, ketQua.cay));
+        } catch (_) {
+          _bao('Tệp "${tep.name}" không phải .zip hợp lệ, đã bỏ qua.');
+        }
+      }
+    }
+    if (nguon.isEmpty) {
+      if (coTepQuaNang && mounted) {
+        hienThongBaoGiua(
+          context,
+          'Không có tệp hợp lệ để nhập — tệp TXT quá 2 MB đã bị bỏ qua',
+        );
+      }
+      return;
     }
     if (!mounted) return;
 
     final ketQua = await Navigator.of(context).push<KetQuaNhapZip>(
       MaterialPageRoute(
-        builder: (_) => ModalNhapZip(cayGoc: cay, tenTepZip: tenTepGoc),
+        builder: (_) => ModalNhapZip(nguon: nguon, coTepQuaNang: coTepQuaNang),
       ),
     );
     if (ketQua == null || ketQua == KetQuaNhapZip.huy || !mounted) return;
 
+    final tatCaCay = [for (final n in nguon) ...n.goc];
     if (ketQua == KetQuaNhapZip.dayVaoHienTai) {
-      setState(() => _kho.nhapCayZip(cay, _thuMucHienTaiId));
+      List<String> ids = [];
+      setState(() {
+        ids = _kho.nhapCayZip(tatCaCay, _thuMucHienTaiId);
+      });
+      _danhDauMucMoi(ids);
       await _kho.luu();
       if (mounted) {
-        hienThongBaoGiua(context, 'Đã nhập tệp nén vào thư mục', ganTren: true);
+        hienThongBaoGiua(context, 'Đã nhập vào thư mục', ganTren: true);
       }
     } else {
       // chonViTriKhac — chờ người dùng tự đi tìm chỗ, xem thanh ghim đáy
       // "Đưa vào chỗ này" (`_zipDangChoNhap`).
-      setState(() => _zipDangChoNhap = cay);
+      setState(() => _zipDangChoNhap = tatCaCay);
     }
   }
 
   Future<void> _dayZipVaoDay() async {
     final cay = _zipDangChoNhap;
     if (cay == null) return;
+    List<String> ids = [];
     setState(() {
-      _kho.nhapCayZip(cay, _thuMucHienTaiId);
+      ids = _kho.nhapCayZip(cay, _thuMucHienTaiId);
       _zipDangChoNhap = null;
     });
+    _danhDauMucMoi(ids);
     await _kho.luu();
     if (mounted) {
       hienThongBaoGiua(context, 'Đã nhập tệp nén vào thư mục', ganTren: true);
@@ -525,6 +629,10 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
 
   Future<void> _dan() async {
     if (!_coDangChoDan) return;
+    // (YÊU CẦU MỚI) Thu lại id THẬT SỰ nằm ở nơi vừa dán tới — với "Cắt"
+    // là chính id cũ (chỉ đổi `chaId`), với "Sao chép" là id bản SAO MỚI
+    // — để đánh dấu nhấp nháy icon 10 giây (`_danhDauMucMoi`).
+    final idsMoi = <String>[];
     for (final id in _choDanThuMucIds) {
       if (_choDanLaCat) {
         if (id == _thuMucHienTaiId) {
@@ -535,15 +643,17 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
           _bao('Không thể chuyển thư mục vào chính con cháu của nó.');
           continue;
         }
+        idsMoi.add(id);
       } else {
-        _kho.saoChepThuMuc(id, _thuMucHienTaiId);
+        idsMoi.add(_kho.saoChepThuMuc(id, _thuMucHienTaiId).id);
       }
     }
     for (final id in _choDanGhiChuIds) {
       if (_choDanLaCat) {
         _kho.diChuyenGhiChu(id, _thuMucHienTaiId);
+        idsMoi.add(id);
       } else {
-        _kho.saoChepGhiChu(id, _thuMucHienTaiId);
+        idsMoi.add(_kho.saoChepGhiChu(id, _thuMucHienTaiId).id);
       }
     }
 
@@ -551,6 +661,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       _choDanThuMucIds = [];
       _choDanGhiChuIds = [];
     });
+    _danhDauMucMoi(idsMoi);
     await _kho.luu();
   }
 
@@ -899,8 +1010,11 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     final chu = kIsWeb
         ? 'Bộ nhớ nội bộ này lưu tại trình duyệt web này của thiết bị, '
             'riêng tư tuyệt đối, nếu xoá Tệp và dữ liệu trang web thì bộ '
-            'nhớ nội bộ này sẽ bị xoá theo'
-        : 'Bộ nhớ nội bộ này lưu tại thiết bị, riêng tư và an toàn.';
+            'nhớ nội bộ này sẽ bị xoá theo. App tự động lưu file mỗi khi '
+            'có sự thay đổi mà không cần bấm nút lưu file.'
+        : 'Bộ nhớ nội bộ này lưu tại thiết bị, riêng tư và an toàn. App tự '
+            'động lưu file mỗi khi có sự thay đổi mà không cần bấm nút lưu '
+            'file.';
     return Material(
       color: const Color(0xFFF1F3F4),
       child: SafeArea(
@@ -1077,8 +1191,12 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                   )
                                 // Vàng rực để phân biệt ngay với icon ghi
                                 // chú (xám) — liếc mắt là biết đâu là thư
-                                // mục.
-                                : Icon(Icons.folder, color: Colors.amber.shade700),
+                                // mục. Opacity 0/1 mỗi giây trong 10 giây
+                                // đầu nếu vừa dán/nhập/khôi phục tới đây.
+                                : Opacity(
+                                    opacity: _hienIconLucNay(t.id) ? 1 : 0,
+                                    child: Icon(Icons.folder, color: Colors.amber.shade700),
+                                  ),
                             // Vừa được khôi phục từ Thùng rác và nhảy tới
                             // đây — nhấp nháy để thu hút chú ý, dùng lại
                             // đúng hiệu ứng `_ChuMucNhayNhay`.
@@ -1181,7 +1299,10 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                       const Icon(Icons.description_outlined),
                                     ],
                                   )
-                                : const Icon(Icons.description_outlined),
+                                : Opacity(
+                                    opacity: _hienIconLucNay(g.id) ? 1 : 0,
+                                    child: const Icon(Icons.description_outlined),
+                                  ),
                             // (YÊU CẦU MỚI) Vừa nhảy tới đây qua nút "Vị trí
                             // Tệp đang soạn thảo" — phóng to/thu nhỏ vài lần
                             // để thu hút chú ý, ĐÚNG hệt hiệu ứng tên thư

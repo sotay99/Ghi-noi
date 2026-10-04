@@ -499,14 +499,36 @@ class KhoDuLieu {
   /// Đưa một cây đã xem trước (`NutZip`, xem `lib/zip_thu_muc.dart` và
   /// `ModalNhapZip`) vào THẬT trong [chaId] — đệ quy, tự đổi tên kiểu
   /// " (N)" nếu trùng tên với mục đang có, CÙNG cơ chế khôi phục từ Thùng
-  /// rác (`tenKhongTrung`).
-  void nhapCayZip(List<NutZip> cay, String chaId) {
+  /// rác (`tenKhongTrung`). Trả về id các mục ở NGAY TẦNG GỐC của [cay]
+  /// (không đệ quy sâu hơn) — dùng để đánh dấu "vừa nhập xong" (nhấp nháy
+  /// icon 10 giây, xem `man_hinh_thu_muc.dart`).
+  List<String> nhapCayZip(List<NutZip> cay, String chaId) {
+    final idsTangGoc = <String>[];
     for (final nut in cay) {
       final tenAnToan = _tenAnToanTuZip(nut.ten);
       if (nut.laThuMuc) {
         final t = taoThuMucMoi(chaId);
         t.ten = tenKhongTrung(tenAnToan, chaId, boQuaIdThuMuc: t.id);
-        nhapCayZip(nut.con, t.id);
+        _nhapCayZipNoiBo(nut.con, t.id);
+        idsTangGoc.add(t.id);
+      } else {
+        final g = taoGhiChuMoi(chaId, noiDungBanDau: nut.noiDung ?? '');
+        g.ten = tenKhongTrung(tenAnToan, chaId, boQuaIdGhiChu: g.id);
+        idsTangGoc.add(g.id);
+      }
+    }
+    return idsTangGoc;
+  }
+
+  /// Phần đệ quy BÊN TRONG của `nhapCayZip` — không cần thu id vì chỉ
+  /// tầng gốc mới nhấp nháy.
+  void _nhapCayZipNoiBo(List<NutZip> cay, String chaId) {
+    for (final nut in cay) {
+      final tenAnToan = _tenAnToanTuZip(nut.ten);
+      if (nut.laThuMuc) {
+        final t = taoThuMucMoi(chaId);
+        t.ten = tenKhongTrung(tenAnToan, chaId, boQuaIdThuMuc: t.id);
+        _nhapCayZipNoiBo(nut.con, t.id);
       } else {
         final g = taoGhiChuMoi(chaId, noiDungBanDau: nut.noiDung ?? '');
         g.ten = tenKhongTrung(tenAnToan, chaId, boQuaIdGhiChu: g.id);

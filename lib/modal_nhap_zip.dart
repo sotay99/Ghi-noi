@@ -1,8 +1,11 @@
-// Modal xem trước cây thư mục đọc được từ một tệp .zip (chỉ .txt và thư
-// mục chứa .txt, xem `lib/zip_thu_muc.dart`) — cho đi dạo thoải mái bên
-// trong, KHÔNG cho mở xem nội dung tệp nào, rồi chọn: hủy, đưa thẳng vào
-// thư mục đang đứng ở `ManHinhThuMuc`, hoặc để màn hình đó tự đi chọn một
-// thư mục khác (xem `KetQuaNhapZip.chonViTriKhac`).
+// Modal xem trước các "nguồn" đọc được từ .zip/.txt vừa chọn (xem
+// `lib/zip_thu_muc.dart`, `NguonNhap` trong `lib/mo_hinh.dart`) — cho đi
+// dạo thoải mái bên trong (KHÔNG cho mở xem nội dung tệp nào), rồi chọn:
+// hủy, đưa thẳng vào thư mục đang đứng ở `ManHinhThuMuc`, hoặc để màn
+// hình đó tự đi chọn một thư mục khác (`KetQuaNhapZip.chonViTriKhac`).
+//
+// Nền TÍM NHẠT (tiêu đề + nội dung) — chỉ để phân biệt với các màn hình
+// khác, không mang ý nghĩa gì khác.
 
 import 'package:flutter/material.dart';
 
@@ -10,11 +13,22 @@ import 'mo_hinh.dart';
 
 enum KetQuaNhapZip { huy, dayVaoHienTai, chonViTriKhac }
 
-class ModalNhapZip extends StatefulWidget {
-  const ModalNhapZip({super.key, required this.cayGoc, required this.tenTepZip});
+/// Nền/tiêu đề tím nhạt dùng chung cho cả modal này.
+const _mauTimNhat = Color(0xFFF3E8FD);
+const _mauTimDam = Color(0xFF6B21A8);
 
-  final List<NutZip> cayGoc;
-  final String tenTepZip;
+class ModalNhapZip extends StatefulWidget {
+  const ModalNhapZip({
+    super.key,
+    required this.nguon,
+    this.coTepQuaNang = false,
+  });
+
+  final List<NguonNhap> nguon;
+
+  /// true nếu có ít nhất 1 tệp .txt (rời hoặc trong .zip) đã bị bỏ qua vì
+  /// nặng hơn `gioiHanTxtByte` — hiện thêm một dòng chú thích.
+  final bool coTepQuaNang;
 
   @override
   State<ModalNhapZip> createState() => _ModalNhapZipState();
@@ -22,13 +36,19 @@ class ModalNhapZip extends StatefulWidget {
 
 class _ModalNhapZipState extends State<ModalNhapZip> {
   final List<String> _tenDuongDan = [];
-  final List<List<NutZip>> _nganXep = [];
-  late List<NutZip> _hienTai;
+  // `null` ở cuối ngăn xếp nghĩa là "quay lại màn hình gốc" (danh sách
+  // gộp nhiều nguồn) — không thể gói trực tiếp một `List<NutZip>` cho
+  // trường hợp đó vì màn gốc không phải một cây duy nhất.
+  final List<List<NutZip>?> _nganXep = [];
+  List<NutZip>? _hienTai; // null = đang ở màn gốc.
 
-  @override
-  void initState() {
-    super.initState();
-    _hienTai = widget.cayGoc;
+  bool get _oGoc => _hienTai == null;
+
+  String get _tieuDeGoc {
+    if (widget.nguon.length == 1 && widget.nguon.single.laZip) {
+      return widget.nguon.single.tenNguon;
+    }
+    return 'Các tệp tin và thư mục chuẩn bị nhập vào app';
   }
 
   void _vaoThuMuc(NutZip n) {
@@ -48,6 +68,67 @@ class _ModalNhapZipState extends State<ModalNhapZip> {
     return true;
   }
 
+  Widget _dongMuc(NutZip n) {
+    return ListTile(
+      leading: Icon(
+        n.laThuMuc ? Icons.folder : Icons.description_outlined,
+        color: n.laThuMuc ? Colors.amber.shade700 : null,
+      ),
+      title: Text(n.ten),
+      // Chỉ cho đi dạo giữa các thư mục — không có gì khác để bấm vào
+      // trên một tệp.
+      onTap: n.laThuMuc ? () => _vaoThuMuc(n) : null,
+    );
+  }
+
+  Widget _danhSachGoc() {
+    final tepTxtRieng = <NutZip>[];
+    final nhomZip = <NguonNhap>[];
+    for (final ng in widget.nguon) {
+      if (ng.laZip) {
+        nhomZip.add(ng);
+      } else {
+        tepTxtRieng.addAll(ng.goc);
+      }
+    }
+
+    return ListView(
+      children: [
+        if (tepTxtRieng.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Text(
+              'Tệp TXT riêng lẻ',
+              style: TextStyle(fontWeight: FontWeight.bold, color: _mauTimDam),
+            ),
+          ),
+          for (final n in tepTxtRieng) _dongMuc(n),
+          const Divider(height: 1),
+        ],
+        for (final nhom in nhomZip) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Text(
+              nhom.tenNguon,
+              style: const TextStyle(fontWeight: FontWeight.bold, color: _mauTimDam),
+            ),
+          ),
+          if (nhom.goc.isEmpty)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                'Không có tệp .txt hợp lệ nào trong tệp nén này.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF9AA0A6)),
+              ),
+            )
+          else
+            for (final n in nhom.goc) _dongMuc(n),
+          const Divider(height: 1),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -56,8 +137,11 @@ class _ModalNhapZipState extends State<ModalNhapZip> {
         if (!daThoat) _veCha();
       },
       child: Scaffold(
+        backgroundColor: _mauTimNhat,
         appBar: AppBar(
-          title: Text(_tenDuongDan.isEmpty ? widget.tenTepZip : _tenDuongDan.last),
+          backgroundColor: _mauTimNhat,
+          foregroundColor: _mauTimDam,
+          title: Text(_oGoc ? _tieuDeGoc : _tenDuongDan.last),
           leading: _tenDuongDan.isEmpty
               ? IconButton(
                   icon: const Icon(Icons.close),
@@ -71,40 +155,45 @@ class _ModalNhapZipState extends State<ModalNhapZip> {
         ),
         body: Column(
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Text(
-                'Chỉ hiện các tệp .txt và thư mục có chứa tệp .txt bên trong '
-                'tệp vừa chọn — tệp/thư mục khác (nếu tải lên .zip) đã được '
-                'ẩn khỏi kết quả.',
-                style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Chỉ hiện các tệp .txt (tối đa 2 MB mỗi tệp) và thư mục '
+                    'có chứa .txt bên trong tệp vừa chọn — tệp/thư mục khác '
+                    'đã được ẩn khỏi kết quả.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+                  ),
+                  if (widget.coTepQuaNang)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Có ít nhất 1 tệp .txt nặng hơn 2 MB đã bị bỏ qua vì '
+                        'dễ làm app giật/lag khi mở.',
+                        style: TextStyle(fontSize: 12, color: _mauTimDam),
+                      ),
+                    ),
+                ],
               ),
             ),
             Expanded(
-              child: _hienTai.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'Thư mục trống',
-                        style: TextStyle(color: Color(0xFF9AA0A6)),
-                      ),
-                    )
-                  : ListView(
-                      children: [
-                        for (final n in _hienTai)
-                          ListTile(
-                            leading: Icon(
-                              n.laThuMuc ? Icons.folder : Icons.description_outlined,
-                              color: n.laThuMuc ? Colors.amber.shade700 : null,
-                            ),
-                            title: Text(n.ten),
-                            // Chỉ cho đi dạo giữa các thư mục — không có gì
-                            // khác để bấm vào trên một tệp.
-                            onTap: n.laThuMuc ? () => _vaoThuMuc(n) : null,
+              child: _oGoc
+                  ? _danhSachGoc()
+                  : _hienTai!.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'Thư mục trống',
+                            style: TextStyle(color: Color(0xFF9AA0A6)),
                           ),
-                      ],
-                    ),
+                        )
+                      : ListView(
+                          children: [for (final n in _hienTai!) _dongMuc(n)],
+                        ),
             ),
             Material(
+              color: _mauTimNhat,
               elevation: 4,
               child: SafeArea(
                 top: false,
