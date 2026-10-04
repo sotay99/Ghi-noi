@@ -1029,12 +1029,22 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
       barrierDismissible: false,
       builder: (ctx) => _KhungGhiAmChat(
         phimTatGhiAm: widget.caiDat.phimTatGhiAm,
+        // (SỬA LỖI) Trước đây LUÔN chèn ở CUỐI văn bản — không biết con
+        // trỏ đang đứng ở đâu. Giờ chèn đúng tại vị trí con trỏ (hoặc đầu
+        // vùng đang chọn, nếu có) — cùng cách tính dấu cách trước khi chèn
+        // với mic "vừa nói vừa ra chữ" ở trên.
         khiCoVanBan: (chu) {
           if (!mounted) return;
           final vb = _oNhap.text;
-          final ghep = vb.isEmpty ? chu : (vb.endsWith(' ') || vb.endsWith('\n') ? '$vb$chu' : '$vb $chu');
-          setState(() => _oNhap.text = ghep);
-          _oNhap.selection = TextSelection.collapsed(offset: _oNhap.text.length);
+          final selection = _oNhap.selection;
+          final viTri = selection.isValid ? selection.start : vb.length;
+          final canDauCachTruoc = viTri > 0 &&
+              vb[viTri - 1] != ' ' &&
+              vb[viTri - 1] != '\n';
+          final phanChen = canDauCachTruoc ? ' $chu' : chu;
+          final moi = vb.replaceRange(viTri, selection.isValid ? selection.end : viTri, phanChen);
+          setState(() => _oNhap.text = moi);
+          _oNhap.selection = TextSelection.collapsed(offset: viTri + phanChen.length);
         },
       ),
     );

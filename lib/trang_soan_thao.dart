@@ -12961,6 +12961,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             onPressed: () => _xacNhanHuyKetQuaToanVan(ctx),
             child: Text('Huỷ', style: TextStyle(color: Colors.red.shade600)),
           ),
+          TextButton(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: _oKetQuaToanVan?.text ?? ''));
+              if (mounted) _bao('Đã sao chép.');
+            },
+            child: const Text('Sao chép tất cả'),
+          ),
           FilledButton(
             onPressed: () {
               final vb = _oKetQuaToanVan?.text ?? '';
@@ -13285,6 +13292,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              TextButton(
+                onPressed: () async {
+                  await Clipboard.setData(
+                    ClipboardData(text: _oKetQuaFileAmThanh?.text ?? ''),
+                  );
+                  if (mounted) _bao('Đã sao chép.');
+                },
+                child: const Text('Sao chép tất cả'),
+              ),
+              const SizedBox(width: 8),
               OutlinedButton(
                 onPressed: () {
                   Navigator.of(ctx).pop();
@@ -13649,11 +13666,31 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               _chonMauTenTepHienTai();
           }
         },
-        itemBuilder: (ctx) => const [
-          PopupMenuItem(value: 'taoMoi', child: Text('Tạo Tệp văn bản mới')),
-          PopupMenuItem(value: 'xoa', child: Text('Chuyển vào thùng rác')),
-          PopupMenuItem(value: 'mau', child: Text('Chọn màu Tên Tệp')),
-        ],
+        itemBuilder: (ctx) {
+          final vb = _boDieuKhien.text;
+          final soTu = vb.trim().isEmpty ? 0 : RegExp(r'\S+').allMatches(vb).length;
+          final soKyTuCoDauCach = vb.length;
+          final soKyTuKhongDauCach = vb.replaceAll(RegExp(r'\s'), '').length;
+          // Đếm "đoạn" ĐÚNG cùng công thức với nhãn "Đoạn số: N" đứng canh
+          // mép trái khi cuộn (`_demSoDoanTaiViTri`) — có tính cả dấu
+          // Enter xuống dòng, nhất quán với trải nghiệm người dùng đã
+          // thấy ở chỗ khác trong app.
+          final soDoan = vb.isEmpty ? 0 : _demSoDoanTaiViTri(vb, vb.length);
+          Widget dongThongTin(String s) => PopupMenuItem(
+                enabled: false,
+                child: Text(s, style: TextStyle(color: Colors.purple.shade700, fontSize: 13)),
+              );
+          return [
+            const PopupMenuItem(value: 'taoMoi', child: Text('Tạo Tệp văn bản mới')),
+            const PopupMenuItem(value: 'xoa', child: Text('Chuyển vào thùng rác')),
+            const PopupMenuItem(value: 'mau', child: Text('Chọn màu Tên Tệp')),
+            const PopupMenuDivider(),
+            dongThongTin('Số từ: $soTu'),
+            dongThongTin('Ký tự (có dấu cách): $soKyTuCoDauCach'),
+            dongThongTin('Ký tự (không dấu cách): $soKyTuKhongDauCach'),
+            dongThongTin('Số đoạn: $soDoan'),
+          ];
+        },
         child: Container(
           width: _canhNutDieuHuongTep,
           height: _canhNutDieuHuongTep,
