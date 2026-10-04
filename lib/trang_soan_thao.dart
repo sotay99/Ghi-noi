@@ -16248,7 +16248,12 @@ class _HopThoaiLichSuBoNhoTam extends StatefulWidget {
 }
 
 class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
-  static const _phimSo = {
+  // KHÔNG được `const` — `LogicalKeyboardKey` không có "primitive equality"
+  // (so sánh qua `==`/`hashCode` ghi đè, không phải định danh identity),
+  // nên dùng làm khoá trong một Map CONST làm trình biên dịch dart2js báo
+  // lỗi "does not have a primitive equality" lúc build Web (`static final`
+  // vẫn tạo map đúng một lần như const, chỉ không ép hằng số lúc biên dịch).
+  static final _phimSo = {
     LogicalKeyboardKey.digit1: 0,
     LogicalKeyboardKey.digit2: 1,
     LogicalKeyboardKey.digit3: 2,
