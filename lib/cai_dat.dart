@@ -56,6 +56,9 @@ class CaiDat {
   static const _khoaPhimTatMicroPhimCtrl = 'ghi_noi_phim_tat_micro_phim_ctrl';
   static const _khoaPhimTatGhiAmLoai = 'ghi_noi_phim_tat_ghi_am_loai';
   static const _khoaPhimTatGhiAmPhimCtrl = 'ghi_noi_phim_tat_ghi_am_phim_ctrl';
+  static const _khoaPhimTatBoNhoTamLoai = 'ghi_noi_phim_tat_bo_nho_tam_loai';
+  static const _khoaPhimTatBoNhoTamPhimCtrl = 'ghi_noi_phim_tat_bo_nho_tam_phim_ctrl';
+  static const _khoaBoNhoTamDanVanBanBat = 'ghi_noi_bo_nho_tam_dan_van_ban_bat';
   static const _khoaThoiGianTuTatMicro = 'ghi_noi_thoi_gian_tu_tat_micro_giay';
   static const _khoaTuDongGuiNgamTheGhiAm = 'ghi_noi_tu_dong_gui_ngam_the_ghi_am';
   static const _khoaNguongTuDongGuiTheGhiAmGiay =
@@ -159,6 +162,18 @@ class CaiDat {
   /// giờ được phép trùng [phimTatMicro] ở BẤT KỲ lựa chọn không tham số
   /// nào (Tab/CtrlDup/ShiftDup) — xem `datPhimTatVaTuHoanDoiNeuTrung`.
   LuaChonPhimTat phimTatGhiAm = const LuaChonPhimTat.tab();
+
+  /// (YÊU CẦU MỚI — nhánh thử nghiệm) Phím tắt ẩn/hiện modal "Bộ nhớ tạm để
+  /// dán văn bản" — cùng bốn kiểu như trên, MẶC ĐỊNH bấm Shift 2 lần. Cùng
+  /// vòng tự hoán đổi với [phimTatMicro]/[phimTatGhiAm] ở BA lựa chọn không
+  /// tham số — xem `TinhNangPhimTat`/`datPhimTatVaTuHoanDoiNeuTrung`.
+  LuaChonPhimTat phimTatBoNhoTam = const LuaChonPhimTat.shiftDup();
+
+  /// Công tắc tổng của "Bộ nhớ tạm để dán văn bản" — mặc định BẬT. Tắt thì
+  /// Cắt/Copy vẫn hoạt động như cũ (ghi vào bộ nhớ đệm hệ thống bình
+  /// thường), chỉ không CÒN GHI THÊM vào lịch sử 10 dòng của app nữa, và
+  /// nút/phím tắt mở bảng lịch sử cũng ẩn/vô hiệu.
+  bool boNhoTamDanVanBanBat = true;
 
   /// Màu chữ/màu nền gần nhất người dùng dùng ở công cụ định dạng thủ công —
   /// nút màu chữ/màu nền trên thanh công cụ và phím tắt Ctrl+Shift+C /
@@ -294,6 +309,11 @@ class CaiDat {
       kho.getString(_khoaPhimTatGhiAmLoai) ?? 'tab',
       kho.getString(_khoaPhimTatGhiAmPhimCtrl),
     );
+    phimTatBoNhoTam = LuaChonPhimTat.tuLuu(
+      kho.getString(_khoaPhimTatBoNhoTamLoai) ?? 'shiftDup',
+      kho.getString(_khoaPhimTatBoNhoTamPhimCtrl),
+    );
+    boNhoTamDanVanBanBat = kho.getBool(_khoaBoNhoTamDanVanBanBat) ?? true;
     thoiGianTuTatMicroGiay =
         (kho.getInt(_khoaThoiGianTuTatMicro) ?? 45).clamp(gioiHanDuoiTuTatMicro, gioiHanTrenTuTatMicro);
     tuDongGuiNgamTheGhiAm = kho.getBool(_khoaTuDongGuiNgamTheGhiAm) ?? true;
@@ -499,36 +519,94 @@ class CaiDat {
     'shiftDup': LuaChonPhimTat.tab(),
   };
 
-  /// Lưu phím tắt MỚI cho Micro (nếu [laMicro]) hoặc Ghi âm (nếu không) —
-  /// và nếu việc này khiến hai chức năng cùng dẫm chân lên nhau ở MỘT
-  /// TRONG BA lựa chọn không tham số (xem `_vongTuDoiPhimTat`), tự đổi
-  /// luôn chức năng CÒN LẠI sang lựa chọn tiếp theo trong vòng để không
-  /// bao giờ trùng nhau. Trả về `true` nếu có xảy ra tự đổi hộ như vậy —
-  /// màn Cài đặt dùng giá trị này để quyết định có hiện thông báo hay
-  /// không.
+  Future<void> datBoNhoTamDanVanBanBat(bool bat) async {
+    boNhoTamDanVanBanBat = bat;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setBool(_khoaBoNhoTamDanVanBanBat, bat);
+  }
+
+  Future<void> _datPhimTatBoNhoTam(LuaChonPhimTat moi) async {
+    phimTatBoNhoTam = moi;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setString(_khoaPhimTatBoNhoTamLoai, moi.loai);
+    if (moi.phim != null) await kho.setString(_khoaPhimTatBoNhoTamPhimCtrl, moi.phim!);
+  }
+
+  LuaChonPhimTat phimTatCuaTinhNang(TinhNangPhimTat t) => switch (t) {
+        TinhNangPhimTat.micro => phimTatMicro,
+        TinhNangPhimTat.ghiAm => phimTatGhiAm,
+        TinhNangPhimTat.boNhoTam => phimTatBoNhoTam,
+      };
+
+  Future<void> _datPhimTatTinhNang(TinhNangPhimTat t, LuaChonPhimTat moi) async {
+    switch (t) {
+      case TinhNangPhimTat.micro:
+        await _datPhimTatMicro(moi);
+      case TinhNangPhimTat.ghiAm:
+        await _datPhimTatGhiAm(moi);
+      case TinhNangPhimTat.boNhoTam:
+        await _datPhimTatBoNhoTam(moi);
+    }
+  }
+
+  /// (YÊU CẦU MỚI — nhánh thử nghiệm) Bản 3 CHIỀU của cơ chế tự đổi hộ —
+  /// giờ có BA chức năng dùng chung bốn kiểu phím tắt (Micro, Ghi âm, Bộ
+  /// nhớ tạm để dán văn bản), không chỉ hai như trước. Lưu phím tắt MỚI
+  /// cho [tinhNang]; nếu nó trùng với MỘT HOẶC CẢ HAI chức năng còn lại ở
+  /// một trong ba lựa chọn không tham số (xem `_vongTuDoiPhimTat`), tự đổi
+  /// hộ (lần theo vòng tròn tới khi tìm được một lựa chọn không đụng chức
+  /// năng thứ ba luôn — tối đa 3 lần thử, đủ cho vòng chỉ có 3 phần tử).
+  /// Trả về map {chức năng bị đổi hộ: phím tắt mới của nó} — rỗng nếu
+  /// không có gì tự đổi.
+  Future<Map<TinhNangPhimTat, LuaChonPhimTat>> datPhimTatTinhNangVaTuHoanDoiNeuTrung({
+    required TinhNangPhimTat tinhNang,
+    required LuaChonPhimTat moi,
+  }) async {
+    final doiHo = <TinhNangPhimTat, LuaChonPhimTat>{};
+    if (_vongTuDoiPhimTat.containsKey(moi.loai)) {
+      for (final khac in TinhNangPhimTat.values) {
+        if (khac == tinhNang) continue;
+        if (!phimTatCuaTinhNang(khac).coBangVoi(moi)) continue;
+        var ungVien = _vongTuDoiPhimTat[moi.loai]!;
+        var vong = 0;
+        bool dungDuoc() {
+          if (doiHo.values.any((v) => v.coBangVoi(ungVien))) return false;
+          for (final t in TinhNangPhimTat.values) {
+            if (t == tinhNang || t == khac) continue;
+            if (phimTatCuaTinhNang(t).coBangVoi(ungVien)) return false;
+          }
+          return true;
+        }
+
+        while (!dungDuoc() && vong < 3) {
+          ungVien = _vongTuDoiPhimTat[ungVien.loai] ?? const LuaChonPhimTat.tab();
+          vong++;
+        }
+        doiHo[khac] = ungVien;
+      }
+    }
+
+    await _datPhimTatTinhNang(tinhNang, moi);
+    for (final e in doiHo.entries) {
+      await _datPhimTatTinhNang(e.key, e.value);
+    }
+    return doiHo;
+  }
+
+  /// Giữ lại API CŨ (bool, chỉ biết Micro/Ghi âm) cho những nơi chưa cần
+  /// biết tới "Bộ nhớ tạm" — bọc quanh bản 3 chiều ở trên. Trả về `true`
+  /// nếu có xảy ra tự đổi hộ ở MỘT TRONG HAI chức năng Micro/Ghi âm (bỏ
+  /// qua trường hợp hiếm chỉ riêng "Bộ nhớ tạm" bị đổi hộ — màn Cài đặt
+  /// Micro/Ghi âm không cần biết, đã có modal riêng của Bộ nhớ tạm tự lo).
   Future<bool> datPhimTatVaTuHoanDoiNeuTrung({
     required bool laMicro,
     required LuaChonPhimTat moi,
   }) async {
-    final hienTaiCuaKia = laMicro ? phimTatGhiAm : phimTatMicro;
-    LuaChonPhimTat? moiCuaKia;
-    if (_vongTuDoiPhimTat.containsKey(moi.loai) && hienTaiCuaKia.coBangVoi(moi)) {
-      moiCuaKia = _vongTuDoiPhimTat[moi.loai];
-    }
-
-    if (laMicro) {
-      await _datPhimTatMicro(moi);
-    } else {
-      await _datPhimTatGhiAm(moi);
-    }
-    if (moiCuaKia != null) {
-      if (laMicro) {
-        await _datPhimTatGhiAm(moiCuaKia);
-      } else {
-        await _datPhimTatMicro(moiCuaKia);
-      }
-    }
-    return moiCuaKia != null;
+    final doiHo = await datPhimTatTinhNangVaTuHoanDoiNeuTrung(
+      tinhNang: laMicro ? TinhNangPhimTat.micro : TinhNangPhimTat.ghiAm,
+      moi: moi,
+    );
+    return doiHo.containsKey(TinhNangPhimTat.micro) || doiHo.containsKey(TinhNangPhimTat.ghiAm);
   }
 
   Future<void> datThoiGianTuTatMicro(int giay) async {

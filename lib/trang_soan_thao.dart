@@ -17,6 +17,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+import 'bo_nho_tam_dan_van_ban.dart';
 import 'cai_dat.dart';
 import 'doan_thiet_bi.dart';
 import 'mo_lien_ket_ngoai.dart';
@@ -42,6 +43,7 @@ import 'loai_thiet_bi.dart';
 import 'lua_chon_phim_tat.dart';
 import 'man_hinh_cai_dat.dart';
 import 'man_hinh_thu_muc.dart';
+import 'modal_bo_nho_tam.dart';
 import 'modal_cai_dat_kiem_tra_toan_van.dart';
 import 'modal_tu_dien_chinh_ta.dart';
 import 'modal_nghe_lai_ghi_am.dart';
@@ -4099,6 +4101,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // phím tắt phải hoạt động kể cả đang gõ dở trong ô văn bản.
     HardwareKeyboard.instance.addHandler(_khiPhimTatMicro);
     HardwareKeyboard.instance.addHandler(_khiPhimTatGhiAm);
+    HardwareKeyboard.instance.addHandler(_khiPhimTatBoNhoTam);
     HardwareKeyboard.instance.addHandler(_khiPhimTatTapDoi);
     HardwareKeyboard.instance.addHandler(_khiPhimTatLuiTien);
     HardwareKeyboard.instance.addHandler(_khiGoPhimBatKyTatChuThich);
@@ -4134,6 +4137,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_khiPhimTatMicro);
     HardwareKeyboard.instance.removeHandler(_khiPhimTatGhiAm);
+    HardwareKeyboard.instance.removeHandler(_khiPhimTatBoNhoTam);
     HardwareKeyboard.instance.removeHandler(_khiPhimTatTapDoi);
     HardwareKeyboard.instance.removeHandler(_khiPhimTatLuiTien);
     HardwareKeyboard.instance.removeHandler(_khiGoPhimBatKyTatChuThich);
@@ -5887,6 +5891,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (!daGhiGiauDinhDang) {
       await Clipboard.setData(ClipboardData(text: doan));
     }
+    // (YÊU CẦU MỚI — nhánh thử nghiệm) "Bộ nhớ tạm để dán văn bản" — thêm
+    // vào lịch sử 10 dòng, KHÔNG thay thế gì ở trên (bộ nhớ đệm hệ thống
+    // vẫn luôn được ghi như cũ).
+    if (widget.caiDat.boNhoTamDanVanBanBat) BoNhoTamDanVanBan.themMoi(doan);
     if (mounted) hienThongBaoGiua(context, 'Đã copy vào bộ nhớ đệm', ganTren: true);
   }
 
@@ -5914,6 +5922,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (!daGhiGiauDinhDang) {
       await Clipboard.setData(ClipboardData(text: doan));
     }
+    if (widget.caiDat.boNhoTamDanVanBanBat) BoNhoTamDanVanBan.themMoi(doan);
     // Cắt LUÔN phải là một mốc Lùi lại/Tiến tới RIÊNG của chính nó — không
     // được gộp chung vào đợt gõ tay đang dở (nếu vừa gõ gì đó trong 5 giây
     // trước). Kết thúc đợt gõ hiện tại TRƯỚC khi áp dụng thay đổi: lượt sửa
@@ -8252,6 +8261,89 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     return true;
   }
 
+  /// (YÊU CẦU MỚI — nhánh thử nghiệm) Bàn phím vật lý bấm đúng phím tắt
+  /// "Bộ nhớ tạm để dán văn bản" (mặc định bấm Shift 2 lần — dò riêng ở
+  /// `_khiHoanTatTapDoiPhimTat`, y hệt Micro/Ghi âm): ẩn/hiện modal lịch
+  /// sử. Không làm gì khi công tắc tổng đang TẮT.
+  bool _khiPhimTatBoNhoTam(KeyEvent event) {
+    if (!mounted || event is! KeyDownEvent) return false;
+    if (!widget.caiDat.boNhoTamDanVanBanBat) return false;
+
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return false;
+
+    if (!_khopPhimTat(widget.caiDat.phimTatBoNhoTam, event)) return false;
+    _bamPhimTatBoNhoTam();
+    return true;
+  }
+
+  /// Ẩn/hiện modal lịch sử "Bộ nhớ tạm" — dùng chung cho cả phím tắt (Tab/
+  /// Ctrl+phím ở trên, và "bấm 2 lần" ở `_khiHoanTatTapDoiPhimTat`) và nút
+  /// toolbar (`_moHopThoaiLichSuBoNhoTam`, bấm nút thì luôn MỞ — chỉ phím
+  /// tắt mới cần "ẩn LẠI nếu đang mở").
+  void _bamPhimTatBoNhoTam() {
+    if (_boNhoTamDangMo) {
+      Navigator.of(context).pop();
+    } else {
+      _moHopThoaiLichSuBoNhoTam();
+    }
+  }
+
+  /// `true` trong lúc modal lịch sử "Bộ nhớ tạm" đang hiện — xem
+  /// `_bamPhimTatBoNhoTam`/`_moHopThoaiLichSuBoNhoTam`.
+  bool _boNhoTamDangMo = false;
+
+  Future<void> _moHopThoaiLichSuBoNhoTam() async {
+    if (!widget.caiDat.boNhoTamDanVanBanBat || _boNhoTamDangMo) return;
+    _boNhoTamDangMo = true;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => _HopThoaiLichSuBoNhoTam(
+        khiChonDong: (i) {
+          final doan = BoNhoTamDanVanBan.lichSu[i];
+          if (doan == null) return;
+          Navigator.of(dialogCtx).pop();
+          _danTuBoNhoTam(doan);
+        },
+      ),
+    );
+    _boNhoTamDangMo = false;
+  }
+
+  /// Dán một dòng từ "Bộ nhớ tạm để dán văn bản" vào đúng vị trí con trỏ —
+  /// y hệt lõi của `_phimAoPaste`, bỏ phần đọc/khôi phục định dạng HTML vì
+  /// lịch sử chỉ lưu CHUỖI THÔ (không kèm gói định dạng).
+  void _danTuBoNhoTam(String chenGoc) {
+    var chen = chenGoc;
+    final chon = _boDieuKhien.selection;
+    if (!chon.isValid) return;
+    final vb = _boDieuKhien.text;
+    final batDau = chon.start, ketThuc = chon.end;
+    final theChongLan = _theGhiAmChongLanMotPhan(batDau, ketThuc);
+    if (theChongLan != null) {
+      _khiCanXoaTheTuBanPhim(theChongLan.$1, theChongLan.$2);
+      return;
+    }
+    final dangBatTuDongThut = widget.caiDat.tuDongThutDauDong;
+    final coTheXoaCachDau = dangBatTuDongThut && batDau > 0 && vb[batDau - 1] == ' ';
+    if (coTheXoaCachDau) {
+      chen = chen.replaceFirst(RegExp(r'^ +'), '');
+      if (chen.isEmpty) return;
+    }
+    _henRanhGioiGoTay?.cancel();
+    _dangTrongDotGoTay = false;
+    if (dangBatTuDongThut) _tamNgungTuDongThutDauDong = true;
+    final moi = vb.replaceRange(batDau, ketThuc, chen);
+    _boDieuKhien.value = TextEditingValue(
+      text: moi,
+      selection: TextSelection.collapsed(offset: batDau + chen.length),
+    );
+    if (dangBatTuDongThut) _tamNgungTuDongThutDauDong = false;
+    _giuFocusOChuSauKhiBam();
+    _cuonToiConTroNeuCan();
+    if (mounted) hienThongBaoGiua(context, 'Đã dán văn bản từ Bộ nhớ tạm', ganTren: true);
+  }
+
   // ---------------------------------------- phím tắt "bấm 2 lần liên tiếp"
 
   /// Bộ dò dùng chung (xem `TheoDoiTapDoiPhim`) — trạng thái riêng của
@@ -8283,6 +8375,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _bamNutMicro();
     } else if (widget.caiDat.phimTatGhiAm.loai == loai) {
       unawaited(_bamNutGhiAmThe());
+    } else if (widget.caiDat.boNhoTamDanVanBanBat && widget.caiDat.phimTatBoNhoTam.loai == loai) {
+      _bamPhimTatBoNhoTam();
     }
   }
 
@@ -13915,6 +14009,20 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           padding: EdgeInsets.zero,
         ),
         if (coDan) _nutDanCongCu(),
+        // (YÊU CẦU MỚI — nhánh thử nghiệm) "Bộ nhớ tạm để dán văn bản" —
+        // chỉ hiện khi công tắc tổng đang BẬT (xem `modal_bo_nho_tam.dart`).
+        // Nằm giữa Dán và "abc" ở màn rộng; giữa "Tiến tới" và "abc" ở màn
+        // hẹp (hàng này không có nút Dán riêng, `coDan: false`) — đúng một
+        // điểm chèn cho cả hai vì cùng một danh sách dùng chung.
+        if (widget.caiDat.boNhoTamDanVanBanBat)
+          IconButton(
+            onPressed: _moHopThoaiLichSuBoNhoTam,
+            icon: const Icon(Icons.content_paste_search, size: 22),
+            tooltip: 'Bộ nhớ tạm để dán văn bản (${widget.caiDat.phimTatBoNhoTam.nhan})',
+            visualDensity: VisualDensity.compact,
+            constraints: _kichThuocNutTren,
+            padding: EdgeInsets.zero,
+          ),
         IconButton(
           onPressed: () => setState(() => _anThanhDinhDang = !_anThanhDinhDang),
           // Emoji "chữ" — các nút khác trong hai thanh này đều dùng
@@ -15114,6 +15222,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   // ngay, không đợi tới lần lưu kế tiếp.
                   if (mounted) _quetTuDienChinhTa();
                 },
+                khiBamBoNhoTam: () async {
+                  await moModalBoNhoTam(context, widget.caiDat);
+                  // Có thể vừa bật/tắt hoặc đổi phím tắt — vẽ lại nút
+                  // toolbar (ẩn/hiện theo công tắc) ngay, không đợi gì cả.
+                  if (mounted) setState(() {});
+                },
                 khiBamHuongDan: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const ManHinhHuongDan()),
                 ),
@@ -16117,4 +16231,136 @@ class _MocVungCanXoa {
 
   final int batDau;
   final int ketThuc;
+}
+
+/// (YÊU CẦU MỚI — nhánh thử nghiệm) Modal lịch sử "Bộ nhớ tạm để dán văn
+/// bản" — 10 dòng (xem `BoNhoTamDanVanBan`), mỗi dòng có "phím N" bên
+/// trái (giống đúng khuôn các hàng trong bảng điều khiển ghi âm). Bấm vào
+/// dòng/chip HOẶC gõ đúng phím số 1-9/0 trên bàn phím rời thì dán — xem
+/// [khiChonDong]. Dòng trống (chưa có lịch sử) không bấm/gõ được gì.
+class _HopThoaiLichSuBoNhoTam extends StatefulWidget {
+  const _HopThoaiLichSuBoNhoTam({required this.khiChonDong});
+
+  final void Function(int chiSo) khiChonDong;
+
+  @override
+  State<_HopThoaiLichSuBoNhoTam> createState() => _HopThoaiLichSuBoNhoTamState();
+}
+
+class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
+  static const _phimSo = {
+    LogicalKeyboardKey.digit1: 0,
+    LogicalKeyboardKey.digit2: 1,
+    LogicalKeyboardKey.digit3: 2,
+    LogicalKeyboardKey.digit4: 3,
+    LogicalKeyboardKey.digit5: 4,
+    LogicalKeyboardKey.digit6: 5,
+    LogicalKeyboardKey.digit7: 6,
+    LogicalKeyboardKey.digit8: 7,
+    LogicalKeyboardKey.digit9: 8,
+    LogicalKeyboardKey.digit0: 9,
+    LogicalKeyboardKey.numpad1: 0,
+    LogicalKeyboardKey.numpad2: 1,
+    LogicalKeyboardKey.numpad3: 2,
+    LogicalKeyboardKey.numpad4: 3,
+    LogicalKeyboardKey.numpad5: 4,
+    LogicalKeyboardKey.numpad6: 5,
+    LogicalKeyboardKey.numpad7: 6,
+    LogicalKeyboardKey.numpad8: 7,
+    LogicalKeyboardKey.numpad9: 8,
+    LogicalKeyboardKey.numpad0: 9,
+  };
+
+  bool _khiPhim(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+    final i = _phimSo[event.logicalKey];
+    if (i == null) return false;
+    if (BoNhoTamDanVanBan.lichSu[i] == null) return true;
+    widget.khiChonDong(i);
+    return true;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_khiPhim);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_khiPhim);
+    super.dispose();
+  }
+
+  Widget _dong(int i) {
+    final doan = BoNhoTamDanVanBan.lichSu[i];
+    final rong = doan == null;
+    return InkWell(
+      onTap: rong ? null : () => widget.khiChonDong(i),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              decoration: BoxDecoration(
+                color: rong ? const Color(0xFFF1F3F4) : const Color(0xFFE8F0FE),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                BoNhoTamDanVanBan.nhanPhim(i),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: rong ? const Color(0xFF9AA0A6) : const Color(0xFF1A73E8),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                doan ?? '(trống)',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+                style: TextStyle(
+                  color: rong ? const Color(0xFF9AA0A6) : null,
+                  fontStyle: rong ? FontStyle.italic : FontStyle.normal,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Bộ nhớ tạm để dán văn bản'),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Bấm vào một dòng (hoặc gõ đúng phím số của dòng đó) để dán '
+              'vào vị trí con trỏ. Dòng 10 mới nhất nằm cuối, dòng cũ nhất '
+              'nằm đầu.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+            ),
+            const SizedBox(height: 10),
+            for (var i = 0; i < BoNhoTamDanVanBan.lichSu.length; i++) _dong(i),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Đóng')),
+      ],
+    );
+  }
 }

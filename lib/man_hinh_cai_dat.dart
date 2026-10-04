@@ -1251,6 +1251,17 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
                           '(${moi.nhan}) — chọn phím khác nhé.');
                       return;
                     }
+                    // (YÊU CẦU MỚI — nhánh thử nghiệm) Lựa chọn 4 (tổ hợp tự
+                    // chọn) không có cơ chế tự đổi hộ — phải chặn lưu nếu
+                    // trùng với BẤT KỲ phím tắt nào trong 3 chức năng dùng
+                    // chung, kể cả "Bộ nhớ tạm để dán văn bản" (modal riêng,
+                    // không mở cùng màn này).
+                    if (widget.caiDat.phimTatBoNhoTam.coBangVoi(moi)) {
+                      capNhatModal(() => loiXungDot =
+                          'Phím tắt này đang trùng với chức năng "Bộ nhớ tạm để dán văn bản" '
+                          '(${moi.nhan}) — chọn phím khác nhé.');
+                      return;
+                    }
                   }
 
                   final coHoanDoi = await widget.caiDat.datPhimTatVaTuHoanDoiNeuTrung(

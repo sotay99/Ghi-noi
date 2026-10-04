@@ -1,5 +1,25 @@
 # Lỗi tồn đọng — hoãn sửa
 
+## Thỉnh thoảng không gõ được bằng bàn phím vật lý sau mất/được tiêu điểm (bản Web)
+
+**Mô tả:** Trên thiết bị có gắn bàn phím vật lý (máy tính, hoặc điện
+thoại/tablet gắn bàn phím ngoài), đôi lúc sau khi ô soạn thảo mất tiêu
+điểm rồi được lại (ví dụ chạm ra khoảng trống rồi chạm lại vào ô), gõ
+bàn phím vật lý không chèn được ký tự nữa — phải F5 mới hết. Người dùng
+xác nhận: đã nhẹ đi rất nhiều sau khi thêm bước dọn `TextInput.clearClient`
+ở `_khiFocusConTroDoi` (nhánh `thu-nghiem/sua-cuon-man-hinh`, v150), nhưng
+vẫn còn xuất hiện lại lâu lâu — không có cách mô tả chính xác hơn để tái
+hiện lại theo yêu cầu.
+
+**Quyết định (2026-10-04):** người dùng yêu cầu HOÃN sửa tiếp — chưa mô tả
+được chính xác hiện tượng còn sót để điều tra tiếp. Khi được nhờ sửa lại,
+hỏi người dùng mô tả MỚI chi tiết hơn (bấm gì, thứ tự nào, trước đó đang
+làm gì) trước khi thử hướng mới — đừng giả định giống y hệt mô tả gốc ở
+trên vì bản thân nó cũng chỉ là suy đoán, chưa chắc đúng gốc rễ hoàn toàn.
+Hướng đã thử: dọn kết nối bàn phím ảo (`TextInput.clearClient`) ngay lúc
+tiêu điểm vừa chuyển từ mất sang có lại — xem `_khiFocusConTroDoi` ở
+`trang_soan_thao.dart`.
+
 ## "Bãi đất trống" kẹt lại sau khi ẩn bàn phím ảo (bản Web)
 
 **Mô tả:** Khi bật "Bộ phím nhanh cho màn hình cảm ứng" VÀ đồng thời bật nút

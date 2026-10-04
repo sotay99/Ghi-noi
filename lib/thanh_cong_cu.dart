@@ -23,6 +23,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamCaiDatMicro,
     required this.khiBamCaiDatHienThi,
     required this.khiBamTuDienChinhTa,
+    required this.khiBamBoNhoTam,
     required this.khiBamHuongDan,
     required this.khiBamCaiDatKiemTraToanVan,
     required this.khiBamChuyenFileAmThanh,
@@ -109,6 +110,10 @@ class ThanhCongCu extends StatelessWidget {
   /// Mục "Từ điển sửa lỗi chính tả của bạn" — ngay dưới "Cài đặt Hiển thị
   /// và tự động sửa" trong cùng menu — mở `moModalTuDienChinhTa`.
   final VoidCallback khiBamTuDienChinhTa;
+
+  /// (YÊU CẦU MỚI — nhánh thử nghiệm) Mục "Bộ nhớ tạm để dán văn bản" —
+  /// ngay dưới "Từ điển sửa lỗi chính tả của bạn" — mở `moModalBoNhoTam`.
+  final VoidCallback khiBamBoNhoTam;
 
   final VoidCallback khiBamHuongDan;
 
@@ -436,6 +441,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamCaiDatMicro: khiBamCaiDatMicro,
                               khiBamCaiDatHienThi: khiBamCaiDatHienThi,
                               khiBamTuDienChinhTa: khiBamTuDienChinhTa,
+                              khiBamBoNhoTam: khiBamBoNhoTam,
                               khiBamTroChuyen: khiBamTroChuyen,
                               khiMoMenu: khiMoMenuCanReset,
                             ),
@@ -1476,6 +1482,7 @@ class _NutTaiKhoanMenu extends StatelessWidget {
     required this.khiBamCaiDatMicro,
     required this.khiBamCaiDatHienThi,
     required this.khiBamTuDienChinhTa,
+    required this.khiBamBoNhoTam,
     required this.khiBamTroChuyen,
     required this.khiMoMenu,
   });
@@ -1486,6 +1493,9 @@ class _NutTaiKhoanMenu extends StatelessWidget {
 
   /// Mục "Từ điển sửa lỗi chính tả của bạn" — mở `moModalTuDienChinhTa`.
   final VoidCallback khiBamTuDienChinhTa;
+
+  /// Mục "Bộ nhớ tạm để dán văn bản" — mở `moModalBoNhoTam`.
+  final VoidCallback khiBamBoNhoTam;
 
   /// Mục "Trò chuyện" — dời vào ĐÂY từ thanh công cụ ngoài (trước kia là
   /// một nút riêng cạnh "Xem thêm lựa chọn"), nằm ngay phía trên "Đăng
@@ -1558,6 +1568,9 @@ class _NutTaiKhoanMenu extends StatelessWidget {
               case 9:
                 khiBamTuDienChinhTa();
                 break;
+              case 10:
+                khiBamBoNhoTam();
+                break;
               case 8:
                 khiBamTroChuyen();
                 break;
@@ -1579,6 +1592,7 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                 _mucMenuThem(1, 'Cài đặt Micro'),
                 _mucMenuThem(2, 'Cài đặt Hiển thị và tự động sửa'),
                 _mucMenuThem(9, 'Từ điển sửa lỗi chính tả của bạn'),
+                _mucMenuThem(10, 'Bộ nhớ tạm để dán văn bản'),
                 _dividerMenu(),
                 _mucMenuThem(3, 'Điều khoản sử dụng'),
                 _mucMenuThem(4, 'Bảo mật và quyền riêng tư'),

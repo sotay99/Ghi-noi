@@ -11,6 +11,11 @@
 // đề nào trong hai vấn đề trên — không phải tổ hợp/phím nào bị hệ thống
 // hay trình duyệt can thiệp sẵn.)
 
+/// Ba chức năng dùng CHUNG bốn kiểu phím tắt ở `LuaChonPhimTat`, không bao
+/// giờ được phép trùng nhau — xem
+/// `CaiDat.datPhimTatTinhNangVaTuHoanDoiNeuTrung`.
+enum TinhNangPhimTat { micro, ghiAm, boNhoTam }
+
 class LuaChonPhimTat {
   const LuaChonPhimTat.tab()
       : loai = 'tab',
