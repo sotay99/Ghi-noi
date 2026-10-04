@@ -14,6 +14,9 @@ class BoNhoTamDanVanBan {
   BoNhoTamDanVanBan._();
 
   static final List<String?> lichSu = List<String?>.filled(10, null);
+
+  /// Ô SẮP bị ghi đè ở lần thêm KẾ TIẾP — chính là ô đang giữ lịch sử CŨ
+  /// NHẤT khi đã đủ 10 dòng (xem `oCuNhat`/`oGanCuNhat`).
   static int _conTro = 0;
 
   /// Gọi mỗi khi Cắt/Copy thành công — xem `_phimAoCopy`/`_phimAoCut` ở
@@ -27,4 +30,17 @@ class BoNhoTamDanVanBan {
   /// Nhãn "phím N" cho ô [i] (0..9) — ô cuối cùng (9) là "phím 0", giống
   /// đúng thứ tự phím số thật trên bàn phím (1,2,...,9,0).
   static String nhanPhim(int i) => 'phím ${(i + 1) % 10}';
+
+  /// `true` khi cả 10 ô đều đã có lịch sử (không ô nào trống) — chỉ khi đó
+  /// "cũ nhất"/"gần cũ nhất" mới có ý nghĩa (ô trống không phải "cũ", chỉ
+  /// là chưa từng có gì).
+  static bool get day => !lichSu.contains(null);
+
+  /// Ô đang giữ lịch sử CŨ NHẤT — chính là ô sắp bị ghi đè kế tiếp. Chỉ có
+  /// ý nghĩa khi [day].
+  static int get oCuNhat => _conTro;
+
+  /// Ô đang giữ lịch sử GẦN CŨ NHẤT (cũ nhì) — ô ngay sau [oCuNhat] theo
+  /// vòng tròn. Chỉ có ý nghĩa khi [day].
+  static int get oGanCuNhat => (_conTro + 1) % lichSu.length;
 }

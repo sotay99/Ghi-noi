@@ -8269,8 +8269,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (!mounted || event is! KeyDownEvent) return false;
     if (!widget.caiDat.boNhoTamDanVanBanBat) return false;
 
-    final route = ModalRoute.of(context);
-    if (route != null && !route.isCurrent) return false;
+    // (SỬA LỖI — nhánh thử nghiệm) Modal lịch sử CHÍNH NÓ đang mở cũng làm
+    // "route không phải route hiện tại" (nó nằm trên cùng) — nếu áp dụng
+    // điều kiện chặn như mọi phím tắt khác thì bấm phím tắt LẦN HAI (để
+    // đóng lại) sẽ bị chặn luôn, phím tắt chỉ mở được mà không đóng được.
+    // Bỏ qua điều kiện chặn CHỈ khi chính modal này đang mở — vẫn chặn
+    // đúng khi một màn khác (Cài đặt, Thư mục...) đang đè lên.
+    if (!_boNhoTamDangMo) {
+      final route = ModalRoute.of(context);
+      if (route != null && !route.isCurrent) return false;
+    }
 
     if (!_khopPhimTat(widget.caiDat.phimTatBoNhoTam, event)) return false;
     _bamPhimTatBoNhoTam();
@@ -8368,15 +8376,21 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// `_khiPhimTatGhiAm`.
   void _khiHoanTatTapDoiPhimTat(String loai) {
     if (!mounted) return;
-    final route = ModalRoute.of(context);
-    if (route != null && !route.isCurrent) return;
+    // (SỬA LỖI — nhánh thử nghiệm) Bỏ qua điều kiện chặn khi CHÍNH modal
+    // lịch sử "Bộ nhớ tạm" đang mở — xem giải thích đầy đủ ở
+    // `_khiPhimTatBoNhoTam`. Micro/Ghi âm vẫn phải chặn riêng bên dưới
+    // (chỉ nhánh Bộ nhớ tạm được bỏ qua).
+    if (!_boNhoTamDangMo) {
+      final route = ModalRoute.of(context);
+      if (route != null && !route.isCurrent) return;
+    }
 
-    if (widget.caiDat.phimTatMicro.loai == loai) {
-      _bamNutMicro();
-    } else if (widget.caiDat.phimTatGhiAm.loai == loai) {
-      unawaited(_bamNutGhiAmThe());
-    } else if (widget.caiDat.boNhoTamDanVanBanBat && widget.caiDat.phimTatBoNhoTam.loai == loai) {
+    if (widget.caiDat.boNhoTamDanVanBanBat && widget.caiDat.phimTatBoNhoTam.loai == loai) {
       _bamPhimTatBoNhoTam();
+    } else if (!_boNhoTamDangMo && widget.caiDat.phimTatMicro.loai == loai) {
+      _bamNutMicro();
+    } else if (!_boNhoTamDangMo && widget.caiDat.phimTatGhiAm.loai == loai) {
+      unawaited(_bamNutGhiAmThe());
     }
   }
 
@@ -12254,6 +12268,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   'Mở/đóng trình Ghi âm (ghi âm xong mới ra chữ)'
                       '${moTaThem(widget.caiDat.phimTatGhiAm)}',
                 ),
+                if (widget.caiDat.boNhoTamDanVanBanBat)
+                  dong(
+                    widget.caiDat.phimTatBoNhoTam.nhan,
+                    'Ẩn/hiện Bộ nhớ tạm để dán văn bản'
+                        '${moTaThem(widget.caiDat.phimTatBoNhoTam)}',
+                  ),
                 deMuc('Điều hướng'),
                 dong('Ctrl + Z', tim('Ctrl+Z')),
                 dong('Ctrl + Shift + Z', tim('Ctrl+Shift+Z')),
@@ -14017,7 +14037,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         if (widget.caiDat.boNhoTamDanVanBanBat)
           IconButton(
             onPressed: _moHopThoaiLichSuBoNhoTam,
-            icon: const Icon(Icons.content_paste_search, size: 22),
+            // (SỬA LỖI — nhánh thử nghiệm) `Icons.content_paste_search` —
+            // một icon Material khá mới — bị mất hẳn trên bản dựng thật
+            // (tree-shake font icon chỉ giữ icon nào chắc chắn dùng được).
+            // Đổi qua emoji (`Text`) — y hệt cách đã né lỗi này ở nút
+            // "🔤"/"🔼" bên dưới.
+            icon: const Text('📋', style: TextStyle(fontSize: 18)),
             tooltip: 'Bộ nhớ tạm để dán văn bản (${widget.caiDat.phimTatBoNhoTam.nhan})',
             visualDensity: VisualDensity.compact,
             constraints: _kichThuocNutTren,
@@ -16300,10 +16325,21 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
   Widget _dong(int i) {
     final doan = BoNhoTamDanVanBan.lichSu[i];
     final rong = doan == null;
+    // (YÊU CẦU MỚI — nhánh thử nghiệm) Chỉ khi ĐỦ 10 dòng (không ô nào
+    // trống) mới có khái niệm "cũ nhất"/"gần cũ nhất" — tô nền đỏ nhạt/
+    // vàng nhạt cho đúng 2 dòng đó, cuốn chiếu theo đúng con trỏ vòng
+    // tròn (xem `BoNhoTamDanVanBan.oCuNhat`/`oGanCuNhat`).
+    final day = BoNhoTamDanVanBan.day;
+    final laCuNhat = day && i == BoNhoTamDanVanBan.oCuNhat;
+    final laGanCuNhat = day && i == BoNhoTamDanVanBan.oGanCuNhat;
+    final mauNenDong = laCuNhat
+        ? const Color(0xFFFCE8E6)
+        : (laGanCuNhat ? const Color(0xFFFEF7E0) : null);
     return InkWell(
       onTap: rong ? null : () => widget.khiChonDong(i),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Container(
+        color: mauNenDong,
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
         child: Row(
           children: [
             Container(
@@ -16354,8 +16390,8 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
           children: [
             const Text(
               'Bấm vào một dòng (hoặc gõ đúng phím số của dòng đó) để dán '
-              'vào vị trí con trỏ. Dòng 10 mới nhất nằm cuối, dòng cũ nhất '
-              'nằm đầu.',
+              'vào vị trí con trỏ. Lịch sử mới nhất sẽ tự động ghi vào dòng '
+              'trống hoặc đè lên dòng lịch sử cũ nhất.',
               style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
             ),
             const SizedBox(height: 10),
