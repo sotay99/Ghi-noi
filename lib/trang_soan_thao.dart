@@ -12284,6 +12284,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 dong('Ctrl + X', tim('Ctrl+X')),
                 dong('Ctrl + C', tim('Ctrl+C')),
                 dong('Ctrl + V', tim('Ctrl+V')),
+                dong('Ctrl + Enter', tim('Ctrl+Enter')),
                 deMuc('Định dạng văn bản'),
                 dong('Ctrl + B', tim('Ctrl+B')),
                 dong('Ctrl + I', tim('Ctrl+I')),
@@ -16325,55 +16326,110 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
   Widget _dong(int i) {
     final doan = BoNhoTamDanVanBan.lichSu[i];
     final rong = doan == null;
+    final dangGhim = BoNhoTamDanVanBan.ghim[i];
     // (YÊU CẦU MỚI — nhánh thử nghiệm) Chỉ khi ĐỦ 10 dòng (không ô nào
-    // trống) mới có khái niệm "cũ nhất"/"gần cũ nhất" — tô nền đỏ nhạt/
-    // vàng nhạt cho đúng 2 dòng đó, cuốn chiếu theo đúng con trỏ vòng
-    // tròn (xem `BoNhoTamDanVanBan.oCuNhat`/`oGanCuNhat`).
+    // trống) mới có khái niệm "cũ nhất"/"gần cũ nhất" — và chỉ xét trong
+    // các dòng CHƯA ghim (`oCuNhat`/`oGanCuNhat` đã tự loại dòng ghim ra
+    // rồi, không cần kiểm `!dangGhim` thêm ở đây).
     final day = BoNhoTamDanVanBan.day;
     final laCuNhat = day && i == BoNhoTamDanVanBan.oCuNhat;
     final laGanCuNhat = day && i == BoNhoTamDanVanBan.oGanCuNhat;
-    final mauNenDong = laCuNhat
-        ? const Color(0xFFFCE8E6)
-        : (laGanCuNhat ? const Color(0xFFFEF7E0) : null);
-    return InkWell(
-      onTap: rong ? null : () => widget.khiChonDong(i),
-      child: Container(
-        color: mauNenDong,
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-        child: Row(
-          children: [
-            Container(
-              width: 56,
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              decoration: BoxDecoration(
-                color: rong ? const Color(0xFFF1F3F4) : const Color(0xFFE8F0FE),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                BoNhoTamDanVanBan.nhanPhim(i),
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: rong ? const Color(0xFF9AA0A6) : const Color(0xFF1A73E8),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                doan ?? '(trống)',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                softWrap: false,
-                style: TextStyle(
-                  color: rong ? const Color(0xFF9AA0A6) : null,
-                  fontStyle: rong ? FontStyle.italic : FontStyle.normal,
-                ),
-              ),
-            ),
-          ],
+
+    // (YÊU CẦU MỚI) Dòng đang ghim: nền xanh lá, chuyển sắc TỪ TRÁI (đậm
+    // vừa, không đậm quá) SANG PHẢI — nửa đầu dòng giữ nguyên màu đậm,
+    // nửa sau nhạt dần tới hết (không còn xanh) ở sát mép phải.
+    final BoxDecoration trangTri;
+    if (dangGhim) {
+      trangTri = const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          stops: [0.0, 0.5, 1.0],
+          colors: [Color(0xFF81C995), Color(0xFF81C995), Colors.transparent],
         ),
+      );
+    } else {
+      trangTri = BoxDecoration(
+        color: laCuNhat
+            ? const Color(0xFFFCE8E6)
+            : (laGanCuNhat ? const Color(0xFFFEF7E0) : null),
+      );
+    }
+
+    return Container(
+      decoration: trangTri,
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: rong ? null : () => widget.khiChonDong(i),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 56,
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      decoration: BoxDecoration(
+                        color: rong ? const Color(0xFFF1F3F4) : const Color(0xFFE8F0FE),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        BoNhoTamDanVanBan.nhanPhim(i),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: rong ? const Color(0xFF9AA0A6) : const Color(0xFF1A73E8),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        doan ?? '(trống)',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: false,
+                        style: TextStyle(
+                          color: rong ? const Color(0xFF9AA0A6) : null,
+                          fontStyle: rong ? FontStyle.italic : FontStyle.normal,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // (YÊU CẦU MỚI) Nút ghim — riêng biệt với vùng bấm-để-dán ở trên
+          // (`Expanded` + `InkWell` riêng), để bấm ghim không lỡ dán luôn.
+          // Icon Material cho pin (`Icons.push_pin`) — dùng emoji 📌 thay
+          // vì vài icon Material mới từng bị "tree-shake" mất trên bản
+          // dựng thật (xem lỗi icon 📋 vừa sửa) — né hẳn rủi ro đó. "Sáng
+          // lên" khi đang ghim thể hiện bằng khung tròn nền xanh lá đậm
+          // sau icon, mờ đi khi chưa ghim hoặc dòng trống.
+          IconButton(
+            onPressed: rong ? null : () => setState(() => BoNhoTamDanVanBan.doiGhim(i)),
+            icon: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: dangGhim ? const Color(0xFF1E8E3E) : Colors.transparent,
+              ),
+              child: Opacity(
+                opacity: rong ? 0.3 : (dangGhim ? 1.0 : 0.55),
+                child: const Text('📌', style: TextStyle(fontSize: 14)),
+              ),
+            ),
+            tooltip: dangGhim
+                ? 'Bỏ ghim (cho phép lịch sử mới đè lên lại)'
+                : 'Ghim dòng này (không bao giờ bị thay thế)',
+            visualDensity: VisualDensity.compact,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            padding: EdgeInsets.zero,
+          ),
+        ],
       ),
     );
   }
@@ -16391,7 +16447,8 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
             const Text(
               'Bấm vào một dòng (hoặc gõ đúng phím số của dòng đó) để dán '
               'vào vị trí con trỏ. Lịch sử mới nhất sẽ tự động ghi vào dòng '
-              'trống hoặc đè lên dòng lịch sử cũ nhất.',
+              'trống hoặc đè lên dòng lịch sử cũ nhất. Dòng nào được ghim '
+              '(màu xanh lá) thì không thể bị thay thế trong tương lai.',
               style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
             ),
             const SizedBox(height: 10),

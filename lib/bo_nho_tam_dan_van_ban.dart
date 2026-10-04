@@ -6,41 +6,87 @@
 // vẫn luôn ghi vào như trước — tính năng này chỉ CỘNG THÊM một lớp lịch sử
 // nhiều dòng, không thay thế gì cả.
 //
-// Vòng tròn 10 ô: lần cắt/copy thứ N (tính từ 1) rơi vào ô (N-1) % 10 — ô
-// 0..8 hiện "phím 1".."phím 9", ô 9 hiện "phím 0" (giống bàn phím số thật:
-// sau phím 9 là phím 0).
+// Mỗi ô (0..9) hiện "phím 1".."phím 9", ô cuối (9) hiện "phím 0" (giống
+// đúng thứ tự phím số thật trên bàn phím: sau phím 9 là phím 0).
+//
+// (YÊU CẦU MỚI) GHIM: mỗi ô có thể được ghim — ô đã ghim KHÔNG BAO GIỜ bị
+// lịch sử mới đè lên, và không tham gia vào việc xác định "cũ nhất/gần cũ
+// nhất" (những ô đó chỉ xét trong các ô CHƯA ghim). Để biết ô nào thật sự
+// cũ nhất trong các ô chưa ghim, mỗi ô giữ một "tuổi" — số thứ tự tăng dần
+// mỗi lần được ghi — thay cho một con trỏ vòng tròn đơn giản như trước
+// (con trỏ đơn không còn đủ, vì ghim có thể làm thứ tự ghi không còn là
+// một vòng tròn đều nữa).
 
 class BoNhoTamDanVanBan {
   BoNhoTamDanVanBan._();
 
   static final List<String?> lichSu = List<String?>.filled(10, null);
-
-  /// Ô SẮP bị ghi đè ở lần thêm KẾ TIẾP — chính là ô đang giữ lịch sử CŨ
-  /// NHẤT khi đã đủ 10 dòng (xem `oCuNhat`/`oGanCuNhat`).
-  static int _conTro = 0;
+  static final List<bool> ghim = List<bool>.filled(10, false);
+  static final List<int> _tuoi = List<int>.filled(10, 0);
+  static int _denSo = 0;
 
   /// Gọi mỗi khi Cắt/Copy thành công — xem `_phimAoCopy`/`_phimAoCut` ở
   /// `trang_soan_thao.dart`. Bỏ qua đoạn rỗng (không có gì để nhớ).
+  ///
+  /// Ưu tiên ô TRỐNG trước (lúc lịch sử chưa đầy lần đầu); hết ô trống thì
+  /// ghi vào ô CŨ NHẤT trong các ô CHƯA ghim. Nếu cả 10 ô đều đã ghim, bỏ
+  /// qua — KHÔNG lỗi, chỉ là lịch sử không còn chỗ chứa (bộ nhớ đệm hệ
+  /// thống thật vẫn luôn ghi bình thường, Dán bằng Ctrl+V/nút Dán không hề
+  /// bị ảnh hưởng).
   static void themMoi(String doan) {
     if (doan.isEmpty) return;
-    lichSu[_conTro] = doan;
-    _conTro = (_conTro + 1) % lichSu.length;
+    final rong = lichSu.indexWhere((v) => v == null);
+    if (rong != -1) {
+      _ghiVaoO(rong, doan);
+      return;
+    }
+    final ungVien = thuTuCuNhatKhongGhim;
+    if (ungVien.isEmpty) return;
+    _ghiVaoO(ungVien.first, doan);
+  }
+
+  static void _ghiVaoO(int i, String doan) {
+    lichSu[i] = doan;
+    _tuoi[i] = ++_denSo;
+  }
+
+  /// Ghim/bỏ ghim ô [i] — không làm gì nếu ô đang trống (không có gì để
+  /// ghim).
+  static void doiGhim(int i) {
+    if (lichSu[i] == null) return;
+    ghim[i] = !ghim[i];
   }
 
   /// Nhãn "phím N" cho ô [i] (0..9) — ô cuối cùng (9) là "phím 0", giống
   /// đúng thứ tự phím số thật trên bàn phím (1,2,...,9,0).
   static String nhanPhim(int i) => 'phím ${(i + 1) % 10}';
 
-  /// `true` khi cả 10 ô đều đã có lịch sử (không ô nào trống) — chỉ khi đó
-  /// "cũ nhất"/"gần cũ nhất" mới có ý nghĩa (ô trống không phải "cũ", chỉ
-  /// là chưa từng có gì).
+  /// `true` khi cả 10 ô đều đã CÓ (hoặc đang có) lịch sử ít nhất một lần
+  /// (không ô nào null) — chỉ khi đó "cũ nhất/gần cũ nhất" mới có ý nghĩa.
+  /// Một khi đã `true` thì luôn `true` (ô đã ghi không bao giờ trở lại
+  /// trống), bất kể ghim/bỏ ghim sau đó.
   static bool get day => !lichSu.contains(null);
 
-  /// Ô đang giữ lịch sử CŨ NHẤT — chính là ô sắp bị ghi đè kế tiếp. Chỉ có
-  /// ý nghĩa khi [day].
-  static int get oCuNhat => _conTro;
+  /// Các ô CHƯA ghim, xếp từ CŨ NHẤT tới MỚI NHẤT (theo [_tuoi]). Cập nhật
+  /// lại danh sách này (gọi ở getter, không lưu cache) mỗi lần hỏi — luôn
+  /// đúng ngay sau mỗi lần ghim/bỏ ghim/thêm lịch sử mới.
+  static List<int> get thuTuCuNhatKhongGhim {
+    final ds = [for (var i = 0; i < lichSu.length; i++) if (!ghim[i] && lichSu[i] != null) i];
+    ds.sort((a, b) => _tuoi[a].compareTo(_tuoi[b]));
+    return ds;
+  }
 
-  /// Ô đang giữ lịch sử GẦN CŨ NHẤT (cũ nhì) — ô ngay sau [oCuNhat] theo
-  /// vòng tròn. Chỉ có ý nghĩa khi [day].
-  static int get oGanCuNhat => (_conTro + 1) % lichSu.length;
+  /// Ô đang giữ lịch sử CŨ NHẤT trong các ô CHƯA ghim — `null` nếu không
+  /// còn ô nào chưa ghim (hoặc chưa [day]).
+  static int? get oCuNhat {
+    final ds = thuTuCuNhatKhongGhim;
+    return ds.isNotEmpty ? ds.first : null;
+  }
+
+  /// Ô đang giữ lịch sử GẦN CŨ NHẤT trong các ô CHƯA ghim — `null` nếu
+  /// không đủ 2 ô chưa ghim.
+  static int? get oGanCuNhat {
+    final ds = thuTuCuNhatKhongGhim;
+    return ds.length > 1 ? ds[1] : null;
+  }
 }
