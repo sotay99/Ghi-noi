@@ -5462,11 +5462,28 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   Timer? _henLamMoiOVanBanDeThoatKet;
 
+  /// (SỬA LỖI — nhánh thử nghiệm) Đổi `_oVanBanKey` ở trên huỷ hẳn
+  /// `Scrollable` cũ của ô soạn thảo rồi dựng một cái MỚI, gắn lại đúng
+  /// `_cuonVanBan` (cùng một instance) — nhưng `ScrollPosition` cũ (đang giữ
+  /// độ cuộn hiện tại) đã mất theo widget cũ, nên `ScrollPosition` MỚI luôn
+  /// khởi đầu ở 0 (đầu trang), bất kể đang cuộn ở đâu lúc dựng lại. Đó là
+  /// gốc rễ màn hình tự "nhảy" lên đầu ~1,5 giây sau khi bấm Copy/Cắt/Dán/
+  /// All (mọi nút đều đi qua `_giuFocusOChuSauKhiBam` →
+  /// `_giuTieuDiemKhongBatBanPhimAo`, cùng cơ chế này). Ghi lại độ cuộn
+  /// NGAY TRƯỚC khi đổi key, rồi trả lại đúng chỗ đó ở khung hình kế tiếp
+  /// (sau khi `Scrollable` mới đã gắn xong) — không đụng gì tới mục đích
+  /// ban đầu của việc đổi key (thoát kẹt kết nối bàn phím ảo).
   void _lamMoiOVanBanDeThoatKetBanPhimAo() {
     if (!mounted) return;
+    final cuonCu = _cuonVanBan.hasClients ? _cuonVanBan.offset : null;
     setState(() => _oVanBanKey = GlobalKey());
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _oChu.requestFocus();
+      if (!mounted) return;
+      _oChu.requestFocus();
+      if (cuonCu != null && _cuonVanBan.hasClients) {
+        final toiDa = _cuonVanBan.position.maxScrollExtent;
+        _cuonVanBan.jumpTo(cuonCu.clamp(0.0, toiDa));
+      }
     });
   }
 

@@ -12,6 +12,10 @@ jobs:
   dung-apk:
     name: Dựng APK cho Android
     runs-on: ubuntu-latest
+    # Nhánh "thu-nghiem/" không build/phát hành APK thật — tránh một nhánh
+    # đang thử nghiệm dở tự đăng Release công khai mỗi lần đẩy. Vẫn chạy
+    # được bằng tay qua "workflow_dispatch" nếu cần kiểm APK ở nhánh này.
+    if: ${{ !startsWith(github.ref_name, 'thu-nghiem/') || github.event_name == 'workflow_dispatch' }}
 
     steps:
       - name: Lấy mã nguồn

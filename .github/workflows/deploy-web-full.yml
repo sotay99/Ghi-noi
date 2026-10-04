@@ -165,10 +165,25 @@ jobs:
           }
           EOF
 
-      - name: Đưa build/web lên Firebase Hosting (channel "live" — vĩnh viễn)
+      # Nhánh "thu-nghiem/" KHÔNG đưa lên channel "live" (bản chính thức) —
+      # đưa vào một channel xem trước riêng, tên suy từ tên nhánh (đổi "/"
+      # thành "-" vì channel Firebase không cho phép "/"), hạn 7 ngày, mỗi
+      # lần đẩy của đúng nhánh đó gia hạn thêm — giữ nguyên địa chỉ.
+      - name: Chọn channel Hosting theo nhánh
+        id: chon-channel
+        run: |
+          if [[ "${{ github.ref_name }}" == thu-nghiem/* ]]; then
+            TEN="${{ github.ref_name }}"
+            echo "id=preview-${TEN//\//-}" >> "$GITHUB_OUTPUT"
+          else
+            echo "id=live" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Đưa build/web lên Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
-          channelId: live
+          channelId: ${{ steps.chon-channel.outputs.id }}
+          expires: ${{ steps.chon-channel.outputs.id != 'live' && '7d' || '' }}
           projectId: flowrite219
