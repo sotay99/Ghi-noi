@@ -4096,9 +4096,27 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// chạm màn hình. Chỉ quan sát (luôn trả về false), không chặn phím đi
   /// tiếp xuống ô văn bản hay các phím tắt khác.
   bool _khiGoPhimBatKyTatChuThich(KeyEvent event) {
-    if (event is KeyDownEvent) _tatChuThich();
+    if (event is KeyDownEvent) {
+      _tatChuThich();
+      // (SỬA LỖI — nhánh thử nghiệm) Có sự kiện phím RỜI (xem chú thích ở
+      // trên — đúng giả định này đã dùng sẵn cho việc tắt chú thích) nghĩa
+      // là thiết bị đang gắn bàn phím vật lý. Ghi nhớ lại, dùng ở
+      // `_giuTieuDiemKhongBatBanPhimAo` để KHÔNG dựng lại ô soạn thảo sau
+      // Copy/Cắt/Dán/All trên thiết bị này nữa.
+      _coBanPhimVatLy = true;
+    }
     return false;
   }
+
+  /// true nếu thiết bị này đã từng gõ qua bàn phím RỜI (vật lý) — xem
+  /// `_khiGoPhimBatKyTatChuThich`. Trên thiết bị như vậy, bàn phím ảo trên
+  /// màn hình hầu như luôn ẨN (không cần tới) bất kể người dùng có đang gõ
+  /// hay không, nên `viewInsets.bottom > 0` không còn là dấu hiệu đáng tin
+  /// để biết "người dùng có đang gõ" — và lỗi mà `_lamMoiOVanBanDeThoatKet-
+  /// BanPhimAo` sinh ra để né (bàn phím ảo bị kẹt) KHÔNG THỂ xảy ra trên
+  /// thiết bị không hề triệu hồi bàn phím ảo — nên bỏ hẳn việc dựng lại đó
+  /// khi cờ này đã lên, thay vì chỉ rút ngắn thời gian chờ.
+  bool _coBanPhimVatLy = false;
 
   @override
   void dispose() {
@@ -5446,6 +5464,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // MỚI từ đầu, trong khi `_boDieuKhien` (nội dung) và `_oChu` (FocusNode)
     // vẫn giữ nguyên nên không mất chữ/không mất tiêu điểm.
     //
+    // (SỬA LỖI — nhánh thử nghiệm) Thiết bị đã gắn bàn phím vật lý (xem
+    // `_coBanPhimVatLy`) thì KHÔNG dựng lại ô soạn thảo nữa — bàn phím ảo
+    // trên màn hình hầu như luôn ẨN trên thiết bị này dù người dùng có
+    // đang gõ hay không (nó không cần tới bàn phím ảo), nên phép đo
+    // `viewInsets.bottom` không còn đáng tin, và cái lỗi "kẹt bàn phím ảo"
+    // mà việc dựng lại này sinh ra để né CŨNG KHÔNG THỂ xảy ra ở đây (có
+    // triệu hồi bàn phím ảo bao giờ đâu mà kẹt). Dựng lại trong tình huống
+    // này chỉ còn lại tác dụng phụ: cắt đứt tạm thời kết nối nhận phím vật
+    // lý, đúng lúc người dùng có thể vẫn đang gõ — bỏ hẳn, không chỉ rút
+    // ngắn thời gian chờ.
+    if (_coBanPhimVatLy) return;
+
     // Chỉ làm việc này SAU một khoảng yên (không phải ngay lập tức — tránh
     // dựng lại giữa lúc người dùng còn đang bấm dồn dập các nút khác), và
     // CHỈ khi lúc đó bàn phím ảo VẪN đang ẩn thật (đọc lại `viewInsets.bottom`
