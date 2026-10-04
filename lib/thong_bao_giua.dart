@@ -47,3 +47,50 @@ void hienThongBaoGiua(BuildContext context, String chu,
     if (entry.mounted) entry.remove();
   });
 }
+
+/// Y hệt [hienThongBaoGiua] về vị trí/khung hiển thị, nhưng dành cho một
+/// việc CHƯA XONG (icon xoay vòng thay cho tick xanh) và KHÔNG tự ẩn theo
+/// thời gian — nơi gọi tự giữ [OverlayEntry] trả về và tự gọi `.remove()`
+/// đúng lúc việc đó xong (xem `_lamMoiOVanBanDeThoatKetBanPhimAo` ở
+/// `trang_soan_thao.dart`: hiện lúc đặt hẹn giờ dựng lại ô soạn thảo, ẩn
+/// đúng lúc hẹn giờ đó chạy — không lệch thời gian thật giữa thông báo và
+/// việc đang chờ).
+OverlayEntry hienThongBaoDangXuLyGiua(BuildContext context, String chu,
+    {bool ganTren = false}) {
+  final overlay = Overlay.of(context);
+  final entry = OverlayEntry(
+    builder: (_) => Align(
+      alignment: ganTren ? const Alignment(0, -0.7) : Alignment.center,
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 40),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          decoration: BoxDecoration(
+            color: const Color(0xEE202124),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Text(
+                  chu,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+  overlay.insert(entry);
+  return entry;
+}

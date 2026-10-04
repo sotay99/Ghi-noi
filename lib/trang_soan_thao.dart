@@ -4124,6 +4124,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henHetLietPastePhimAo?.cancel();
     _henHetCheDoNhanhChonTatCa?.cancel();
     _henLamMoiOVanBanDeThoatKet?.cancel();
+    _dangXuLyEntry?.remove();
     _oKetQuaFileAmThanh?.dispose();
     _oKetQuaToanVan?.dispose();
     _theoDoiTapDoi.dispose();
@@ -5445,22 +5446,47 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // MỚI từ đầu, trong khi `_boDieuKhien` (nội dung) và `_oChu` (FocusNode)
     // vẫn giữ nguyên nên không mất chữ/không mất tiêu điểm.
     //
-    // Chỉ làm việc này SAU 1,5 giây yên (không phải ngay lập tức — tránh
+    // Chỉ làm việc này SAU một khoảng yên (không phải ngay lập tức — tránh
     // dựng lại giữa lúc người dùng còn đang bấm dồn dập các nút khác), và
     // CHỈ khi lúc đó bàn phím ảo VẪN đang ẩn thật (đọc lại `viewInsets.bottom`
     // ngay tại thời điểm hẹn giờ chạy, không dùng giá trị cũ) — nếu người
     // dùng đã tự chạm vào ô và bàn phím đã hiện lên bình thường trong lúc
     // chờ, đừng đụng vào gì nữa. Mã phiên `_phienAnBanPhimAo` (dùng lại y
     // hệt ở trên) đảm bảo chỉ lần bấm GẦN NHẤT mới thật sự kích hoạt.
+    //
+    // (SỬA LỖI — nhánh thử nghiệm) Khoảng yên này hạ từ 1,5 giây xuống
+    // [_treDungLaiOVanBanMs] — vẫn đủ dài hơn hẳn một lần bấm đôi tự nhiên
+    // của ngón tay (tránh dựng lại giữa lúc bấm dồn dập), nhưng đỡ cảm giác
+    // "khựng" hơn hẳn. KHÔNG liên quan gì tới cơ chế chống kẹt bàn phím ảo
+    // (mã phiên `_phienAnBanPhimAo` ở trên lo việc đó) — số này chỉ là thời
+    // gian CHỜ trước khi áp dụng cách chữa, không phải một mốc phần cứng.
+    //
+    // Trong lúc chờ, hiện "Đang xử lý" ở giữa màn hình — y hệt khung thông
+    // báo "Đã copy/cắt/dán..." (cao 85%, `ganTren: true`) nhưng vẽ TRÒN
+    // GIỮA màn hình nên không chồng lên nhau, và chỉ ẩn đi khi hẹn giờ này
+    // thật sự chạy (xem `_dangXuLyEntry`) — không phải một con số ghi cứng
+    // riêng, luôn khớp đúng thời gian chờ thật.
+    _dangXuLyEntry?.remove();
+    _dangXuLyEntry = hienThongBaoDangXuLyGiua(context, 'Đang xử lý');
     _henLamMoiOVanBanDeThoatKet?.cancel();
-    _henLamMoiOVanBanDeThoatKet = Timer(const Duration(milliseconds: 1500), () {
+    _henLamMoiOVanBanDeThoatKet = Timer(const Duration(milliseconds: _treDungLaiOVanBanMs), () {
+      _dangXuLyEntry?.remove();
+      _dangXuLyEntry = null;
       if (!mounted || phien != _phienAnBanPhimAo) return;
       if (MediaQuery.of(context).viewInsets.bottom > 0) return;
       _lamMoiOVanBanDeThoatKetBanPhimAo();
     });
   }
 
+  /// Khoảng yên trước khi dựng lại ô soạn thảo để thoát kẹt bàn phím ảo —
+  /// xem giải thích ở `_giuTieuDiemKhongBatBanPhimAo`.
+  static const _treDungLaiOVanBanMs = 450;
+
   Timer? _henLamMoiOVanBanDeThoatKet;
+
+  /// Thông báo "Đang xử lý" đang hiện (nếu có) trong lúc chờ hẹn giờ ở
+  /// trên — `null` khi không có gì đang chờ.
+  OverlayEntry? _dangXuLyEntry;
 
   /// (SỬA LỖI — nhánh thử nghiệm) Đổi `_oVanBanKey` ở trên huỷ hẳn
   /// `Scrollable` cũ của ô soạn thảo rồi dựng một cái MỚI, gắn lại đúng
