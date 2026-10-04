@@ -2539,7 +2539,10 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
                 )
               else
                 _NhapNhayGhiAmChat(
-                  giay: _thoiLuong.inSeconds,
+                  // (YÊU CẦU MỚI — nhánh thử nghiệm) "Tạm dừng" không nhấp
+                  // nháy — xem giải thích ở `_NhapNhayGioiHanGhiAm` (trang
+                  // soạn thảo chính).
+                  giay: _dangTamDung ? 0 : _thoiLuong.inSeconds,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [

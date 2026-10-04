@@ -14400,7 +14400,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               final kieuSo = TextStyle(
                   color: Colors.red.shade700, fontWeight: FontWeight.bold, fontSize: coChu);
               return _NhapNhayGioiHanGhiAm(
-                giay: gia.inSeconds,
+                // (YÊU CẦU MỚI — nhánh thử nghiệm) "Tạm dừng mm:ss" KHÔNG
+                // được nhấp nháy dù đang ở giây thứ bao nhiêu — truyền 0
+                // (dưới ngưỡng 45s) tắt hẳn nhịp nhấp nháy của
+                // `_NhapNhayGioiHanGhiAm` trong lúc tạm dừng; "Đang Ghi âm"
+                // vẫn nhấp nháy đúng theo giây thật khi tiếp tục ghi.
+                giay: _theGhiAmDangTamDung ? 0 : gia.inSeconds,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -15655,7 +15660,10 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
                         // Cả dòng nhấp nháy khi sắp chạm hạn 60 giây — y hệt
                         // AppBar của trình ghi âm, xem `_NhapNhayGioiHanGhiAm`.
                         builder: (context, gia, _) => _NhapNhayGioiHanGhiAm(
-                          giay: gia.inSeconds,
+                          // (YÊU CẦU MỚI — nhánh thử nghiệm) Tắt nhấp nháy
+                          // hẳn trong lúc tạm dừng — xem giải thích ở
+                          // `_oTrangThaiGhiAmLon`.
+                          giay: _dangTamDung ? 0 : gia.inSeconds,
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
