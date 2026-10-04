@@ -83,7 +83,10 @@ class ManHinhTroChuyen extends StatefulWidget {
 }
 
 class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
-  final _oNhap = TextEditingController();
+  // (YÊU CẦU MỚI) Bản thường (`TextEditingController`) không tô được nền
+  // riêng cho "thẻ ghi âm" — đổi qua `_BoDieuKhienChat` (cuối tệp), tự tô
+  // nền token `〔🎙️ ...〕` và chặn con trỏ đứng/xoá lẻ bên trong token.
+  final _oNhap = _BoDieuKhienChat();
   // (YÊU CẦU MỚI) Bật Micro bằng nút "+" → "Micro (vừa nói vừa ra chữ)" phải
   // ép được tiêu điểm/con trỏ nhấp nháy vào khung nhập (kéo theo bàn phím ảo
   // tự bật lên, giống cách bật "bàn phím" trong Bộ phím nhanh) — cần một
@@ -1021,6 +1024,121 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     await _moGhiAmChat();
   }
 
+  /// (YÊU CẦU MỚI) "Thẻ ghi âm" cho kênh chat — bản ĐƠN GIẢN HOÁ của thẻ
+  /// ghi âm ở trang soạn thảo chính (`the_ghi_am.dart`): không cần đánh số
+  /// nhiều thẻ song song, không cần phát lại hay menu — thẻ ở đây chỉ
+  /// sống qua 2 trạng thái liên tiếp (đang ghi → đang chuyển) rồi biến
+  /// mất ngay khi có chữ, nên không cần cả bộ máy render phức tạp của
+  /// trang chính. Token dạng `〔🎙️ Đang ghi âm #N〕`/`〔🎙️ Đang chuyển #N〕`
+  /// được tô nền riêng bởi `_BoDieuKhienChat` (xem cuối tệp) — `_oNhap`
+  /// dùng CHÍNH controller này thay `TextEditingController` thường.
+  int _dinhDanhTheChoChuyenChatKeTiep = 0;
+  // soThe (của `_KhungGhiAmChat`) -> id token hiện đang đại diện cho nó
+  // trong `_oNhap.text` — một hộp thoại ghi âm có thể tạo NHIỀU thẻ liên
+  // tiếp (phím "Tạo bản ghi âm mới"), mỗi thẻ một token riêng.
+  final Map<int, int> _idTheChoChuyenChat = {};
+
+  /// Chèn thẻ MỚI ("Đang ghi âm") tại đúng vị trí con trỏ — cùng cách tính
+  /// dấu cách trước khi chèn với mic "vừa nói vừa ra chữ" ở trên.
+  void _chenTheChoChuyenChat(int soThe) {
+    if (!mounted) return;
+    final id = ++_dinhDanhTheChoChuyenChatKeTiep;
+    _idTheChoChuyenChat[soThe] = id;
+    final token = '〔🎙️ Đang ghi âm #$id〕';
+    final vb = _oNhap.text;
+    final selection = _oNhap.selection;
+    final viTri = selection.isValid ? selection.start : vb.length;
+    final ketThuc = selection.isValid ? selection.end : viTri;
+    final canDauCachTruoc = viTri > 0 && vb[viTri - 1] != ' ' && vb[viTri - 1] != '\n';
+    final phanChen = canDauCachTruoc ? ' $token' : token;
+    final moi = vb.replaceRange(viTri, ketThuc, phanChen);
+    setState(() => _oNhap.text = moi);
+    _oNhap.selection = TextSelection.collapsed(offset: viTri + phanChen.length);
+  }
+
+  /// Đổi nhãn thẻ của [soThe] từ "Đang ghi âm" sang "Đang chuyển" — vẫn
+  /// giữ ĐÚNG id token cũ, chỉ sửa chữ.
+  void _doiTheSangDangChuyen(int soThe) {
+    if (!mounted) return;
+    final id = _idTheChoChuyenChat[soThe];
+    if (id == null) return;
+    final cu = '〔🎙️ Đang ghi âm #$id〕';
+    final moiLabel = '〔🎙️ Đang chuyển #$id〕';
+    final vb = _oNhap.text;
+    final i = vb.indexOf(cu);
+    if (i == -1) return;
+    final selCu = _oNhap.selection;
+    setState(() => _oNhap.text = vb.replaceRange(i, i + cu.length, moiLabel));
+    // Token mới dài hơn 1 ký tự ("ghi âm" dài hơn "chuyển") — dời con trỏ
+    // theo đúng độ lệch nếu nó đang đứng NGAY SAU token (vị trí thường
+    // gặp nhất: vừa chèn xong).
+    if (selCu.isValid && selCu.baseOffset >= i + cu.length) {
+      final lech = moiLabel.length - cu.length;
+      _oNhap.selection = TextSelection.collapsed(offset: selCu.baseOffset + lech);
+    }
+  }
+
+  /// Thay token (bất kể đang ở nhãn nào) bằng [chu] — gọi khi AI trả chữ
+  /// xong. Không tìm thấy token (hiếm — người dùng tự xoá tay) thì rơi về
+  /// hành vi cũ: chèn tại vị trí con trỏ hiện tại.
+  void _hoanThanhTheChoChuyenChat(int soThe, String chu) {
+    if (!mounted) return;
+    final id = _idTheChoChuyenChat.remove(soThe);
+    final vb = _oNhap.text;
+    int? batDau, ketThuc;
+    if (id != null) {
+      for (final g in ['Đang ghi âm', 'Đang chuyển']) {
+        final token = '〔🎙️ $g #$id〕';
+        final i = vb.indexOf(token);
+        if (i != -1) {
+          batDau = i;
+          ketThuc = i + token.length;
+          break;
+        }
+      }
+    }
+    if (batDau == null || ketThuc == null) {
+      _chenVanBanTaiConTroChat(chu);
+      return;
+    }
+    final moi = vb.replaceRange(batDau, ketThuc, chu);
+    setState(() => _oNhap.text = moi);
+    _oNhap.selection = TextSelection.collapsed(offset: batDau + chu.length);
+  }
+
+  /// Xoá hẳn token của [soThe] (dùng khi bấm "Xoá bản này và Đóng" lúc thẻ
+  /// CHƯA hoàn thành) hoặc khi chuyển hoá LỖI — không để kẹt lại mãi.
+  void _xoaTheChoChuyenChat(int soThe) {
+    if (!mounted) return;
+    final id = _idTheChoChuyenChat.remove(soThe);
+    if (id == null) return;
+    final vb = _oNhap.text;
+    for (final g in ['Đang ghi âm', 'Đang chuyển']) {
+      final token = '〔🎙️ $g #$id〕';
+      final i = vb.indexOf(token);
+      if (i != -1) {
+        setState(() => _oNhap.text = vb.replaceRange(i, i + token.length, ''));
+        _oNhap.selection = TextSelection.collapsed(offset: i);
+        return;
+      }
+    }
+  }
+
+  /// (SỬA LỖI cũ) Chèn tại đúng vị trí con trỏ (hoặc thay vùng đang chọn)
+  /// — dùng chung cho cả mic "vừa nói vừa ra chữ" và khi không tìm lại
+  /// được token của thẻ ghi âm.
+  void _chenVanBanTaiConTroChat(String chu) {
+    final vb = _oNhap.text;
+    final selection = _oNhap.selection;
+    final viTri = selection.isValid ? selection.start : vb.length;
+    final ketThuc = selection.isValid ? selection.end : viTri;
+    final canDauCachTruoc = viTri > 0 && vb[viTri - 1] != ' ' && vb[viTri - 1] != '\n';
+    final phanChen = canDauCachTruoc ? ' $chu' : chu;
+    final moi = vb.replaceRange(viTri, ketThuc, phanChen);
+    setState(() => _oNhap.text = moi);
+    _oNhap.selection = TextSelection.collapsed(offset: viTri + phanChen.length);
+  }
+
   Future<void> _moGhiAmChat() async {
     if (!mounted) return;
     setState(() => _ghiDangMo = true);
@@ -1029,23 +1147,11 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
       barrierDismissible: false,
       builder: (ctx) => _KhungGhiAmChat(
         phimTatGhiAm: widget.caiDat.phimTatGhiAm,
-        // (SỬA LỖI) Trước đây LUÔN chèn ở CUỐI văn bản — không biết con
-        // trỏ đang đứng ở đâu. Giờ chèn đúng tại vị trí con trỏ (hoặc đầu
-        // vùng đang chọn, nếu có) — cùng cách tính dấu cách trước khi chèn
-        // với mic "vừa nói vừa ra chữ" ở trên.
-        khiCoVanBan: (chu) {
-          if (!mounted) return;
-          final vb = _oNhap.text;
-          final selection = _oNhap.selection;
-          final viTri = selection.isValid ? selection.start : vb.length;
-          final canDauCachTruoc = viTri > 0 &&
-              vb[viTri - 1] != ' ' &&
-              vb[viTri - 1] != '\n';
-          final phanChen = canDauCachTruoc ? ' $chu' : chu;
-          final moi = vb.replaceRange(viTri, selection.isValid ? selection.end : viTri, phanChen);
-          setState(() => _oNhap.text = moi);
-          _oNhap.selection = TextSelection.collapsed(offset: viTri + phanChen.length);
-        },
+        khiBatDauThe: _chenTheChoChuyenChat,
+        khiHoanThanhGhiThe: _doiTheSangDangChuyen,
+        khiCoVanBan: _hoanThanhTheChoChuyenChat,
+        khiLoiChuyenHoa: _xoaTheChoChuyenChat,
+        khiHuyThe: _xoaTheChoChuyenChat,
       ),
     );
     if (mounted) setState(() => _ghiDangMo = false);
@@ -2102,12 +2208,36 @@ class _NhapNhayGhiAmChatState extends State<_NhapNhayGhiAmChat> {
 /// `trang_soan_thao.dart`), không đổi ý nghĩa, chỉ đơn giản hoá phần giao
 /// diện cho vừa một hộp thoại nhỏ.
 class _KhungGhiAmChat extends StatefulWidget {
-  const _KhungGhiAmChat({required this.phimTatGhiAm, required this.khiCoVanBan});
+  const _KhungGhiAmChat({
+    required this.phimTatGhiAm,
+    required this.khiBatDauThe,
+    required this.khiHoanThanhGhiThe,
+    required this.khiCoVanBan,
+    required this.khiLoiChuyenHoa,
+    required this.khiHuyThe,
+  });
   final LuaChonPhimTat phimTatGhiAm;
 
-  /// Gọi lại MỖI LẦN một thẻ vừa chuyển hoá xong — nơi gọi (`_moGhiAmChat`)
-  /// tự nối thẳng vào ô nhập chat.
-  final void Function(String chu) khiCoVanBan;
+  /// (YÊU CẦU MỚI) Gọi NGAY lúc một thẻ BẮT ĐẦU ghi (mở hộp thoại, hoặc
+  /// bấm "Hoàn thành và Tạo bản ghi âm mới") — nơi gọi chèn ngay một "thẻ
+  /// đang ghi âm" vào đúng vị trí con trỏ trong ô nhập chat.
+  final void Function(int soThe) khiBatDauThe;
+
+  /// Gọi NGAY lúc thẻ [soThe] DỪNG ghi và bắt đầu gửi AI chuyển hoá — nơi
+  /// gọi đổi "thẻ đang ghi âm" (của đúng thẻ này) thành "thẻ đang chuyển".
+  final void Function(int soThe) khiHoanThanhGhiThe;
+
+  /// Gọi lại MỖI LẦN một thẻ vừa chuyển hoá XONG — nơi gọi (`_moGhiAmChat`)
+  /// thay "thẻ đang chuyển" bằng chữ AI trả về.
+  final void Function(int soThe, String chu) khiCoVanBan;
+
+  /// Chuyển hoá LỖI — nơi gọi dọn hẳn "thẻ đang chuyển" của thẻ đó (không
+  /// để kẹt lại mãi trong ô nhập).
+  final void Function(int soThe) khiLoiChuyenHoa;
+
+  /// Bấm "Xoá bản này và Đóng" trong khi thẻ [soThe] CHƯA hoàn thành (còn
+  /// đang ghi) — nơi gọi xoá hẳn "thẻ đang ghi âm" của thẻ đó khỏi ô nhập.
+  final void Function(int soThe) khiHuyThe;
 
   @override
   State<_KhungGhiAmChat> createState() => _KhungGhiAmChatState();
@@ -2160,6 +2290,7 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
     await ghiAmTheBatDauThe();
     if (!mounted) return;
     setState(() => _daSanSang = true);
+    widget.khiBatDauThe(_soThe);
     _chayDongHo();
   }
 
@@ -2191,8 +2322,13 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
   Future<void> _chuyenHoa(KetQuaGhiAmThe kq, int soThe) async {
     try {
       final chu = await guiGhiAmChoGemini(kq.bytes, kq.mime, locHallucination: true);
-      if (chu.trim().isNotEmpty) widget.khiCoVanBan(chu.trim());
+      if (chu.trim().isNotEmpty) {
+        widget.khiCoVanBan(soThe, chu.trim());
+      } else {
+        widget.khiLoiChuyenHoa(soThe);
+      }
     } catch (e) {
+      widget.khiLoiChuyenHoa(soThe);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Thẻ ghi âm #$soThe chuyển hoá thất bại: $e'),
@@ -2210,8 +2346,13 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
     setState(() => _dangXuLy = true);
     _dongHo?.cancel();
     final soTheVuaXong = _soThe;
+    widget.khiHoanThanhGhiThe(soTheVuaXong);
     final kq = await ghiAmTheKetThucThe();
-    if (kq != null) unawaited(_chuyenHoa(kq, soTheVuaXong));
+    if (kq != null) {
+      unawaited(_chuyenHoa(kq, soTheVuaXong));
+    } else {
+      widget.khiLoiChuyenHoa(soTheVuaXong);
+    }
 
     if (!taoTheMoi) {
       // ĐÃ SỬA (chấm đỏ "đang dùng micro" ở tab trình duyệt kẹt lại mãi dù
@@ -2234,6 +2375,7 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
       _dangXuLy = false;
       _daHienCanhBao5Phut = false;
     });
+    widget.khiBatDauThe(_soThe);
     _chayDongHo();
   }
 
@@ -2241,6 +2383,9 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
     if (_dangXuLy) return;
     setState(() => _dangXuLy = true);
     _dongHo?.cancel();
+    // Thẻ hiện tại chưa hoàn thành (chưa gửi AI) — xoá hẳn "thẻ đang ghi
+    // âm" của nó khỏi ô nhập chat, không để kẹt lại.
+    widget.khiHuyThe(_soThe);
     await ghiAmTheDongHan();
     if (mounted) Navigator.of(context).pop();
   }
@@ -2438,5 +2583,98 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
         ),
       ),
     );
+  }
+}
+
+/// (YÊU CẦU MỚI) Controller riêng cho ô nhập chat — tô nền cho "thẻ ghi
+/// âm" (token `〔🎙️ Đang ghi âm #N〕`/`〔🎙️ Đang chuyển #N〕`, xem
+/// `_ManHinhTroChuyenState._chenTheChoChuyenChat`) và ngăn người dùng
+/// đứng/xoá lẻ TỪNG KÝ TỰ bên trong token — chỉ xoá được nguyên cả token
+/// (phím Backspace ngay sau nó) hoặc để code tự thay nguyên token bằng
+/// chữ AI trả về. Đơn giản hơn NHIỀU so với bộ máy "thẻ ghi âm" của trang
+/// soạn thảo chính vì thẻ ở đây không cần phát lại, không cần menu, và
+/// chỉ sống qua đúng 2 trạng thái liên tiếp rồi biến mất ngay khi có chữ.
+class _BoDieuKhienChat extends TextEditingController {
+  static final RegExp _reThe = RegExp('〔🎙️ (?:Đang ghi âm|Đang chuyển) #(\\d+)〕');
+
+  @override
+  set selection(TextSelection newSelection) {
+    super.selection = _naRaKhoiThe(newSelection);
+  }
+
+  /// Không cho một selection RỖNG (con trỏ nhấp nháy, không bôi đen gì)
+  /// đứng NGAY GIỮA một token — đẩy ra biên gần nhất (trái hoặc phải, tuỳ
+  /// bên nào gần hơn).
+  TextSelection _naRaKhoiThe(TextSelection sel) {
+    if (!sel.isValid || !sel.isCollapsed) return sel;
+    final s = text;
+    for (final m in _reThe.allMatches(s)) {
+      final o = sel.baseOffset;
+      if (o > m.start && o < m.end) {
+        final bien = (o - m.start) <= (m.end - o) ? m.start : m.end;
+        return TextSelection.collapsed(offset: bien);
+      }
+    }
+    return sel;
+  }
+
+  @override
+  set value(TextEditingValue newValue) {
+    final cu = text;
+    // Backspace/Delete làm MẤT ĐÚNG 1 KÝ TỰ ngay sát một biên token — coi
+    // như đang muốn xoá nguyên token đó, không để sứt mẻ còn lại nửa token
+    // vô nghĩa giữa văn bản.
+    if (newValue.text.length == cu.length - 1 && newValue.selection.isCollapsed) {
+      for (final m in _reThe.allMatches(cu)) {
+        // Backspace ngay sau token (con trỏ đứng ở m.end, xoá ký tự cuối).
+        if (newValue.selection.baseOffset == m.end - 1 &&
+            cu.substring(0, m.end - 1) + cu.substring(m.end) == newValue.text) {
+          super.value = TextEditingValue(
+            text: cu.replaceRange(m.start, m.end, ''),
+            selection: TextSelection.collapsed(offset: m.start),
+          );
+          return;
+        }
+        // Delete ngay trước token (con trỏ đứng ở m.start, xoá ký tự đầu).
+        if (newValue.selection.baseOffset == m.start &&
+            cu.substring(0, m.start) + cu.substring(m.start + 1) == newValue.text) {
+          super.value = TextEditingValue(
+            text: cu.replaceRange(m.start, m.end, ''),
+            selection: TextSelection.collapsed(offset: m.start),
+          );
+          return;
+        }
+      }
+    }
+    super.value = newValue;
+  }
+
+  @override
+  TextSpan buildTextSpan({
+    required BuildContext context,
+    TextStyle? style,
+    required bool withComposing,
+  }) {
+    final s = text;
+    final matches = _reThe.allMatches(s).toList();
+    if (matches.isEmpty) {
+      return super.buildTextSpan(context: context, style: style, withComposing: withComposing);
+    }
+    final spans = <TextSpan>[];
+    var vt = 0;
+    for (final m in matches) {
+      if (m.start > vt) spans.add(TextSpan(text: s.substring(vt, m.start), style: style));
+      spans.add(TextSpan(
+        text: s.substring(m.start, m.end),
+        style: (style ?? const TextStyle()).copyWith(
+          backgroundColor: const Color(0xFFE1BEE7),
+          color: Colors.purple.shade900,
+          fontWeight: FontWeight.w600,
+        ),
+      ));
+      vt = m.end;
+    }
+    if (vt < s.length) spans.add(TextSpan(text: s.substring(vt), style: style));
+    return TextSpan(style: style, children: spans);
   }
 }

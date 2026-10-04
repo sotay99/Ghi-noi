@@ -68,6 +68,22 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   // đang chờ.
   List<NutZip>? _zipDangChoNhap;
 
+  // (YÊU CẦU MỚI) "Tìm kiếm trong này" — thay hẳn 3 dòng trên cùng + thanh
+  // ghim đáy (nếu có) bằng 2 thanh riêng khi đang mở. `static` để GIỮ
+  // NGUYÊN trạng thái (đang mở hay không, từ khoá đang gõ) qua lần đóng
+  // màn hình này để mở TỆP vừa bấm trong kết quả tìm — mở lại "Thư mục" ở
+  // trang soạn thảo thì quay thẳng lại modal tìm kiếm, đúng ý "quay lại
+  // modal tìm kiếm nếu chưa đóng".
+  bool _dangTimKiem = false;
+  String? _timKiemTrongThuMucId;
+  String _timKiemTrongThuMucTen = '';
+  final _oTimKiemThuMuc = TextEditingController();
+
+  static bool _dangTimKiemNho = false;
+  static String? _timKiemTrongThuMucIdNho;
+  static String _timKiemTrongThuMucTenNho = '';
+  static String _tuKhoaTimKiemNho = '';
+
   // (YÊU CẦU MỚI) Mục "vừa dán/nhập/khôi phục" — icon nhấp nháy (hiện/ẩn
   // mỗi giây) trong 10 giây rồi im lặng hẳn. `static` để sống qua các lần
   // Navigator.push/pop khác nhau của CHÍNH màn hình này trong một phiên
@@ -75,6 +91,11 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   // cũng không sao, chỉ là hiệu ứng thu hút chú ý tạm thời.
   static final Map<String, DateTime> _thoiDiemMucMoi = {};
   Timer? _nhipNhayNhay;
+
+  // (YÊU CẦU MỚI) Nhanh hơn 1,3 lần so với trước (mỗi pha hiện/ẩn 1 giây
+  // → còn ~770ms) nhưng vẫn giữ nguyên tổng thời gian hiệu ứng (10 giây).
+  static const _nhipNhayNhayMs = 770;
+  static const _tongGiayNhayNhay = 10;
 
   void _danhDauMucMoi(Iterable<String> ids) {
     if (ids.isEmpty) return;
@@ -87,9 +108,11 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
 
   void _dambaoNhipDangChay() {
     if (_nhipNhayNhay != null || _thoiDiemMucMoi.isEmpty) return;
-    _nhipNhayNhay = Timer.periodic(const Duration(seconds: 1), (_) {
+    _nhipNhayNhay = Timer.periodic(const Duration(milliseconds: _nhipNhayNhayMs), (_) {
       final luc = DateTime.now();
-      _thoiDiemMucMoi.removeWhere((_, t) => luc.difference(t).inSeconds >= 10);
+      _thoiDiemMucMoi.removeWhere(
+        (_, t) => luc.difference(t).inSeconds >= _tongGiayNhayNhay,
+      );
       if (_thoiDiemMucMoi.isEmpty) {
         _nhipNhayNhay?.cancel();
         _nhipNhayNhay = null;
@@ -99,12 +122,13 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   }
 
   /// true nếu icon của [id] nên VẼ RA ở đúng lúc này (nhấp nháy — xen kẽ
-  /// hiện/ẩn mỗi giây trong 10 giây đầu, mục không nằm trong danh sách thì
-  /// luôn vẽ bình thường).
+  /// hiện/ẩn mỗi ~770ms trong 10 giây đầu, mục không nằm trong danh sách
+  /// thì luôn vẽ bình thường).
   bool _hienIconLucNay(String id) {
     final t = _thoiDiemMucMoi[id];
     if (t == null) return true;
-    return DateTime.now().difference(t).inSeconds.isEven;
+    final ms = DateTime.now().difference(t).inMilliseconds;
+    return (ms ~/ _nhipNhayNhayMs).isEven;
   }
 
   KhoDuLieu get _kho => widget.kho;
@@ -128,6 +152,14 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     // Có mục đang nhấp nháy từ lần mở trước (vẫn trong phiên app này) —
     // tiếp tục đếm nhịp luôn, đừng chờ tới lần `_danhDauMucMoi` kế tiếp.
     _dambaoNhipDangChay();
+    // Modal "Tìm kiếm trong này" chưa bị tắt ở lần mở trước — quay lại
+    // đúng chỗ đó (xem chú thích ở khai báo `_dangTimKiemNho`).
+    if (_dangTimKiemNho && _timKiemTrongThuMucIdNho != null) {
+      _dangTimKiem = true;
+      _timKiemTrongThuMucId = _timKiemTrongThuMucIdNho;
+      _timKiemTrongThuMucTen = _timKiemTrongThuMucTenNho;
+      _oTimKiemThuMuc.text = _tuKhoaTimKiemNho;
+    }
   }
 
   @override
@@ -136,6 +168,11 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     // này) đọc lại đúng ở `initState`.
     _nhoThuMucId = _thuMucHienTaiId;
     _nhoDuongDan = List<String>.from(_duongDan);
+    _dangTimKiemNho = _dangTimKiem;
+    _timKiemTrongThuMucIdNho = _timKiemTrongThuMucId;
+    _timKiemTrongThuMucTenNho = _timKiemTrongThuMucTen;
+    _tuKhoaTimKiemNho = _oTimKiemThuMuc.text;
+    _oTimKiemThuMuc.dispose();
     _nhipNhayNhay?.cancel();
     super.dispose();
   }
@@ -1098,6 +1135,9 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                         ten: _tenThuMucHienTai,
                       );
                       break;
+                    case 7:
+                      _moTimKiemTrongThuMuc(_thuMucHienTaiId, _tenThuMucHienTai);
+                      break;
                   }
                 },
                 itemBuilder: (ctx) => const [
@@ -1109,6 +1149,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                   PopupMenuItem(value: 4, child: Text('Thông tin thư mục này')),
                   PopupMenuDivider(),
                   PopupMenuItem(value: 5, child: Text('Thùng rác Nội bộ')),
+                  PopupMenuItem(value: 7, child: Text('Tìm kiếm trong này')),
                 ],
               ),
             ],
@@ -1118,8 +1159,204 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     );
   }
 
+  // ------------------------------------------------- "Tìm kiếm trong này"
+
+  void _moTimKiemTrongThuMuc(String chaId, String ten) {
+    setState(() {
+      _dangTimKiem = true;
+      _timKiemTrongThuMucId = chaId;
+      _timKiemTrongThuMucTen = ten;
+      _oTimKiemThuMuc.clear();
+    });
+  }
+
+  void _tatTimKiem() {
+    setState(() {
+      _dangTimKiem = false;
+      _timKiemTrongThuMucId = null;
+      _timKiemTrongThuMucTen = '';
+      _oTimKiemThuMuc.clear();
+    });
+  }
+
+  /// Bấm vào một THƯ MỤC trong kết quả tìm kiếm — đóng hẳn modal tìm kiếm,
+  /// cây thư mục đi thẳng vào bên trong thư mục đó.
+  void _chonThuMucTuKetQuaTim(ThuMuc t) {
+    setState(() {
+      _dangTimKiem = false;
+      _timKiemTrongThuMucId = null;
+      _timKiemTrongThuMucTen = '';
+      _oTimKiemThuMuc.clear();
+      _duongDan.add(_thuMucHienTaiId);
+      _thuMucHienTaiId = t.id;
+    });
+  }
+
+  /// Thu thập ĐỆ QUY mọi thư mục con/tệp con (mọi tầng, bỏ qua mục đang
+  /// trong Thùng rác — `noiDungThuMuc` đã tự lọc) bên trong [chaId].
+  ({List<ThuMuc> thuMuc, List<GhiChuFile> ghiChu}) _thuThapDeQuy(String chaId) {
+    final noiDung = _kho.noiDungThuMuc(chaId);
+    final dsThuMuc = <ThuMuc>[...noiDung.thuMucCon];
+    final dsGhiChu = <GhiChuFile>[...noiDung.ghiChuCon];
+    for (final t in noiDung.thuMucCon) {
+      final con = _thuThapDeQuy(t.id);
+      dsThuMuc.addAll(con.thuMuc);
+      dsGhiChu.addAll(con.ghiChu);
+    }
+    return (thuMuc: dsThuMuc, ghiChu: dsGhiChu);
+  }
+
+  /// 4 nhóm kết quả, ĐÚNG thứ tự xếp từ trên xuống đã yêu cầu: thư mục
+  /// khớp có-dấu, tệp khớp có-dấu, thư mục chỉ khớp sau khi bỏ dấu, tệp
+  /// chỉ khớp sau khi bỏ dấu. Rỗng (chưa gõ gì) thì trả về 4 danh sách
+  /// rỗng.
+  ({
+    List<ThuMuc> tmCoDau,
+    List<GhiChuFile> gcCoDau,
+    List<ThuMuc> tmKhongDau,
+    List<GhiChuFile> gcKhongDau,
+  }) _ketQuaTimKiemTrongThuMuc(String chaId, String tuKhoaTho) {
+    final tuKhoa = tuKhoaTho.trim();
+    if (tuKhoa.isEmpty) {
+      return (tmCoDau: [], gcCoDau: [], tmKhongDau: [], gcKhongDau: []);
+    }
+    final tuKhoaThuong = tuKhoa.toLowerCase();
+    final tuKhoaKhongDau = _boDauTiengViet(tuKhoa);
+    final tatCa = _thuThapDeQuy(chaId);
+
+    final tmCoDau = <ThuMuc>[];
+    final tmKhongDau = <ThuMuc>[];
+    for (final t in tatCa.thuMuc) {
+      if (t.ten.toLowerCase().contains(tuKhoaThuong)) {
+        tmCoDau.add(t);
+      } else if (_boDauTiengViet(t.ten).contains(tuKhoaKhongDau)) {
+        tmKhongDau.add(t);
+      }
+    }
+    final gcCoDau = <GhiChuFile>[];
+    final gcKhongDau = <GhiChuFile>[];
+    for (final g in tatCa.ghiChu) {
+      if (g.ten.toLowerCase().contains(tuKhoaThuong)) {
+        gcCoDau.add(g);
+      } else if (_boDauTiengViet(g.ten).contains(tuKhoaKhongDau)) {
+        gcKhongDau.add(g);
+      }
+    }
+    int soTen(String a, String b) => a.toLowerCase().compareTo(b.toLowerCase());
+    tmCoDau.sort((a, b) => soTen(a.ten, b.ten));
+    tmKhongDau.sort((a, b) => soTen(a.ten, b.ten));
+    gcCoDau.sort((a, b) => soTen(a.ten, b.ten));
+    gcKhongDau.sort((a, b) => soTen(a.ten, b.ten));
+    return (tmCoDau: tmCoDau, gcCoDau: gcCoDau, tmKhongDau: tmKhongDau, gcKhongDau: gcKhongDau);
+  }
+
+  Widget _dongKetQuaTimThuMuc(ThuMuc t) => ListTile(
+        leading: Icon(Icons.folder, color: Colors.amber.shade700),
+        title: Text(t.ten, style: t.mau != null ? TextStyle(color: Color(t.mau!)) : null),
+        onTap: () => _chonThuMucTuKetQuaTim(t),
+      );
+
+  Widget _dongKetQuaTimGhiChu(GhiChuFile g) => ListTile(
+        leading: const Icon(Icons.description_outlined),
+        title: Text(g.ten, style: g.mau != null ? TextStyle(color: Color(g.mau!)) : null),
+        onTap: () => Navigator.of(context).pop(g.id),
+      );
+
+  Widget _buildTimKiem(BuildContext context) {
+    final ketQua = _ketQuaTimKiemTrongThuMuc(_timKiemTrongThuMucId!, _oTimKiemThuMuc.text);
+    final coGoTim = _oTimKiemThuMuc.text.trim().isNotEmpty;
+    final rong = ketQua.tmCoDau.isEmpty &&
+        ketQua.gcCoDau.isEmpty &&
+        ketQua.tmKhongDau.isEmpty &&
+        ketQua.gcKhongDau.isEmpty;
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (daThoat, _) {
+        if (!daThoat) _tatTimKiem();
+      },
+      child: Scaffold(
+        body: SafeArea(
+          child: Column(
+            children: [
+              Material(
+                color: const Color(0xFFF1F3F4),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Text(
+                    'Tìm kiếm trong "$_timKiemTrongThuMucTen"',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+              Material(
+                color: const Color(0xFFF1F3F4),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 8, 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _oTimKiemThuMuc,
+                          autofocus: true,
+                          onChanged: (_) => setState(() {}),
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            hintText: 'Nhập tên tệp hoặc thư mục...',
+                            border: OutlineInputBorder(),
+                            contentPadding:
+                                EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                        ),
+                      ),
+                      _NutXoaTimKiemThuMuc(
+                        onXoa: () => setState(() => _oTimKiemThuMuc.clear()),
+                      ),
+                      TextButton(
+                        onPressed: _tatTimKiem,
+                        style: TextButton.styleFrom(foregroundColor: Colors.red.shade600),
+                        child: const Text('Tắt'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Expanded(
+                child: !coGoTim
+                    ? const Center(
+                        child: Text(
+                          'Nhập ký tự để tìm kiếm',
+                          style: TextStyle(color: Color(0xFF9AA0A6)),
+                        ),
+                      )
+                    : rong
+                        ? const Center(
+                            child: Text(
+                              'Không tìm thấy kết quả',
+                              style: TextStyle(color: Color(0xFF9AA0A6)),
+                            ),
+                          )
+                        : ListView(
+                            children: [
+                              for (final t in ketQua.tmCoDau) _dongKetQuaTimThuMuc(t),
+                              for (final g in ketQua.gcCoDau) _dongKetQuaTimGhiChu(g),
+                              for (final t in ketQua.tmKhongDau) _dongKetQuaTimThuMuc(t),
+                              for (final g in ketQua.gcKhongDau) _dongKetQuaTimGhiChu(g),
+                            ],
+                          ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_dangTimKiem && _timKiemTrongThuMucId != null) {
+      return _buildTimKiem(context);
+    }
     // (YÊU CẦU MỚI) "Ngôi nhà chung" không phải thư mục thật trong `_kho` —
     // KHÔNG đưa `_ngoiNhaChung` vào `noiDungThuMuc` (id không tồn tại).
     final laNgoiNhaChung = _thuMucHienTaiId == _ngoiNhaChung;
@@ -1484,6 +1721,81 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Bỏ dấu tiếng Việt + hạ chữ thường — dùng cho "Tìm kiếm trong này" khớp cả
+/// không dấu (ví dụ gõ "Thắng" vẫn ra "thằng"/"tháng"/"thang"...).
+String _boDauTiengViet(String s) {
+  const banDo = {
+    'à': 'a', 'á': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
+    'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
+    'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a',
+    'è': 'e', 'é': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
+    'ê': 'e', 'ề': 'e', 'ế': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e',
+    'ì': 'i', 'í': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
+    'ò': 'o', 'ó': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
+    'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o',
+    'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o',
+    'ù': 'u', 'ú': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
+    'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u',
+    'ỳ': 'y', 'ý': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y',
+    'đ': 'd',
+  };
+  final buf = StringBuffer();
+  for (final ch in s.toLowerCase().split('')) {
+    buf.write(banDo[ch] ?? ch);
+  }
+  return buf.toString();
+}
+
+/// Nút "X" xoá ô nhập "Tìm kiếm trong này" — cùng kiểu với `_NutXoaCoThongBao`
+/// ở màn hình soạn thảo chính (bấm xong tự đổi thành "Đã xoá" trong 1,5 giây
+/// rồi quay lại nút X), viết riêng ở đây vì widget gốc là `private` của tệp
+/// khác.
+class _NutXoaTimKiemThuMuc extends StatefulWidget {
+  const _NutXoaTimKiemThuMuc({required this.onXoa});
+  final VoidCallback onXoa;
+
+  @override
+  State<_NutXoaTimKiemThuMuc> createState() => _NutXoaTimKiemThuMucState();
+}
+
+class _NutXoaTimKiemThuMucState extends State<_NutXoaTimKiemThuMuc> {
+  bool _vuaXoa = false;
+  Timer? _hen;
+
+  @override
+  void dispose() {
+    _hen?.cancel();
+    super.dispose();
+  }
+
+  void _bam() {
+    widget.onXoa();
+    setState(() => _vuaXoa = true);
+    _hen?.cancel();
+    _hen = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _vuaXoa = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_vuaXoa) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Text(
+          'Đã xoá',
+          style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w600),
+        ),
+      );
+    }
+    return IconButton(
+      icon: Icon(Icons.close, color: Colors.green.shade700),
+      tooltip: 'Xoá',
+      onPressed: _bam,
     );
   }
 }
