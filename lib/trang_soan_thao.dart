@@ -13676,7 +13676,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           // Enter xuống dòng, nhất quán với trải nghiệm người dùng đã
           // thấy ở chỗ khác trong app.
           final soDoan = vb.isEmpty ? 0 : _demSoDoanTaiViTri(vb, vb.length);
-          Widget dongThongTin(String s) => PopupMenuItem(
+          PopupMenuEntry<String> dongThongTin(String s) => PopupMenuItem<String>(
                 enabled: false,
                 child: Text(s, style: TextStyle(color: Colors.purple.shade700, fontSize: 13)),
               );
