@@ -2693,6 +2693,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void _khiFocusConTroDoi() {
     if (_oChu.hasFocus) {
       if (_henNhapNhayConTro != null) return;
+      // (SỬA LỖI — nhánh thử nghiệm) `_henNhapNhayConTro == null` ở đây
+      // nghĩa là MỖI lần tiêu điểm vừa chuyển từ MẤT sang CÓ LẠI (không chỉ
+      // riêng do Copy/Cắt/Dán/All — kể cả chạm ra khoảng trống rồi chạm lại
+      // vào ô, một đường Flutter tự xử lý tiêu điểm/kết nối bàn phím, chưa
+      // hề đi qua `_giuTieuDiemKhongBatBanPhimAo`). Trên thiết bị có bàn
+      // phím vật lý, dọn trước một lệnh `TextInput.clearClient` — rẻ,
+      // không gây trễ/nháy gì thấy được (Flutter đằng nào cũng sắp tự thiết
+      // lập một kết nối mới ngay sau đây) — đề phòng kết nối CŨ (nếu đang
+      // "liệt" từ trước) bị giữ lại nhầm thay vì dựng một kết nối sạch.
+      if (_coBanPhimVatLy) {
+        SystemChannels.textInput.invokeMethod<void>('TextInput.clearClient');
+      }
       _conTroDangHien.value = true;
       _henNhapNhayConTro = Timer.periodic(const Duration(milliseconds: 500), (_) {
         _conTroDangHien.value = !_conTroDangHien.value;
