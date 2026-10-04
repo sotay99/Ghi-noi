@@ -16323,9 +16323,72 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
     super.dispose();
   }
 
+  /// (YÊU CẦU MỚI) Modal hướng dẫn riêng, rộng hơn nên viết đầy đủ/dễ
+  /// hiểu hơn bản chú thích ngắn cũ — giải thích đúng mọi logic đang có:
+  /// cách dán, cách lịch sử tự ghi/đè, ý nghĩa 2 màu nền đỏ/vàng, cơ chế
+  /// ghim, và giới hạn 1000 ký tự âm thầm.
+  void _moHuongDanBoNhoTam() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hướng dẫn sử dụng bảng Bộ nhớ tạm'),
+        content: const SizedBox(
+          width: 380,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '• Dán: bấm vào một dòng, hoặc gõ đúng phím số của dòng đó '
+                  '(bàn phím rời, 1-9 rồi 0) để dán ngay vào vị trí con trỏ.',
+                ),
+                SizedBox(height: 8),
+                Text(
+                  '• Tự ghi: mỗi lần Cắt/Copy, đoạn văn bản tự thêm vào dòng '
+                  'trống đầu tiên; hết dòng trống thì đè lên dòng CŨ NHẤT '
+                  'trong các dòng chưa ghim.',
+                ),
+                SizedBox(height: 8),
+                Text(
+                  '• Màu nền đỏ nhạt = dòng cũ nhất, vàng nhạt = dòng gần cũ '
+                  'nhất trong các dòng CHƯA ghim — đây là 2 dòng sắp bị đè '
+                  'tiếp theo, chỉ hiện khi lịch sử đã đủ 10 dòng.',
+                ),
+                SizedBox(height: 8),
+                Text(
+                  '• Ghim (nút 📌): dòng đã ghim (nền xanh lá) không bao giờ '
+                  'bị đè, và không tính vào việc xác định dòng cũ/gần cũ '
+                  'nhất. Bấm lại để bỏ ghim. Ghim đủ cả 10 dòng thì lịch sử '
+                  'tạm hết chỗ ghi thêm — vẫn bình thường, Dán bằng Ctrl+V/'
+                  'nút Dán không hề bị ảnh hưởng.',
+                ),
+                SizedBox(height: 8),
+                Text(
+                  '• Đoạn nào dài hơn 1000 ký tự sẽ KHÔNG được ghi vào bảng '
+                  'này (âm thầm, không báo) — tránh bộ nhớ tạm quá nặng. '
+                  'Cắt/Copy vẫn thành công như thường vào bộ nhớ đệm của '
+                  'máy.',
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Đóng')),
+        ],
+      ),
+    );
+  }
+
   Widget _dong(int i) {
     final doan = BoNhoTamDanVanBan.lichSu[i];
     final rong = doan == null;
+    // (YÊU CẦU MỚI) Chỉ là lỗi HIỂN THỊ — đoạn CÓ dấu xuống dòng thật vẫn
+    // được dán đầy đủ, nguyên văn, không đổi gì; đây chỉ đổi dấu xuống
+    // dòng thành dấu cách NGAY TRÊN MÀN HÌNH để một dòng ngang (không tự
+    // xuống dòng, có `...` ở cuối nếu dài) hiện được nhiều chữ hơn.
+    final doanHienThi = doan?.replaceAll('\n', ' ');
     final dangGhim = BoNhoTamDanVanBan.ghim[i];
     // (YÊU CẦU MỚI — nhánh thử nghiệm) Chỉ khi ĐỦ 10 dòng (không ô nào
     // trống) mới có khái niệm "cũ nhất"/"gần cũ nhất" — và chỉ xét trong
@@ -16387,7 +16450,7 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        doan ?? '(trống)',
+                        doanHienThi ?? '(trống)',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         softWrap: false,
@@ -16457,14 +16520,19 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Bấm vào một dòng (hoặc gõ đúng phím số của dòng đó) để dán '
-              'vào vị trí con trỏ. Lịch sử mới nhất sẽ tự động ghi vào dòng '
-              'trống hoặc đè lên dòng lịch sử cũ nhất. Dòng nào được ghim '
-              '(màu xanh lá) thì không thể bị thay thế trong tương lai.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+            // (YÊU CẦU MỚI) Thay chú thích rải ở đây bằng một nút mở modal
+            // hướng dẫn riêng (xem `_moHuongDanBoNhoTam`) — modal đó rộng
+            // rãi hơn, viết đầy đủ/dễ hiểu hơn.
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _moHuongDanBoNhoTam,
+                icon: const Icon(Icons.help_outline, size: 18),
+                label: const Text('Hướng dẫn sử dụng bảng Bộ nhớ tạm'),
+                style: TextButton.styleFrom(padding: EdgeInsets.zero),
+              ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             // (SỬA LỖI — nhánh thử nghiệm) Trước đây 10 dòng nằm thẳng
             // trong `Column` KHÔNG cuộn được — nếu tổng chiều cao vượt quá
             // khung AlertDialog cho phép, Flutter CẮT HẲN phần tràn ra mà

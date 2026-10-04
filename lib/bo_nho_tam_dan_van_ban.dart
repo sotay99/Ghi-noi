@@ -33,8 +33,14 @@ class BoNhoTamDanVanBan {
   /// qua — KHÔNG lỗi, chỉ là lịch sử không còn chỗ chứa (bộ nhớ đệm hệ
   /// thống thật vẫn luôn ghi bình thường, Dán bằng Ctrl+V/nút Dán không hề
   /// bị ảnh hưởng).
+  /// (YÊU CẦU MỚI) Đoạn dài hơn ngưỡng này thì ÂM THẦM không ghi vào lịch
+  /// sử — tránh bộ nhớ tạm quá nặng. Không báo gì cho người dùng (Cắt/
+  /// Copy vẫn thành công như thường vào bộ nhớ đệm hệ thống, chỉ riêng
+  /// lịch sử 10 dòng này không nhận đoạn đó).
+  static const gioiHanKyTu = 1000;
+
   static void themMoi(String doan) {
-    if (doan.isEmpty) return;
+    if (doan.isEmpty || doan.length > gioiHanKyTu) return;
     final rong = lichSu.indexWhere((v) => v == null);
     if (rong != -1) {
       _ghiVaoO(rong, doan);
