@@ -16437,7 +16437,20 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Bộ nhớ tạm để dán văn bản'),
+      // (SỬA LỖI — nhánh thử nghiệm) Bỏ nút "Đóng" ở `actions` — thay bằng
+      // nút X đỏ cố định ở góc trên-phải, qua `title` dạng `Row` (AlertDialog
+      // không có tham số riêng cho việc này).
+      title: Row(
+        children: [
+          const Expanded(child: Text('Bộ nhớ tạm để dán văn bản')),
+          IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.close, color: Colors.red),
+            tooltip: 'Đóng',
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
+      ),
       content: SizedBox(
         width: 420,
         child: Column(
@@ -16452,13 +16465,27 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
               style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
             ),
             const SizedBox(height: 10),
-            for (var i = 0; i < BoNhoTamDanVanBan.lichSu.length; i++) _dong(i),
+            // (SỬA LỖI — nhánh thử nghiệm) Trước đây 10 dòng nằm thẳng
+            // trong `Column` KHÔNG cuộn được — nếu tổng chiều cao vượt quá
+            // khung AlertDialog cho phép, Flutter CẮT HẲN phần tràn ra mà
+            // không cuộn, khiến dòng cuối (dòng 10) chỉ còn lại một dải rất
+            // mỏng thật sự nằm trong vùng có thể bấm — đúng hiện tượng
+            // "nút ghim dòng 10 chỉ bấm được ở sát mép trên". Bọc trong
+            // `SingleChildScrollView` với chiều cao giới hạn — giờ LUÔN đủ
+            // chỗ cho mọi dòng, cuộn khi cần, không còn bị cắt.
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 420),
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    for (var i = 0; i < BoNhoTamDanVanBan.lichSu.length; i++) _dong(i),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Đóng')),
-      ],
     );
   }
 }
