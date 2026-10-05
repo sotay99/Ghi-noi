@@ -266,7 +266,18 @@ class _ModalBoNhoTamState extends State<_ModalBoNhoTam> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Bộ nhớ tạm để dán văn bản'),
+      // (YÊU CẦU MỚI) Bỏ nút "Đóng" ở `actions` — thay bằng nút X đỏ gọn
+      // gàng ở góc trên bên phải.
+      title: Row(
+        children: [
+          const Expanded(child: Text('Bộ nhớ tạm để dán văn bản')),
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.red),
+            tooltip: 'Đóng',
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
       content: SizedBox(
         width: 380,
         child: SingleChildScrollView(
@@ -322,9 +333,6 @@ class _ModalBoNhoTamState extends State<_ModalBoNhoTam> {
           ),
         ),
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Đóng')),
-      ],
     );
   }
 }

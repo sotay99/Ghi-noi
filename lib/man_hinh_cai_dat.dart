@@ -202,7 +202,18 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(tieuDe),
+        // (YÊU CẦU MỚI) Bỏ nút "Đóng" ở `actions` — thay bằng nút X đỏ gọn
+        // gàng ở góc trên bên phải.
+        title: Row(
+          children: [
+            Expanded(child: Text(tieuDe)),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.red),
+              tooltip: 'Đóng',
+              onPressed: () => Navigator.of(ctx).pop(),
+            ),
+          ],
+        ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -234,12 +245,6 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Đóng'),
-          ),
-        ],
       ),
     );
   }

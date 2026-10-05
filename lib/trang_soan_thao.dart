@@ -2483,14 +2483,19 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(tieuDe),
+        // (YÊU CẦU MỚI) Bỏ nút "Đóng" ở `actions` — thay bằng nút X đỏ gọn
+        // gàng ở góc trên bên phải.
+        title: Row(
+          children: [
+            Expanded(child: Text(tieuDe)),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.red),
+              tooltip: 'Đóng',
+              onPressed: () => Navigator.of(ctx).pop(),
+            ),
+          ],
+        ),
         content: Text(noiDung, style: const TextStyle(fontSize: 14, height: 1.4)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Đóng'),
-          ),
-        ],
       ),
     );
   }
@@ -5517,26 +5522,25 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           setState(() => _epAnBanPhimAoKhiGiuFocus = false);
         }
       });
-      // (SỬA LỖI — thảo luận với người dùng, "vẫn còn liệt bàn phím vật lý
-      // sau ĐÚNG ~1,5 giây, gõ ngay thì không sao") Dọn ống ngay ở trên vẫn
-      // chưa triệt để — người dùng xác nhận lỗi luôn rơi đúng vào một mốc
-      // cố định SAU hành động (không phải ngay lúc hành động), dù không
-      // phải do bất kỳ hẹn giờ nào của chính app (đã soát không có). Nghi
-      // ngờ: trình duyệt tự "nhả" kết nối bàn phím cũ sau một khoảng ngắn
-      // KHÔNG THẤY có ký tự nào thật sự được gõ qua nó — gõ ngay thì kết
-      // nối còn kịp dùng nên không bị nhả, chờ thì bị nhả trước khi gõ.
-      // Dọn ống LẦN THỨ HAI, hẹn ngay SAU mốc nguy hiểm đó (1,7 giây — qua
-      // cả mốc 1,5 giây người dùng quan sát được, lẫn cửa sổ "đợt gõ" 5
-      // giây ở `_dangTrongDotGoTay` vẫn còn kịp phản ánh nếu người dùng đã
-      // gõ gì trong lúc chờ) — CHỈ dọn nếu `_dangTrongDotGoTay` vẫn `false`
-      // (nghĩa là từ lúc hành động tới giờ chưa gõ ký tự nào cả; đã gõ rồi
-      // thì kết nối rõ ràng còn sống, đừng động vào giữa một đợt gõ đang
-      // chạy tốt). Mã phiên `_phienAnBanPhimAo` đảm bảo chỉ lần hành động
-      // GẦN NHẤT mới còn hiệu lực.
+      // (SỬA LỖI — thảo luận với người dùng, "v161 vẫn không khác gì cả")
+      // Dọn ống NGAY lúc hành động (ở trên) VÀ dọn lại lần hai chỉ bằng
+      // `clearClient` ở mốc 1,7 giây (v161) đều KHÔNG đổi được gì — người
+      // dùng xác nhận lỗi giữ nguyên hệt như trước. Vì cùng một việc
+      // (`clearClient`) lặp lại không có tác dụng, nghi ngờ đã chuyển:
+      // chỗ "liệt" thật không nằm ở tầng kênh giao tiếp platform
+      // (`clearClient` dọn đúng tầng đó) mà nằm sâu hơn, ở tầng
+      // Element/RenderEditable của chính `TextField` — tầng mà chỉ đổi
+      // `GlobalKey` mới huỷ-dựng-lại được (xem `_lamMoiOVanBanDeThoatKetBanPhimAo`,
+      // đang dùng cho nhánh bàn phím ẢO). Đổi hẳn lần dọn thứ hai này sang
+      // gọi ĐÚNG hàm đó (vừa `clearClient` vừa đổi `GlobalKey`, có giữ lại
+      // vị trí cuộn) thay vì chỉ gọi lại `clearClient` — thử một biến số
+      // MỚI thay vì lặp lại biến số cũ đã biết không ăn. Vẫn giữ nguyên
+      // điều kiện: hẹn ở mốc 1,7 giây, CHỈ chạy nếu `_dangTrongDotGoTay`
+      // vẫn `false` (chưa gõ gì) và đúng phiên hành động gần nhất.
       _henDonOngLanHaiVatLy?.cancel();
       _henDonOngLanHaiVatLy = Timer(const Duration(milliseconds: 1700), () {
         if (!mounted || phien != _phienAnBanPhimAo || _dangTrongDotGoTay) return;
-        SystemChannels.textInput.invokeMethod<void>('TextInput.clearClient');
+        _lamMoiOVanBanDeThoatKetBanPhimAo();
       });
       return;
     }
@@ -6639,7 +6643,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, capNhatModal) => AlertDialog(
-          title: const Text('Tự động chuyển hoá văn bản'),
+          // (YÊU CẦU MỚI) Bỏ nút "Đóng" ở `actions` — thay bằng nút X đỏ
+          // gọn gàng ở góc trên bên phải.
+          title: Row(
+            children: [
+              const Expanded(child: Text('Tự động chuyển hoá văn bản')),
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.red),
+                tooltip: 'Đóng',
+                onPressed: () => Navigator.of(ctx).pop(),
+              ),
+            ],
+          ),
           content: SizedBox(
             width: 340,
             child: Column(
@@ -6689,9 +6704,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               ],
             ),
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Đóng')),
-          ],
         ),
       ),
     );
@@ -12331,7 +12343,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       context: context,
       builder: (ctx) => AlertDialog(
         icon: const Icon(Icons.keyboard_alt_outlined, size: 28),
-        title: const Text('Danh sách phím tắt'),
+        // (YÊU CẦU MỚI) Bỏ nút "Đóng" ở `actions` — thay bằng nút X đỏ gọn
+        // gàng ở góc trên bên phải.
+        title: Row(
+          children: [
+            const Expanded(child: Text('Danh sách phím tắt')),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.red),
+              tooltip: 'Đóng',
+              onPressed: () => Navigator.of(ctx).pop(),
+            ),
+          ],
+        ),
         content: SizedBox(
           width: 360,
           child: SingleChildScrollView(
@@ -12388,10 +12411,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             ),
           ),
         ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Đóng')),
-        ],
       ),
     );
   }
@@ -12401,7 +12420,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       context: context,
       builder: (ctx) => AlertDialog(
         icon: Icon(bieuTuong, size: 28),
-        title: Text(tieuDe),
+        // (YÊU CẦU MỚI) Bỏ nút "Đóng" ở `actions` — thay bằng nút X đỏ gọn
+        // gàng ở góc trên bên phải.
+        title: Row(
+          children: [
+            Expanded(child: Text(tieuDe)),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.red),
+              tooltip: 'Đóng',
+              onPressed: () => Navigator.of(ctx).pop(),
+            ),
+          ],
+        ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -12422,13 +12452,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             ],
           ),
         ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Đóng'),
-          ),
-        ],
       ),
     );
   }
@@ -16318,7 +16341,18 @@ class _NutMauDinhDang extends StatelessWidget {
             onPressed: () => showDialog<void>(
               context: context,
               builder: (dialogCtx) => AlertDialog(
-                title: const Text('Chọn màu'),
+                // (YÊU CẦU MỚI) Bỏ nút "Đóng" ở `actions` — thay bằng nút X
+                // đỏ gọn gàng ở góc trên bên phải.
+                title: Row(
+                  children: [
+                    const Expanded(child: Text('Chọn màu')),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.red),
+                      tooltip: 'Đóng',
+                      onPressed: () => Navigator.of(dialogCtx).pop(),
+                    ),
+                  ],
+                ),
                 content: Wrap(
                   spacing: 10,
                   runSpacing: 10,
@@ -16358,12 +16392,6 @@ class _NutMauDinhDang extends StatelessWidget {
                       ),
                   ],
                 ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(dialogCtx).pop(),
-                    child: const Text('Đóng'),
-                  ),
-                ],
               ),
             ),
           ),

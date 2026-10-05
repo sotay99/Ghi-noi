@@ -79,11 +79,34 @@ lỗi — đây là một giả thuyết thử nghiệm (không đo được tr�
 thật của trình duyệt), cần người dùng dùng thử rồi báo lại, đặc biệt báo
 lại CẢ 3 tình huống mô tả ở trên riêng từng cái.
 
-Nếu v161 vẫn không hết: hướng tiếp theo đáng thử là đo lại mốc "liệt"
-chính xác hơn (có đúng luôn là ~1,5 giây không, hay dao động?), và/hoặc
-thử lặp lại việc dọn ống nhiều lần trong một khoảng (ví dụ mỗi 500ms từ
-1 tới 3 giây) thay vì đúng một lần ở 1700ms, đề phòng mốc thật không cố
-định.
+**Kết quả v161:** người dùng xác nhận — "chả khác gì cả", vẫn liệt y
+hệt như trước. Vì lần 2 (chỉ gọi lại `clearClient`, giống lần 1) không
+đổi được gì, kết luận: KHÔNG phải vấn đề "chưa đủ liều/chưa đúng lúc" —
+gọi lại ĐÚNG MỘT hành động đã biết vô tác dụng thêm nhiều lần nữa (người
+dùng có đề xuất thêm mốc 2s/2,5s/3s/3,5s/4s) cũng sẽ vô tác dụng, vì bản
+chất hành động đó không chạm đúng chỗ hỏng. Quyết định KHÔNG làm theo
+hướng "thêm nhiều mốc thời gian" — đổi biến số thay vì lặp lại biến số
+cũ.
+
+**Đã thử lần 4 (2026-10-05, v162):** đổi lần "dọn ống thứ hai" (mốc
+1700ms) từ chỉ gọi `clearClient` sang gọi ĐẦY ĐỦ
+`_lamMoiOVanBanDeThoatKetBanPhimAo()` (vừa `clearClient` VỪA đổi
+`GlobalKey` của `TextField`, có giữ lại vị trí cuộn) — hàm này trước đó
+chỉ dùng cho nhánh bàn phím ẢO, CHƯA từng thử cho bàn phím VẬT LÝ. Giả
+thuyết: chỗ "liệt" không nằm ở tầng kênh giao tiếp platform
+(`clearClient` dọn đúng tầng đó, đã thử 2 lần không ăn) mà nằm sâu hơn,
+ở tầng Element/RenderEditable — chỉ đổi `GlobalKey` mới huỷ-dựng-lại
+được tầng đó. CHƯA xác nhận hết lỗi — cần người dùng dùng thử lại đúng 3
+tình huống đã mô tả ở trên (dán từ Bộ nhớ tạm, mở/đóng bảng lịch sử lúc
+đang có con trỏ nhấp nháy, Cắt/Copy/Dán/All) rồi báo lại riêng từng cái.
+
+Nếu v162 vẫn không hết: `_lamMoiOVanBanDeThoatKetBanPhimAo()` cũng là
+"vô tác dụng" rồi — tức là NGAY CẢ đổi `GlobalKey` cũng không chạm đúng
+chỗ hỏng, nên đừng tiếp tục ở hướng "dọn ống" (bất kể nhẹ hay nặng, bất
+kể mốc thời gian nào) nữa — đây sẽ là tín hiệu cần đổi hẳn hướng điều
+tra, có thể cần log/console thật từ máy người dùng ngay lúc liệt (không
+chỉ suy đoán từ triệu chứng) mới biết chính xác cái gì đang xảy ra ở tầng
+trình duyệt.
 
 ## "Bãi đất trống" kẹt lại sau khi ẩn bàn phím ảo (bản Web)
 

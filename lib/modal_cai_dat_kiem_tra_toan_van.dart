@@ -40,16 +40,21 @@ void _hienGiaiThich(BuildContext context, String tieuDe, String noiDung) {
   showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: Text(tieuDe),
+      // (YÊU CẦU MỚI) Bỏ nút "Đóng" ở `actions` — thay bằng nút X đỏ gọn
+      // gàng ở góc trên bên phải.
+      title: Row(
+        children: [
+          Expanded(child: Text(tieuDe)),
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.red),
+            tooltip: 'Đóng',
+            onPressed: () => Navigator.of(ctx).pop(),
+          ),
+        ],
+      ),
       content: SingleChildScrollView(
         child: Text(noiDung, style: const TextStyle(height: 1.5)),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Đóng'),
-        ),
-      ],
     ),
   );
 }
