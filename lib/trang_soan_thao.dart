@@ -4178,6 +4178,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henHetCheDoNhanhChonTatCa?.cancel();
     _henLamMoiOVanBanDeThoatKet?.cancel();
     _henTatReadOnlyNhanh?.cancel();
+    _henDonOngLanHaiVatLy?.cancel();
     _dangXuLyEntry?.remove();
     _oKetQuaFileAmThanh?.dispose();
     _oKetQuaToanVan?.dispose();
@@ -5516,6 +5517,27 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           setState(() => _epAnBanPhimAoKhiGiuFocus = false);
         }
       });
+      // (SỬA LỖI — thảo luận với người dùng, "vẫn còn liệt bàn phím vật lý
+      // sau ĐÚNG ~1,5 giây, gõ ngay thì không sao") Dọn ống ngay ở trên vẫn
+      // chưa triệt để — người dùng xác nhận lỗi luôn rơi đúng vào một mốc
+      // cố định SAU hành động (không phải ngay lúc hành động), dù không
+      // phải do bất kỳ hẹn giờ nào của chính app (đã soát không có). Nghi
+      // ngờ: trình duyệt tự "nhả" kết nối bàn phím cũ sau một khoảng ngắn
+      // KHÔNG THẤY có ký tự nào thật sự được gõ qua nó — gõ ngay thì kết
+      // nối còn kịp dùng nên không bị nhả, chờ thì bị nhả trước khi gõ.
+      // Dọn ống LẦN THỨ HAI, hẹn ngay SAU mốc nguy hiểm đó (1,7 giây — qua
+      // cả mốc 1,5 giây người dùng quan sát được, lẫn cửa sổ "đợt gõ" 5
+      // giây ở `_dangTrongDotGoTay` vẫn còn kịp phản ánh nếu người dùng đã
+      // gõ gì trong lúc chờ) — CHỈ dọn nếu `_dangTrongDotGoTay` vẫn `false`
+      // (nghĩa là từ lúc hành động tới giờ chưa gõ ký tự nào cả; đã gõ rồi
+      // thì kết nối rõ ràng còn sống, đừng động vào giữa một đợt gõ đang
+      // chạy tốt). Mã phiên `_phienAnBanPhimAo` đảm bảo chỉ lần hành động
+      // GẦN NHẤT mới còn hiệu lực.
+      _henDonOngLanHaiVatLy?.cancel();
+      _henDonOngLanHaiVatLy = Timer(const Duration(milliseconds: 1700), () {
+        if (!mounted || phien != _phienAnBanPhimAo || _dangTrongDotGoTay) return;
+        SystemChannels.textInput.invokeMethod<void>('TextInput.clearClient');
+      });
       return;
     }
 
@@ -5596,6 +5618,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Debounce riêng, ngắn, cho việc trả `readOnly` về bình thường trên
   /// thiết bị có bàn phím vật lý — xem `_giuTieuDiemKhongBatBanPhimAo`.
   Timer? _henTatReadOnlyNhanh;
+
+  /// Hẹn giờ "dọn ống lần hai" cho bàn phím vật lý — xem giải thích ở
+  /// `_giuTieuDiemKhongBatBanPhimAo`.
+  Timer? _henDonOngLanHaiVatLy;
 
   /// Khoảng yên trước khi dựng lại ô soạn thảo để thoát kẹt bàn phím ảo —
   /// xem giải thích ở `_giuTieuDiemKhongBatBanPhimAo`.
@@ -16486,7 +16512,19 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Hướng dẫn sử dụng bảng Bộ nhớ tạm'),
+        // (YÊU CẦU MỚI) Bỏ nút "Đóng" ở dưới cùng — thay bằng nút X đỏ gọn
+        // gàng ở góc trên bên phải, y hệt kiểu `_tieuDeVaNutDong` đã dùng ở
+        // `modal_thong_tin_muc.dart`.
+        title: Row(
+          children: [
+            const Expanded(child: Text('Hướng dẫn sử dụng bảng Bộ nhớ tạm')),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.red),
+              tooltip: 'Đóng',
+              onPressed: () => Navigator.of(ctx).pop(),
+            ),
+          ],
+        ),
         content: const SizedBox(
           width: 380,
           child: SingleChildScrollView(
@@ -16529,9 +16567,6 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
             ),
           ),
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Đóng')),
-        ],
       ),
     );
   }
@@ -16574,6 +16609,37 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
       );
     }
 
+    // (YÊU CẦU MỚI) Màn hẹp: bỏ hẳn khung vuông quanh số — chỉ còn đúng con
+    // số, sát mép trái, nhường tối đa chỗ ngang cho đoạn văn bản bên phải.
+    // Màn rộng giữ nguyên khung "phím N" như cũ.
+    final manHinhHep = MediaQuery.sizeOf(context).width < _TrangSoanThaoState._nguongManHinhHep;
+    final oSoThuTu = manHinhHep
+        ? Text(
+            '${(i + 1) % 10}',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: rong ? const Color(0xFF9AA0A6) : const Color(0xFF1A73E8),
+            ),
+          )
+        : Container(
+            width: 56,
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            decoration: BoxDecoration(
+              color: rong ? const Color(0xFFF1F3F4) : const Color(0xFFE8F0FE),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              BoNhoTamDanVanBan.nhanPhim(i),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: rong ? const Color(0xFF9AA0A6) : const Color(0xFF1A73E8),
+              ),
+            ),
+          );
+
     return Container(
       decoration: trangTri,
       child: Row(
@@ -16582,31 +16648,11 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
             child: InkWell(
               onTap: rong ? null : () => widget.khiChonDong(i),
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                padding: EdgeInsets.symmetric(vertical: 6, horizontal: manHinhHep ? 2 : 4),
                 child: Row(
                   children: [
-                    Container(
-                      width: 56,
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      decoration: BoxDecoration(
-                        color: rong ? const Color(0xFFF1F3F4) : const Color(0xFFE8F0FE),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        // (YÊU CẦU MỚI) Màn hẹp: chỉ hiện số, bỏ chữ "phím"
-                        // cho gọn — màn rộng vẫn giữ "phím N" như cũ.
-                        MediaQuery.sizeOf(context).width < _TrangSoanThaoState._nguongManHinhHep
-                            ? '${(i + 1) % 10}'
-                            : BoNhoTamDanVanBan.nhanPhim(i),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: rong ? const Color(0xFF9AA0A6) : const Color(0xFF1A73E8),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
+                    oSoThuTu,
+                    SizedBox(width: manHinhHep ? 4 : 10),
                     Expanded(
                       child: Text(
                         doanHienThi ?? '(trống)',
@@ -16658,6 +16704,8 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
 
   @override
   Widget build(BuildContext context) {
+    final manHinhHepBeNgang =
+        MediaQuery.sizeOf(context).width < _TrangSoanThaoState._nguongManHinhHep;
     return AlertDialog(
       // (SỬA LỖI — nhánh thử nghiệm) Bỏ nút "Đóng" ở `actions` — thay bằng
       // nút X đỏ cố định ở góc trên-phải, qua `title` dạng `Row` (AlertDialog
@@ -16673,6 +16721,21 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
           ),
         ],
       ),
+      // (SỬA LỖI — "màn hình hẹp chiều cao vẫn chưa cuộn được để thấy đủ
+      // 10 dòng") Trước đây chỉ bọc riêng 10 dòng trong một
+      // `ConstrainedBox(maxHeight: 420)` + `SingleChildScrollView` — nhưng
+      // `AlertDialog` (mặc định `scrollable: false`) không tự co giãn/cuộn
+      // theo chiều cao MÀN HÌNH THẬT: nếu tổng chiều cao tiêu đề + 2 nút +
+      // khung 420 đó vượt quá khung mà hệ thống dành cho dialog trên một
+      // màn hẹp chiều cao, phần vượt bị CẮT từ ngoài `AlertDialog`, trước
+      // khi cuộn nội bộ của khung 420 kịp có tác dụng — y hệt cách
+      // `_BangDieuKhienGhiAm` (bảng điều khiển trình ghi âm) đang làm:
+      // `scrollable: true` gộp TITLE + CONTENT vào đúng MỘT
+      // `SingleChildScrollView` do chính `AlertDialog` tự quản, luôn cuộn
+      // được bất kể màn hình cao hay thấp. Bỏ hẳn `ConstrainedBox` cố định
+      // 420 cũ — lồng 2 `SingleChildScrollView` vào nhau dễ sinh cử chỉ
+      // cuộn chồng chéo, không cần thiết khi đã có đúng một lớp cuộn ngoài.
+      scrollable: true,
       content: SizedBox(
         width: 420,
         child: Column(
@@ -16689,7 +16752,9 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
                 TextButton.icon(
                   onPressed: _moHuongDanBoNhoTam,
                   icon: const Icon(Icons.help_outline, size: 18),
-                  label: const Text('Hướng dẫn sử dụng'),
+                  // (YÊU CẦU MỚI) Màn hẹp bề ngang: rút gọn còn "Hướng dẫn"
+                  // (vẫn giữ icon) — màn rộng giữ nguyên tên đầy đủ.
+                  label: Text(manHinhHepBeNgang ? 'Hướng dẫn' : 'Hướng dẫn sử dụng'),
                   style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
                 ),
                 TextButton.icon(
@@ -16701,23 +16766,10 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
               ],
             ),
             const SizedBox(height: 6),
-            // (SỬA LỖI — nhánh thử nghiệm) Trước đây 10 dòng nằm thẳng
-            // trong `Column` KHÔNG cuộn được — nếu tổng chiều cao vượt quá
-            // khung AlertDialog cho phép, Flutter CẮT HẲN phần tràn ra mà
-            // không cuộn, khiến dòng cuối (dòng 10) chỉ còn lại một dải rất
-            // mỏng thật sự nằm trong vùng có thể bấm — đúng hiện tượng
-            // "nút ghim dòng 10 chỉ bấm được ở sát mép trên". Bọc trong
-            // `SingleChildScrollView` với chiều cao giới hạn — giờ LUÔN đủ
-            // chỗ cho mọi dòng, cuộn khi cần, không còn bị cắt.
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 420),
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    for (var i = 0; i < BoNhoTamDanVanBan.lichSu.length; i++) _dong(i),
-                  ],
-                ),
-              ),
+            Column(
+              children: [
+                for (var i = 0; i < BoNhoTamDanVanBan.lichSu.length; i++) _dong(i),
+              ],
             ),
           ],
         ),

@@ -48,12 +48,42 @@ CHỦ Ý KHÔNG làm thêm: không mở rộng việc "dọn nhẹ mỗi lần c
 phím ảo (rủi ro phá hỏng chính lúc trình duyệt tự quyết định có bật bàn
 phím ảo hay không, biến ca đang chạy tốt thành hỏng) — xem thảo luận đầy
 đủ trong lịch sử trò chuyện lúc sửa, không lặp lại hướng đó nếu chưa có
-dữ liệu mới. Người dùng CHƯA xác nhận bản vá này hết lỗi — cần hỏi lại
-sau khi dùng thử một thời gian trước khi coi là xong.
+dữ liệu mới.
 
-Hướng đã thử TRƯỚC v160: dọn kết nối bàn phím ảo (`TextInput.clearClient`) ngay lúc
-tiêu điểm vừa chuyển từ mất sang có lại — xem `_khiFocusConTroDoi` ở
-`trang_soan_thao.dart`.
+**Kết quả v160:** người dùng xác nhận — bàn phím ẢO tạm hết lỗi (chưa chắc
+triệt để, hẹn báo lại nếu gặp lại). Bàn phím VẬT LÝ **vẫn còn**, và mô tả
+thêm chi tiết mới quan trọng (2026-10-05):
+- Dán 1 dòng từ bảng Bộ nhớ tạm vào vị trí con trỏ → gõ tay NGAY thì
+  không sao; CHỜ ĐÚNG khoảng 1,5 giây mới gõ thì liệt hẳn.
+- Mở bảng 10 dòng lịch sử (không dán gì), đóng lại, gõ tay NGAY thì không
+  sao; chờ 1,5 giây mới gõ thì liệt — NHƯNG CHỈ KHI con trỏ đang nhấp
+  nháy (ô soạn thảo đang giữ tiêu điểm) TRƯỚC LÚC mở bảng. Không có con
+  trỏ nhấp nháy trước đó thì mở/đóng bảng thoải mái, không lỗi.
+- Cắt/Copy/Dán/All (bấm nút hay phím tắt) → LUÔN liệt sau 1,5 giây nếu
+  không gõ ngay, KHÔNG PHÂN BIỆT có con trỏ nhấp nháy trước đó hay không.
+
+Đã soát lại toàn bộ code, KHÔNG tìm thấy hẹn giờ (`Timer`) nào của chính
+app chạy đúng mốc ~1,5 giây sau các hành động trên — nghi ngờ đây là một
+mốc "ân hạn" tự nhiên của trình duyệt: giữ kết nối bàn phím cũ "sống tạm"
+một lúc sau khi tiêu điểm/vùng chọn đổi, rồi tự âm thầm nhả nếu không
+thấy ký tự nào thật sự được gõ qua nó trong khoảng đó.
+
+**Đã thử lần 3 (2026-10-05, v161):** thêm "dọn ống LẦN HAI" cho bàn phím
+vật lý — ngoài `clearClient` gọi ngay lúc hành động (đã có từ v160), hẹn
+thêm một lần `clearClient` nữa ở mốc 1700ms SAU hành động (qua đúng mốc
+1,5 giây quan sát được), nhưng CHỈ chạy nếu tới lúc đó người dùng vẫn
+CHƯA gõ ký tự nào (đọc cờ `_dangTrongDotGoTay`) — tránh động vào một đợt
+gõ đang chạy tốt. Xem `_henDonOngLanHaiVatLy` ở
+`_giuTieuDiemKhongBatBanPhimAo`, `trang_soan_thao.dart`. CHƯA xác nhận hết
+lỗi — đây là một giả thuyết thử nghiệm (không đo được trực tiếp hành vi
+thật của trình duyệt), cần người dùng dùng thử rồi báo lại, đặc biệt báo
+lại CẢ 3 tình huống mô tả ở trên riêng từng cái.
+
+Nếu v161 vẫn không hết: hướng tiếp theo đáng thử là đo lại mốc "liệt"
+chính xác hơn (có đúng luôn là ~1,5 giây không, hay dao động?), và/hoặc
+thử lặp lại việc dọn ống nhiều lần trong một khoảng (ví dụ mỗi 500ms từ
+1 tới 3 giây) thay vì đúng một lần ở 1700ms, đề phòng mốc thật không cố
+định.
 
 ## "Bãi đất trống" kẹt lại sau khi ẩn bàn phím ảo (bản Web)
 
