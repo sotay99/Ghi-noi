@@ -4182,8 +4182,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _henHetLietPastePhimAo?.cancel();
     _henHetCheDoNhanhChonTatCa?.cancel();
     _henLamMoiOVanBanDeThoatKet?.cancel();
-    _henTatReadOnlyNhanh?.cancel();
-    _henDonOngLanHaiVatLy?.cancel();
     _dangXuLyEntry?.remove();
     _oKetQuaFileAmThanh?.dispose();
     _oKetQuaToanVan?.dispose();
@@ -5475,6 +5473,29 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// dồn dập, và chỉ tắt lại đúng MỘT lần, sau khi lần bấm cuối cùng đã yên —
   /// không còn cảnh bật/tắt xen nhau liên tục nữa.
   void _giuTieuDiemKhongBatBanPhimAo() {
+    // (SỬA LỖI — thảo luận với người dùng, "4 lần dọn ống đều không ăn,
+    // nghi ngờ chính cơ chế readOnly/clearClient/GlobalKey mới là NGUYÊN
+    // NHÂN, không phải cách chữa") Toàn bộ phần dưới (đổi `readOnly` tạm
+    // thời, `clearClient`, hẹn giờ đổi `GlobalKey`) CHỈ tồn tại để chống
+    // bàn phím ẢO tự bật/kẹt — thứ bàn phím VẬT LÝ không hề đụng tới. Cờ
+    // `_coBanPhimVatLy` đã có từ lâu để nhận biết đúng điều đó (xem chú
+    // thích gốc ở nơi khai báo), nhưng trước đây hàm này vẫn LỠ áp dụng
+    // một phần cơ chế đó (bật `_epAnBanPhimAoKhiGiuFocus` ngay từ đầu hàm,
+    // trước cả khi kiểm tra cờ) cho MỌI thiết bị — tức là bàn phím vật lý
+    // vẫn bị đổi `readOnly` qua lại mỗi lần bấm Copy/Cắt/Dán/All/Micro,
+    // dù hoàn toàn không cần. Rất có thể chính việc đổi `readOnly` liên
+    // tục đó mới là thứ làm "liệt" kết nối bàn phím vật lý — 4 lần dọn
+    // ống trước đây đều chữa ở hạ nguồn, không chặn đúng hành động gây
+    // ra lỗi. Kiểm tra cờ này NGAY ĐẦU hàm — có bàn phím vật lý thì CHỈ
+    // xin lại tiêu điểm, không đụng gì khác (không `readOnly`, không
+    // `clearClient`, không đổi `GlobalKey`) — trả lại đúng hành vi của
+    // trang TRƯỚC KHI có các nút Copy/Cắt/Dán/All/Micro "nâng cao" này.
+    if (_coBanPhimVatLy) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _oChu.requestFocus();
+      });
+      return;
+    }
     if (_boPhimNhanhCamUngMo) {
       // Bộ phím nhanh đang mở đã tự lo đúng `readOnly` theo quy tắc riêng
       // của nó rồi (`_epHienBanPhimAoTrongBoPhimNhanh`) — không đụng vào,
@@ -5492,58 +5513,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       if (!mounted || phien != _phienAnBanPhimAo) return;
       _oChu.requestFocus();
     });
-
-    // (SỬA LỖI — nhánh thử nghiệm) Thiết bị đã gắn bàn phím vật lý: không
-    // có gì để "thoát kẹt" cả (xem giải thích đầy đủ ở nhánh dưới) — chỉ
-    // cần trả `readOnly` về bình thường THẬT NHANH sau khi đã yên tay, để
-    // không ảnh hưởng gì tới việc gõ tiếp bằng bàn phím vật lý. Debounce
-    // riêng, ngắn (60ms, y hệt con số gốc trước khi sửa) — KHÔNG dùng
-    // chung hẹn giờ 450ms của nhánh bàn phím ảo bên dưới, vì nhánh đó còn
-    // phải chờ rồi dựng lại ô soạn thảo, còn ở đây không có gì phải chờ.
-    //
-    // (SỬA LỖI — thảo luận với người dùng, "liệt bàn phím vật lý sau khi
-    // dùng Bộ nhớ tạm/Copy/Cắt/Dán/All") Hàm này gọi `requestFocus()` ngay
-    // sau đây (ở `addPostFrameCallback` phía trên) — nhưng nếu `_oChu` đã
-    // SẴN giữ tiêu điểm từ trước (không có chuyển mất→có), lệnh đó là
-    // no-op về mặt tiêu điểm, và quan trọng hơn: `_khiFocusConTroDoi` (nơi
-    // DUY NHẤT đang gọi `TextInput.clearClient` để dọn kết nối cũ cho bàn
-    // phím vật lý) CHỈ chạy khi có đúng một lượt chuyển mất→có — không chạy
-    // ở đây. Đường (Copy/Cắt/Dán/All, dán từ Bộ nhớ tạm...) vì vậy có thể
-    // "lọt qua" mà không được dọn kết nối lần nào, dù tiêu điểm trông vẫn
-    // bình thường. Gọi thẳng `clearClient` NGAY TẠI ĐÂY — rẻ, đã chứng minh
-    // an toàn/không gây nháy ở `_khiFocusConTroDoi` — để chắc chắn đường
-    // này cũng được dọn, không phải chờ một chuyển tiêu điểm có thể không
-    // bao giờ xảy ra.
-    if (_coBanPhimVatLy) {
-      SystemChannels.textInput.invokeMethod<void>('TextInput.clearClient');
-      _henTatReadOnlyNhanh?.cancel();
-      _henTatReadOnlyNhanh = Timer(const Duration(milliseconds: 60), () {
-        if (mounted && phien == _phienAnBanPhimAo) {
-          setState(() => _epAnBanPhimAoKhiGiuFocus = false);
-        }
-      });
-      // (SỬA LỖI — thảo luận với người dùng, "v161 vẫn không khác gì cả")
-      // Dọn ống NGAY lúc hành động (ở trên) VÀ dọn lại lần hai chỉ bằng
-      // `clearClient` ở mốc 1,7 giây (v161) đều KHÔNG đổi được gì — người
-      // dùng xác nhận lỗi giữ nguyên hệt như trước. Vì cùng một việc
-      // (`clearClient`) lặp lại không có tác dụng, nghi ngờ đã chuyển:
-      // chỗ "liệt" thật không nằm ở tầng kênh giao tiếp platform
-      // (`clearClient` dọn đúng tầng đó) mà nằm sâu hơn, ở tầng
-      // Element/RenderEditable của chính `TextField` — tầng mà chỉ đổi
-      // `GlobalKey` mới huỷ-dựng-lại được (xem `_lamMoiOVanBanDeThoatKetBanPhimAo`,
-      // đang dùng cho nhánh bàn phím ẢO). Đổi hẳn lần dọn thứ hai này sang
-      // gọi ĐÚNG hàm đó (vừa `clearClient` vừa đổi `GlobalKey`, có giữ lại
-      // vị trí cuộn) thay vì chỉ gọi lại `clearClient` — thử một biến số
-      // MỚI thay vì lặp lại biến số cũ đã biết không ăn. Vẫn giữ nguyên
-      // điều kiện: hẹn ở mốc 1,7 giây, CHỈ chạy nếu `_dangTrongDotGoTay`
-      // vẫn `false` (chưa gõ gì) và đúng phiên hành động gần nhất.
-      _henDonOngLanHaiVatLy?.cancel();
-      _henDonOngLanHaiVatLy = Timer(const Duration(milliseconds: 1700), () {
-        if (!mounted || phien != _phienAnBanPhimAo || _dangTrongDotGoTay) return;
-        _lamMoiOVanBanDeThoatKetBanPhimAo();
-      });
-      return;
-    }
 
     // (SỬA LỖI v120 — "cứng đầu", vẫn còn kẹt sau v119, cả ở Dán) Bật/tắt
     // `readOnly` liên tục, dồn dập có lúc làm trình duyệt (web) đánh mất
@@ -5618,14 +5587,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   /// Xem chú thích ở nơi được bật, trong `_giuTieuDiemKhongBatBanPhimAo`.
   bool _choChamLaiDeBatBanPhimAo = false;
-
-  /// Debounce riêng, ngắn, cho việc trả `readOnly` về bình thường trên
-  /// thiết bị có bàn phím vật lý — xem `_giuTieuDiemKhongBatBanPhimAo`.
-  Timer? _henTatReadOnlyNhanh;
-
-  /// Hẹn giờ "dọn ống lần hai" cho bàn phím vật lý — xem giải thích ở
-  /// `_giuTieuDiemKhongBatBanPhimAo`.
-  Timer? _henDonOngLanHaiVatLy;
 
   /// Khoảng yên trước khi dựng lại ô soạn thảo để thoát kẹt bàn phím ảo —
   /// xem giải thích ở `_giuTieuDiemKhongBatBanPhimAo`.
@@ -13928,10 +13889,21 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// ra CÙNG LÚC ở cả hai nơi, lỗi người dùng báo). KHÔNG có "Dán" ở đây —
   /// nút Dán đã luôn hiện sẵn, cố định, ở `_dsNutCongCu`/`_nutDanCongCu`
   /// (thanh trên cùng), thêm một nút Dán thứ hai ở đây chỉ dư thừa.
+  ///
+  /// (YÊU CẦU MỚI) Thêm nút "Xoá" ngay cạnh bên phải "Cắt" — hình dạng/logic
+  /// Y CHANG nút xoá ký tự của Bộ phím nhanh (`_NutPhimAo`, nền/viền đỏ,
+  /// nhãn ⌫, gọi thẳng `_xoaKyTuTuPhimAo` — hàm đó đã tự xử lý đúng việc
+  /// xoá nguyên vùng đang chọn khi `selection` không rỗng, không cần viết
+  /// logic mới), bọc qua `_bamCopyCutPasteOHangThayNav` y hệt Copy/Cắt để
+  /// hàng này tự ẩn ngay sau khi bấm. CHỈ hiện ở màn hình KHÔNG quá hẹp —
+  /// màn RẤT hẹp (ngưỡng 420, xem `_nguongManHinhRatHep` ở
+  /// `thanh_cong_cu.dart`) thì nút này dời lên hàng trên cạnh "Dán" (xem
+  /// `build`), không lặp lại ở đây.
   Widget _hangCopyCutPaste() {
     // Chữ xanh dương — nổi bật đúng ngữ cảnh "đang ở phía trên", khác hai nút
     // cùng tên ở Bộ phím nhanh (giữ màu mặc định).
     const mauChu = Color(0xFF1A73E8);
+    final ratHep = MediaQuery.sizeOf(context).width < 420;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -13946,6 +13918,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           mauChu: mauChu,
           onTap: () => _bamCopyCutPasteOHangThayNav(_phimAoCut),
         ),
+        if (!ratHep) ...[
+          const SizedBox(width: 6),
+          _NutPhimAo(
+            nhan: '⌫',
+            moTa: 'Xoá đoạn đang chọn',
+            mauNen: Colors.red.shade50,
+            mauVien: Colors.red.shade300,
+            rong: 40,
+            onTap: () => _bamCopyCutPasteOHangThayNav(_xoaKyTuTuPhimAo),
+          ),
+        ],
       ],
     );
   }
@@ -14879,6 +14862,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // thanh luôn nằm khít mép trên bàn phím.
     final caoBanPhim = MediaQuery.viewInsetsOf(context).bottom;
     final manHinhHep = MediaQuery.sizeOf(context).width < _nguongManHinhHep;
+    // (YÊU CẦU MỚI) Màn RẤT hẹp — xem `_nguongManHinhRatHep` ở
+    // `thanh_cong_cu.dart` (cùng ngưỡng 420) — dời nút "Xoá" từ hàng
+    // Copy/Cắt (`_hangCopyCutPaste`) lên đây, cạnh "Dán".
+    final ratHep = MediaQuery.sizeOf(context).width < 420;
 
     // Màn hình rộng (máy tính bảng): tên tệp và công cụ chung một dòng, như
     // thiết kế gốc. Màn hình hẹp (điện thoại): tên tệp một dòng riêng, công
@@ -14900,7 +14887,25 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             // (YÊU CẦU MỚI) Màn hẹp: nút "Bộ nhớ tạm" đi CHUNG với "Dán" ở
             // hàng trên (cùng dòng tên tệp), sát mép phải — không còn ở gần
             // "abc" nữa (xem `_dsNutCongCu`, `coBoNhoTam: false` ở dưới).
+            //
+            // (YÊU CẦU MỚI) Màn RẤT hẹp + có vùng chọn thật: nút "Xoá" (y
+            // chang hình dạng/logic nút xoá ký tự của Bộ phím nhanh) đứng
+            // ngay bên TRÁI "Dán" — đây là nơi DUY NHẤT nó xuất hiện ở màn
+            // rất hẹp, không lặp lại ở hàng Copy/Cắt dưới (`_hangCopyCutPaste`
+            // đã tự ẩn nó khi `ratHep`).
             actions: [
+              if (ratHep && _hienHangCopyCutPaste())
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: _NutPhimAo(
+                    nhan: '⌫',
+                    moTa: 'Xoá đoạn đang chọn',
+                    mauNen: Colors.red.shade50,
+                    mauVien: Colors.red.shade300,
+                    rong: 40,
+                    onTap: () => _bamCopyCutPasteOHangThayNav(_xoaKyTuTuPhimAo),
+                  ),
+                ),
               _nutDanCongCu(),
               if (widget.caiDat.boNhoTamDanVanBanBat) _nutBoNhoTamCongCu(),
             ],
