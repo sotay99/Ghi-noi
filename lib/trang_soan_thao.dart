@@ -5957,7 +5957,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // (YÊU CẦU MỚI — nhánh thử nghiệm) "Bộ nhớ tạm để dán văn bản" — thêm
     // vào lịch sử 10 dòng, KHÔNG thay thế gì ở trên (bộ nhớ đệm hệ thống
     // vẫn luôn được ghi như cũ).
-    if (widget.caiDat.boNhoTamDanVanBanBat) BoNhoTamDanVanBan.themMoi(doan);
+    // (YÊU CẦU MỚI) Lưu luôn gói định dạng (nếu có) kèm theo dòng lịch sử —
+    // tái sử dụng chính gói vừa đóng cho `text/html` ở trên (tách lại từ
+    // [htmlClip] qua `_tachGoiDinhDangTuHtml`, không tính toán lại từ đầu).
+    if (widget.caiDat.boNhoTamDanVanBanBat) {
+      BoNhoTamDanVanBan.themMoi(doan, dinhDangGoi: _tachGoiDinhDangTuHtml(htmlClip));
+    }
     if (mounted) hienThongBaoGiua(context, 'Đã copy vào bộ nhớ đệm', ganTren: true);
   }
 
@@ -5985,7 +5990,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (!daGhiGiauDinhDang) {
       await Clipboard.setData(ClipboardData(text: doan));
     }
-    if (widget.caiDat.boNhoTamDanVanBanBat) BoNhoTamDanVanBan.themMoi(doan);
+    // (YÊU CẦU MỚI) Xem giải thích ở `_phimAoCopy`, cùng cơ chế.
+    if (widget.caiDat.boNhoTamDanVanBanBat) {
+      BoNhoTamDanVanBan.themMoi(doan, dinhDangGoi: _tachGoiDinhDangTuHtml(htmlClip));
+    }
     // Cắt LUÔN phải là một mốc Lùi lại/Tiến tới RIÊNG của chính nó — không
     // được gộp chung vào đợt gõ tay đang dở (nếu vừa gõ gì đó trong 5 giây
     // trước). Kết thúc đợt gõ hiện tại TRƯỚC khi áp dụng thay đổi: lượt sửa
@@ -8400,8 +8408,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         khiChonDong: (i) {
           final doan = BoNhoTamDanVanBan.lichSu[i];
           if (doan == null) return;
+          final goi = BoNhoTamDanVanBan.dinhDang[i];
           Navigator.of(dialogCtx).pop();
-          _danTuBoNhoTam(doan);
+          _danTuBoNhoTam(doan, dinhDangGoi: goi);
         },
       ),
     );
@@ -8413,7 +8422,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// trí con trỏ — y hệt lõi của `_phimAoPaste`, bỏ phần đọc/khôi phục định
   /// dạng HTML vì cả hai nguồn đều chỉ lưu CHUỖI THÔ (không kèm gói định
   /// dạng).
-  void _danTuBoNhoTam(String chenGoc, {String thongBao = 'Đã dán văn bản từ Bộ nhớ tạm'}) {
+  void _danTuBoNhoTam(
+    String chenGoc, {
+    String thongBao = 'Đã dán văn bản từ Bộ nhớ tạm',
+    String? dinhDangGoi,
+  }) {
     var chen = chenGoc;
     final chon = _boDieuKhien.selection;
     if (!chon.isValid) return;
@@ -8430,6 +8443,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       chen = chen.replaceFirst(RegExp(r'^ +'), '');
       if (chen.isEmpty) return;
     }
+    // (YÊU CẦU MỚI) Xoá dấu cách đầu làm lệch toạ độ gói định dạng (đóng gói
+    // theo đúng [chenGoc] chưa xoá gì) — mất định dạng còn hơn gán sai chỗ,
+    // y hệt lý do `matDinhDangViXoaCach` ở `_phimAoPaste`.
+    final matDinhDangViXoaCach = chen != chenGoc;
     _henRanhGioiGoTay?.cancel();
     _dangTrongDotGoTay = false;
     if (dangBatTuDongThut) _tamNgungTuDongThutDauDong = true;
@@ -8439,6 +8456,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       selection: TextSelection.collapsed(offset: batDau + chen.length),
     );
     if (dangBatTuDongThut) _tamNgungTuDongThutDauDong = false;
+    if (!matDinhDangViXoaCach && dinhDangGoi != null) {
+      setState(() => _apDungGoiDinhDangTuClipboard(dinhDangGoi, chen, batDau));
+    }
     _giuFocusOChuSauKhiBam();
     _cuonToiConTroNeuCan();
     if (mounted) hienThongBaoGiua(context, thongBao, ganTren: true);
@@ -8489,6 +8509,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           final doan = widget.caiDat.tuDienNhapLieuNhanh[i];
           Navigator.of(dialogCtx).pop();
           if (doan.trim().isEmpty) return;
+          _GanDayTuDienNhapLieuNhanh.ghiNhan(i);
           _danTuBoNhoTam(doan, thongBao: 'Đã dán văn bản từ Từ điển nhập liệu nhanh');
         },
       ),
@@ -16852,6 +16873,29 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             padding: EdgeInsets.zero,
           ),
+          // (YÊU CẦU MỚI) Nút sao chép riêng — CHỈ ghi vào bộ nhớ đệm hệ
+          // thống (để dán lại ở bất cứ đâu, kể cả trong Từ điển nhập liệu
+          // nhanh), KHÔNG ghi thêm vào chính lịch sử 10 dòng này. Luôn là
+          // nút CUỐI trong `Row` nên tự sát mép phải modal.
+          IconButton(
+            onPressed: rong
+                ? null
+                : () async {
+                    await Clipboard.setData(ClipboardData(text: doan!));
+                    if (mounted) {
+                      hienThongBaoGiua(context, 'Đã sao chép nội dung vào bộ nhớ đệm');
+                    }
+                  },
+            icon: Icon(
+              Icons.copy_outlined,
+              size: 16,
+              color: rong ? const Color(0xFF9AA0A6) : const Color(0xFF5F6368),
+            ),
+            tooltip: 'Sao chép nội dung dòng này vào bộ nhớ đệm',
+            visualDensity: VisualDensity.compact,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            padding: EdgeInsets.zero,
+          ),
         ],
       ),
     );
@@ -16930,6 +16974,33 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
         ),
       ),
     );
+  }
+}
+
+/// (YÊU CẦU MỚI) Nhớ TẠM (biến tĩnh trong bộ nhớ — mất khi F5/mở lại app,
+/// không ghi đĩa) tối đa 10 lần dán gần nhất ở bảng 26 dòng "Từ điển nhập
+/// liệu nhanh", dùng để tô màu nền xanh lá mỗi lần mở lại bảng — phần tử ở
+/// CUỐI danh sách là lần dán MỚI NHẤT.
+class _GanDayTuDienNhapLieuNhanh {
+  _GanDayTuDienNhapLieuNhanh._();
+  static final List<int> _ds = [];
+  static const _gioiHan = 10;
+
+  static void ghiNhan(int i) {
+    _ds.remove(i);
+    _ds.add(i);
+    while (_ds.length > _gioiHan) {
+      _ds.removeAt(0);
+    }
+  }
+
+  /// `null` nếu dòng [i] không nằm trong 10 lần dán gần nhất; ngược lại độ
+  /// "mới" của nó (0 = mới nhất) — dùng để `_dong` chọn xanh đậm (0-4) hay
+  /// xanh nhạt (5-9).
+  static int? doMoi(int i) {
+    final vt = _ds.lastIndexOf(i);
+    if (vt == -1) return null;
+    return _ds.length - 1 - vt;
   }
 }
 
@@ -17014,36 +17085,45 @@ class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNha
     // — đổi dấu xuống dòng thật thành dấu cách CHỈ trên màn hình.
     final doanHienThi = doan.replaceAll('\n', ' ');
     final manHinhHep = MediaQuery.sizeOf(context).width < _TrangSoanThaoState._nguongManHinhHep;
-    return InkWell(
-      onTap: rong ? null : () => widget.khiChonDong(i),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                rong ? '(trống)' : doanHienThi,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                softWrap: false,
-                style: TextStyle(
-                  color: rong ? const Color(0xFF9AA0A6) : null,
-                  fontStyle: rong ? FontStyle.italic : FontStyle.normal,
+    // (YÊU CẦU MỚI) Tô nền phủ cả dòng nếu dòng này nằm trong 10 lần dán gần
+    // nhất — 5 lần gần nhất xanh đậm, 5 lần kế tiếp xanh nhạt hơn.
+    final doMoi = _GanDayTuDienNhapLieuNhanh.doMoi(i);
+    final mauNen = doMoi == null
+        ? null
+        : (doMoi < 5 ? const Color(0xFF81C995) : const Color(0xFFCEEAD6));
+    return Container(
+      color: mauNen,
+      child: InkWell(
+        onTap: rong ? null : () => widget.khiChonDong(i),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  rong ? '(trống)' : doanHienThi,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: false,
+                  style: TextStyle(
+                    color: rong ? const Color(0xFF9AA0A6) : null,
+                    fontStyle: rong ? FontStyle.italic : FontStyle.normal,
+                  ),
                 ),
               ),
-            ),
-            SizedBox(width: manHinhHep ? 4 : 10),
-            // (YÊU CẦU MỚI) Nhãn ở BÊN PHẢI — ngược vị trí so với Bộ nhớ
-            // tạm (bên trái) — và không có khung/nền quanh nó.
-            Text(
-              manHinhHep ? chuCai : 'Phím $chuCai',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: rong ? const Color(0xFF9AA0A6) : const Color(0xFF1A73E8),
+              SizedBox(width: manHinhHep ? 4 : 10),
+              // (YÊU CẦU MỚI) Nhãn ở BÊN PHẢI — ngược vị trí so với Bộ nhớ
+              // tạm (bên trái) — và không có khung/nền quanh nó.
+              Text(
+                manHinhHep ? chuCai : 'Phím $chuCai',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: rong ? const Color(0xFF9AA0A6) : const Color(0xFF1A73E8),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

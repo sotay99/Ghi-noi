@@ -10,6 +10,8 @@
 // giữa 26 dòng, và chính 26 ô nhập liệu (lưu thẳng vào
 // `CaiDat.tuDienNhapLieuNhanh`).
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -59,6 +61,14 @@ class _ManHinhTuDienNhapLieuNhanhState
   /// chuột không ở trên vùng thả nào.
   int? _chiSoThaDuKien;
 
+  /// (YÊU CẦU MỚI) Các dòng đang hiện nút "Đã copy"/"Đã dán" (chữ xanh lá,
+  /// bấm vào không làm gì cả) — tự trở lại "Copy"/"Dán" sau 2 giây, xem
+  /// `_copyDong`/`_danDong`.
+  final Set<int> _vuaCopy = {};
+  final Set<int> _vuaDan = {};
+  final Map<int, Timer> _henCopy = {};
+  final Map<int, Timer> _henDan = {};
+
   @override
   void initState() {
     super.initState();
@@ -72,6 +82,12 @@ class _ManHinhTuDienNhapLieuNhanhState
   void dispose() {
     for (final o in _oNhap) {
       o.dispose();
+    }
+    for (final h in _henCopy.values) {
+      h.cancel();
+    }
+    for (final h in _henDan.values) {
+      h.cancel();
     }
     super.dispose();
   }
@@ -87,21 +103,25 @@ class _ManHinhTuDienNhapLieuNhanhState
   /// (YÊU CẦU MỚI) Copy nội dung dòng [i] vào bộ nhớ đệm HỆ THỐNG — CHỦ Ý
   /// không ghi vào "Bộ nhớ tạm để dán văn bản" (lịch sử 10 dòng riêng của
   /// tính năng khác), chỉ `Clipboard.setData` đơn thuần như Ctrl+C thường.
+  /// Bấm xong, nút tự đổi thành "Đã copy" (chữ xanh lá) 2 giây — bấm vào
+  /// trong lúc đó không làm gì cả (xem `_vuaCopy`, chặn ngay ở đầu hàm).
   Future<void> _copyDong(int i) async {
+    if (_vuaCopy.contains(i)) return;
     await Clipboard.setData(ClipboardData(text: _oNhap[i].text));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Đã copy nội dung dòng Phím ${_chuCaiAt(i)}')),
-    );
+    setState(() => _vuaCopy.add(i));
+    _henCopy[i]?.cancel();
+    _henCopy[i] = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _vuaCopy.remove(i));
+    });
   }
-
-  String _chuCaiAt(int i) => _chuCai(i);
 
   /// (YÊU CẦU MỚI) Dán từ bộ nhớ đệm HỆ THỐNG vào ô nhập dòng [i] — vào
   /// đúng vị trí con trỏ nếu ô đang có vùng chọn/con trỏ hợp lệ, hoặc vào
   /// cuối văn bản của dòng đó nếu không (ô chưa từng được chạm vào,
-  /// `selection` không hợp lệ).
+  /// `selection` không hợp lệ). Cùng cơ chế "Đã dán" 2 giây như `_copyDong`.
   Future<void> _danDong(int i) async {
+    if (_vuaDan.contains(i)) return;
     final du = await Clipboard.getData('text/plain');
     final chenGoc = du?.text;
     if (chenGoc == null || chenGoc.isEmpty) return;
@@ -123,8 +143,13 @@ class _ManHinhTuDienNhapLieuNhanhState
         text: moi,
         selection: TextSelection.collapsed(offset: viTriConTroMoi),
       );
+      _vuaDan.add(i);
     });
     _doiDong(i, moi);
+    _henDan[i]?.cancel();
+    _henDan[i] = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _vuaDan.remove(i));
+    });
   }
 
   /// (YÊU CẦU MỚI) Xoá trắng dòng [i] — hỏi xác nhận trước, không xoá nhầm.
@@ -133,7 +158,7 @@ class _ManHinhTuDienNhapLieuNhanhState
       context: context,
       builder: (ctx) => AlertDialog(
         icon: const Icon(Icons.delete_forever_outlined, size: 28),
-        title: Text('Xoá nội dung dòng Phím ${_chuCaiAt(i)}?'),
+        title: Text('Xoá nội dung dòng Phím ${_chuCai(i)}?'),
         content: const Text('Không thể hoàn tác lại được. Bạn có chắc chắn không?'),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Không')),
@@ -644,19 +669,36 @@ class _ManHinhTuDienNhapLieuNhanhState
               ),
             ),
             const SizedBox(height: 4),
-            // (YÊU CẦU MỚI) Ba nút Copy/Dán/Xoá riêng cho từng dòng.
+            // (YÊU CẦU MỚI) Ba nút Copy/Dán/Xoá riêng cho từng dòng — Copy
+            // và Dán tự đổi thành "Đã copy"/"Đã dán" (chữ xanh lá) 2 giây
+            // sau khi bấm, bấm vào lúc đó không làm gì cả (xem `_copyDong`/
+            // `_danDong`).
             Row(
               children: [
                 TextButton.icon(
-                  onPressed: () => _copyDong(i),
-                  icon: const Icon(Icons.copy_outlined, size: 16),
-                  label: const Text('Copy'),
+                  onPressed: _vuaCopy.contains(i) ? () {} : () => _copyDong(i),
+                  icon: Icon(
+                    _vuaCopy.contains(i) ? Icons.check : Icons.copy_outlined,
+                    size: 16,
+                    color: _vuaCopy.contains(i) ? Colors.green.shade700 : null,
+                  ),
+                  label: Text(
+                    _vuaCopy.contains(i) ? 'Đã copy' : 'Copy',
+                    style: TextStyle(color: _vuaCopy.contains(i) ? Colors.green.shade700 : null),
+                  ),
                   style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
                 ),
                 TextButton.icon(
-                  onPressed: () => _danDong(i),
-                  icon: const Icon(Icons.content_paste, size: 16),
-                  label: const Text('Dán'),
+                  onPressed: _vuaDan.contains(i) ? () {} : () => _danDong(i),
+                  icon: Icon(
+                    _vuaDan.contains(i) ? Icons.check : Icons.content_paste,
+                    size: 16,
+                    color: _vuaDan.contains(i) ? Colors.green.shade700 : null,
+                  ),
+                  label: Text(
+                    _vuaDan.contains(i) ? 'Đã dán' : 'Dán',
+                    style: TextStyle(color: _vuaDan.contains(i) ? Colors.green.shade700 : null),
+                  ),
                   style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
                 ),
                 TextButton.icon(
