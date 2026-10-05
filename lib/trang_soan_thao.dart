@@ -46,6 +46,7 @@ import 'man_hinh_thu_muc.dart';
 import 'modal_bo_nho_tam.dart';
 import 'modal_cai_dat_kiem_tra_toan_van.dart';
 import 'modal_tu_dien_chinh_ta.dart';
+import 'modal_tu_dien_nhap_lieu_nhanh.dart';
 import 'modal_nghe_lai_ghi_am.dart';
 import 'mo_hinh.dart';
 import 'phien_ban_web_day_du.dart';
@@ -4126,6 +4127,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     HardwareKeyboard.instance.addHandler(_khiPhimTatMicro);
     HardwareKeyboard.instance.addHandler(_khiPhimTatGhiAm);
     HardwareKeyboard.instance.addHandler(_khiPhimTatBoNhoTam);
+    HardwareKeyboard.instance.addHandler(_khiPhimTatTuDienNhapLieuNhanh);
     HardwareKeyboard.instance.addHandler(_khiPhimTatTapDoi);
     HardwareKeyboard.instance.addHandler(_khiPhimTatLuiTien);
     HardwareKeyboard.instance.addHandler(_khiGoPhimBatKyTatChuThich);
@@ -4162,6 +4164,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     HardwareKeyboard.instance.removeHandler(_khiPhimTatMicro);
     HardwareKeyboard.instance.removeHandler(_khiPhimTatGhiAm);
     HardwareKeyboard.instance.removeHandler(_khiPhimTatBoNhoTam);
+    HardwareKeyboard.instance.removeHandler(_khiPhimTatTuDienNhapLieuNhanh);
     HardwareKeyboard.instance.removeHandler(_khiPhimTatTapDoi);
     HardwareKeyboard.instance.removeHandler(_khiPhimTatLuiTien);
     HardwareKeyboard.instance.removeHandler(_khiGoPhimBatKyTatChuThich);
@@ -5414,6 +5417,20 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _oChu.requestFocus();
     });
+  }
+
+  /// (YÊU CẦU MỚI) Nút "Xoá" ở hàng Copy/Cắt (`_hangCopyCutPaste`) dùng LẠI
+  /// đúng `_xoaKyTuTuPhimAo` (không viết logic xoá mới) nhưng CẦN thêm đúng
+  /// quy tắc giữ trạng thái bàn phím ảo mà Copy/Cắt đang có (`_phimAoCopy`/
+  /// `_phimAoCut` đều tự gọi `_giuFocusOChuSauKhiBam()` ở cuối) — bàn phím
+  /// ảo đang hiện thì tiếp tục hiện, đang ẩn thì tiếp tục ẩn. KHÔNG sửa
+  /// thẳng vào `_xoaKyTuTuPhimAo` vì hàm đó còn dùng chung cho nút ⌫ của Bộ
+  /// phím nhanh — nơi đó có quy tắc `readOnly` RIÊNG của chính nó
+  /// (`_epHienBanPhimAoTrongBoPhimNhanh`), gọi thêm `_giuFocusOChuSauKhiBam()`
+  /// vào đó sẽ đụng nhau.
+  void _xoaChonOHangCopyCutPaste() {
+    _xoaKyTuTuPhimAo();
+    _giuFocusOChuSauKhiBam();
   }
 
   /// `true` = tạm ép `_oChu` thành `readOnly` CHỈ để xin focus mà không cho
@@ -8280,6 +8297,24 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         return HardwareKeyboard.instance.isControlPressed &&
             !HardwareKeyboard.instance.isAltPressed &&
             event.logicalKey.keyLabel.toUpperCase() == (lc.phim ?? '').toUpperCase();
+      // (YÊU CẦU MỚI) Alt + Shift cùng lúc — CHỈ dùng cho "Từ điển nhập
+      // liệu nhanh". Phải CHÍNH phím vừa bấm xuống là Alt hoặc Shift (không
+      // phải bất kỳ phím nào khác trong lúc đang giữ sẵn cả hai) — tránh
+      // kích hoạt lặp lại mỗi khi gõ phím khác trong lúc tình cờ giữ cả Alt
+      // và Shift (hiếm nhưng không phải không thể, ví dụ phím tắt khác của
+      // hệ điều hành). Khớp đúng lúc phím THỨ HAI trong cặp được bấm xuống,
+      // trong khi phím còn lại đã đang được giữ.
+      case 'altShift':
+        final phim = event.logicalKey;
+        final laAltHoacShift = phim == LogicalKeyboardKey.altLeft ||
+            phim == LogicalKeyboardKey.altRight ||
+            phim == LogicalKeyboardKey.shiftLeft ||
+            phim == LogicalKeyboardKey.shiftRight;
+        return laAltHoacShift &&
+            HardwareKeyboard.instance.isAltPressed &&
+            HardwareKeyboard.instance.isShiftPressed &&
+            !HardwareKeyboard.instance.isControlPressed &&
+            !HardwareKeyboard.instance.isMetaPressed;
       default:
         return false;
     }
@@ -8373,10 +8408,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _boNhoTamDangMo = false;
   }
 
-  /// Dán một dòng từ "Bộ nhớ tạm để dán văn bản" vào đúng vị trí con trỏ —
-  /// y hệt lõi của `_phimAoPaste`, bỏ phần đọc/khôi phục định dạng HTML vì
-  /// lịch sử chỉ lưu CHUỖI THÔ (không kèm gói định dạng).
-  void _danTuBoNhoTam(String chenGoc) {
+  /// Dán một dòng từ "Bộ nhớ tạm để dán văn bản" (hoặc, dùng lại nguyên
+  /// văn cho "Từ điển nhập liệu nhanh" — chỉ khác [thongBao]) vào đúng vị
+  /// trí con trỏ — y hệt lõi của `_phimAoPaste`, bỏ phần đọc/khôi phục định
+  /// dạng HTML vì cả hai nguồn đều chỉ lưu CHUỖI THÔ (không kèm gói định
+  /// dạng).
+  void _danTuBoNhoTam(String chenGoc, {String thongBao = 'Đã dán văn bản từ Bộ nhớ tạm'}) {
     var chen = chenGoc;
     final chon = _boDieuKhien.selection;
     if (!chon.isValid) return;
@@ -8404,7 +8441,59 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (dangBatTuDongThut) _tamNgungTuDongThutDauDong = false;
     _giuFocusOChuSauKhiBam();
     _cuonToiConTroNeuCan();
-    if (mounted) hienThongBaoGiua(context, 'Đã dán văn bản từ Bộ nhớ tạm', ganTren: true);
+    if (mounted) hienThongBaoGiua(context, thongBao, ganTren: true);
+  }
+
+  // ------------------------------------------- "Từ điển nhập liệu nhanh"
+
+  /// Bàn phím vật lý bấm đúng phím tắt "Từ điển nhập liệu nhanh" (mặc định
+  /// Alt + Shift) — ẩn/hiện bảng 26 dòng, y hệt `_khiPhimTatBoNhoTam`.
+  bool _khiPhimTatTuDienNhapLieuNhanh(KeyEvent event) {
+    if (!mounted || event is! KeyDownEvent) return false;
+    if (!widget.caiDat.tuDienNhapLieuNhanhBat) return false;
+
+    // Xem giải thích ở `_khiPhimTatBoNhoTam` — cùng lý do, cùng cách sửa
+    // (modal CHÍNH NÓ đang mở không bị tính là "route khác đè lên").
+    if (!_tuDienNhapLieuNhanhDangMo) {
+      final route = ModalRoute.of(context);
+      if (route != null && !route.isCurrent) return false;
+    }
+
+    if (!_khopPhimTat(widget.caiDat.phimTatTuDienNhapLieuNhanh, event)) return false;
+    _bamPhimTatTuDienNhapLieuNhanh();
+    return true;
+  }
+
+  /// Ẩn/hiện bảng "Từ điển nhập liệu nhanh" — dùng chung cho cả phím tắt và
+  /// nút toolbar (`_moHopThoaiTuDienNhapLieuNhanh`, bấm nút thì luôn MỞ —
+  /// chỉ phím tắt mới cần "ẩn LẠI nếu đang mở").
+  void _bamPhimTatTuDienNhapLieuNhanh() {
+    if (_tuDienNhapLieuNhanhDangMo) {
+      Navigator.of(context).pop();
+    } else {
+      _moHopThoaiTuDienNhapLieuNhanh();
+    }
+  }
+
+  /// `true` trong lúc bảng "Từ điển nhập liệu nhanh" đang hiện.
+  bool _tuDienNhapLieuNhanhDangMo = false;
+
+  Future<void> _moHopThoaiTuDienNhapLieuNhanh() async {
+    if (!widget.caiDat.tuDienNhapLieuNhanhBat || _tuDienNhapLieuNhanhDangMo) return;
+    _tuDienNhapLieuNhanhDangMo = true;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => _HopThoaiTuDienNhapLieuNhanh(
+        caiDat: widget.caiDat,
+        khiChonDong: (i) {
+          final doan = widget.caiDat.tuDienNhapLieuNhanh[i];
+          Navigator.of(dialogCtx).pop();
+          if (doan.trim().isEmpty) return;
+          _danTuBoNhoTam(doan, thongBao: 'Đã dán văn bản từ Từ điển nhập liệu nhanh');
+        },
+      ),
+    );
+    _tuDienNhapLieuNhanhDangMo = false;
   }
 
   // ---------------------------------------- phím tắt "bấm 2 lần liên tiếp"
@@ -12340,6 +12429,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     'Ẩn/hiện Bộ nhớ tạm để dán văn bản'
                         '${moTaThem(widget.caiDat.phimTatBoNhoTam)}',
                   ),
+                if (widget.caiDat.tuDienNhapLieuNhanhBat)
+                  dong(
+                    widget.caiDat.phimTatTuDienNhapLieuNhanh.nhan,
+                    'Ẩn/hiện Từ điển nhập liệu nhanh',
+                  ),
                 deMuc('Điều hướng'),
                 dong('Ctrl + Z', tim('Ctrl+Z')),
                 dong('Ctrl + Shift + Z', tim('Ctrl+Shift+Z')),
@@ -13926,7 +14020,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             mauNen: Colors.red.shade50,
             mauVien: Colors.red.shade300,
             rong: 40,
-            onTap: () => _bamCopyCutPasteOHangThayNav(_xoaKyTuTuPhimAo),
+            onTap: () => _bamCopyCutPasteOHangThayNav(_xoaChonOHangCopyCutPaste),
           ),
         ],
       ],
@@ -14208,6 +14302,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           constraints: _kichThuocNutTren,
           padding: EdgeInsets.zero,
         ),
+        // (YÊU CẦU MỚI) Nút "Từ điển nhập liệu nhanh" — ngay bên phải "Tiến
+        // tới", chỉ hiện khi công tắc tổng đang BẬT.
+        if (widget.caiDat.tuDienNhapLieuNhanhBat)
+          IconButton(
+            onPressed: _moHopThoaiTuDienNhapLieuNhanh,
+            icon: const Text('📖', style: TextStyle(fontSize: 18)),
+            tooltip:
+                'Từ điển nhập liệu nhanh (${widget.caiDat.phimTatTuDienNhapLieuNhanh.nhan})',
+            visualDensity: VisualDensity.compact,
+            constraints: _kichThuocNutTren,
+            padding: EdgeInsets.zero,
+          ),
         if (coDan) _nutDanCongCu(),
         // (YÊU CẦU MỚI) Màn rộng vẫn giữ nút "Bộ nhớ tạm" ở đây (giữa Dán
         // và "abc"); màn hẹp giờ chuyển nó lên hàng trên cạnh Dán (xem
@@ -14903,7 +15009,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     mauNen: Colors.red.shade50,
                     mauVien: Colors.red.shade300,
                     rong: 40,
-                    onTap: () => _bamCopyCutPasteOHangThayNav(_xoaKyTuTuPhimAo),
+                    onTap: () => _bamCopyCutPasteOHangThayNav(_xoaChonOHangCopyCutPaste),
                   ),
                 ),
               _nutDanCongCu(),
@@ -15455,6 +15561,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   // Từ điển có thể vừa đổi (thêm/sửa/xoá cặp từ) — quét lại
                   // ngay, không đợi tới lần lưu kế tiếp.
                   if (mounted) _quetTuDienChinhTa();
+                },
+                khiBamTuDienNhapLieuNhanh: () async {
+                  await moModalTuDienNhapLieuNhanh(context, widget.caiDat);
+                  // Có thể vừa bật/tắt hoặc đổi phím tắt — vẽ lại nút
+                  // toolbar (ẩn/hiện theo công tắc) ngay, không đợi gì cả.
+                  if (mounted) setState(() {});
                 },
                 khiBamBoNhoTam: () async {
                   await moModalBoNhoTam(context, widget.caiDat);
@@ -16802,6 +16914,171 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
             Column(
               children: [
                 for (var i = 0; i < BoNhoTamDanVanBan.lichSu.length; i++) _dong(i),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// (YÊU CẦU MỚI) Bảng 26 dòng của "Từ điển nhập liệu nhanh" — y hệt khuôn
+/// `_HopThoaiLichSuBoNhoTam` (nút Hướng dẫn/Cài đặt, `scrollable: true`,
+/// tự cuộn trên màn hẹp), khác ở: 26 dòng cố định A-Z (không ghim, không tô
+/// nền), nhãn "Phím X" ở BÊN PHẢI mỗi dòng (không phải bên trái), và phím
+/// tắt dán là CHỮ CÁI thay vì phím số.
+class _HopThoaiTuDienNhapLieuNhanh extends StatefulWidget {
+  const _HopThoaiTuDienNhapLieuNhanh({required this.khiChonDong, required this.caiDat});
+
+  final void Function(int chiSo) khiChonDong;
+  final CaiDat caiDat;
+
+  @override
+  State<_HopThoaiTuDienNhapLieuNhanh> createState() => _HopThoaiTuDienNhapLieuNhanhState();
+}
+
+class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNhanh> {
+  // KHÔNG được `const` — xem giải thích ở `_HopThoaiLichSuBoNhoTamState._phimSo`.
+  static final _phimChu = {
+    for (var i = 0; i < 26; i++)
+      LogicalKeyboardKey(LogicalKeyboardKey.keyA.keyId + i): i,
+  };
+
+  /// (YÊU CẦU MỚI) Khác `_HopThoaiLichSuBoNhoTamState._khiPhim` — dòng
+  /// TRỐNG vẫn phải ẨN bảng đi (chỉ là không dán gì), không giữ bảng mở lại
+  /// như Bộ nhớ tạm. Luôn gọi `widget.khiChonDong`, hàm đó tự biết bỏ qua
+  /// việc dán nếu dòng rỗng — xem `_moHopThoaiTuDienNhapLieuNhanh`.
+  bool _khiPhim(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+    final i = _phimChu[event.logicalKey];
+    if (i == null) return false;
+    widget.khiChonDong(i);
+    return true;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_khiPhim);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_khiPhim);
+    super.dispose();
+  }
+
+  /// (YÊU CẦU MỚI) Nội dung tạm để trống, sẽ viết sau — chỉ cần khung modal
+  /// + nút X đỏ đóng đúng chuẩn đã thống nhất cho cả app.
+  void _moHuongDan() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Expanded(child: Text('Hướng dẫn sử dụng Từ điển nhập liệu nhanh')),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.red),
+              tooltip: 'Đóng',
+              onPressed: () => Navigator.of(ctx).pop(),
+            ),
+          ],
+        ),
+        content: const SizedBox(width: 380),
+      ),
+    );
+  }
+
+  Widget _dong(int i) {
+    final chuCai = String.fromCharCode('A'.codeUnitAt(0) + i);
+    final doan = widget.caiDat.tuDienNhapLieuNhanh[i];
+    final rong = doan.trim().isEmpty;
+    // (YÊU CẦU MỚI) Cùng lý do hiển thị với `_HopThoaiLichSuBoNhoTamState._dong`
+    // — đổi dấu xuống dòng thật thành dấu cách CHỈ trên màn hình.
+    final doanHienThi = doan.replaceAll('\n', ' ');
+    final manHinhHep = MediaQuery.sizeOf(context).width < _TrangSoanThaoState._nguongManHinhHep;
+    return InkWell(
+      onTap: rong ? null : () => widget.khiChonDong(i),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                rong ? '(trống)' : doanHienThi,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+                style: TextStyle(
+                  color: rong ? const Color(0xFF9AA0A6) : null,
+                  fontStyle: rong ? FontStyle.italic : FontStyle.normal,
+                ),
+              ),
+            ),
+            SizedBox(width: manHinhHep ? 4 : 10),
+            // (YÊU CẦU MỚI) Nhãn ở BÊN PHẢI — ngược vị trí so với Bộ nhớ
+            // tạm (bên trái) — và không có khung/nền quanh nó.
+            Text(
+              manHinhHep ? chuCai : 'Phím $chuCai',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: rong ? const Color(0xFF9AA0A6) : const Color(0xFF1A73E8),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final manHinhHepBeNgang =
+        MediaQuery.sizeOf(context).width < _TrangSoanThaoState._nguongManHinhHep;
+    return AlertDialog(
+      title: Row(
+        children: [
+          const Expanded(child: Text('Từ điển nhập liệu nhanh')),
+          IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.close, color: Colors.red),
+            tooltip: 'Đóng',
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
+      ),
+      // Xem giải thích đầy đủ ở `_HopThoaiLichSuBoNhoTamState.build` — cùng
+      // lý do cần `scrollable: true` để luôn cuộn được trên màn hẹp chiều
+      // cao, thay cho `ConstrainedBox` cố định.
+      scrollable: true,
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              children: [
+                TextButton.icon(
+                  onPressed: _moHuongDan,
+                  icon: const Icon(Icons.help_outline, size: 18),
+                  label: Text(manHinhHepBeNgang ? 'Hướng dẫn' : 'Hướng dẫn sử dụng'),
+                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
+                ),
+                TextButton.icon(
+                  onPressed: () => moModalTuDienNhapLieuNhanh(context, widget.caiDat),
+                  icon: const Icon(Icons.settings_outlined, size: 18),
+                  label: const Text('Cài đặt'),
+                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Column(
+              children: [
+                for (var i = 0; i < 26; i++) _dong(i),
               ],
             ),
           ],
