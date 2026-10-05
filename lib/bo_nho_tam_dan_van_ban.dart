@@ -37,7 +37,7 @@ class BoNhoTamDanVanBan {
   /// sử — tránh bộ nhớ tạm quá nặng. Không báo gì cho người dùng (Cắt/
   /// Copy vẫn thành công như thường vào bộ nhớ đệm hệ thống, chỉ riêng
   /// lịch sử 10 dòng này không nhận đoạn đó).
-  static const gioiHanKyTu = 1000;
+  static const gioiHanKyTu = 10000;
 
   static void themMoi(String doan) {
     if (doan.isEmpty || doan.length > gioiHanKyTu) return;

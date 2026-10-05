@@ -173,13 +173,27 @@ bool _kyTuHopLeChoTreMu(String kyTu) {
 /// cho dòng trạng thái ghi âm (xem `_xayAppBarTrinhGhiAmThe`) — chỉ có ý
 /// nghĩa lúc ĐANG ghi (không dùng cho lúc tạm dừng, đứng yên).
 class _ChuLuonSong extends StatefulWidget {
-  const _ChuLuonSong({required this.chu, required this.mau, this.coChu = 12});
+  const _ChuLuonSong({
+    required this.chu,
+    required this.mau,
+    this.coChu = 12,
+    this.motLan = false,
+    this.khiXong,
+  });
   final String chu;
   final Color mau;
 
   /// Cỡ chữ — mặc định 12 (nhãn nhỏ cũ). Bảng nút trình ghi âm mới dùng cỡ
   /// to hơn hẳn cho dòng "Đang Ghi âm mm:ss" (dễ nhìn hơn, theo yêu cầu).
   final double coChu;
+
+  /// (YÊU CẦU MỚI) `true` = chỉ lượn sóng MỘT LẦN (trái qua phải) rồi đứng
+  /// yên hẳn — dùng cho tên tệp khi chuyển tệp/quay lại trang soạn thảo.
+  /// `false` (mặc định, như cũ) = lặp lại liên tục (dòng "Đang Ghi âm").
+  final bool motLan;
+
+  /// Gọi đúng một lần khi hết lượt lượn sóng — chỉ có ý nghĩa khi [motLan].
+  final VoidCallback? khiXong;
 
   @override
   State<_ChuLuonSong> createState() => _ChuLuonSongState();
@@ -194,8 +208,13 @@ class _ChuLuonSongState extends State<_ChuLuonSong>
     super.initState();
     _dieuKhien = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2400),
-    )..repeat();
+      duration: Duration(milliseconds: widget.motLan ? 700 : 2400),
+    );
+    if (widget.motLan) {
+      _dieuKhien.forward().whenComplete(widget.khiXong ?? () {});
+    } else {
+      _dieuKhien.repeat();
+    }
   }
 
   @override
@@ -4567,6 +4586,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       ),
     );
     if (!mounted) return;
+    // (YÊU CẦU MỚI) Mỗi lần quay lại trang soạn thảo từ cây thư mục, tên
+    // tệp lượn sóng một lần — bất kể có đổi sang tệp khác hay không.
+    _kichHoatLuonSongTen();
 
     if (idChon != null && idChon != _ghiChuHienTai.id) {
       _moGhiChu(idChon);
@@ -4612,6 +4634,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (!mounted) return;
 
     _moGhiChu(tepMoi.id);
+    // (YÊU CẦU MỚI) Chuyển sang tệp khác bằng nút Tệp trước/sau — tên tệp
+    // lượn sóng một lần.
+    _kichHoatLuonSongTen();
     _baoDangOTrongTep(tepMoi.ten);
   }
 
@@ -8307,6 +8332,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     await showDialog<void>(
       context: context,
       builder: (dialogCtx) => _HopThoaiLichSuBoNhoTam(
+        caiDat: widget.caiDat,
         khiChonDong: (i) {
           final doan = BoNhoTamDanVanBan.lichSu[i];
           if (doan == null) return;
@@ -13935,28 +13961,102 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
+  /// (YÊU CẦU MỚI) `true` trong khoảng hiệu ứng lượn sóng MỘT LẦN của tên
+  /// tệp — kích hoạt mỗi lần chuyển sang tệp khác (nút Tệp trước/sau) hoặc
+  /// mỗi lần quay lại trang soạn thảo từ cây thư mục. Xem `_ChuLuonSong`
+  /// (`motLan: true`) và `_kichHoatLuonSongTen`.
+  bool _tenDangLuonSong = false;
+
+  void _kichHoatLuonSongTen() {
+    if (mounted) setState(() => _tenDangLuonSong = true);
+  }
+
   Widget _oTenField() {
     // Đọc lại `_ghiChuHienTai.mau` mỗi lần dựng — không cache riêng, nên
     // đổi màu ở màn hình thư mục (cùng tham chiếu `widget.kho`) hay ở nút
     // "Mở rộng" đều tự hiện đúng ngay lần dựng kế tiếp, không cần đồng bộ
     // tay giữa hai nơi.
     final mauTen = _ghiChuHienTai.mau;
-    return TextField(
-      controller: _tenController,
-      focusNode: _oTen,
-      maxLength: doDaiTenToiDa,
-      inputFormatters: [FilteringTextInputFormatter.deny(kyTuCamTrongTen)],
-      style: TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: mauTen != null ? Color(mauTen) : Colors.black87,
+    final mau = mauTen != null ? Color(mauTen) : Colors.black87;
+    final style = TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: mau);
+
+    if (_tenDangLuonSong) {
+      return _ChuLuonSong(
+        chu: _tenController.text,
+        mau: mau,
+        coChu: 18,
+        motLan: true,
+        khiXong: () {
+          if (mounted) setState(() => _tenDangLuonSong = false);
+        },
+      );
+    }
+
+    // (YÊU CẦU MỚI) Bấm vào tên tệp không còn đặt con trỏ TẠI CHỖ để sửa
+    // nữa — mở một modal nhỏ chính giữa màn hình riêng (xem
+    // `_moModalDoiTenTep`), hiện đầy đủ tên (dù dài), có nút "Huỷ - quay
+    // lại"/"Lưu thay đổi", vẫn áp đúng các quy tắc cũ (ký tự cấm, độ dài,
+    // không trùng tên) qua `KhoDuLieu.doiTenGhiChu`.
+    return InkWell(
+      onTap: _moModalDoiTenTep,
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(_tenController.text, style: style, overflow: TextOverflow.ellipsis),
       ),
-      decoration: const InputDecoration(
-        border: InputBorder.none,
-        isDense: true,
-        counterText: '',
+    );
+  }
+
+  Future<void> _moModalDoiTenTep() async {
+    final tenGoc = _ghiChuHienTai.ten;
+    final bo = TextEditingController(text: tenGoc)
+      ..selection = TextSelection(baseOffset: 0, extentOffset: tenGoc.length);
+    String? loi;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, capNhat) {
+          void luu() {
+            final tenMoi = bo.text.trim();
+            if (tenMoi.isEmpty) {
+              capNhat(() => loi = 'Tên không được để trống.');
+              return;
+            }
+            if (tenMoi == tenGoc) {
+              Navigator.of(ctx).pop();
+              return;
+            }
+            final k = widget.kho.doiTenGhiChu(_ghiChuHienTai.id, tenMoi);
+            if (k != null) {
+              capNhat(() => loi = k);
+              return;
+            }
+            widget.kho.luu();
+            if (mounted) setState(() => _tenController.text = tenMoi);
+            Navigator.of(ctx).pop();
+          }
+
+          return AlertDialog(
+            title: const Text('Đổi tên tệp'),
+            content: TextField(
+              controller: bo,
+              autofocus: true,
+              minLines: 1,
+              maxLines: 3,
+              maxLength: doDaiTenToiDa,
+              inputFormatters: [FilteringTextInputFormatter.deny(kyTuCamTrongTen)],
+              decoration: InputDecoration(errorText: loi),
+              onSubmitted: (_) => luu(),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Huỷ - quay lại'),
+              ),
+              FilledButton(onPressed: luu, child: const Text('Lưu thay đổi')),
+            ],
+          );
+        },
       ),
-      onSubmitted: (_) => _oTen.unfocus(),
     );
   }
 
@@ -14012,7 +14112,24 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   /// [coDan] = false ở nhánh màn hình hẹp — nút Dán đã dời lên cùng dòng
   /// Tên tệp riêng (`_nutDanCongCu`), không lặp lại ở đây nữa.
-  List<Widget> _dsNutCongCu({bool coDan = true}) => [
+  /// (YÊU CẦU MỚI) Nút "Bộ nhớ tạm" tách riêng thành hàm dùng chung — màn
+  /// rộng vẫn gọi từ `_dsNutCongCu` (cạnh "abc" như cũ); màn hẹp gọi riêng
+  /// ở hàng TRÊN (cạnh "Dán"), không còn nằm trong `_dsNutCongCu` nữa — xem
+  /// `build()`.
+  Widget _nutBoNhoTamCongCu() => IconButton(
+        onPressed: _moHopThoaiLichSuBoNhoTam,
+        // (SỬA LỖI — nhánh thử nghiệm) `Icons.content_paste_search` — một
+        // icon Material khá mới — bị mất hẳn trên bản dựng thật (tree-shake
+        // font icon chỉ giữ icon nào chắc chắn dùng được). Đổi qua emoji
+        // (`Text`) — y hệt cách đã né lỗi này ở nút "🔤"/"🔼" bên dưới.
+        icon: const Text('📋', style: TextStyle(fontSize: 18)),
+        tooltip: 'Bộ nhớ tạm để dán văn bản (${widget.caiDat.phimTatBoNhoTam.nhan})',
+        visualDensity: VisualDensity.compact,
+        constraints: _kichThuocNutTren,
+        padding: EdgeInsets.zero,
+      );
+
+  List<Widget> _dsNutCongCu({bool coDan = true, bool coBoNhoTam = true}) => [
         IconButton(
           onPressed: _lichSuLui.isEmpty ? null : _lui,
           icon: const Icon(Icons.undo, size: 22),
@@ -14030,25 +14147,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           padding: EdgeInsets.zero,
         ),
         if (coDan) _nutDanCongCu(),
-        // (YÊU CẦU MỚI — nhánh thử nghiệm) "Bộ nhớ tạm để dán văn bản" —
-        // chỉ hiện khi công tắc tổng đang BẬT (xem `modal_bo_nho_tam.dart`).
-        // Nằm giữa Dán và "abc" ở màn rộng; giữa "Tiến tới" và "abc" ở màn
-        // hẹp (hàng này không có nút Dán riêng, `coDan: false`) — đúng một
-        // điểm chèn cho cả hai vì cùng một danh sách dùng chung.
-        if (widget.caiDat.boNhoTamDanVanBanBat)
-          IconButton(
-            onPressed: _moHopThoaiLichSuBoNhoTam,
-            // (SỬA LỖI — nhánh thử nghiệm) `Icons.content_paste_search` —
-            // một icon Material khá mới — bị mất hẳn trên bản dựng thật
-            // (tree-shake font icon chỉ giữ icon nào chắc chắn dùng được).
-            // Đổi qua emoji (`Text`) — y hệt cách đã né lỗi này ở nút
-            // "🔤"/"🔼" bên dưới.
-            icon: const Text('📋', style: TextStyle(fontSize: 18)),
-            tooltip: 'Bộ nhớ tạm để dán văn bản (${widget.caiDat.phimTatBoNhoTam.nhan})',
-            visualDensity: VisualDensity.compact,
-            constraints: _kichThuocNutTren,
-            padding: EdgeInsets.zero,
-          ),
+        // (YÊU CẦU MỚI) Màn rộng vẫn giữ nút "Bộ nhớ tạm" ở đây (giữa Dán
+        // và "abc"); màn hẹp giờ chuyển nó lên hàng trên cạnh Dán (xem
+        // `build()`), nên gọi `_dsNutCongCu` cho hàng dưới ở màn hẹp với
+        // `coBoNhoTam: false` để không hiện trùng 2 lần.
+        if (widget.caiDat.boNhoTamDanVanBanBat && coBoNhoTam) _nutBoNhoTamCongCu(),
         IconButton(
           onPressed: () => setState(() => _anThanhDinhDang = !_anThanhDinhDang),
           // Emoji "chữ" — các nút khác trong hai thanh này đều dùng
@@ -14715,7 +14818,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             // lẫn trong hàng công cụ ở dòng DƯỚI cùng Lùi/Tiến/..., xa tên
             // tệp). Hàng dưới (`_dsNutCongCu(coDan: false)`) không lặp lại
             // nó nữa.
-            actions: [_nutDanCongCu()],
+            // (YÊU CẦU MỚI) Màn hẹp: nút "Bộ nhớ tạm" đi CHUNG với "Dán" ở
+            // hàng trên (cùng dòng tên tệp), sát mép phải — không còn ở gần
+            // "abc" nữa (xem `_dsNutCongCu`, `coBoNhoTam: false` ở dưới).
+            actions: [
+              _nutDanCongCu(),
+              if (widget.caiDat.boNhoTamDanVanBanBat) _nutBoNhoTamCongCu(),
+            ],
             backgroundColor: Colors.white,
             surfaceTintColor: Colors.white,
             elevation: 1,
@@ -14731,7 +14840,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                         alignment: Alignment.centerRight,
                         child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
-                          child: Row(children: _dsNutCongCu(coDan: false)),
+                          child: Row(children: _dsNutCongCu(coDan: false, coBoNhoTam: false)),
                         ),
                       ),
                     ),
@@ -16265,9 +16374,10 @@ class _MocVungCanXoa {
 /// dòng/chip HOẶC gõ đúng phím số 1-9/0 trên bàn phím rời thì dán — xem
 /// [khiChonDong]. Dòng trống (chưa có lịch sử) không bấm/gõ được gì.
 class _HopThoaiLichSuBoNhoTam extends StatefulWidget {
-  const _HopThoaiLichSuBoNhoTam({required this.khiChonDong});
+  const _HopThoaiLichSuBoNhoTam({required this.khiChonDong, required this.caiDat});
 
   final void Function(int chiSo) khiChonDong;
+  final CaiDat caiDat;
 
   @override
   State<_HopThoaiLichSuBoNhoTam> createState() => _HopThoaiLichSuBoNhoTamState();
@@ -16326,7 +16436,7 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
   /// (YÊU CẦU MỚI) Modal hướng dẫn riêng, rộng hơn nên viết đầy đủ/dễ
   /// hiểu hơn bản chú thích ngắn cũ — giải thích đúng mọi logic đang có:
   /// cách dán, cách lịch sử tự ghi/đè, ý nghĩa 2 màu nền đỏ/vàng, cơ chế
-  /// ghim, và giới hạn 1000 ký tự âm thầm.
+  /// ghim, và giới hạn 10.000 ký tự âm thầm.
   void _moHuongDanBoNhoTam() {
     showDialog<void>(
       context: context,
@@ -16365,7 +16475,7 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  '• Đoạn nào dài hơn 1000 ký tự sẽ KHÔNG được ghi vào bảng '
+                  '• Đoạn nào dài hơn 10.000 ký tự sẽ KHÔNG được ghi vào bảng '
                   'này (âm thầm, không báo) — tránh bộ nhớ tạm quá nặng. '
                   'Cắt/Copy vẫn thành công như thường vào bộ nhớ đệm của '
                   'máy.',
@@ -16439,7 +16549,11 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
                       ),
                       alignment: Alignment.center,
                       child: Text(
-                        BoNhoTamDanVanBan.nhanPhim(i),
+                        // (YÊU CẦU MỚI) Màn hẹp: chỉ hiện số, bỏ chữ "phím"
+                        // cho gọn — màn rộng vẫn giữ "phím N" như cũ.
+                        MediaQuery.sizeOf(context).width < _TrangSoanThaoState._nguongManHinhHep
+                            ? '${(i + 1) % 10}'
+                            : BoNhoTamDanVanBan.nhanPhim(i),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -16520,17 +16634,26 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // (YÊU CẦU MỚI) Thay chú thích rải ở đây bằng một nút mở modal
-            // hướng dẫn riêng (xem `_moHuongDanBoNhoTam`) — modal đó rộng
-            // rãi hơn, viết đầy đủ/dễ hiểu hơn.
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: _moHuongDanBoNhoTam,
-                icon: const Icon(Icons.help_outline, size: 18),
-                label: const Text('Hướng dẫn sử dụng bảng Bộ nhớ tạm'),
-                style: TextButton.styleFrom(padding: EdgeInsets.zero),
-              ),
+            // (YÊU CẦU MỚI) Thay chú thích rải ở đây bằng 2 nút: mở modal
+            // hướng dẫn riêng (xem `_moHuongDanBoNhoTam`), và mở thẳng modal
+            // cài đặt (công tắc bật/tắt + phím tắt) — y hệt đường vào từ
+            // menu "Tài khoản và Cài đặt" → "Cài đặt Bộ nhớ tạm để dán văn
+            // bản".
+            Wrap(
+              children: [
+                TextButton.icon(
+                  onPressed: _moHuongDanBoNhoTam,
+                  icon: const Icon(Icons.help_outline, size: 18),
+                  label: const Text('Hướng dẫn sử dụng'),
+                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
+                ),
+                TextButton.icon(
+                  onPressed: () => moModalBoNhoTam(context, widget.caiDat),
+                  icon: const Icon(Icons.settings_outlined, size: 18),
+                  label: const Text('Cài đặt'),
+                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
+                ),
+              ],
             ),
             const SizedBox(height: 6),
             // (SỬA LỖI — nhánh thử nghiệm) Trước đây 10 dòng nằm thẳng

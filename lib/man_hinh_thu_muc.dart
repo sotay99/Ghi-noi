@@ -1250,16 +1250,99 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     return (tmCoDau: tmCoDau, gcCoDau: gcCoDau, tmKhongDau: tmKhongDau, gcKhongDau: gcKhongDau);
   }
 
+  // (YÊU CẦU MỚI) Nút ba chấm ở kết quả tìm kiếm — y chang menu thả xuống
+  // của thư mục ở ngoài cây (cùng lựa chọn, cùng logic, chỉ tách ra đây để
+  // dùng lại được ở cả hàng bình thường và hàng kết quả tìm kiếm).
+  Widget _menuBaChamThuMuc(ThuMuc t) => PopupMenuButton<String>(
+        onSelected: (v) {
+          switch (v) {
+            case 'doi_ten':
+              _doiTen(laThuMuc: true, id: t.id, tenCu: t.ten);
+              break;
+            case 'cat':
+              _dat(laCat: true, laThuMuc: true, id: t.id, ten: t.ten);
+              break;
+            case 'chep':
+              _dat(laCat: false, laThuMuc: true, id: t.id, ten: t.ten);
+              break;
+            case 'mau':
+              _chonMau(laThuMuc: true, id: t.id);
+              break;
+            case 'tai':
+              _taiThuMuc(t.id, t.ten);
+              break;
+            case 'thong_tin':
+              hienThongTinThuMuc(context, _kho, id: t.id, ten: t.ten);
+              break;
+            case 'xoa':
+              _xoaThuMuc(t);
+              break;
+          }
+        },
+        itemBuilder: (ctx) => const [
+          PopupMenuItem(value: 'doi_ten', child: Text('Đổi tên')),
+          PopupMenuItem(value: 'cat', child: Text('Cắt (di chuyển)')),
+          PopupMenuItem(value: 'chep', child: Text('Sao chép')),
+          PopupMenuItem(value: 'mau', child: Text('Chọn màu Tên Thư mục')),
+          PopupMenuItem(value: 'tai', child: Text('Tải và chia sẻ thư mục này')),
+          PopupMenuItem(value: 'thong_tin', child: Text('Thông tin thư mục này')),
+          PopupMenuItem(value: 'xoa', child: Text('Chuyển vào thùng rác')),
+        ],
+      );
+
+  // (YÊU CẦU MỚI) Tương tự cho tệp — y chang menu thả xuống của tệp ở ngoài
+  // cây thư mục.
+  Widget _menuBaChamGhiChu(GhiChuFile g) => PopupMenuButton<String>(
+        onSelected: (v) {
+          switch (v) {
+            case 'doi_ten':
+              _doiTen(laThuMuc: false, id: g.id, tenCu: g.ten);
+              break;
+            case 'cat':
+              _dat(laCat: true, laThuMuc: false, id: g.id, ten: g.ten);
+              break;
+            case 'chep':
+              _dat(laCat: false, laThuMuc: false, id: g.id, ten: g.ten);
+              break;
+            case 'tai_ve':
+              _taiVeGhiChu(g);
+              break;
+            case 'mau':
+              _chonMau(laThuMuc: false, id: g.id);
+              break;
+            case 'thong_tin':
+              hienThongTinGhiChu(context, ten: g.ten, noiDung: g.noiDung);
+              break;
+            case 'xoa':
+              _xoaGhiChu(g);
+              break;
+          }
+        },
+        itemBuilder: (ctx) => const [
+          PopupMenuItem(value: 'doi_ten', child: Text('Đổi tên')),
+          PopupMenuItem(value: 'cat', child: Text('Cắt (di chuyển)')),
+          PopupMenuItem(value: 'chep', child: Text('Sao chép')),
+          PopupMenuItem(value: 'tai_ve', child: Text('Tải về')),
+          PopupMenuItem(value: 'mau', child: Text('Chọn màu Tên Tệp')),
+          PopupMenuItem(value: 'thong_tin', child: Text('Thông tin tệp này')),
+          PopupMenuItem(value: 'xoa', child: Text('Chuyển vào thùng rác')),
+        ],
+      );
+
   Widget _dongKetQuaTimThuMuc(ThuMuc t) => ListTile(
         leading: Icon(Icons.folder, color: Colors.amber.shade700),
         title: Text(t.ten, style: t.mau != null ? TextStyle(color: Color(t.mau!)) : null),
         onTap: () => _chonThuMucTuKetQuaTim(t),
+        // (YÊU CẦU MỚI) Nút ba chấm ở mép phải — y chang menu ở ngoài cây.
+        trailing: _menuBaChamThuMuc(t),
       );
 
   Widget _dongKetQuaTimGhiChu(GhiChuFile g) => ListTile(
         leading: const Icon(Icons.description_outlined),
         title: Text(g.ten, style: g.mau != null ? TextStyle(color: Color(g.mau!)) : null),
         onTap: () => Navigator.of(context).pop(g.id),
+        // (YÊU CẦU MỚI) Nút ba chấm ở mép phải — y chang menu ở ngoài cây.
+        trailing: _menuBaChamGhiChu(g),
       );
 
   Widget _buildTimKiem(BuildContext context) {

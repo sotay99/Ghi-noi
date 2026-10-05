@@ -7,6 +7,16 @@ import 'package:flutter/material.dart';
 
 import 'kho_du_lieu.dart';
 import 'mo_hinh.dart';
+import 'modal_thong_tin_muc.dart';
+
+typedef _MucThungRac = ({
+  bool laThuMuc,
+  String id,
+  String ten,
+  int? mau,
+  String chaId,
+  DateTime thoiGianXoa,
+});
 
 /// Lấp đầy màn hình (`MaterialPageRoute` bên gọi). Trả về
 /// `({laThuMuc, id})` khi người dùng bấm "Đến vị trí vừa được khôi phục" —
@@ -45,11 +55,24 @@ class _ModalThungRacState extends State<ModalThungRac> {
         '${pad(t.hour)}:${pad(t.minute)}:${pad(t.second)}';
   }
 
-  Future<void> _moMenuMuc(
-    BuildContext context,
-    ({bool laThuMuc, String id, String ten, int? mau, DateTime thoiGianXoa})
-        muc,
-  ) async {
+  // (YÊU CẦU MỚI) Thông tin chi tiết — y chang modal bên ngoài thùng rác,
+  // cộng thêm dòng "Vị trí: ..." làm dòng ĐẦU TIÊN.
+  void _xemThongTinChiTiet(_MucThungRac muc) {
+    final diaChi = _duongDanHienThi(muc.chaId);
+    if (muc.laThuMuc) {
+      hienThongTinThuMuc(context, _kho, id: muc.id, ten: muc.ten, viTri: diaChi);
+    } else {
+      final g = _kho.timGhiChu(muc.id);
+      hienThongTinGhiChu(
+        context,
+        ten: muc.ten,
+        noiDung: g?.noiDung ?? '',
+        viTri: diaChi,
+      );
+    }
+  }
+
+  Future<void> _moMenuMuc(BuildContext context, _MucThungRac muc) async {
     final hanhDong = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -69,6 +92,11 @@ class _ModalThungRacState extends State<ModalThungRac> {
                   style: TextStyle(color: Colors.red.shade600)),
               onTap: () => Navigator.of(ctx).pop('xoa_vinh_vien'),
             ),
+            ListTile(
+              leading: const Icon(Icons.info_outline),
+              title: const Text('Thông tin chi tiết'),
+              onTap: () => Navigator.of(ctx).pop('thong_tin'),
+            ),
           ],
         ),
       ),
@@ -76,15 +104,14 @@ class _ModalThungRacState extends State<ModalThungRac> {
     if (hanhDong == null || !mounted) return;
     if (hanhDong == 'khoi_phuc') {
       await _khoiPhuc(muc);
-    } else {
+    } else if (hanhDong == 'xoa_vinh_vien') {
       await _xoaVinhVien(muc);
+    } else {
+      _xemThongTinChiTiet(muc);
     }
   }
 
-  Future<void> _khoiPhuc(
-    ({bool laThuMuc, String id, String ten, int? mau, DateTime thoiGianXoa})
-        muc,
-  ) async {
+  Future<void> _khoiPhuc(_MucThungRac muc) async {
     final dongY = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -138,10 +165,7 @@ class _ModalThungRacState extends State<ModalThungRac> {
     }
   }
 
-  Future<void> _xoaVinhVien(
-    ({bool laThuMuc, String id, String ten, int? mau, DateTime thoiGianXoa})
-        muc,
-  ) async {
+  Future<void> _xoaVinhVien(_MucThungRac muc) async {
     final dongY = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -177,6 +201,20 @@ class _ModalThungRacState extends State<ModalThungRac> {
     await _kho.luu();
   }
 
+  // (YÊU CẦU MỚI) "Tìm kiếm trong Thùng rác bộ nhớ nội bộ" — y chang UI/
+  // logic tìm kiếm ở ngoài cây thư mục, chỉ khác tiêu đề và menu 3 lựa chọn
+  // khi bấm vào kết quả (dùng lại đúng `_moMenuMuc` ở trên).
+  Future<void> _moTimKiemThungRac() async {
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => _ManHinhTimKiemThungRac(
+        kho: _kho,
+        onMoMenu: _moMenuMuc,
+        dinhDangThoiGian: _dinhDangThoiGian,
+      ),
+    ));
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final ds = _kho.mucTrongThungRac;
@@ -188,6 +226,14 @@ class _ModalThungRacState extends State<ModalThungRac> {
           tooltip: 'Đóng',
           onPressed: () => Navigator.of(context).pop(),
         ),
+        // (YÊU CẦU MỚI) Nút tìm kiếm — sát mép phải, cùng dòng với tiêu đề.
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            tooltip: 'Tìm kiếm trong thùng rác',
+            onPressed: _moTimKiemThungRac,
+          ),
+        ],
       ),
       body: ds.isEmpty
           ? const Center(
@@ -226,6 +272,181 @@ class _ModalThungRacState extends State<ModalThungRac> {
                 );
               },
             ),
+    );
+  }
+}
+
+/// Bỏ dấu tiếng Việt + hạ chữ thường — dùng cho tìm kiếm trong thùng rác
+/// khớp cả khi gõ không dấu (y chang bản gốc ở `man_hinh_thu_muc.dart`,
+/// nhân bản ở đây vì `_` là riêng theo từng tệp trong Dart).
+String _boDauTiengVietThungRac(String s) {
+  const banDo = {
+    'à': 'a', 'á': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
+    'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
+    'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a',
+    'è': 'e', 'é': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
+    'ê': 'e', 'ề': 'e', 'ế': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e',
+    'ì': 'i', 'í': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
+    'ò': 'o', 'ó': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
+    'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o',
+    'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o',
+    'ù': 'u', 'ú': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
+    'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u',
+    'ỳ': 'y', 'ý': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y',
+    'đ': 'd',
+  };
+  final buf = StringBuffer();
+  for (final ch in s.toLowerCase().split('')) {
+    buf.write(banDo[ch] ?? ch);
+  }
+  return buf.toString();
+}
+
+/// "Tìm kiếm trong Thùng rác bộ nhớ nội bộ" — y chang UI/logic "Tìm kiếm
+/// trong này" ở ngoài cây thư mục; chỉ khác là bấm vào kết quả mở đúng
+/// menu 3 lựa chọn của thùng rác (Khôi phục/Xoá vĩnh viễn/Thông tin chi
+/// tiết), qua [onMoMenu].
+class _ManHinhTimKiemThungRac extends StatefulWidget {
+  const _ManHinhTimKiemThungRac({
+    required this.kho,
+    required this.onMoMenu,
+    required this.dinhDangThoiGian,
+  });
+
+  final KhoDuLieu kho;
+  final void Function(BuildContext, _MucThungRac) onMoMenu;
+  final String Function(DateTime) dinhDangThoiGian;
+
+  @override
+  State<_ManHinhTimKiemThungRac> createState() => _ManHinhTimKiemThungRacState();
+}
+
+class _ManHinhTimKiemThungRacState extends State<_ManHinhTimKiemThungRac> {
+  final _oTimKiem = TextEditingController();
+
+  @override
+  void dispose() {
+    _oTimKiem.dispose();
+    super.dispose();
+  }
+
+  List<_MucThungRac> _ketQua() {
+    final tuKhoa = _oTimKiem.text.trim();
+    if (tuKhoa.isEmpty) return const [];
+    final tuKhoaThuong = tuKhoa.toLowerCase();
+    final tuKhoaKhongDau = _boDauTiengVietThungRac(tuKhoa);
+    final coDau = <_MucThungRac>[];
+    final khongDau = <_MucThungRac>[];
+    for (final muc in widget.kho.mucTrongThungRac) {
+      if (muc.ten.toLowerCase().contains(tuKhoaThuong)) {
+        coDau.add(muc);
+      } else if (_boDauTiengVietThungRac(muc.ten).contains(tuKhoaKhongDau)) {
+        khongDau.add(muc);
+      }
+    }
+    int soTen(_MucThungRac a, _MucThungRac b) =>
+        a.ten.toLowerCase().compareTo(b.ten.toLowerCase());
+    coDau.sort(soTen);
+    khongDau.sort(soTen);
+    return [...coDau, ...khongDau];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final coGoTim = _oTimKiem.text.trim().isNotEmpty;
+    final ketQua = _ketQua();
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          children: [
+            Material(
+              color: const Color(0xFFF1F3F4),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: const Text(
+                  'Tìm kiếm trong "Thùng rác bộ nhớ nội bộ"',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+            Material(
+              color: const Color(0xFFF1F3F4),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 8, 10),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _oTimKiem,
+                        autofocus: true,
+                        onChanged: (_) => setState(() {}),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          hintText: 'Nhập tên tệp hoặc thư mục...',
+                          border: OutlineInputBorder(),
+                          contentPadding:
+                              EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      tooltip: 'Xoá từ khoá',
+                      onPressed: () => setState(() => _oTimKiem.clear()),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: TextButton.styleFrom(foregroundColor: Colors.red.shade600),
+                      child: const Text('Tắt'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Expanded(
+              child: !coGoTim
+                  ? const Center(
+                      child: Text(
+                        'Nhập ký tự để tìm kiếm',
+                        style: TextStyle(color: Color(0xFF9AA0A6)),
+                      ),
+                    )
+                  : ketQua.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'Không tìm thấy kết quả',
+                            style: TextStyle(color: Color(0xFF9AA0A6)),
+                          ),
+                        )
+                      : ListView(
+                          children: [
+                            for (final muc in ketQua)
+                              ListTile(
+                                leading: Icon(
+                                  muc.laThuMuc
+                                      ? Icons.folder
+                                      : Icons.description_outlined,
+                                  color: muc.laThuMuc ? Colors.amber.shade700 : null,
+                                ),
+                                title: Text(
+                                  muc.ten,
+                                  style: muc.mau != null
+                                      ? TextStyle(color: Color(muc.mau!))
+                                      : null,
+                                ),
+                                subtitle: Text(
+                                  'Đã xoá lúc ${widget.dinhDangThoiGian(muc.thoiGianXoa)}',
+                                ),
+                                onTap: () => widget.onMoMenu(context, muc),
+                                trailing: const Icon(Icons.more_vert),
+                              ),
+                          ],
+                        ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -1592,7 +1592,7 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                 _mucMenuThem(1, 'Cài đặt Micro'),
                 _mucMenuThem(2, 'Cài đặt Hiển thị và tự động sửa'),
                 _mucMenuThem(9, 'Từ điển sửa lỗi chính tả của bạn'),
-                _mucMenuThem(10, 'Bộ nhớ tạm để dán văn bản'),
+                _mucMenuThem(10, 'Cài đặt Bộ nhớ tạm để dán văn bản'),
                 _dividerMenu(),
                 _mucMenuThem(3, 'Điều khoản sử dụng'),
                 _mucMenuThem(4, 'Bảo mật và quyền riêng tư'),

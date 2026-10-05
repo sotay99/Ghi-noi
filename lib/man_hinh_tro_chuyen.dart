@@ -34,6 +34,7 @@ import 'loai_thiet_bi.dart';
 import 'lua_chon_phim_tat.dart';
 import 'the_ghi_am.dart' show dinhDangMmSs;
 import 'theo_doi_tap_doi_phim.dart';
+import 'thong_bao_giua.dart';
 import 'tin_nhan_tro_chuyen.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -1647,6 +1648,19 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                           maxLines: null,
                           keyboardType: TextInputType.multiline,
                           textInputAction: TextInputAction.newline,
+                          // (YÊU CẦU MỚI) Giới hạn 100.000 ký tự — dán đoạn
+                          // dài hơn thì tự cắt bớt, kèm thông báo nhanh.
+                          inputFormatters: [
+                            _GioiHanKyTuChat(() {
+                              if (mounted) {
+                                hienThongBaoGiua(
+                                  context,
+                                  'Tin nhắn không được vượt quá 100.000 ký tự',
+                                  ganTren: true,
+                                );
+                              }
+                            }),
+                          ],
                           decoration: const InputDecoration(
                             hintText: 'Ctrl + Enter để gửi',
                             border: OutlineInputBorder(
@@ -2597,6 +2611,29 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
 /// chữ AI trả về. Đơn giản hơn NHIỀU so với bộ máy "thẻ ghi âm" của trang
 /// soạn thảo chính vì thẻ ở đây không cần phát lại, không cần menu, và
 /// chỉ sống qua đúng 2 trạng thái liên tiếp rồi biến mất ngay khi có chữ.
+/// (YÊU CẦU MỚI) Chặn khung nhập chat vượt quá 100.000 ký tự — dán một
+/// đoạn dài hơn thì tự cắt bớt (giữ đúng 100.000 ký tự đầu), gọi
+/// [khiVuotGioiHan] đúng một lần cho lần cắt đó (hoãn qua
+/// `addPostFrameCallback` — không gọi `Overlay`/`showDialog` ngay giữa lúc
+/// khung hình đang build từ `TextInputFormatter`).
+class _GioiHanKyTuChat extends TextInputFormatter {
+  _GioiHanKyTuChat(this.khiVuotGioiHan);
+
+  static const gioiHanKyTu = 100000;
+
+  final VoidCallback khiVuotGioiHan;
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.length <= gioiHanKyTu) return newValue;
+    WidgetsBinding.instance.addPostFrameCallback((_) => khiVuotGioiHan());
+    return TextEditingValue(
+      text: newValue.text.substring(0, gioiHanKyTu),
+      selection: TextSelection.collapsed(offset: gioiHanKyTu),
+    );
+  }
+}
+
 class _BoDieuKhienChat extends TextEditingController {
   static final RegExp _reThe = RegExp('〔🎙️ (?:Đang ghi âm|Đang chuyển) #(\\d+)〕');
 

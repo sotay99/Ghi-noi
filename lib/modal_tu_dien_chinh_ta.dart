@@ -252,9 +252,14 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
               child: TextField(
                 controller: controller,
                 onChanged: onChanged,
+                // (YÊU CẦU MỚI) Giới hạn 500 ký tự cho MỌI trường của từ điển
+                // — `maxLength` tự kèm `LengthLimitingTextInputFormatter`,
+                // nên dán đoạn dài hơn cũng tự cắt bớt, không cần thêm gì.
+                maxLength: 500,
                 style: const TextStyle(fontSize: 15),
                 decoration: InputDecoration(
                   isDense: true,
+                  counterText: '',
                   // (SỬA LỖI — "không thấy gì khác biệt") Chỉ đổi màu/độ dày
                   // viền thì quá mờ để nhận ra ngay, đặc biệt lúc không
                   // focus — tô luôn NỀN xanh nhạt cho cặp đang rỗng, không
@@ -350,7 +355,11 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
             child: TextButton.icon(
               onPressed: _themCap,
               icon: const Icon(Icons.add_circle_outline),
-              label: const Text('Thêm cặp từ'),
+              // (YÊU CẦU MỚI) Màn hẹp: rút gọn chữ còn "Thêm" (vẫn giữ icon)
+              // cho đỡ chật — màn rộng giữ nguyên tên đầy đủ.
+              label: Text(
+                MediaQuery.sizeOf(context).width < 600 ? 'Thêm' : 'Thêm cặp từ',
+              ),
               style: TextButton.styleFrom(
                 foregroundColor: Colors.white,
                 disabledForegroundColor: Colors.white38,

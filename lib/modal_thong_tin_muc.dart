@@ -43,6 +43,9 @@ void hienThongTinThuMuc(
   KhoDuLieu kho, {
   required String id,
   required String ten,
+  // (YÊU CẦU MỚI) Chỉ truyền khi gọi từ Thùng rác — "Vị trí: ..." trở
+  // thành dòng ĐẦU TIÊN, đứng trên mọi dòng thông tin còn lại.
+  String? viTri,
 }) {
   final truc = kho.thongKeTrucTiep(id);
   final sau = kho.thongKeDeQuy(id);
@@ -54,6 +57,7 @@ void hienThongTinThuMuc(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (viTri != null) _dongThongTin('Vị trí: $viTri'),
           _dongThongTin('Tên: $ten'),
           _dongThongTin('Kích thước: ${dinhDangKichThuoc(sau.tongByte)}'),
           _dongThongTin(
@@ -77,6 +81,9 @@ void hienThongTinGhiChu(
   BuildContext context, {
   required String ten,
   required String noiDung,
+  // (YÊU CẦU MỚI) Chỉ truyền khi gọi từ Thùng rác — xem ghi chú ở
+  // `hienThongTinThuMuc`.
+  String? viTri,
 }) {
   final soByte = utf8.encode(noiDung).length;
   showDialog<void>(
@@ -87,6 +94,7 @@ void hienThongTinGhiChu(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (viTri != null) _dongThongTin('Vị trí: $viTri'),
           _dongThongTin('Tên: $ten'),
           _dongThongTin('Kích thước: ${dinhDangKichThuoc(soByte)}'),
           _dongThongTin('Chủ sở hữu: '),

@@ -343,17 +343,17 @@ class KhoDuLieu {
 
   /// Toàn bộ mục đang nằm trong thùng rác (thư mục lẫn ghi chú), mới xoá
   /// nhất xếp trước — dùng để vẽ modal "Thùng rác Bộ nhớ Nội bộ".
-  List<({bool laThuMuc, String id, String ten, int? mau, DateTime thoiGianXoa})>
+  List<({bool laThuMuc, String id, String ten, int? mau, String chaId, DateTime thoiGianXoa})>
       get mucTrongThungRac {
-    final ds = <({bool laThuMuc, String id, String ten, int? mau, DateTime thoiGianXoa})>[];
+    final ds = <({bool laThuMuc, String id, String ten, int? mau, String chaId, DateTime thoiGianXoa})>[];
     for (final t in thuMuc) {
       if (t.thoiGianXoa != null) {
-        ds.add((laThuMuc: true, id: t.id, ten: t.ten, mau: t.mau, thoiGianXoa: t.thoiGianXoa!));
+        ds.add((laThuMuc: true, id: t.id, ten: t.ten, mau: t.mau, chaId: t.chaId, thoiGianXoa: t.thoiGianXoa!));
       }
     }
     for (final g in ghiChu) {
       if (g.thoiGianXoa != null) {
-        ds.add((laThuMuc: false, id: g.id, ten: g.ten, mau: g.mau, thoiGianXoa: g.thoiGianXoa!));
+        ds.add((laThuMuc: false, id: g.id, ten: g.ten, mau: g.mau, chaId: g.chaId, thoiGianXoa: g.thoiGianXoa!));
       }
     }
     ds.sort((a, b) => b.thoiGianXoa.compareTo(a.thoiGianXoa));
