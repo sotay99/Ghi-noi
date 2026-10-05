@@ -5494,7 +5494,22 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // riêng, ngắn (60ms, y hệt con số gốc trước khi sửa) — KHÔNG dùng
     // chung hẹn giờ 450ms của nhánh bàn phím ảo bên dưới, vì nhánh đó còn
     // phải chờ rồi dựng lại ô soạn thảo, còn ở đây không có gì phải chờ.
+    //
+    // (SỬA LỖI — thảo luận với người dùng, "liệt bàn phím vật lý sau khi
+    // dùng Bộ nhớ tạm/Copy/Cắt/Dán/All") Hàm này gọi `requestFocus()` ngay
+    // sau đây (ở `addPostFrameCallback` phía trên) — nhưng nếu `_oChu` đã
+    // SẴN giữ tiêu điểm từ trước (không có chuyển mất→có), lệnh đó là
+    // no-op về mặt tiêu điểm, và quan trọng hơn: `_khiFocusConTroDoi` (nơi
+    // DUY NHẤT đang gọi `TextInput.clearClient` để dọn kết nối cũ cho bàn
+    // phím vật lý) CHỈ chạy khi có đúng một lượt chuyển mất→có — không chạy
+    // ở đây. Đường (Copy/Cắt/Dán/All, dán từ Bộ nhớ tạm...) vì vậy có thể
+    // "lọt qua" mà không được dọn kết nối lần nào, dù tiêu điểm trông vẫn
+    // bình thường. Gọi thẳng `clearClient` NGAY TẠI ĐÂY — rẻ, đã chứng minh
+    // an toàn/không gây nháy ở `_khiFocusConTroDoi` — để chắc chắn đường
+    // này cũng được dọn, không phải chờ một chuyển tiêu điểm có thể không
+    // bao giờ xảy ra.
     if (_coBanPhimVatLy) {
+      SystemChannels.textInput.invokeMethod<void>('TextInput.clearClient');
       _henTatReadOnlyNhanh?.cancel();
       _henTatReadOnlyNhanh = Timer(const Duration(milliseconds: 60), () {
         if (mounted && phien == _phienAnBanPhimAo) {
@@ -5560,8 +5575,23 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       if (mounted) setState(() => _epAnBanPhimAoKhiGiuFocus = false);
       if (MediaQuery.of(context).viewInsets.bottom > 0) return;
       _lamMoiOVanBanDeThoatKetBanPhimAo();
+      // (SỬA LỖI — thảo luận với người dùng, "liệt bàn phím ảo sau khi bàn
+      // phím đã ẩn từ trước") Đã dọn xong kết nối (`clearClient` + đổi
+      // `GlobalKey` ở trên) nhưng KHÔNG tự gọi `TextInput.show()` ngay tại
+      // đây — lệnh đó chạy trong `Timer`, không đi kèm một cử chỉ chạm thật
+      // nào của người dùng, nên trình duyệt có thể lặng lẽ chặn không cho
+      // tự bật bàn phím ảo lên (đúng lý do mẹo tay của người dùng luôn cần
+      // một lần CHẠM LẠI vào ô sau khi bật nút "bàn phím" của Bộ phím
+      // nhanh). Bật cờ này — lần `onTap` KẾ TIẾP vào ô soạn thảo (xem
+      // `TextField` chính ở `build`) sẽ tự gọi `TextInput.show()` NGAY
+      // trong đúng lượt chạm đó, mượn cử chỉ thật của người dùng, rồi tự
+      // tắt cờ.
+      _choChamLaiDeBatBanPhimAo = true;
     });
   }
+
+  /// Xem chú thích ở nơi được bật, trong `_giuTieuDiemKhongBatBanPhimAo`.
+  bool _choChamLaiDeBatBanPhimAo = false;
 
   /// Debounce riêng, ngắn, cho việc trả `readOnly` về bình thường trên
   /// thiết bị có bàn phím vật lý — xem `_giuTieuDiemKhongBatBanPhimAo`.
@@ -15188,6 +15218,21 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           maxLines: null,
                           expands: true,
                           autofocus: true,
+                          // (SỬA LỖI — thảo luận với người dùng, "liệt bàn
+                          // phím ảo") Chỉ có TÁC DỤNG khi `_choChamLaiDeBatBanPhimAo`
+                          // đang bật (xem `_giuTieuDiemKhongBatBanPhimAo`) —
+                          // mượn đúng cử chỉ chạm thật này để gọi
+                          // `TextInput.show()`, việc mà lúc dọn kết nối
+                          // trước đó (chạy trong `Timer`, không có cử chỉ
+                          // nào đi kèm) không chắc làm được. Chạm bình
+                          // thường (cờ đang tắt) thì không có gì xảy ra
+                          // thêm — không ảnh hưởng gì tới việc di chuyển
+                          // con trỏ/chọn vùng bằng chạm như cũ.
+                          onTap: () {
+                            if (!_choChamLaiDeBatBanPhimAo) return;
+                            _choChamLaiDeBatBanPhimAo = false;
+                            SystemChannels.textInput.invokeMethod<void>('TextInput.show');
+                          },
                           textAlignVertical: TextAlignVertical.top,
                           // (SỬA LỖI mất hết dấu xuống dòng khi chạm vào khung,
                           // chỉ xảy ra lúc "Bộ phím nhanh cho màn hình cảm

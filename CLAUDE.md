@@ -16,7 +16,42 @@ hiện lại theo yêu cầu.
 hỏi người dùng mô tả MỚI chi tiết hơn (bấm gì, thứ tự nào, trước đó đang
 làm gì) trước khi thử hướng mới — đừng giả định giống y hệt mô tả gốc ở
 trên vì bản thân nó cũng chỉ là suy đoán, chưa chắc đúng gốc rễ hoàn toàn.
-Hướng đã thử: dọn kết nối bàn phím ảo (`TextInput.clearClient`) ngay lúc
+
+**Đã thử lần 2 (2026-10-05, v160, người dùng mô tả MỚI chi tiết hơn):**
+người dùng kể lại mẹo tay đang dùng để tự thoát kẹt (cả bàn phím vật lý
+LẪN bàn phím ảo): mở "Bộ phím nhanh cho màn hình cảm ứng", bấm nút "bàn
+phím" trong đó, chờ ~1,5 giây, rồi TỰ CHẠM lại vào ô soạn thảo — luôn hết
+kẹt. Phân tích: mẹo đó tái hiện đúng 2 việc đã có sẵn trong code
+(`_lamMoiOVanBanDeThoatKetBanPhimAo`: `TextInput.clearClient` + đổi
+`GlobalKey`) CỘNG THÊM một lần CHẠM THẬT sau đó — mắt xích đang thiếu, vì
+trình duyệt chỉ cho code tự bật lại bàn phím ảo khi việc đó nằm trong/sát
+một cử chỉ chạm thật, không phải gọi từ một `Timer` đơn độc. Tìm ra 2 khe
+hở cụ thể:
+1. Nhánh bàn phím VẬT LÝ trong `_giuTieuDiemKhongBatBanPhimAo` (đường đi
+   của Copy/Cắt/Dán/All VÀ "dán từ Bộ nhớ tạm") trước đây KHÔNG gọi
+   `clearClient` gì cả — chỉ tắt `readOnly` sau 60ms. Lý do: `requestFocus()`
+   gọi vào một `FocusNode` ĐÃ SẴN giữ tiêu điểm (không có chuyển mất→có)
+   không kích hoạt được `_khiFocusConTroDoi` (nơi duy nhất đang dọn
+   `clearClient` cho bàn phím vật lý, nhưng chỉ chạy đúng lúc có chuyển
+   tiêu điểm). Sửa: gọi thẳng `clearClient` ngay trong nhánh đó luôn,
+   không chờ một chuyển tiêu điểm có thể không xảy ra.
+2. Nhánh bàn phím ẢO: tự dọn kết nối sau 450ms yên tay NẾU bàn phím vẫn ẩn
+   (giữ nguyên, đã có từ trước) — nhưng KHÔNG tự gọi `TextInput.show()`
+   ngay trong `Timer` đó (thiếu cử chỉ chạm thật, dễ bị trình duyệt chặn
+   âm thầm — giải thích đúng vì sao KHÔNG PHẢI MỌI LẦN Copy/All lúc bàn
+   phím ảo đang ẩn đều bị kẹt, chỉ thỉnh thoảng, tuỳ còn trong "cửa sổ cho
+   phép cử chỉ" của trình duyệt hay không). Sửa: bật cờ
+   `_choChamLaiDeBatBanPhimAo`; `onTap` MỚI thêm vào `TextField` chính sẽ
+   tự gọi `TextInput.show()` ngay trong lần chạm thật KẾ TIẾP nếu cờ đang
+   bật, rồi tự tắt cờ.
+CHỦ Ý KHÔNG làm thêm: không mở rộng việc "dọn nhẹ mỗi lần chạm" sang bàn
+phím ảo (rủi ro phá hỏng chính lúc trình duyệt tự quyết định có bật bàn
+phím ảo hay không, biến ca đang chạy tốt thành hỏng) — xem thảo luận đầy
+đủ trong lịch sử trò chuyện lúc sửa, không lặp lại hướng đó nếu chưa có
+dữ liệu mới. Người dùng CHƯA xác nhận bản vá này hết lỗi — cần hỏi lại
+sau khi dùng thử một thời gian trước khi coi là xong.
+
+Hướng đã thử TRƯỚC v160: dọn kết nối bàn phím ảo (`TextInput.clearClient`) ngay lúc
 tiêu điểm vừa chuyển từ mất sang có lại — xem `_khiFocusConTroDoi` ở
 `trang_soan_thao.dart`.
 
