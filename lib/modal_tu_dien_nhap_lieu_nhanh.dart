@@ -431,8 +431,37 @@ class _ManHinhTuDienNhapLieuNhanhState
         ),
       );
 
-  /// Một trong 26 dòng ở chế độ kéo-thả — cả dòng (không chỉ icon 3 gạch)
-  /// đều kéo được, đúng yêu cầu. Vị trí CHÈN TRƯỚC dòng này là chính [i].
+  /// (YÊU CẦU MỚI) Đường kẻ ngang MỜ ngăn cách giữa 2 dòng liên tiếp — chỉ
+  /// để mắt thấy ranh giới, không phải đường chèn (xem [_duongKeChiThi]).
+  Widget _duongNganCachDong() => Container(height: 1, color: const Color(0x14000000));
+
+  /// (YÊU CẦU MỚI) Phần NỘI DUNG kéo được (icon 3 gạch + chữ) — KHÔNG gồm
+  /// nhãn "Phím X" (xem [_dongKeoTha]: nhãn đó cố ý đứng NGOÀI `Draggable`
+  /// để chạm/vuốt đúng khu vực nó — ở màn hình cảm ứng, chỗ dễ vuốt lên/
+  /// xuống để cuộn trang nhất — không vô tình khởi động kéo-thả dòng).
+  Widget _noiDungKeoDuocKeo(String noiDung) => Row(
+        children: [
+          const Icon(Icons.drag_handle, color: Color(0xFF9AA0A6)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              noiDung.trim().isEmpty ? '(trống)' : noiDung.replaceAll('\n', ' '),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+              style: TextStyle(
+                color: noiDung.trim().isEmpty ? const Color(0xFF9AA0A6) : null,
+                fontStyle: noiDung.trim().isEmpty ? FontStyle.italic : FontStyle.normal,
+              ),
+            ),
+          ),
+        ],
+      );
+
+  /// Một trong 26 dòng ở chế độ kéo-thả — bấm/kéo được ở phần nội dung bên
+  /// trái (icon 3 gạch hoặc chữ), KHÔNG kéo được ở khu vực nhãn "Phím X"
+  /// bên phải (xem [_noiDungKeoDuocKeo]). Vị trí CHÈN TRƯỚC dòng này là
+  /// chính [i].
   Widget _dongKeoTha(int i) {
     final dangBiKeo = _chiSoDangKeo == i;
     final noiDung = _dsSapXepTam[i];
@@ -447,68 +476,58 @@ class _ManHinhTuDienNhapLieuNhanhState
       onAcceptWithDetails: (details) => _apDungKeoTha(details.data, i),
       builder: (context, candidate, rejected) => Column(
         children: [
-          if (_chiSoThaDuKien == i) _duongKeChiThi(),
+          if (_chiSoThaDuKien == i)
+            _duongKeChiThi()
+          else if (i > 0)
+            _duongNganCachDong(),
           Opacity(
             opacity: dangBiKeo ? 0.3 : 1.0,
-            child: Draggable<int>(
-              data: i,
-              axis: Axis.vertical,
-              feedback: Material(
-                elevation: 4,
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  width: MediaQuery.sizeOf(context).width - 32,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: const Color(0xFFDADCE0)),
-                    borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Draggable<int>(
+                      data: i,
+                      axis: Axis.vertical,
+                      feedback: Material(
+                        elevation: 4,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          width: MediaQuery.sizeOf(context).width - 32,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            border: Border.all(color: const Color(0xFFDADCE0)),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: _noiDungKeoDuocKeo(noiDung),
+                        ),
+                      ),
+                      childWhenDragging: const SizedBox(height: 24),
+                      onDragStarted: () => setState(() => _chiSoDangKeo = i),
+                      onDragEnd: (_) => setState(() => _chiSoDangKeo = null),
+                      onDraggableCanceled: (_, __) => setState(() => _chiSoDangKeo = null),
+                      child: _noiDungKeoDuocKeo(noiDung),
+                    ),
                   ),
-                  child: _noiDungDongKeoTha(i, noiDung),
-                ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Phím ${_chuCai(i)}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _mauChinh,
+                    ),
+                  ),
+                ],
               ),
-              childWhenDragging: const SizedBox(height: 44),
-              onDragStarted: () => setState(() => _chiSoDangKeo = i),
-              onDragEnd: (_) => setState(() => _chiSoDangKeo = null),
-              onDraggableCanceled: (_, __) => setState(() => _chiSoDangKeo = null),
-              child: _noiDungDongKeoTha(i, noiDung),
             ),
           ),
         ],
       ),
     );
   }
-
-  Widget _noiDungDongKeoTha(int i, String noiDung) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          children: [
-            const Icon(Icons.drag_handle, color: Color(0xFF9AA0A6)),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                noiDung.trim().isEmpty ? '(trống)' : noiDung.replaceAll('\n', ' '),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                softWrap: false,
-                style: TextStyle(
-                  color: noiDung.trim().isEmpty ? const Color(0xFF9AA0A6) : null,
-                  fontStyle: noiDung.trim().isEmpty ? FontStyle.italic : FontStyle.normal,
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              'Phím ${_chuCai(i)}',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: _mauChinh,
-              ),
-            ),
-          ],
-        ),
-      );
 
   /// Vùng thả cuối cùng — chèn vào CUỐI danh sách (vị trí 26).
   Widget _vungThaCuoiDanhSach() => DragTarget<int>(
