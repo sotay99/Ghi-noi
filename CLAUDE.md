@@ -1,6 +1,15 @@
 # Lỗi tồn đọng — hoãn sửa
 
-## Thỉnh thoảng không gõ được bằng bàn phím vật lý sau mất/được tiêu điểm (bản Web)
+## [ĐÃ SỬA XONG — v162, 2026-10-05] Thỉnh thoảng không gõ được bằng bàn phím vật lý sau mất/được tiêu điểm (bản Web)
+
+**Kết quả cuối cùng: người dùng xác nhận v162 đã hết lỗi — cả bàn phím ẢO
+(hết từ v160) lẫn bàn phím VẬT LÝ (hết từ v162).** Gốc rễ thật của bàn
+phím vật lý: KHÔNG phải tầng kênh giao tiếp platform (`TextInput.clearClient`
+— đã thử dọn tầng đó 3 lần ở các thời điểm khác nhau, không ăn gì), mà
+nằm ở tầng Element/RenderEditable của chính `TextField` — chỉ đổi
+`GlobalKey` (buộc Flutter huỷ-dựng-lại) mới chạm đúng chỗ hỏng. Xem chi
+tiết lịch sử điều tra (4 lần thử, giữ lại để tham khảo cách suy luận nếu
+lỗi họ hàng xuất hiện lại) ngay dưới đây.
 
 **Mô tả:** Trên thiết bị có gắn bàn phím vật lý (máy tính, hoặc điện
 thoại/tablet gắn bàn phím ngoài), đôi lúc sau khi ô soạn thảo mất tiêu
@@ -100,12 +109,18 @@ thuyết: chỗ "liệt" không nằm ở tầng kênh giao tiếp platform
 tình huống đã mô tả ở trên (dán từ Bộ nhớ tạm, mở/đóng bảng lịch sử lúc
 đang có con trỏ nhấp nháy, Cắt/Copy/Dán/All) rồi báo lại riêng từng cái.
 
-Nếu v162 vẫn không hết: `_lamMoiOVanBanDeThoatKetBanPhimAo()` cũng là
-"vô tác dụng" rồi — tức là NGAY CẢ đổi `GlobalKey` cũng không chạm đúng
-chỗ hỏng, nên đừng tiếp tục ở hướng "dọn ống" (bất kể nhẹ hay nặng, bất
-kể mốc thời gian nào) nữa — đây sẽ là tín hiệu cần đổi hẳn hướng điều
-tra, có thể cần log/console thật từ máy người dùng ngay lúc liệt (không
-chỉ suy đoán từ triệu chứng) mới biết chính xác cái gì đang xảy ra ở tầng
+**Xác nhận cuối (2026-10-05, ngay sau v162):** người dùng báo đã dùng
+thử và hết lỗi — "giải quyết tất cả mọi lỗi bị liệt bàn phím ảo và bàn
+phím vật lý". Đóng mục này. Nếu lỗi tương tự xuất hiện lại (có thể là
+một nguyên nhân khác, đừng mặc định giống y hệt), bắt đầu điều tra lại
+từ đây, và nhớ hỏi mô tả MỚI chi tiết trước khi thử lại hướng cũ.
+
+Hướng đã bỏ qua KHÔNG cần quay lại trừ khi có dữ liệu mới: nếu một lỗi
+giống thế này xuất hiện lại mà `_lamMoiOVanBanDeThoatKetBanPhimAo()` đã
+không ăn, đừng tiếp tục ở hướng "dọn ống" (bất kể nhẹ hay nặng, bất kể
+mốc thời gian nào) nữa — đó là tín hiệu cần đổi hẳn hướng điều tra, có
+thể cần log/console thật từ máy người dùng ngay lúc liệt (không chỉ suy
+đoán từ triệu chứng) mới biết chính xác cái gì đang xảy ra ở tầng
 trình duyệt.
 
 ## "Bãi đất trống" kẹt lại sau khi ẩn bàn phím ảo (bản Web)
