@@ -16630,6 +16630,16 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
 
   bool _khiPhim(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
+    // (YÊU CẦU MỚI) Modal "Cài đặt Bộ nhớ tạm để dán văn bản" (mở từ nút
+    // "Cài đặt" ngay trong bảng này) đứng TRÊN bảng này — nếu không chặn,
+    // gõ phím số trong lúc đang ở modal cài đặt vẫn lọt xuống đây, tự dán
+    // một dòng + đóng cả hai modal, dù người dùng chỉ đang gõ vào modal
+    // cài đặt. `ModalRoute.of(context)?.isCurrent` là `false` ngay khi có
+    // route khác đè lên trên — đúng tín hiệu cần để tự khoá, không cần cờ
+    // riêng.
+    if (!mounted) return false;
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return false;
     final i = _phimSo[event.logicalKey];
     if (i == null) return false;
     if (BoNhoTamDanVanBan.lichSu[i] == null) return true;
@@ -16951,6 +16961,12 @@ class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNha
   /// việc dán nếu dòng rỗng — xem `_moHopThoaiTuDienNhapLieuNhanh`.
   bool _khiPhim(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
+    // (YÊU CẦU MỚI) Xem giải thích ở `_HopThoaiLichSuBoNhoTamState._khiPhim`
+    // — cùng lý do: modal "Cài đặt Từ điển nhập liệu nhanh" đè lên trên thì
+    // phải khoá hẳn phím chữ cái ở đây, không cho lọt xuống dán nhầm.
+    if (!mounted) return false;
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return false;
     final i = _phimChu[event.logicalKey];
     if (i == null) return false;
     widget.khiChonDong(i);

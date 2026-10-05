@@ -6,8 +6,9 @@
 //
 // Nội dung thật của 26 dòng (dán vào vị trí con trỏ) nằm ở
 // `_HopThoaiTuDienNhapLieuNhanh` trong `trang_soan_thao.dart` — modal này
-// chỉ cấu hình: công tắc bật/tắt tổng, phím tắt ẩn/hiện bảng đó, và chính
-// 26 ô nhập liệu (lưu thẳng vào `CaiDat.tuDienNhapLieuNhanh`).
+// chỉ cấu hình: công tắc bật/tắt tổng, phím tắt ẩn/hiện bảng đó, đổi thứ tự
+// giữa 26 dòng, và chính 26 ô nhập liệu (lưu thẳng vào
+// `CaiDat.tuDienNhapLieuNhanh`).
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -25,6 +26,8 @@ Future<void> moModalTuDienNhapLieuNhanh(BuildContext context, CaiDat caiDat) {
   );
 }
 
+String _chuCai(int i) => String.fromCharCode('A'.codeUnitAt(0) + i);
+
 class _ManHinhTuDienNhapLieuNhanh extends StatefulWidget {
   const _ManHinhTuDienNhapLieuNhanh({required this.caiDat});
   final CaiDat caiDat;
@@ -37,6 +40,24 @@ class _ManHinhTuDienNhapLieuNhanh extends StatefulWidget {
 class _ManHinhTuDienNhapLieuNhanhState
     extends State<_ManHinhTuDienNhapLieuNhanh> {
   late List<TextEditingController> _oNhap;
+
+  /// (YÊU CẦU MỚI) Đang ở chế độ "Thay đổi thứ tự giữa các dòng" — thay hết
+  /// mọi thứ khác (công tắc, phím tắt, chú thích, 26 ô nhập + Copy/Dán/Xoá)
+  /// bằng 26 dòng kéo-thả, xem `build`.
+  bool _dangSapXepLai = false;
+
+  /// Bản TẠM của 26 đoạn văn bản trong lúc kéo-thả — chỉ áp dụng thật vào
+  /// `widget.caiDat`/các ô nhập khi bấm "Lưu thay đổi"; bấm "Huỷ" thì vứt
+  /// bỏ, không đụng gì tới dữ liệu thật.
+  List<String> _dsSapXepTam = [];
+
+  /// Vị trí (0-25) đang bị kéo đi — `null` khi không kéo gì.
+  int? _chiSoDangKeo;
+
+  /// Vị trí CHÈN dự kiến nếu thả ra ngay lúc này — 0-25 nghĩa là "chèn
+  /// ngay TRƯỚC dòng này", 26 nghĩa là "chèn vào cuối cùng". `null` khi con
+  /// chuột không ở trên vùng thả nào.
+  int? _chiSoThaDuKien;
 
   @override
   void initState() {
@@ -61,6 +82,72 @@ class _ManHinhTuDienNhapLieuNhanhState
     // yêu cầu gốc. Không cần debounce 500ms như từ điển chính tả vì đây chỉ
     // ghi MỘT danh sách chuỗi (rẻ hơn hẳn việc ghi lại cả cây CapTuDien).
     widget.caiDat.luuTuDienNhapLieuNhanh();
+  }
+
+  /// (YÊU CẦU MỚI) Copy nội dung dòng [i] vào bộ nhớ đệm HỆ THỐNG — CHỦ Ý
+  /// không ghi vào "Bộ nhớ tạm để dán văn bản" (lịch sử 10 dòng riêng của
+  /// tính năng khác), chỉ `Clipboard.setData` đơn thuần như Ctrl+C thường.
+  Future<void> _copyDong(int i) async {
+    await Clipboard.setData(ClipboardData(text: _oNhap[i].text));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Đã copy nội dung dòng Phím ${_chuCaiAt(i)}')),
+    );
+  }
+
+  String _chuCaiAt(int i) => _chuCai(i);
+
+  /// (YÊU CẦU MỚI) Dán từ bộ nhớ đệm HỆ THỐNG vào ô nhập dòng [i] — vào
+  /// đúng vị trí con trỏ nếu ô đang có vùng chọn/con trỏ hợp lệ, hoặc vào
+  /// cuối văn bản của dòng đó nếu không (ô chưa từng được chạm vào,
+  /// `selection` không hợp lệ).
+  Future<void> _danDong(int i) async {
+    final du = await Clipboard.getData('text/plain');
+    final chenGoc = du?.text;
+    if (chenGoc == null || chenGoc.isEmpty) return;
+    final oDieuKhien = _oNhap[i];
+    final vb = oDieuKhien.text;
+    final chon = oDieuKhien.selection;
+    final batDau = chon.isValid ? chon.start : vb.length;
+    final ketThuc = chon.isValid ? chon.end : vb.length;
+    var moi = vb.replaceRange(batDau, ketThuc, chenGoc);
+    var viTriConTroMoi = batDau + chenGoc.length;
+    // (YÊU CẦU MỚI) Giới hạn 1000 ký tự — gán thẳng `.text` không tự cắt
+    // như lúc gõ tay qua `maxLength`, phải tự cắt ở đây.
+    if (moi.length > CaiDat.gioiHanTuDienNhapLieuNhanh) {
+      moi = moi.substring(0, CaiDat.gioiHanTuDienNhapLieuNhanh);
+      viTriConTroMoi = viTriConTroMoi.clamp(0, moi.length);
+    }
+    setState(() {
+      oDieuKhien.value = TextEditingValue(
+        text: moi,
+        selection: TextSelection.collapsed(offset: viTriConTroMoi),
+      );
+    });
+    _doiDong(i, moi);
+  }
+
+  /// (YÊU CẦU MỚI) Xoá trắng dòng [i] — hỏi xác nhận trước, không xoá nhầm.
+  Future<void> _xoaDong(int i) async {
+    final dongY = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.delete_forever_outlined, size: 28),
+        title: Text('Xoá nội dung dòng Phím ${_chuCaiAt(i)}?'),
+        content: const Text('Không thể hoàn tác lại được. Bạn có chắc chắn không?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Không')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Xoá'),
+          ),
+        ],
+      ),
+    );
+    if (dongY != true || !mounted) return;
+    setState(() => _oNhap[i].clear());
+    _doiDong(i, '');
   }
 
   Future<void> _moDoiPhimTat() async {
@@ -260,6 +347,330 @@ class _ManHinhTuDienNhapLieuNhanhState
     );
   }
 
+  // ------------------------------------- "Thay đổi thứ tự giữa các dòng"
+
+  void _batDauSapXepLai() {
+    setState(() {
+      _dsSapXepTam = [for (final o in _oNhap) o.text];
+      _dangSapXepLai = true;
+    });
+  }
+
+  void _huySapXepLai() {
+    setState(() {
+      _dangSapXepLai = false;
+      _dsSapXepTam = [];
+      _chiSoDangKeo = null;
+      _chiSoThaDuKien = null;
+    });
+  }
+
+  void _luuSapXepLai() {
+    final moi = List<String>.of(_dsSapXepTam);
+    setState(() {
+      widget.caiDat.tuDienNhapLieuNhanh = moi;
+      for (var i = 0; i < 26; i++) {
+        _oNhap[i].text = moi[i];
+      }
+      _dangSapXepLai = false;
+      _dsSapXepTam = [];
+      _chiSoDangKeo = null;
+      _chiSoThaDuKien = null;
+    });
+    widget.caiDat.luuTuDienNhapLieuNhanh();
+  }
+
+  /// [nguon] (0-25) là vị trí ĐANG bị kéo; [dich] (0-26) là vị trí CHÈN
+  /// (xem [_chiSoThaDuKien]) — đúng công thức xoá-rồi-chèn-lại tiêu chuẩn,
+  /// trừ bớt 1 nếu nguồn nằm TRƯỚC đích (xoá nguồn làm mọi phần tử sau nó
+  /// dồn lên một bậc trước khi chèn).
+  void _apDungKeoTha(int nguon, int dich) {
+    setState(() {
+      final tu = _dsSapXepTam.removeAt(nguon);
+      var d = dich;
+      if (nguon < dich) d -= 1;
+      _dsSapXepTam.insert(d, tu);
+      _chiSoThaDuKien = null;
+      _chiSoDangKeo = null;
+    });
+  }
+
+  /// Đường kẻ ngang màu xanh — vị trí sẽ chèn tới nếu thả tay ra NGAY LÚC
+  /// NÀY, đi theo con chuột trong lúc đang kéo (chưa thả).
+  Widget _duongKeChiThi() => Container(
+        height: 3,
+        margin: const EdgeInsets.symmetric(vertical: 3),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade600,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      );
+
+  /// Một trong 26 dòng ở chế độ kéo-thả — cả dòng (không chỉ icon 3 gạch)
+  /// đều kéo được, đúng yêu cầu. Vị trí CHÈN TRƯỚC dòng này là chính [i].
+  Widget _dongKeoTha(int i) {
+    final dangBiKeo = _chiSoDangKeo == i;
+    final noiDung = _dsSapXepTam[i];
+    return DragTarget<int>(
+      onWillAcceptWithDetails: (details) => details.data != i,
+      onMove: (_) {
+        if (_chiSoThaDuKien != i) setState(() => _chiSoThaDuKien = i);
+      },
+      onLeave: (_) {
+        if (_chiSoThaDuKien == i) setState(() => _chiSoThaDuKien = null);
+      },
+      onAcceptWithDetails: (details) => _apDungKeoTha(details.data, i),
+      builder: (context, candidate, rejected) => Column(
+        children: [
+          if (_chiSoThaDuKien == i) _duongKeChiThi(),
+          Opacity(
+            opacity: dangBiKeo ? 0.3 : 1.0,
+            child: Draggable<int>(
+              data: i,
+              axis: Axis.vertical,
+              feedback: Material(
+                elevation: 4,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  width: MediaQuery.sizeOf(context).width - 32,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: const Color(0xFFDADCE0)),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: _noiDungDongKeoTha(i, noiDung),
+                ),
+              ),
+              childWhenDragging: const SizedBox(height: 44),
+              onDragStarted: () => setState(() => _chiSoDangKeo = i),
+              onDragEnd: (_) => setState(() => _chiSoDangKeo = null),
+              onDraggableCanceled: (_, __) => setState(() => _chiSoDangKeo = null),
+              child: _noiDungDongKeoTha(i, noiDung),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _noiDungDongKeoTha(int i, String noiDung) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            const Icon(Icons.drag_handle, color: Color(0xFF9AA0A6)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                noiDung.trim().isEmpty ? '(trống)' : noiDung.replaceAll('\n', ' '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+                style: TextStyle(
+                  color: noiDung.trim().isEmpty ? const Color(0xFF9AA0A6) : null,
+                  fontStyle: noiDung.trim().isEmpty ? FontStyle.italic : FontStyle.normal,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              'Phím ${_chuCai(i)}',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: _mauChinh,
+              ),
+            ),
+          ],
+        ),
+      );
+
+  /// Vùng thả cuối cùng — chèn vào CUỐI danh sách (vị trí 26).
+  Widget _vungThaCuoiDanhSach() => DragTarget<int>(
+        onWillAcceptWithDetails: (details) => details.data != 25,
+        onMove: (_) {
+          if (_chiSoThaDuKien != 26) setState(() => _chiSoThaDuKien = 26);
+        },
+        onLeave: (_) {
+          if (_chiSoThaDuKien == 26) setState(() => _chiSoThaDuKien = null);
+        },
+        onAcceptWithDetails: (details) => _apDungKeoTha(details.data, 26),
+        builder: (context, candidate, rejected) => Column(
+          children: [
+            if (_chiSoThaDuKien == 26) _duongKeChiThi(),
+            const SizedBox(height: 32),
+          ],
+        ),
+      );
+
+  Widget _thanSapXepLai() => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
+                  onPressed: _huySapXepLai,
+                  child: const Text('Huỷ - Không lưu thay đổi'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: Colors.green.shade600),
+                  onPressed: _luuSapXepLai,
+                  child: const Text('Lưu thay đổi'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Bấm và giữ từng dòng, sau đó kéo và thả để thay đổi vị trí cho '
+            'từng dòng.',
+            style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+          ),
+          const SizedBox(height: 8),
+          for (var i = 0; i < 26; i++) _dongKeoTha(i),
+          _vungThaCuoiDanhSach(),
+        ],
+      );
+
+  Widget _thanBinhThuong() => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F3F4),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Bật Từ điển nhập liệu nhanh',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                Switch(
+                  value: widget.caiDat.tuDienNhapLieuNhanhBat,
+                  activeThumbColor: _mauChinh,
+                  onChanged: (gia) {
+                    setState(() => widget.caiDat.tuDienNhapLieuNhanhBat = gia);
+                    widget.caiDat.datTuDienNhapLieuNhanhBat(gia);
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text('Phím tắt ẩn hiện bảng Từ điển nhập liệu nhanh',
+              style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          InkWell(
+            onTap: _moDoiPhimTat,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                border: Border.all(color: const Color(0xFFDADCE0)),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(widget.caiDat.phimTatTuDienNhapLieuNhanh.nhan,
+                      style: const TextStyle(fontWeight: FontWeight.w600, color: _mauChinh)),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.edit_outlined, size: 16, color: Color(0xFF5F6368)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          // (YÊU CẦU MỚI) Nút "Thay đổi thứ tự giữa các dòng" — ngay dưới
+          // cài đặt phím tắt.
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: _batDauSapXepLai,
+              icon: const Icon(Icons.swap_vert, size: 18),
+              label: const Text('Thay đổi thứ tự giữa các dòng'),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // (YÊU CẦU MỚI) Dòng chú thích mới — đứng TRƯỚC dòng chú thích cũ.
+          const Text(
+            'Từ điển được lưu lâu dài trong bộ nhớ nội bộ của thiết bị.',
+            style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Mỗi dòng ứng với một phím chữ cái trên bàn phím vật lý — gõ '
+            'sẵn đoạn văn bản muốn dán nhanh vào dòng tương ứng. Mở bảng '
+            'bằng nút trên thanh công cụ hoặc phím tắt ở trên, rồi bấm vào '
+            'một dòng (hoặc gõ đúng phím chữ cái của dòng đó) để dán ngay '
+            'vào vị trí con trỏ. Để trống dòng nào cũng được. Mỗi lần sửa '
+            'tự lưu lại ngay, không cần bấm nút Lưu.',
+            style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+          ),
+          const SizedBox(height: 8),
+          for (var i = 0; i < 26; i++) ...[
+            const Divider(height: 24),
+            Text(
+              'Phím ${_chuCai(i)}',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF5F6368),
+              ),
+            ),
+            const SizedBox(height: 4),
+            TextField(
+              controller: _oNhap[i],
+              onChanged: (gia) => _doiDong(i, gia),
+              maxLines: 3,
+              minLines: 1,
+              // (YÊU CẦU MỚI) Giới hạn 1000 ký tự — dán đoạn dài hơn cũng
+              // tự cắt bớt nhờ `maxLength`, không cần thêm gì.
+              maxLength: CaiDat.gioiHanTuDienNhapLieuNhanh,
+              style: const TextStyle(fontSize: 15),
+              decoration: const InputDecoration(
+                isDense: true,
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+            const SizedBox(height: 4),
+            // (YÊU CẦU MỚI) Ba nút Copy/Dán/Xoá riêng cho từng dòng.
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: () => _copyDong(i),
+                  icon: const Icon(Icons.copy_outlined, size: 16),
+                  label: const Text('Copy'),
+                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                ),
+                TextButton.icon(
+                  onPressed: () => _danDong(i),
+                  icon: const Icon(Icons.content_paste, size: 16),
+                  label: const Text('Dán'),
+                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                ),
+                TextButton.icon(
+                  onPressed: () => _xoaDong(i),
+                  icon: Icon(Icons.delete_outline, size: 16, color: Colors.red.shade600),
+                  label: Text('Xoá', style: TextStyle(color: Colors.red.shade600)),
+                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                ),
+              ],
+            ),
+          ],
+        ],
+      );
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -277,93 +688,7 @@ class _ManHinhTuDienNhapLieuNhanhState
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F3F4),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Bật Từ điển nhập liệu nhanh',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  Switch(
-                    value: widget.caiDat.tuDienNhapLieuNhanhBat,
-                    activeThumbColor: _mauChinh,
-                    onChanged: (gia) {
-                      setState(() => widget.caiDat.tuDienNhapLieuNhanhBat = gia);
-                      widget.caiDat.datTuDienNhapLieuNhanhBat(gia);
-                    },
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text('Phím tắt ẩn hiện bảng Từ điển nhập liệu nhanh',
-                style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
-            InkWell(
-              onTap: _moDoiPhimTat,
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFFDADCE0)),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(widget.caiDat.phimTatTuDienNhapLieuNhanh.nhan,
-                        style: const TextStyle(fontWeight: FontWeight.w600, color: _mauChinh)),
-                    const SizedBox(width: 6),
-                    const Icon(Icons.edit_outlined, size: 16, color: Color(0xFF5F6368)),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Mỗi dòng ứng với một phím chữ cái trên bàn phím vật lý — gõ '
-              'sẵn đoạn văn bản muốn dán nhanh vào dòng tương ứng. Mở bảng '
-              'bằng nút trên thanh công cụ hoặc phím tắt ở trên, rồi bấm vào '
-              'một dòng (hoặc gõ đúng phím chữ cái của dòng đó) để dán ngay '
-              'vào vị trí con trỏ. Để trống dòng nào cũng được. Mỗi lần sửa '
-              'tự lưu lại ngay, không cần bấm nút Lưu.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
-            ),
-            const SizedBox(height: 8),
-            for (var i = 0; i < 26; i++) ...[
-              const Divider(height: 24),
-              Text(
-                'Phím ${String.fromCharCode('A'.codeUnitAt(0) + i)}',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF5F6368),
-                ),
-              ),
-              const SizedBox(height: 4),
-              TextField(
-                controller: _oNhap[i],
-                onChanged: (gia) => _doiDong(i, gia),
-                maxLines: 3,
-                minLines: 1,
-                // (YÊU CẦU MỚI) Giới hạn 1000 ký tự — dán đoạn dài hơn cũng
-                // tự cắt bớt nhờ `maxLength`, không cần thêm gì.
-                maxLength: CaiDat.gioiHanTuDienNhapLieuNhanh,
-                style: const TextStyle(fontSize: 15),
-                decoration: const InputDecoration(
-                  isDense: true,
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-              ),
-            ],
+            _dangSapXepLai ? _thanSapXepLai() : _thanBinhThuong(),
           ],
         ),
       ),
