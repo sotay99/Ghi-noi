@@ -25,6 +25,14 @@ class BoNhoTamDanVanBan {
   static final List<int> _tuoi = List<int>.filled(10, 0);
   static int _denSo = 0;
 
+  /// (YÊU CẦU MỚI) Gói định dạng thủ công (chuỗi base64 do
+  /// `_macGoiDinhDangChoClipboard` đóng, xem `trang_soan_thao.dart`) đi kèm
+  /// từng dòng — `null` nếu dòng đó không có định dạng gì đáng nhớ. Gói này
+  /// tự mang đủ độ dài + mã băm của đoạn văn bản để bên dán tự xác minh lại,
+  /// không cần toạ độ tài liệu gốc — an toàn khi tái sử dụng cho một tài
+  /// liệu KHÁC (hoặc cùng tài liệu, vị trí khác) với lúc Cắt/Copy.
+  static final List<String?> dinhDang = List<String?>.filled(10, null);
+
   /// Gọi mỗi khi Cắt/Copy thành công — xem `_phimAoCopy`/`_phimAoCut` ở
   /// `trang_soan_thao.dart`. Bỏ qua đoạn rỗng (không có gì để nhớ).
   ///
@@ -39,20 +47,21 @@ class BoNhoTamDanVanBan {
   /// lịch sử 10 dòng này không nhận đoạn đó).
   static const gioiHanKyTu = 10000;
 
-  static void themMoi(String doan) {
+  static void themMoi(String doan, {String? dinhDangGoi}) {
     if (doan.isEmpty || doan.length > gioiHanKyTu) return;
     final rong = lichSu.indexWhere((v) => v == null);
     if (rong != -1) {
-      _ghiVaoO(rong, doan);
+      _ghiVaoO(rong, doan, dinhDangGoi);
       return;
     }
     final ungVien = thuTuCuNhatKhongGhim;
     if (ungVien.isEmpty) return;
-    _ghiVaoO(ungVien.first, doan);
+    _ghiVaoO(ungVien.first, doan, dinhDangGoi);
   }
 
-  static void _ghiVaoO(int i, String doan) {
+  static void _ghiVaoO(int i, String doan, String? dinhDangGoi) {
     lichSu[i] = doan;
+    dinhDang[i] = dinhDangGoi;
     _tuoi[i] = ++_denSo;
   }
 

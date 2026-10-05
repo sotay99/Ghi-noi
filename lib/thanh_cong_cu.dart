@@ -23,6 +23,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamCaiDatMicro,
     required this.khiBamCaiDatHienThi,
     required this.khiBamTuDienChinhTa,
+    required this.khiBamTuDienNhapLieuNhanh,
     required this.khiBamBoNhoTam,
     required this.khiBamHuongDan,
     required this.khiBamCaiDatKiemTraToanVan,
@@ -107,9 +108,14 @@ class ThanhCongCu extends StatelessWidget {
   final VoidCallback khiBamCaiDatMicro;
   final VoidCallback khiBamCaiDatHienThi;
 
-  /// Mục "Từ điển sửa lỗi chính tả của bạn" — ngay dưới "Cài đặt Hiển thị
+  /// Mục "Cài đặt từ điển sửa lỗi chính tả" — ngay dưới "Cài đặt Hiển thị
   /// và tự động sửa" trong cùng menu — mở `moModalTuDienChinhTa`.
   final VoidCallback khiBamTuDienChinhTa;
+
+  /// (YÊU CẦU MỚI) Mục "Cài đặt Từ điển nhập liệu nhanh" — ngay GIỮA "Cài
+  /// đặt từ điển sửa lỗi chính tả" và "Cài đặt Bộ nhớ tạm để dán văn bản" —
+  /// mở `moModalTuDienNhapLieuNhanh`.
+  final VoidCallback khiBamTuDienNhapLieuNhanh;
 
   /// (YÊU CẦU MỚI — nhánh thử nghiệm) Mục "Bộ nhớ tạm để dán văn bản" —
   /// ngay dưới "Từ điển sửa lỗi chính tả của bạn" — mở `moModalBoNhoTam`.
@@ -441,6 +447,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamCaiDatMicro: khiBamCaiDatMicro,
                               khiBamCaiDatHienThi: khiBamCaiDatHienThi,
                               khiBamTuDienChinhTa: khiBamTuDienChinhTa,
+                              khiBamTuDienNhapLieuNhanh: khiBamTuDienNhapLieuNhanh,
                               khiBamBoNhoTam: khiBamBoNhoTam,
                               khiBamTroChuyen: khiBamTroChuyen,
                               khiMoMenu: khiMoMenuCanReset,
@@ -1482,6 +1489,7 @@ class _NutTaiKhoanMenu extends StatelessWidget {
     required this.khiBamCaiDatMicro,
     required this.khiBamCaiDatHienThi,
     required this.khiBamTuDienChinhTa,
+    required this.khiBamTuDienNhapLieuNhanh,
     required this.khiBamBoNhoTam,
     required this.khiBamTroChuyen,
     required this.khiMoMenu,
@@ -1491,8 +1499,12 @@ class _NutTaiKhoanMenu extends StatelessWidget {
   final VoidCallback khiBamCaiDatMicro;
   final VoidCallback khiBamCaiDatHienThi;
 
-  /// Mục "Từ điển sửa lỗi chính tả của bạn" — mở `moModalTuDienChinhTa`.
+  /// Mục "Cài đặt từ điển sửa lỗi chính tả" — mở `moModalTuDienChinhTa`.
   final VoidCallback khiBamTuDienChinhTa;
+
+  /// (YÊU CẦU MỚI) Mục "Cài đặt Từ điển nhập liệu nhanh" — mở
+  /// `moModalTuDienNhapLieuNhanh`.
+  final VoidCallback khiBamTuDienNhapLieuNhanh;
 
   /// Mục "Bộ nhớ tạm để dán văn bản" — mở `moModalBoNhoTam`.
   final VoidCallback khiBamBoNhoTam;
@@ -1568,6 +1580,9 @@ class _NutTaiKhoanMenu extends StatelessWidget {
               case 9:
                 khiBamTuDienChinhTa();
                 break;
+              case 26:
+                khiBamTuDienNhapLieuNhanh();
+                break;
               case 10:
                 khiBamBoNhoTam();
                 break;
@@ -1591,7 +1606,8 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                 _dividerMenu(),
                 _mucMenuThem(1, 'Cài đặt Micro'),
                 _mucMenuThem(2, 'Cài đặt Hiển thị và tự động sửa'),
-                _mucMenuThem(9, 'Từ điển sửa lỗi chính tả của bạn'),
+                _mucMenuThem(9, 'Cài đặt từ điển sửa lỗi chính tả'),
+                _mucMenuThem(26, 'Cài đặt Từ điển nhập liệu nhanh'),
                 _mucMenuThem(10, 'Cài đặt Bộ nhớ tạm để dán văn bản'),
                 _dividerMenu(),
                 _mucMenuThem(3, 'Điều khoản sử dụng'),

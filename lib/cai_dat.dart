@@ -296,6 +296,62 @@ class CaiDat {
     );
   }
 
+  /// (YÊU CẦU MỚI — nhánh thử nghiệm) "Từ điển nhập liệu nhanh" — 26 đoạn
+  /// văn bản cố định, một cho mỗi chữ cái A-Z (chỉ số 0 = A, 25 = Z), gán
+  /// vào phím chữ cái tương ứng để dán nhanh vào vị trí con trỏ. Khác hẳn
+  /// "Từ điển sửa lỗi chính tả" (không quét/gạch chân gì cả) — đây chỉ là
+  /// 26 đoạn dán nhanh, y hệt vai trò "phím tắt gõ nhanh" của một số app
+  /// gõ tiếng Việt khác.
+  List<String> tuDienNhapLieuNhanh = List<String>.filled(26, '');
+
+  static const _khoaTuDienNhapLieuNhanh = 'ghi_noi_tu_dien_nhap_lieu_nhanh';
+
+  /// Giới hạn ký tự cho MỖI dòng trong 26 dòng trên.
+  static const gioiHanTuDienNhapLieuNhanh = 1000;
+
+  /// Công tắc tổng — mặc định BẬT. Tắt thì ẩn hẳn nút mở bảng 26 dòng ở
+  /// thanh công cụ và phím tắt cũng vô hiệu, nhưng nội dung 26 dòng vẫn giữ
+  /// nguyên để bật lại là dùng tiếp ngay.
+  bool tuDienNhapLieuNhanhBat = true;
+
+  static const _khoaTuDienNhapLieuNhanhBat = 'ghi_noi_tu_dien_nhap_lieu_nhanh_bat';
+
+  /// Phím tắt ẩn/hiện bảng 26 dòng — CHỈ hai lựa chọn (khác hẳn bốn lựa
+  /// chọn của Micro/Ghi âm/Bộ nhớ tạm): "Alt + Shift" (MẶC ĐỊNH, cố định,
+  /// không đổi được) hoặc "Ctrl + một phím tự chọn". Không tham gia vòng tự
+  /// đổi hộ 3 chiều — xem `LuaChonPhimTat.altShift`.
+  LuaChonPhimTat phimTatTuDienNhapLieuNhanh = const LuaChonPhimTat.altShift();
+
+  static const _khoaPhimTatTuDienNhapLieuNhanhLoai =
+      'ghi_noi_phim_tat_tu_dien_nhap_lieu_nhanh_loai';
+  static const _khoaPhimTatTuDienNhapLieuNhanhPhimCtrl =
+      'ghi_noi_phim_tat_tu_dien_nhap_lieu_nhanh_phim_ctrl';
+
+  Future<void> luuTuDienNhapLieuNhanh() async {
+    final kho = await SharedPreferences.getInstance();
+    await kho.setString(_khoaTuDienNhapLieuNhanh, jsonEncode(tuDienNhapLieuNhanh));
+  }
+
+  Future<void> datTuDienNhapLieuNhanhBat(bool bat) async {
+    tuDienNhapLieuNhanhBat = bat;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setBool(_khoaTuDienNhapLieuNhanhBat, bat);
+  }
+
+  /// (YÊU CẦU MỚI) Lựa chọn "Ctrl + ..." của tính năng này không tham gia
+  /// vòng tự đổi hộ — nơi gọi (modal cài đặt) tự kiểm tra trùng với phím tắt
+  /// CỐ ĐỊNH (`tenXungDot`) và với Micro/Ghi âm/Bộ nhớ tạm TRƯỚC khi gọi hàm
+  /// này, y hệt cách modal Bộ nhớ tạm đang làm cho lựa chọn "Ctrl + ..." của
+  /// riêng nó.
+  Future<void> datPhimTatTuDienNhapLieuNhanh(LuaChonPhimTat moi) async {
+    phimTatTuDienNhapLieuNhanh = moi;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setString(_khoaPhimTatTuDienNhapLieuNhanhLoai, moi.loai);
+    if (moi.phim != null) {
+      await kho.setString(_khoaPhimTatTuDienNhapLieuNhanhPhimCtrl, moi.phim!);
+    }
+  }
+
   Future<void> tai() async {
     final kho = await SharedPreferences.getInstance();
     thoiGianBatLaiGiay = kho.getDouble(_khoaThoiGianBatLai) ?? 1.0;
@@ -360,6 +416,25 @@ class CaiDat {
               return <CapTuDien>[];
             }
           })();
+    tuDienNhapLieuNhanhBat = kho.getBool(_khoaTuDienNhapLieuNhanhBat) ?? true;
+    phimTatTuDienNhapLieuNhanh = LuaChonPhimTat.tuLuu(
+      kho.getString(_khoaPhimTatTuDienNhapLieuNhanhLoai) ?? 'altShift',
+      kho.getString(_khoaPhimTatTuDienNhapLieuNhanhPhimCtrl),
+    );
+    final tuDienNhapLieuNhanhRaw = kho.getString(_khoaTuDienNhapLieuNhanh);
+    if (tuDienNhapLieuNhanhRaw != null) {
+      try {
+        final ds = jsonDecode(tuDienNhapLieuNhanhRaw);
+        if (ds is List) {
+          tuDienNhapLieuNhanh = List<String>.generate(
+            26,
+            (i) => i < ds.length && ds[i] is String ? ds[i] as String : '',
+          );
+        }
+      } catch (_) {
+        // Dữ liệu hỏng — giữ 26 dòng trống, không ném lỗi làm hỏng cả app.
+      }
+    }
     final tenThietBiDaLuu = kho.getString(_khoaThietBiChonTay);
     thietBiChonTay = tenThietBiDaLuu == null
         ? null

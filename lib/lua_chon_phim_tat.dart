@@ -30,7 +30,15 @@ class LuaChonPhimTat {
       : loai = 'shiftDup',
         phim = null;
 
-  /// 'tab' | 'ctrl' | 'ctrlDup' | 'shiftDup'.
+  /// (YÊU CẦU MỚI) Alt + Shift cùng lúc — CHỈ dùng cho "Từ điển nhập liệu
+  /// nhanh" (mặc định của nó), KHÔNG tham gia vòng tự đổi hộ 3 chiều của
+  /// Micro/Ghi âm/Bộ nhớ tạm (xem `CaiDat._vongTuDoiPhimTat`) vì đó là một
+  /// họ tổ hợp hoàn toàn khác, không bao giờ trùng nhau.
+  const LuaChonPhimTat.altShift()
+      : loai = 'altShift',
+        phim = null;
+
+  /// 'tab' | 'ctrl' | 'ctrlDup' | 'shiftDup' | 'altShift'.
   final String loai;
 
   /// Chỉ có ý nghĩa khi [loai] == 'ctrl' — phím bấm thêm cùng Ctrl.
@@ -49,6 +57,8 @@ class LuaChonPhimTat {
         return LuaChonPhimTat.ctrl((phimLuu == null || phimLuu.isEmpty) ? 'G' : phimLuu);
       case 'shiftDup':
         return const LuaChonPhimTat.shiftDup();
+      case 'altShift':
+        return const LuaChonPhimTat.altShift();
       default:
         return const LuaChonPhimTat.ctrlDup();
     }
@@ -63,6 +73,8 @@ class LuaChonPhimTat {
         return 'Ctrl + ${phim ?? '?'}';
       case 'shiftDup':
         return 'Bấm Shift 2 lần';
+      case 'altShift':
+        return 'Alt + Shift';
       default:
         return 'Bấm Ctrl 2 lần';
     }
@@ -73,6 +85,7 @@ class LuaChonPhimTat {
         'tab' => 'TAB',
         'ctrl' => 'CTRL+${(phim ?? '').toUpperCase()}',
         'shiftDup' => 'SHIFTDUP',
+        'altShift' => 'ALTSHIFT',
         _ => 'CTRLDUP',
       };
 
