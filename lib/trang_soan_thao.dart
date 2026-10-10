@@ -5717,7 +5717,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// vào `_boDieuKhien.dinhDang`. Hỏng khuôn/không khớp ở bất kỳ đâu thì bỏ
   /// qua ÊM RU — dán vẫn thành công, chỉ mất định dạng, KHÔNG BAO GIỜ gán
   /// định dạng sai chỗ.
-  void _apDungGoiDinhDangTuClipboard(String maHoa, String vanBanDaDan, int batDauChen) {
+  /// [vanBanDaDan] PHẢI là đoạn chữ ĐẦY ĐỦ như lúc copy (dùng xác minh độ
+  /// dài/mã băm) — KỂ CẢ khi đoạn thật sự chèn vào văn bản đã bị cắt bớt
+  /// [boQuaDau] ký tự ở đầu (xem [_themVungDinhDangTuDs]).
+  void _apDungGoiDinhDangTuClipboard(String maHoa, String vanBanDaDan, int batDauChen,
+      {int boQuaDau = 0}) {
     try {
       final goi = jsonDecode(utf8.decode(base64Decode(maHoa)));
       if (goi is! Map) return;
@@ -5725,7 +5729,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       if (goi['ham'] != _bamFnv1a(vanBanDaDan)) return;
       final sp = goi['sp'];
       if (sp is! List) return;
-      _themVungDinhDangTuDs(sp, batDauChen);
+      _themVungDinhDangTuDs(sp, batDauChen, boQuaDau: boQuaDau);
     } catch (_) {
       // Bỏ qua toàn bộ — xem chú thích khai báo hàm.
     }
@@ -5735,7 +5739,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// trong [ds] vào `_boDieuKhien.dinhDang`, dịch toạ độ theo [batDauChen] —
   /// dùng chung cho cả gói JSON riêng của Flowrite ([_apDungGoiDinhDangTuClipboard])
   /// lẫn kết quả rút từ HTML nguồn ngoài ([_dinhDangTuHtmlNgoai]).
-  void _themVungDinhDangTuDs(List<dynamic> ds, int batDauChen) {
+  ///
+  /// [boQuaDau]: số ký tự đã bị cắt khỏi ĐẦU đoạn chữ thật sự chèn vào (tính
+  /// năng tự động thụt đầu dòng xoá bớt dấu cách đầu — xem
+  /// `coTheXoaCachDau` ở `_phimAoPaste`/`_danTuBoNhoTam`), nhưng [ds] vẫn
+  /// đánh toạ độ theo đoạn chữ GỐC ĐẦY ĐỦ (chưa cắt) — mỗi vùng phải lùi về
+  /// đúng [boQuaDau] để khớp lại với đoạn đã cắt. Vùng rơi HẲN vào phần bị
+  /// cắt (kết thúc không vượt qua điểm cắt) thì bỏ hẳn; vùng chỉ cắt một
+  /// phần ở đầu thì giữ lại phần còn lại, bắt đầu từ 0.
+  void _themVungDinhDangTuDs(List<dynamic> ds, int batDauChen, {int boQuaDau = 0}) {
     final vb = _boDieuKhien.text;
     for (final j in ds) {
       if (j is! Map) continue;
@@ -5743,8 +5755,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       final vt = m['vt'];
       final kt = m['kt'];
       if (vt is! int || kt is! int) continue;
-      m['vt'] = vt + batDauChen;
-      m['kt'] = kt + batDauChen;
+      final ktMoi = kt - boQuaDau;
+      if (ktMoi <= 0) continue;
+      final vtMoi = vt - boQuaDau;
+      m['vt'] = (vtMoi < 0 ? 0 : vtMoi) + batDauChen;
+      m['kt'] = ktMoi + batDauChen;
       final v = _VungDinhDangThuCong.fromJson(m, vb.length);
       if (v != null) _boDieuKhien.dinhDang.add(v);
     }
@@ -6186,7 +6201,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       chen = chen.replaceFirst(RegExp(r'^ +'), '');
       if (chen.isEmpty) return;
     }
-    final matDinhDangViXoaCach = chen != chenGoc;
+    // Số ký tự (dấu cách) đã bị cắt khỏi ĐẦU đoạn dán — [chenGoc] vẫn giữ
+    // NGUYÊN để xác minh/rút định dạng (gói định dạng và `text/html` của
+    // clipboard đều đánh toạ độ theo đoạn ĐẦY ĐỦ chưa cắt); vùng định dạng
+    // rút ra được sẽ tự lùi lại đúng số này ở `_themVungDinhDangTuDs` —
+    // KHÔNG bỏ qua hẳn định dạng như trước (mất định dạng chỉ vì có dấu
+    // cách đầu dòng là lỗi, không phải cố ý).
+    final soCachBiXoa = chenGoc.length - chen.length;
 
     // Dán LUÔN phải là một mốc Lùi lại/Tiến tới RIÊNG — xem giải thích ở
     // `_phimAoCut`, cùng cơ chế.
@@ -6203,22 +6224,19 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // (qua `_khiNguoiDungSua` → `_apDungChinhSuaNguoiDung`, đã tự dời mọi
     // vùng định dạng CŨ theo đúng phép chèn) rồi mới THÊM các vùng định dạng
     // MỚI của đoạn vừa dán — không đụng gì vào dây chuyền dời/co giãn đã có,
-    // chỉ cộng thêm sau cùng. Đã xoá dấu cách đầu (ở trên) thì toạ độ của
-    // gói định dạng (tính theo [chenGoc] CHƯA xoá) không còn khớp nữa — bỏ
-    // qua hẳn định dạng lúc đó, thà mất định dạng còn hơn gán sai chỗ.
-    if (!matDinhDangViXoaCach) {
-      if (maHoaGoi != null) {
-        setState(() => _apDungGoiDinhDangTuClipboard(maHoaGoi, chen!, batDau));
-      } else if (htmlClipboard != null) {
-        // Không mang đánh dấu riêng của Flowrite — thử "cố gắng tốt nhất" rút
-        // định dạng từ HTML nguồn ngoài (Google Docs/Word/trang web...), kể
-        // cả định dạng khai qua CSS trong `style="..."` (chứ không chỉ thẻ
-        // ngữ nghĩa `<b>/<i>/<u>`) — xem giải thích đầy đủ ở
-        // `_dinhDangTuHtmlNgoai`. Tự trả về `null` nếu chữ rút ra không khớp
-        // y hệt [chen] — an toàn, không dán sai chữ.
-        final ds = _dinhDangTuHtmlNgoai(htmlClipboard, chen!);
-        if (ds != null) setState(() => _themVungDinhDangTuDs(ds, batDau));
-      }
+    // chỉ cộng thêm sau cùng.
+    if (maHoaGoi != null) {
+      setState(
+          () => _apDungGoiDinhDangTuClipboard(maHoaGoi, chenGoc, batDau, boQuaDau: soCachBiXoa));
+    } else if (htmlClipboard != null) {
+      // Không mang đánh dấu riêng của Flowrite — thử "cố gắng tốt nhất" rút
+      // định dạng từ HTML nguồn ngoài (Google Docs/Word/trang web...), kể
+      // cả định dạng khai qua CSS trong `style="..."` (chứ không chỉ thẻ
+      // ngữ nghĩa `<b>/<i>/<u>`) — xem giải thích đầy đủ ở
+      // `_dinhDangTuHtmlNgoai`. Tự trả về `null` nếu chữ rút ra không khớp
+      // y hệt [chenGoc] — an toàn, không dán sai chữ.
+      final ds = _dinhDangTuHtmlNgoai(htmlClipboard, chenGoc);
+      if (ds != null) setState(() => _themVungDinhDangTuDs(ds, batDau, boQuaDau: soCachBiXoa));
     }
     _cuonToiConTroNeuCan();
     if (mounted) hienThongBaoGiua(context, 'Đã dán văn bản vào từ bộ nhớ đệm', ganTren: true);
@@ -8556,10 +8574,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       chen = chen.replaceFirst(RegExp(r'^ +'), '');
       if (chen.isEmpty) return;
     }
-    // (YÊU CẦU MỚI) Xoá dấu cách đầu làm lệch toạ độ gói định dạng (đóng gói
-    // theo đúng [chenGoc] chưa xoá gì) — mất định dạng còn hơn gán sai chỗ,
-    // y hệt lý do `matDinhDangViXoaCach` ở `_phimAoPaste`.
-    final matDinhDangViXoaCach = chen != chenGoc;
+    // Số ký tự (dấu cách) đã bị cắt khỏi ĐẦU đoạn dán — [chenGoc] vẫn giữ
+    // NGUYÊN để xác minh gói định dạng (đóng gói theo đúng đoạn ĐẦY ĐỦ chưa
+    // cắt); vùng định dạng rút ra được sẽ tự lùi lại đúng số này ở
+    // `_themVungDinhDangTuDs` — xem giải thích đầy đủ ở `_phimAoPaste`.
+    final soCachBiXoa = chenGoc.length - chen.length;
     _henRanhGioiGoTay?.cancel();
     _dangTrongDotGoTay = false;
     if (dangBatTuDongThut) _tamNgungTuDongThutDauDong = true;
@@ -8569,8 +8588,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       selection: TextSelection.collapsed(offset: batDau + chen.length),
     );
     if (dangBatTuDongThut) _tamNgungTuDongThutDauDong = false;
-    if (!matDinhDangViXoaCach && dinhDangGoi != null) {
-      setState(() => _apDungGoiDinhDangTuClipboard(dinhDangGoi, chen, batDau));
+    if (dinhDangGoi != null) {
+      setState(() =>
+          _apDungGoiDinhDangTuClipboard(dinhDangGoi, chenGoc, batDau, boQuaDau: soCachBiXoa));
     }
     _giuFocusOChuSauKhiBam();
     _cuonToiConTroNeuCan();
