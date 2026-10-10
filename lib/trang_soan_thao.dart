@@ -14114,6 +14114,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // cùng tên ở Bộ phím nhanh (giữ màu mặc định).
     const mauChu = Color(0xFF1A73E8);
     final ratHep = MediaQuery.sizeOf(context).width < 420;
+    // (YÊU CẦU MỚI) Màn hẹp BÌNH THƯỜNG (không rất hẹp) — hai nút 📖/📒 dời
+    // LÊN hàng trên cùng (chung dòng tên tệp, sát bên trái "Dán", xem
+    // `build`), không lặp lại ở đây nữa. Màn RỘNG (không `manHinhHep`) vẫn
+    // giữ ở đây, ngay cạnh nút Xoá như cũ.
+    final manHinhHep = MediaQuery.sizeOf(context).width < _nguongManHinhHep;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -14138,7 +14143,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             rong: 40,
             onTap: () => _bamCopyCutPasteOHangThayNav(_xoaChonOHangCopyCutPaste),
           ),
-          ..._haiNutThemVaoTuDien(),
+          if (!manHinhHep) ..._haiNutThemVaoTuDien(),
         ],
       ],
     );
@@ -15136,6 +15141,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       ..._haiNutThemVaoTuDien(),
                     ],
                   ),
+                ),
+              // (YÊU CẦU MỚI) Màn hẹp BÌNH THƯỜNG (không rất hẹp) + có vùng
+              // chọn thật: chỉ hai nút 📖/📒 (KHÔNG có nút Xoá — nút đó vẫn ở
+              // hàng Copy/Cắt dưới như cũ) dời lên đây, sát bên TRÁI "Dán".
+              if (!ratHep && _hienHangCopyCutPaste())
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: _haiNutThemVaoTuDien()),
                 ),
               _nutDanCongCu(),
               if (widget.caiDat.boNhoTamDanVanBanBat) _nutBoNhoTamCongCu(),
@@ -17266,6 +17279,11 @@ class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNha
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(
+                  'Từ điển này được lưu tại bộ nhớ lâu dài của app',
+                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+                ),
+                SizedBox(height: 10),
                 Text(
                   '• Dán nhanh: bấm vào một dòng (hoặc gõ đúng phím chữ cái '
                   'của dòng đó trên bàn phím vật lý) để dán ngay vào vị trí '
