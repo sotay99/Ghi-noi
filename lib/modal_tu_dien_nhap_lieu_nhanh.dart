@@ -17,6 +17,7 @@ import 'package:flutter/services.dart';
 
 import 'cai_dat.dart';
 import 'lua_chon_phim_tat.dart';
+import 'mau_phim_tu_dien_nhap_lieu_nhanh.dart';
 
 const _mauChinh = Color(0xFF1A73E8);
 
@@ -372,11 +373,80 @@ class _ManHinhTuDienNhapLieuNhanhState
     );
   }
 
+  /// (YÊU CẦU MỚI) "Chọn thứ tự giữa các phím tắt chữ cái" — áp dụng ngay và
+  /// tự đóng modal khi chọn (không cần nút Lưu riêng, chỉ 2 lựa chọn loại
+  /// trừ nhau). Đổi lựa chọn này làm đổi NGAY thứ tự hiển thị 26 dòng ở màn
+  /// cài đặt này VÀ ở modal "Thay đổi thứ tự giữa các dòng".
+  Future<void> _moChonThuTuPhimTat() async {
+    Widget oLuaChon({required String gt, required String nhan, required String giaiThich}) {
+      return RadioListTile<String>(
+        value: gt,
+        groupValue: widget.caiDat.thuTuTuDienNhapLieuNhanh,
+        dense: true,
+        contentPadding: EdgeInsets.zero,
+        title: Text(nhan, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(giaiThich, style: const TextStyle(fontSize: 12)),
+        onChanged: (v) {
+          if (v == null) return;
+          widget.caiDat.datThuTuTuDienNhapLieuNhanh(v);
+          setState(() {});
+          Navigator.of(context).pop();
+        },
+      );
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Expanded(child: Text('Chọn thứ tự giữa các phím tắt chữ cái')),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.red),
+              tooltip: 'Đóng',
+              onPressed: () => Navigator.of(ctx).pop(),
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 360,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              oLuaChon(
+                gt: 'hang',
+                nhan: 'Sắp xếp theo các hàng chữ cái trên bàn phím',
+                giaiThich: 'Sắp xếp theo hàng phím của bàn phím vật lý.',
+              ),
+              oLuaChon(
+                gt: 'bangChuCai',
+                nhan: 'Sắp xếp theo Bảng chữ cái A → Z',
+                giaiThich: 'Sắp xếp theo tiêu chuẩn bảng chữ cái quốc tế '
+                    'alphabet, tức là từ A đến Z.',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ------------------------------------- "Thay đổi thứ tự giữa các dòng"
+
+  /// (YÊU CẦU MỚI) Thứ tự CHỮ CÁI (không phải thứ tự nội dung) đang áp dụng
+  /// cho lượt sắp xếp-lại này — chụp lại NGAY lúc bấm "Thay đổi thứ tự giữa
+  /// các dòng" (xem `_batDauSapXepLai`) để nếu người dùng đổi "Chọn thứ tự
+  /// giữa các phím tắt chữ cái" trong lúc đang kéo-thả (hiếm, nhưng modal đó
+  /// vẫn mở được từ đây) thì KHÔNG làm xáo trộn lượt kéo-thả đang dở —
+  /// `_thuTuSapXep[p]` = chữ cái (0-25) đang đứng ở VỊ TRÍ HIỂN THỊ `p`.
+  List<int> _thuTuSapXep = [];
 
   void _batDauSapXepLai() {
     setState(() {
-      _dsSapXepTam = [for (final o in _oNhap) o.text];
+      _thuTuSapXep =
+          thuTuTuDienNhapLieuNhanhTheoKieu(widget.caiDat.thuTuTuDienNhapLieuNhanh);
+      _dsSapXepTam = [for (final chuCai in _thuTuSapXep) _oNhap[chuCai].text];
       _dangSapXepLai = true;
     });
   }
@@ -385,6 +455,7 @@ class _ManHinhTuDienNhapLieuNhanhState
     setState(() {
       _dangSapXepLai = false;
       _dsSapXepTam = [];
+      _thuTuSapXep = [];
       _chiSoDangKeo = null;
       _chiSoThaDuKien = null;
     });
@@ -392,13 +463,16 @@ class _ManHinhTuDienNhapLieuNhanhState
 
   void _luuSapXepLai() {
     final moi = List<String>.of(_dsSapXepTam);
+    final thuTu = _thuTuSapXep;
     setState(() {
-      widget.caiDat.tuDienNhapLieuNhanh = moi;
-      for (var i = 0; i < 26; i++) {
-        _oNhap[i].text = moi[i];
+      for (var p = 0; p < 26; p++) {
+        final chuCai = thuTu[p];
+        widget.caiDat.tuDienNhapLieuNhanh[chuCai] = moi[p];
+        _oNhap[chuCai].text = moi[p];
       }
       _dangSapXepLai = false;
       _dsSapXepTam = [];
+      _thuTuSapXep = [];
       _chiSoDangKeo = null;
       _chiSoThaDuKien = null;
     });
@@ -513,11 +587,14 @@ class _ManHinhTuDienNhapLieuNhanhState
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    'Phím ${_chuCai(i)}',
-                    style: const TextStyle(
+                    'Phím ${_chuCai(_thuTuSapXep[i])}',
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: _mauChinh,
+                      color: mauChuPhimTuDienNhapLieuNhanh(_thuTuSapXep[i]),
+                      decoration: ganChanPhimTuDienNhapLieuNhanh(_thuTuSapXep[i])
+                          ? TextDecoration.underline
+                          : TextDecoration.none,
                     ),
                   ),
                 ],
@@ -644,6 +721,17 @@ class _ManHinhTuDienNhapLieuNhanhState
               label: const Text('Thay đổi thứ tự giữa các dòng'),
             ),
           ),
+          const SizedBox(height: 8),
+          // (YÊU CẦU MỚI) Nút "Chọn thứ tự giữa các phím tắt chữ cái" — ngay
+          // sát dưới nút trên.
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: _moChonThuTuPhimTat,
+              icon: const Icon(Icons.sort_by_alpha, size: 18),
+              label: const Text('Chọn thứ tự giữa các phím tắt chữ cái'),
+            ),
+          ),
           const SizedBox(height: 16),
           // (YÊU CẦU MỚI) Dòng chú thích mới — đứng TRƯỚC dòng chú thích cũ.
           const Text(
@@ -661,14 +749,16 @@ class _ManHinhTuDienNhapLieuNhanhState
             style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
           ),
           const SizedBox(height: 8),
-          for (var i = 0; i < 26; i++) ...[
+          for (final i in thuTuTuDienNhapLieuNhanhTheoKieu(widget.caiDat.thuTuTuDienNhapLieuNhanh)) ...[
             const Divider(height: 24),
             Text(
               'Phím ${_chuCai(i)}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF5F6368),
+                color: mauChuPhimTuDienNhapLieuNhanh(i),
+                decoration:
+                    ganChanPhimTuDienNhapLieuNhanh(i) ? TextDecoration.underline : TextDecoration.none,
               ),
             ),
             const SizedBox(height: 4),

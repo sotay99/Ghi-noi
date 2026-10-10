@@ -352,6 +352,61 @@ class CaiDat {
     }
   }
 
+  /// (YÊU CẦU MỚI) Thứ tự hiển thị 26 dòng ở MODAL CÀI ĐẶT và ở modal "Thay
+  /// đổi thứ tự giữa các dòng" — `'hang'` (theo hàng phím Q-W-E.../A-S-D.../
+  /// Z-X-C... của bàn phím vật lý, MẶC ĐỊNH) hoặc `'bangChuCai'` (A→Z, như
+  /// trước khi có tính năng này). Xem `thuTuTuDienNhapLieuNhanhTheoKieu` ở
+  /// `mau_phim_tu_dien_nhap_lieu_nhanh.dart`.
+  String thuTuTuDienNhapLieuNhanh = 'hang';
+  static const _khoaThuTuTuDienNhapLieuNhanh =
+      'ghi_noi_thu_tu_tu_dien_nhap_lieu_nhanh';
+
+  Future<void> datThuTuTuDienNhapLieuNhanh(String gt) async {
+    thuTuTuDienNhapLieuNhanh = gt;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setString(_khoaThuTuTuDienNhapLieuNhanh, gt);
+  }
+
+  /// (YÊU CẦU MỚI) Tab đang mở gần nhất trong bảng 26 dòng của Từ điển nhập
+  /// liệu nhanh — `'ganDay'` | `'hang'` | `'bangChuCai'`. Mặc định `'hang'`
+  /// (tab giữa). Nhớ lâu dài để mở lại đúng tab cũ.
+  String tabTuDienNhapLieuNhanh = 'hang';
+  static const _khoaTabTuDienNhapLieuNhanh = 'ghi_noi_tab_tu_dien_nhap_lieu_nhanh';
+
+  Future<void> datTabTuDienNhapLieuNhanh(String gt) async {
+    tabTuDienNhapLieuNhanh = gt;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setString(_khoaTabTuDienNhapLieuNhanh, gt);
+  }
+
+  /// (YÊU CẦU MỚI) Lịch sử dán gần nhất ở bảng 26 dòng — trước đây chỉ là
+  /// biến tĩnh trong bộ nhớ (mất khi F5), giờ lưu lâu dài. Phần tử ở CUỐI
+  /// danh sách là lần dán MỚI NHẤT; tối đa 10 phần tử.
+  List<int> ganDayTuDienNhapLieuNhanh = [];
+  static const _khoaGanDayTuDienNhapLieuNhanh =
+      'ghi_noi_gan_day_tu_dien_nhap_lieu_nhanh';
+
+  Future<void> ghiNhanGanDayTuDienNhapLieuNhanh(int i) async {
+    ganDayTuDienNhapLieuNhanh.remove(i);
+    ganDayTuDienNhapLieuNhanh.add(i);
+    while (ganDayTuDienNhapLieuNhanh.length > 10) {
+      ganDayTuDienNhapLieuNhanh.removeAt(0);
+    }
+    final kho = await SharedPreferences.getInstance();
+    await kho.setString(
+      _khoaGanDayTuDienNhapLieuNhanh,
+      jsonEncode(ganDayTuDienNhapLieuNhanh),
+    );
+  }
+
+  /// `null` nếu dòng [i] không nằm trong lịch sử dán gần nhất; ngược lại độ
+  /// "mới" của nó (0 = mới nhất) — 0-4 tô xanh đậm, 5-9 tô xanh nhạt.
+  int? doMoiTuDienNhapLieuNhanh(int i) {
+    final vt = ganDayTuDienNhapLieuNhanh.lastIndexOf(i);
+    if (vt == -1) return null;
+    return ganDayTuDienNhapLieuNhanh.length - 1 - vt;
+  }
+
   Future<void> tai() async {
     final kho = await SharedPreferences.getInstance();
     thoiGianBatLaiGiay = kho.getDouble(_khoaThoiGianBatLai) ?? 1.0;
@@ -433,6 +488,20 @@ class CaiDat {
         }
       } catch (_) {
         // Dữ liệu hỏng — giữ 26 dòng trống, không ném lỗi làm hỏng cả app.
+      }
+    }
+    thuTuTuDienNhapLieuNhanh = kho.getString(_khoaThuTuTuDienNhapLieuNhanh) ?? 'hang';
+    tabTuDienNhapLieuNhanh = kho.getString(_khoaTabTuDienNhapLieuNhanh) ?? 'hang';
+    final ganDayRaw = kho.getString(_khoaGanDayTuDienNhapLieuNhanh);
+    if (ganDayRaw != null) {
+      try {
+        final ds = jsonDecode(ganDayRaw);
+        if (ds is List) {
+          ganDayTuDienNhapLieuNhanh =
+              ds.whereType<int>().where((i) => i >= 0 && i < 26).toList();
+        }
+      } catch (_) {
+        // Dữ liệu hỏng — giữ lịch sử trống, không ném lỗi làm hỏng cả app.
       }
     }
     final tenThietBiDaLuu = kho.getString(_khoaThietBiChonTay);
