@@ -5783,29 +5783,99 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// hàm này rút chữ từ thẻ HTML (ví dụ xuống dòng quanh khối `<p>/<div>`)
   /// là chuyện bình thường, và khi đó THÀ bỏ qua định dạng còn hơn gán sai
   /// chỗ hoặc dán nhầm chữ.
+  /// (SỬA LỖI) Trước đây CHỈ nhận 3 thẻ ngữ nghĩa `<b>/<i>/<u>` — Google
+  /// Docs (và nhiều nguồn khác) KHÔNG dùng các thẻ đó, mà bọc mọi định dạng
+  /// trong `style="font-weight:700;font-style:italic;..."` của thẻ
+  /// `<span>` — nên trước đây dán từ Google Docs vào luôn rơi về "không có
+  /// định dạng nào" (chữ đã khớp, nhưng `ds` luôn rỗng). Giờ đọc THÊM các
+  /// thuộc tính CSS: `font-weight`, `font-style`, `text-decoration(-line)`,
+  /// `vertical-align`, `color`, `background(-color)` — đúng các thuộc tính
+  /// mà CHÍNH Flowrite cũng xuất ra lúc Copy (xem `_dinhDangThuCongSangHtml`),
+  /// nên hai chiều dán qua lại giữa Flowrite ↔ Google Docs/Word đều ra đúng
+  /// định dạng. Dùng NGĂN XẾP để khôi phục đúng trạng thái lúc gặp thẻ đóng
+  /// (thay cho 3 cờ phẳng cũ, chỉ đúng khi các thẻ không lồng nhau) — bắt
+  /// buộc phải vậy vì HTML thật luôn lồng `<span>` trong `<span>` nhiều lớp.
   List<Map<String, dynamic>>? _dinhDangTuHtmlNgoai(String htmlGoc, String vanBanThoDaDoc) {
     try {
       var html = htmlGoc.replaceAll(
           RegExp(r'<script[\s\S]*?</script>', caseSensitive: false), '');
       html = html.replaceAll(RegExp(r'<style[\s\S]*?</style>', caseSensitive: false), '');
       final buf = StringBuffer();
-      final runs = <(int, int, bool, bool, bool)>[];
-      var dam = false, nghieng = false, gachChan = false;
+      final runs = <(int, int, bool, bool, bool, bool, bool, bool, Color?, Color?)>[];
+
+      var dam = false, nghieng = false, gachChan = false, gachNgang = false;
+      var treMu = false, treChan = false;
+      Color? mauChu, mauNen;
+      final nganXep = <(bool, bool, bool, bool, bool, bool, Color?, Color?)>[];
+
+      const theTuDong = {
+        'br', 'img', 'hr', 'meta', 'link', 'input', 'col', 'area', 'base', 'embed', 'source', 'track', 'wbr',
+      };
+
       for (final m in RegExp(r'<[^>]*>|[^<]+', dotAll: true).allMatches(html)) {
         final tok = m[0]!;
         if (tok.startsWith('<')) {
           final te = tok.toLowerCase();
-          final dong = !te.startsWith('</');
-          if (RegExp(r'^</?\s*(b|strong)\b').hasMatch(te)) {
-            dam = dong;
-          } else if (RegExp(r'^</?\s*(i|em)\b').hasMatch(te)) {
-            nghieng = dong;
-          } else if (RegExp(r'^</?\s*u\b').hasMatch(te)) {
-            gachChan = dong;
-          } else if (te.startsWith('<br')) {
+          final tenThe = RegExp(r'^<\s*/?\s*([a-zA-Z0-9]+)').firstMatch(te)?.group(1) ?? '';
+          if (tenThe == 'br') {
             final bd = buf.length;
             buf.write('\n');
-            runs.add((bd, buf.length, dam, nghieng, gachChan));
+            runs.add((bd, buf.length, dam, nghieng, gachChan, gachNgang, treMu, treChan, mauChu, mauNen));
+            continue;
+          }
+          if (theTuDong.contains(tenThe)) continue;
+
+          if (te.startsWith('</')) {
+            if (nganXep.isNotEmpty) {
+              final tt = nganXep.removeLast();
+              dam = tt.$1;
+              nghieng = tt.$2;
+              gachChan = tt.$3;
+              gachNgang = tt.$4;
+              treMu = tt.$5;
+              treChan = tt.$6;
+              mauChu = tt.$7;
+              mauNen = tt.$8;
+            }
+            continue;
+          }
+
+          // Thẻ MỞ — lưu trạng thái hiện tại để khôi phục đúng lúc gặp thẻ
+          // đóng tương ứng, rồi áp thêm định dạng của riêng thẻ này.
+          nganXep.add((dam, nghieng, gachChan, gachNgang, treMu, treChan, mauChu, mauNen));
+          if (RegExp(r'^<\s*(b|strong)\b').hasMatch(te)) dam = true;
+          if (RegExp(r'^<\s*(i|em)\b').hasMatch(te)) nghieng = true;
+          if (RegExp(r'^<\s*u\b').hasMatch(te)) gachChan = true;
+          if (RegExp(r'^<\s*(s|strike|del)\b').hasMatch(te)) gachNgang = true;
+          if (RegExp(r'^<\s*sup\b').hasMatch(te)) treMu = true;
+          if (RegExp(r'^<\s*sub\b').hasMatch(te)) treChan = true;
+
+          final kieu =
+              RegExp(r'''style\s*=\s*["']([^"']*)["']''', caseSensitive: false).firstMatch(tok)?.group(1);
+          if (kieu != null) {
+            final k = kieu.toLowerCase();
+            final fw = RegExp(r'font-weight\s*:\s*([a-z0-9]+)').firstMatch(k)?.group(1);
+            if (fw != null) {
+              final so = int.tryParse(fw);
+              if (fw == 'bold' || (so != null && so >= 600)) dam = true;
+              if (fw == 'normal' || (so != null && so < 600)) dam = false;
+            }
+            if (RegExp(r'font-style\s*:\s*italic').hasMatch(k)) nghieng = true;
+            if (RegExp(r'font-style\s*:\s*normal').hasMatch(k)) nghieng = false;
+            final td = RegExp(r'text-decoration(?:-line)?\s*:\s*([a-z \-]+)').firstMatch(k)?.group(1) ?? '';
+            if (td.contains('underline')) gachChan = true;
+            if (td.contains('line-through')) gachNgang = true;
+            if (td.contains('none')) {
+              gachChan = false;
+              gachNgang = false;
+            }
+            final va = RegExp(r'vertical-align\s*:\s*([a-z]+)').firstMatch(k)?.group(1);
+            if (va == 'super') treMu = true;
+            if (va == 'sub') treChan = true;
+            final mcMoi = _mauTuCss(RegExp(r'(?<![\w-])color\s*:\s*([^;]+)').firstMatch(k)?.group(1));
+            if (mcMoi != null) mauChu = mcMoi;
+            final mnMoi = _mauTuCss(RegExp(r'background(?:-color)?\s*:\s*([^;]+)').firstMatch(k)?.group(1));
+            if (mnMoi != null) mauNen = mnMoi;
           }
           continue;
         }
@@ -5813,27 +5883,42 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         if (chu.isEmpty) continue;
         final bd = buf.length;
         buf.write(chu);
-        runs.add((bd, buf.length, dam, nghieng, gachChan));
+        runs.add((bd, buf.length, dam, nghieng, gachChan, gachNgang, treMu, treChan, mauChu, mauNen));
       }
       if (buf.toString() != vanBanThoDaDoc) return null;
 
       final ds = <Map<String, dynamic>>[];
       var i = 0;
       while (i < runs.length) {
-        final (bd, kt0, d, n, g) = runs[i];
-        var kt = kt0;
+        final r0 = runs[i];
+        var kt = r0.$2;
         var j = i + 1;
         while (j < runs.length &&
-            runs[j].$3 == d &&
-            runs[j].$4 == n &&
-            runs[j].$5 == g &&
+            runs[j].$3 == r0.$3 &&
+            runs[j].$4 == r0.$4 &&
+            runs[j].$5 == r0.$5 &&
+            runs[j].$6 == r0.$6 &&
+            runs[j].$7 == r0.$7 &&
+            runs[j].$8 == r0.$8 &&
+            runs[j].$9 == r0.$9 &&
+            runs[j].$10 == r0.$10 &&
             runs[j].$1 == kt) {
           kt = runs[j].$2;
           j++;
         }
-        if (d || n || g) {
-          ds.add(_VungDinhDangThuCong(batDau: bd, ketThuc: kt, dam: d, nghieng: n, gachChan: g)
-              .toJson());
+        if (r0.$3 || r0.$4 || r0.$5 || r0.$6 || r0.$7 || r0.$8 || r0.$9 != null || r0.$10 != null) {
+          ds.add(_VungDinhDangThuCong(
+            batDau: r0.$1,
+            ketThuc: kt,
+            dam: r0.$3,
+            nghieng: r0.$4,
+            gachChan: r0.$5,
+            gachNgang: r0.$6,
+            treMu: r0.$7,
+            treChan: r0.$8,
+            mauChu: r0.$9,
+            mauNen: r0.$10,
+          ).toJson());
         }
         i = j;
       }
@@ -5841,6 +5926,32 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     } catch (_) {
       return null;
     }
+  }
+
+  /// `rgb(...)`/`rgba(...)`/`#rrggbb`/`#rgb` → `Color` — `null` nếu không
+  /// nhận diện được hoặc là `transparent`/`inherit`/`initial` (không đáng
+  /// gán màu cụ thể nào). Dùng để đọc `color`/`background-color` từ CSS
+  /// của HTML dán vào từ nguồn ngoài (xem [_dinhDangTuHtmlNgoai]).
+  Color? _mauTuCss(String? gt) {
+    if (gt == null) return null;
+    final s = gt.trim();
+    if (s.isEmpty || s == 'transparent' || s == 'inherit' || s == 'initial') return null;
+    final rgba = RegExp(r'rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)')
+        .firstMatch(s);
+    if (rgba != null) {
+      final r = (double.tryParse(rgba.group(1)!) ?? 0).round().clamp(0, 255);
+      final g = (double.tryParse(rgba.group(2)!) ?? 0).round().clamp(0, 255);
+      final b = (double.tryParse(rgba.group(3)!) ?? 0).round().clamp(0, 255);
+      final a = rgba.group(4) != null ? (double.tryParse(rgba.group(4)!) ?? 1.0) : 1.0;
+      return Color.fromARGB((a * 255).round().clamp(0, 255), r, g, b);
+    }
+    final hex = RegExp(r'^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$').firstMatch(s);
+    if (hex != null) {
+      var h = hex.group(1)!;
+      if (h.length == 3) h = h.split('').map((c) => '$c$c').join();
+      return Color(0xFF000000 | int.parse(h, radix: 16));
+    }
+    return null;
   }
 
   /// Ba ký tự HTML tối thiểu cần thoát trong một đoạn chữ thường trước khi
@@ -6100,9 +6211,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         setState(() => _apDungGoiDinhDangTuClipboard(maHoaGoi, chen!, batDau));
       } else if (htmlClipboard != null) {
         // Không mang đánh dấu riêng của Flowrite — thử "cố gắng tốt nhất" rút
-        // định dạng cơ bản (đậm/nghiêng/gạch chân) từ HTML nguồn ngoài (Google
-        // Docs/Word/trang web...). `_dinhDangTuHtmlNgoai` tự trả về `null` nếu
-        // chữ rút ra không khớp y hệt [chen] — an toàn, không dán sai chữ.
+        // định dạng từ HTML nguồn ngoài (Google Docs/Word/trang web...), kể
+        // cả định dạng khai qua CSS trong `style="..."` (chứ không chỉ thẻ
+        // ngữ nghĩa `<b>/<i>/<u>`) — xem giải thích đầy đủ ở
+        // `_dinhDangTuHtmlNgoai`. Tự trả về `null` nếu chữ rút ra không khớp
+        // y hệt [chen] — an toàn, không dán sai chữ.
         final ds = _dinhDangTuHtmlNgoai(htmlClipboard, chen!);
         if (ds != null) setState(() => _themVungDinhDangTuDs(ds, batDau));
       }
