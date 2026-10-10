@@ -223,6 +223,89 @@ String? dungHtmlChoClipboard(String doan, List<VungDinhDangDoanVan> vung) {
   return '<!--$_danhDauGoiDinhDangClip:$maHoaGoi--><span>$buf</span>';
 }
 
+/// Dời/co giãn các vùng định dạng thủ công [vungCu] theo đúng MỘT phép sửa
+/// từ [vanBanCu] sang [vanBanMoi] — ĐÚNG thuật toán (so khác biệt 2 đầu, rồi
+/// xác minh lại bằng nội dung cho vùng rơi vào khoảng "không chắc" khi có
+/// nhiều ký tự giống nhau liên tiếp) đã dùng ở `_dieuChinhLoiChinhTaSauKhiSua`
+/// (`trang_soan_thao.dart`) cho các vùng định dạng của khung soạn thảo
+/// CHÍNH — tách bản PUBLIC này ra để "Từ điển nhập liệu nhanh"
+/// (`modal_tu_dien_nhap_lieu_nhanh.dart`, khác tệp nên không gọi được hàm
+/// riêng-theo-tệp đó) tái dùng CHO ĐÚNG, không viết lại một bản khác có thể
+/// lệch logic.
+///
+/// Quy tắc: gõ thêm chữ NGAY TRONG một vùng (không phải ngay tại biên) thì
+/// vùng đó tự nới rộng ra để ôm luôn chữ mới; xoá bớt thì vùng co lại theo;
+/// vùng nằm hẳn TRƯỚC/SAU chỗ sửa thì giữ nguyên/chỉ dời nguyên khối. Vùng
+/// co về rỗng (xoá hết) thì bị loại khỏi kết quả. Trả về danh sách MỚI,
+/// không sửa [vungCu] tại chỗ.
+List<VungDinhDangDoanVan> apDungChinhSuaChoDinhDang(
+  List<VungDinhDangDoanVan> vungCu,
+  String vanBanCu,
+  String vanBanMoi,
+) {
+  if (vungCu.isEmpty || vanBanCu == vanBanMoi) return vungCu;
+
+  final gioiHan = vanBanCu.length < vanBanMoi.length ? vanBanCu.length : vanBanMoi.length;
+  var dau = 0;
+  while (dau < gioiHan && vanBanCu[dau] == vanBanMoi[dau]) {
+    dau++;
+  }
+  var duoi = 0;
+  final gioiHanDuoi = gioiHan - dau;
+  while (duoi < gioiHanDuoi &&
+      vanBanCu[vanBanCu.length - 1 - duoi] == vanBanMoi[vanBanMoi.length - 1 - duoi]) {
+    duoi++;
+  }
+
+  final vitri = dau;
+  final soLuongXoa = vanBanCu.length - dau - duoi;
+  final ketThucXoa = vitri + soLuongXoa;
+  final doDaiChenVao = vanBanMoi.length - dau - duoi;
+  final lech = doDaiChenVao - soLuongXoa;
+
+  final ketQua = <VungDinhDangDoanVan>[];
+  for (final d in vungCu) {
+    var batDauMoi =
+        d.batDau <= vitri ? d.batDau : (d.batDau >= ketThucXoa ? d.batDau + lech : vitri);
+    var ketThucMoi =
+        d.ketThuc <= vitri ? d.ketThuc : (d.ketThuc >= ketThucXoa ? d.ketThuc + lech : vitri);
+
+    // Xác minh lại bằng nội dung khi vùng THẬT SỰ giao với khoảng vừa sửa —
+    // xem giải thích đầy đủ ở `_dieuChinhLoiChinhTaSauKhiSua`, cùng lý do.
+    if (d.ketThuc > vitri &&
+        d.batDau < ketThucXoa &&
+        d.batDau >= 0 &&
+        d.ketThuc <= vanBanCu.length &&
+        d.batDau < d.ketThuc) {
+      final batDauDoiChieu = d.batDau + lech;
+      final ketThucDoiChieu = d.ketThuc + lech;
+      if (batDauDoiChieu >= 0 &&
+          ketThucDoiChieu <= vanBanMoi.length &&
+          vanBanCu.substring(d.batDau, d.ketThuc) ==
+              vanBanMoi.substring(batDauDoiChieu, ketThucDoiChieu)) {
+        batDauMoi = batDauDoiChieu;
+        ketThucMoi = ketThucDoiChieu;
+      }
+    }
+
+    if (batDauMoi < ketThucMoi) {
+      ketQua.add(VungDinhDangDoanVan(
+        batDau: batDauMoi,
+        ketThuc: ketThucMoi,
+        dam: d.dam,
+        nghieng: d.nghieng,
+        gachChan: d.gachChan,
+        gachNgang: d.gachNgang,
+        treMu: d.treMu,
+        treChan: d.treChan,
+        mauChu: d.mauChu,
+        mauNen: d.mauNen,
+      ));
+    }
+  }
+  return ketQua;
+}
+
 /// Hiển thị [doan] có áp dụng [vung] (rỗng thì chỉ là `Text` chữ thô) —
 /// dùng để xem trước định dạng ở các dòng trong modal cài đặt "Từ điển nhập
 /// liệu nhanh". KHÔNG dùng ở bảng 26 dòng để dán nhanh hay modal "Thay đổi

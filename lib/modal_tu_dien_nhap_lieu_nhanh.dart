@@ -60,6 +60,15 @@ class _ManHinhTuDienNhapLieuNhanhState
   /// tiêu điểm khi Ctrl+V được bấm (xem `_YDinhDanTuDien`).
   late List<FocusNode> _focusNodes;
 
+  /// (YÊU CẦU MỚI) Định dạng HIỆN HÀNH của từng dòng, dạng `ValueNotifier`
+  /// để nút "Xem đầy đủ nội dung của dòng này" (ẩn/hiện theo nội dung) VÀ
+  /// modal xem đầy đủ (đồng bộ thời gian thực) cùng nghe được — mỗi lần gõ
+  /// tay/dán/xoá đều gán LẠI `.value` (danh sách MỚI, xem `_ganDinhDang`),
+  /// nên luôn tự bắn ra `notifyListeners` dù nội dung mới có hệt nội dung cũ
+  /// (`List` so sánh theo danh tính, không theo phần tử) — không cần tự so
+  /// sánh "có đổi gì không" trước khi gán.
+  late List<ValueNotifier<List<VungDinhDangDoanVan>>> _dinhDangLive;
+
   /// (YÊU CẦU MỚI) Đang ở chế độ "Thay đổi thứ tự giữa các dòng" — thay hết
   /// mọi thứ khác (công tắc, phím tắt, chú thích, 26 ô nhập + Copy/Dán/Xoá)
   /// bằng 26 dòng kéo-thả, xem `build`.
@@ -94,6 +103,10 @@ class _ManHinhTuDienNhapLieuNhanhState
       (i) => TextEditingController(text: widget.caiDat.tuDienNhapLieuNhanh[i]),
     );
     _focusNodes = List.generate(26, (_) => FocusNode());
+    _dinhDangLive = List.generate(
+      26,
+      (i) => ValueNotifier(widget.caiDat.docDinhDangTuDienNhapLieuNhanh(i)),
+    );
   }
 
   @override
@@ -104,6 +117,9 @@ class _ManHinhTuDienNhapLieuNhanhState
     for (final f in _focusNodes) {
       f.dispose();
     }
+    for (final n in _dinhDangLive) {
+      n.dispose();
+    }
     for (final h in _henCopy.values) {
       h.cancel();
     }
@@ -113,31 +129,52 @@ class _ManHinhTuDienNhapLieuNhanhState
     super.dispose();
   }
 
-  /// Gõ tay (qua `onChanged`) hoặc xoá trắng — toạ độ định dạng CŨ (nếu có)
-  /// không còn đáng tin sau một lượt gõ tay (người dùng có thể đã thêm/xoá
-  /// ký tự ở bất kỳ đâu), bỏ hẳn cho an toàn — đơn giản hơn nhiều so với cố
-  /// dời từng vùng theo từng phím gõ, đúng yêu cầu "logic càng đơn giản
-  /// càng tốt". CHỈ "Dán"/Ctrl+V (xem `_doiDongKemDinhDang`) mới gán định
-  /// dạng mới.
+  /// Gán định dạng MỚI [vung] cho dòng [i] — cập nhật `_dinhDangLive[i]`
+  /// (để nút "Xem đầy đủ nội dung của dòng này" và modal xem đầy đủ tự vẽ
+  /// lại) VÀ lưu lâu dài vào `CaiDat`. Dùng chung cho cả đường gõ tay
+  /// ([_doiDong]) lẫn đường dán ([_doiDongKemDinhDang]).
+  void _ganDinhDang(int i, List<VungDinhDangDoanVan> vung) {
+    _dinhDangLive[i].value = vung;
+    widget.caiDat.datDinhDangTuDienNhapLieuNhanh(
+      i,
+      vung.isEmpty ? null : jsonEncode(vung.map((v) => v.toJson()).toList()),
+    );
+  }
+
+  /// Gõ tay (qua `onChanged`) hoặc xoá trắng — (YÊU CẦU MỚI) không còn bỏ
+  /// hẳn định dạng cũ nữa: dời/co giãn từng vùng theo đúng phép sửa vừa xảy
+  /// ra (`apDungChinhSuaChoDinhDang`, CÙNG thuật toán đã dùng cho khung soạn
+  /// thảo chính), y hệt cách chèn/sửa/xoá ký tự trong một đoạn đang có định
+  /// dạng ở đó — chỉ ký tự THẬT SỰ bị đổi mới mất định dạng, phần còn lại
+  /// giữ nguyên.
   void _doiDong(int i, String gia) {
+    final cu = widget.caiDat.tuDienNhapLieuNhanh[i];
     widget.caiDat.tuDienNhapLieuNhanh[i] = gia;
     // (YÊU CẦU MỚI) Tự lưu ngay mỗi lần đổi, không cần nút Lưu riêng — xem
     // yêu cầu gốc. Không cần debounce 500ms như từ điển chính tả vì đây chỉ
     // ghi MỘT danh sách chuỗi (rẻ hơn hẳn việc ghi lại cả cây CapTuDien).
     widget.caiDat.luuTuDienNhapLieuNhanh();
-    widget.caiDat.datDinhDangTuDienNhapLieuNhanh(i, null);
+    _ganDinhDang(i, apDungChinhSuaChoDinhDang(_dinhDangLive[i].value, cu, gia));
   }
 
   /// (YÊU CẦU MỚI) Lưu CẢ chữ LẪN định dạng mới cho dòng [i] — dùng riêng
-  /// cho đường "Dán" (giữ định dạng), khác `_doiDong` (gõ tay, luôn xoá
-  /// định dạng cũ).
-  void _doiDongKemDinhDang(int i, String gia, List<VungDinhDangDoanVan>? vung) {
+  /// cho đường "Dán": [cu] là chữ TRƯỚC khi dán, [gia] là chữ SAU khi dán,
+  /// [vungChenThem] là định dạng (nếu có, toạ độ đã dịch đúng vị trí dán)
+  /// của riêng đoạn VỪA được dán vào. Định dạng của phần chữ KHÔNG bị đụng
+  /// tới (trước/sau đoạn dán) vẫn được GIỮ NGUYÊN — dời/co giãn theo đúng
+  /// phép sửa bằng `apDungChinhSuaChoDinhDang` y hệt `_doiDong`, rồi cộng
+  /// thêm định dạng riêng của đoạn mới dán vào, không còn thay HẲN cả dòng
+  /// như trước (mất oan định dạng của phần không liên quan tới chỗ dán).
+  void _doiDongKemDinhDang(
+    int i,
+    String cu,
+    String gia,
+    List<VungDinhDangDoanVan>? vungChenThem,
+  ) {
     widget.caiDat.tuDienNhapLieuNhanh[i] = gia;
     widget.caiDat.luuTuDienNhapLieuNhanh();
-    widget.caiDat.datDinhDangTuDienNhapLieuNhanh(
-      i,
-      (vung == null || vung.isEmpty) ? null : jsonEncode(vung.map((v) => v.toJson()).toList()),
-    );
+    final conLai = apDungChinhSuaChoDinhDang(_dinhDangLive[i].value, cu, gia);
+    _ganDinhDang(i, [...conLai, ...(vungChenThem ?? const [])]);
   }
 
   /// (YÊU CẦU MỚI) Copy nội dung dòng [i] vào bộ nhớ đệm HỆ THỐNG — CHỦ Ý
@@ -150,7 +187,7 @@ class _ManHinhTuDienNhapLieuNhanhState
   Future<void> _copyDong(int i) async {
     if (_vuaCopy.contains(i)) return;
     final doan = _oNhap[i].text;
-    final vung = widget.caiDat.docDinhDangTuDienNhapLieuNhanh(i);
+    final vung = _dinhDangLive[i].value;
     final html = vung.isEmpty ? null : dungHtmlChoClipboard(doan, vung);
     final daGhiGiauDinhDang = html != null && await ghiClipboardCoDinhDang(doan, html);
     if (!daGhiGiauDinhDang) {
@@ -169,9 +206,9 @@ class _ManHinhTuDienNhapLieuNhanhState
   /// cuối văn bản của dòng đó nếu không (ô chưa từng được chạm vào,
   /// `selection` không hợp lệ). Thử lấy kèm định dạng từ `text/html` của
   /// clipboard (y hệt cách "Bộ nhớ tạm để dán văn bản" đang làm ở màn hình
-  /// soạn thảo chính) — ĐƠN GIẢN HOÁ: gói định dạng mới (nếu có) THAY HẲN
-  /// định dạng cũ của dòng (không cố dời định dạng cũ theo đoạn vừa chèn).
-  /// Cùng cơ chế "Đã dán" 2 giây như `_copyDong`.
+  /// soạn thảo chính) — định dạng của phần chữ KHÔNG bị đụng tới vẫn được
+  /// giữ nguyên (xem `_doiDongKemDinhDang`), chỉ đoạn vừa dán mới mang định
+  /// dạng mới đọc được. Cùng cơ chế "Đã dán" 2 giây như `_copyDong`.
   Future<void> _danDong(int i) async {
     if (_vuaDan.contains(i)) return;
     final du = await Clipboard.getData('text/plain');
@@ -212,11 +249,69 @@ class _ManHinhTuDienNhapLieuNhanhState
       );
       _vuaDan.add(i);
     });
-    _doiDongKemDinhDang(i, moi, vungMoi);
+    _doiDongKemDinhDang(i, vb, moi, vungMoi);
     _henDan[i]?.cancel();
     _henDan[i] = Timer(const Duration(seconds: 2), () {
       if (mounted) setState(() => _vuaDan.remove(i));
     });
+  }
+
+  /// (YÊU CẦU MỚI) Mở modal nhỏ giữa màn hình, hiện ĐẦY ĐỦ nội dung dòng
+  /// [i] (kèm định dạng nếu có) — thay cho khung xem trước cũ, không còn bị
+  /// giới hạn `maxLines`. Nội dung LUÔN đồng bộ thời gian thực với ô nhập ở
+  /// khung cài đặt phía sau: `ValueListenableBuilder` nghe `_dinhDangLive[i]`
+  /// (xem `_ganDinhDang`, luôn bắn `notifyListeners` đúng lúc `_oNhap[i].text`
+  /// cũng vừa đổi xong — đọc `_oNhap[i].text` ngay trong `builder` luôn thấy
+  /// giá trị MỚI NHẤT), nên modal này vẽ lại ngay mỗi lần gõ/dán/xoá ở ô kia,
+  /// dù modal đang mở ở một route khác — không cần tự đóng/mở lại.
+  void _moXemDayDuDong(int i) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 8, 16),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: (MediaQuery.sizeOf(ctx).width - 48).clamp(280.0, 560.0),
+              maxHeight: MediaQuery.sizeOf(ctx).height * 0.75,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Phím ${_chuCai(i)} — đầy đủ nội dung',
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.red),
+                      tooltip: 'Đóng',
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: ValueListenableBuilder<List<VungDinhDangDoanVan>>(
+                      valueListenable: _dinhDangLive[i],
+                      builder: (context, vung, _) => vanBanCoDinhDangTuDien(
+                        _oNhap[i].text,
+                        vung,
+                        const TextStyle(fontSize: 15),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   /// (YÊU CẦU MỚI) Xoá trắng dòng [i] — hỏi xác nhận trước, không xoá nhầm.
@@ -901,33 +996,34 @@ class _ManHinhTuDienNhapLieuNhanhState
               contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             ),
           ),
-          // (YÊU CẦU MỚI) Xem trước định dạng — CHỈ hiện khi dòng này có
-          // định dạng (dán từ "Dán"/Ctrl+V), ô nhập ở trên vẫn luôn là chữ
-          // thô (TextField không vẽ được định dạng theo từng đoạn trong lúc
-          // đang sửa) — đơn giản hoá đúng yêu cầu "logic càng đơn giản càng
-          // tốt": chỉ cần XEM ra được định dạng là đủ, không cần sửa trực
-          // tiếp trên chữ có định dạng.
-          Builder(builder: (context) {
-            final vung = widget.caiDat.docDinhDangTuDienNhapLieuNhanh(i);
-            if (vung.isEmpty) return const SizedBox.shrink();
-            return Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8F9FA),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFFDADCE0)),
+          // (YÊU CẦU MỚI) Nút "Xem đầy đủ nội dung của dòng này" — THAY cho
+          // khung xem trước định dạng cũ. CHỈ hiện khi dòng này ĐANG có ký
+          // tự (bất kể có định dạng hay không — trước đây khung cũ chỉ hiện
+          // khi có định dạng). Nghe `_dinhDangLive[i]` để tự ẩn/hiện ngay
+          // mỗi lần gõ/dán/xoá (xem `_ganDinhDang`, luôn gán LẠI `.value`
+          // dù nội dung định dạng mới có rỗng y hệt nội dung cũ, nên LUÔN
+          // bắn `notifyListeners` đúng lúc `_oNhap[i].text` cũng vừa đổi).
+          ValueListenableBuilder<List<VungDinhDangDoanVan>>(
+            valueListenable: _dinhDangLive[i],
+            builder: (context, vung, _) {
+              if (_oNhap[i].text.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _moXemDayDuDong(i),
+                    icon: const Icon(Icons.visibility_outlined, size: 16),
+                    label: const Text('Xem đầy đủ nội dung của dòng này'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      minimumSize: Size.zero,
+                    ),
+                  ),
                 ),
-                child: vanBanCoDinhDangTuDien(
-                  _oNhap[i].text,
-                  vung,
-                  const TextStyle(fontSize: 14),
-                ),
-              ),
-            );
-          }),
+              );
+            },
+          ),
           const SizedBox(height: 4),
             // (YÊU CẦU MỚI) Ba nút Copy/Dán/Xoá riêng cho từng dòng — Copy
             // và Dán tự đổi thành "Đã copy"/"Đã dán" (chữ xanh lá) 2 giây
