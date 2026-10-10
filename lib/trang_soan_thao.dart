@@ -3054,17 +3054,25 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// còn "mồ côi"); dấu mở vừa gõ chưa có gì để chuẩn hoá, bỏ qua.
   ///
   /// Ngoặc kép "": KHÔNG có hình dạng riêng để phân biệt mở/đóng như ba
-  /// loại trên, nên KHÔNG được áp dụng kiểu "quét lại toàn bộ" như trên —
-  /// (SỬA LỖI gõ 1 dấu nháy ở giữa làm đảo lộn cách ghép cặp của MỌI dấu
-  /// nháy phía sau nó) bản trước đây quét lại toàn văn bản mỗi lần gõ, coi
-  /// dấu thứ 1/3/5.../2/4/6... lần lượt là mở/đóng — nhưng chèn/xoá MỘT
-  /// dấu nháy làm lệch thứ tự đếm của TẤT CẢ dấu nháy đứng sau nó, khiến
-  /// những cặp đã chuẩn hoá ổn định trước đó bị ghép lại sai rồi bị chuẩn
-  /// hoá nhầm theo, dù người dùng chỉ gõ đúng MỘT ký tự ở một chỗ. Sửa:
-  /// CHỈ xét đúng dấu nháy VỪA GÕ — đếm số dấu nháy đứng TRƯỚC nó (không
-  /// đụng gì tới những dấu đứng SAU) để suy ra vai trò (đếm được số LẺ dấu
-  /// đứng trước ⇒ nó là dấu ĐÓNG), rồi ghép với dấu nháy GẦN NHẤT ngay
-  /// phía trước nó — không đá động gì tới các cặp khác trong bài.
+  /// loại trên, nên KHÔNG được áp dụng kiểu "quét lại toàn bộ" như trên.
+  ///
+  /// (YÊU CẦU MỚI — thuật toán "láng giềng gần nhất") Mỗi lần gõ một dấu
+  /// nháy MỚI (tại [vt]), CHỈ xét quan hệ của nó với các dấu nháy GẦN NÓ
+  /// NHẤT — không đụng gì tới các cặp khác đã ổn định ở xa hơn trong bài:
+  ///
+  /// 1. Tìm 2 dấu nháy GẦN NHẤT ở PHÍA TRƯỚC [vt] (nếu có).
+  ///    - Không có dấu nào phía trước: dấu mới vẫn "cô đơn" — qua bước 2.
+  ///    - Chỉ có ĐÚNG 1 dấu phía trước: tự động ghép cặp với dấu đó, xong.
+  ///    - Có ĐỦ 2 dấu: xét xem HAI dấu đó (không phải dấu mới) đã là một
+  ///      cặp HỢP LỆ chưa (bên phải dấu xa hơn + bên trái dấu gần hơn đều
+  ///      không có dấu cách). Hợp lệ rồi thì để yên, không đụng — dấu mới
+  ///      vẫn cô đơn, qua bước 2. CHƯA hợp lệ thì dấu GẦN hơn (trong 2 dấu
+  ///      đó) bị coi là đang cô đơn — ghép cặp nó với dấu mới, xong.
+  /// 2. (CHỈ chạy khi dấu mới vẫn cô đơn sau bước 1) Làm Y HỆT bước 1 nhưng
+  ///    xét 2 dấu nháy gần nhất ở PHÍA SAU [vt] thay vì phía trước.
+  ///
+  /// Ghép cặp xong thì áp dụng đúng [chuanHoaMotCap] (xoá dấu cách thừa
+  /// ngay sau dấu mở/ngay trước dấu đóng) như ba loại ngoặc khác.
   void _chuanHoaNgoacSauKhiGo(String kyTuVuaGo, int vt) {
     if (!widget.caiDat.tuDongChuanHoaNgoac) return;
     if (!_kyTuNgoacCanChuanHoa.contains(kyTuVuaGo)) return;
@@ -3078,25 +3086,44 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
 
     if (kyTuVuaGo == '"') {
-      // CHỈ xét đúng dấu nháy VỪA GÕ (tại [vt]) — đếm số dấu nháy đứng
-      // TRƯỚC nó để suy ra vai trò, rồi ghép với dấu nháy GẦN NHẤT ngay
-      // phía trước — KHÔNG quét/đụng gì tới các dấu nháy khác trong bài,
-      // để không làm đảo lộn những cặp đã ổn định từ trước (xem giải thích
-      // ở trên hàm).
-      var soDauTruoc = 0;
-      for (var i = 0; i < vt; i++) {
-        if (vb[i] == '"') soDauTruoc++;
-      }
-      if (soDauTruoc.isOdd) {
-        for (var i = vt - 1; i >= 0; i--) {
-          if (vb[i] == '"') {
-            chuanHoaMotCap(i, vt);
-            break;
-          }
+      // [a] luôn ở vị trí SỚM HƠN [b] trong văn bản (a = dấu "mở" của cặp
+      // đang xét, b = dấu "đóng") — hợp lệ khi không có dấu cách ngay sau
+      // [a] và ngay trước [b].
+      bool laCapHopLe(int a, int b) =>
+          !(a + 1 < b && vb[a + 1] == ' ') && !(b - 1 > a && vb[b - 1] == ' ');
+
+      final viTriTatCa = <int>[
+        for (var i = 0; i < vb.length; i++) if (vb[i] == '"') i,
+      ];
+      final viTriNew = viTriTatCa.indexOf(vt);
+      final truoc = viTriTatCa.sublist(0, viTriNew);
+      final sau = viTriTatCa.sublist(viTriNew + 1);
+
+      int? banKetCap;
+      if (truoc.isNotEmpty) {
+        final ganNhat = truoc.last;
+        if (truoc.length == 1) {
+          banKetCap = ganNhat;
+        } else {
+          final xaHon = truoc[truoc.length - 2];
+          if (!laCapHopLe(xaHon, ganNhat)) banKetCap = ganNhat;
         }
       }
-      // Số dấu trước nó CHẴN ⇒ chính nó là dấu MỞ — chưa có gì để chuẩn
-      // hoá, chờ dấu đóng của nó xuất hiện trong tương lai.
+      if (banKetCap == null && sau.isNotEmpty) {
+        final ganNhat = sau.first;
+        if (sau.length == 1) {
+          banKetCap = ganNhat;
+        } else {
+          final xaHon = sau[1];
+          if (!laCapHopLe(ganNhat, xaHon)) banKetCap = ganNhat;
+        }
+      }
+      if (banKetCap != null) {
+        chuanHoaMotCap(
+          banKetCap < vt ? banKetCap : vt,
+          banKetCap < vt ? vt : banKetCap,
+        );
+      }
     } else {
       const laMoNgoac = {'(', '{', '['};
       if (laMoNgoac.contains(kyTuVuaGo)) return; // dấu mở: chưa có gì để làm.
@@ -4667,6 +4694,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     await widget.kho.luu();
     if (!mounted) return;
     _moGhiChu(moi.id);
+    // (YÊU CẦU MỚI) Thêm tệp mới rồi nhảy sang nó — tên tệp lượn sóng một
+    // lần, cùng hiệu ứng với Tệp trước/sau và xoá tệp.
+    _kichHoatLuonSongTen();
     _baoDangOTrongTep(moi.ten);
   }
 
@@ -4722,13 +4752,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   /// "Chuyển vào thùng rác" — KHÔNG hỏi xác nhận (khôi phục được trong 30
   /// ngày qua Thùng rác Nội bộ ở cây thư mục, xem `lib/modal_thung_rac.dart`
-  /// và `lib/kho_du_lieu.dart`), xong nhảy sang một tệp khác còn lại trong
-  /// CÙNG thư mục nếu còn, hoặc tự tạo "Ghi chú N" (hệt tên tự gợi ý mặc
-  /// định) nếu đây là tệp CUỐI CÙNG của thư mục — rồi làm việc ngay ở tệp
-  /// đó, kèm thông báo giữa màn hình.
+  /// và `lib/kho_du_lieu.dart`), xong nhảy sang tệp NGAY SAU tệp vừa xoá
+  /// (YÊU CẦU MỚI — trước đây luôn nhảy về tệp ĐẦU danh sách); không còn
+  /// tệp sau (vừa xoá đúng tệp cuối) thì lùi về tệp NGAY TRƯỚC nó; không
+  /// còn tệp nào trong thư mục nữa (vừa xoá tệp duy nhất) thì tự tạo
+  /// "Ghi chú N" (hệt tên tự gợi ý mặc định) — rồi làm việc ngay ở tệp đó,
+  /// kèm thông báo giữa màn hình VÀ hiệu ứng lượn sóng tên tệp một lần
+  /// (YÊU CẦU MỚI, xem `_kichHoatLuonSongTen`).
   Future<void> _xoaTepHienTaiTuThanhCongCu() async {
     final chaId = _ghiChuHienTai.chaId;
     final idVuaXoa = _ghiChuHienTai.id;
+    final viTriVuaXoa =
+        widget.kho.noiDungThuMuc(chaId).ghiChuCon.indexWhere((g) => g.id == idVuaXoa);
     widget.kho.chuyenGhiChuVaoThungRac(idVuaXoa);
     // Dọn luôn bộ nhớ đệm Lùi lại/Tiến tới của tệp vừa xoá — tệp không còn
     // hiện ra ở cây thư mục nữa thì giữ lại mốc cũ trong Map chỉ tổ chiếm
@@ -4739,11 +4774,23 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     final conLai = widget.kho.noiDungThuMuc(chaId).ghiChuCon;
     final laTuDongTao = conLai.isEmpty;
-    final ke = laTuDongTao ? widget.kho.taoGhiChuMoi(chaId) : conLai.first;
+    // Mọi phần tử đứng SAU tệp vừa xoá đã tự dồn lên đúng một bậc — tệp ở
+    // ĐÚNG [viTriVuaXoa] trong danh sách MỚI (nếu còn tồn tại) chính là tệp
+    // từng nằm NGAY SAU tệp vừa xoá. Hết tệp sau (vừa xoá đúng tệp cuối,
+    // [viTriVuaXoa] đã vượt khỏi danh sách mới) thì lùi về tệp liền trước.
+    final GhiChuFile ke;
+    if (laTuDongTao) {
+      ke = widget.kho.taoGhiChuMoi(chaId);
+    } else if (viTriVuaXoa >= 0 && viTriVuaXoa < conLai.length) {
+      ke = conLai[viTriVuaXoa];
+    } else {
+      ke = conLai[(viTriVuaXoa - 1).clamp(0, conLai.length - 1)];
+    }
     await widget.kho.luu();
     if (!mounted) return;
     hienThongBaoGiua(context, 'Đã di chuyển vào Thùng rác', ganTren: true);
     _moGhiChu(ke.id);
+    _kichHoatLuonSongTen();
     if (laTuDongTao) {
       _bao('Đã chuyển vào thùng rác — đang ở trong tệp "${ke.ten}" do hệ'
           'thống tự tạo.');
