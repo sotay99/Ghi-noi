@@ -31,14 +31,22 @@ class LuaChonPhimTat {
         phim = null;
 
   /// (YÊU CẦU MỚI) Alt + Shift cùng lúc — CHỈ dùng cho "Từ điển nhập liệu
-  /// nhanh" (mặc định của nó), KHÔNG tham gia vòng tự đổi hộ 3 chiều của
-  /// Micro/Ghi âm/Bộ nhớ tạm (xem `CaiDat._vongTuDoiPhimTat`) vì đó là một
-  /// họ tổ hợp hoàn toàn khác, không bao giờ trùng nhau.
+  /// nhanh", KHÔNG tham gia vòng tự đổi hộ 3 chiều của Micro/Ghi âm/Bộ nhớ
+  /// tạm (xem `CaiDat._vongTuDoiPhimTat`) vì đó là một họ tổ hợp hoàn toàn
+  /// khác, không bao giờ trùng nhau.
   const LuaChonPhimTat.altShift()
       : loai = 'altShift',
         phim = null;
 
-  /// 'tab' | 'ctrl' | 'ctrlDup' | 'shiftDup' | 'altShift'.
+  /// (YÊU CẦU MỚI) Bấm Alt 2 lần liên tiếp — MẶC ĐỊNH của "Từ điển nhập
+  /// liệu nhanh", dò qua `TheoDoiTapDoiPhim` y hệt `ctrlDup`/`shiftDup`
+  /// (chỉ khác phím theo dõi là Alt). Cũng đứng NGOÀI vòng tự đổi hộ 3
+  /// chiều — xem giải thích ở `.altShift()`.
+  const LuaChonPhimTat.altDup()
+      : loai = 'altDup',
+        phim = null;
+
+  /// 'tab' | 'ctrl' | 'ctrlDup' | 'shiftDup' | 'altShift' | 'altDup'.
   final String loai;
 
   /// Chỉ có ý nghĩa khi [loai] == 'ctrl' — phím bấm thêm cùng Ctrl.
@@ -59,6 +67,8 @@ class LuaChonPhimTat {
         return const LuaChonPhimTat.shiftDup();
       case 'altShift':
         return const LuaChonPhimTat.altShift();
+      case 'altDup':
+        return const LuaChonPhimTat.altDup();
       default:
         return const LuaChonPhimTat.ctrlDup();
     }
@@ -75,6 +85,8 @@ class LuaChonPhimTat {
         return 'Bấm Shift 2 lần';
       case 'altShift':
         return 'Alt + Shift';
+      case 'altDup':
+        return 'Bấm Alt 2 lần';
       default:
         return 'Bấm Ctrl 2 lần';
     }
@@ -86,6 +98,7 @@ class LuaChonPhimTat {
         'ctrl' => 'CTRL+${(phim ?? '').toUpperCase()}',
         'shiftDup' => 'SHIFTDUP',
         'altShift' => 'ALTSHIFT',
+        'altDup' => 'ALTDUP',
         _ => 'CTRLDUP',
       };
 

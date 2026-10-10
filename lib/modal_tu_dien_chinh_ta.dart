@@ -17,10 +17,24 @@ import 'cai_dat.dart';
 
 const _mauChinh = Color(0xFF1A73E8);
 
-Future<void> moModalTuDienChinhTa(BuildContext context, CaiDat caiDat) {
+/// (YÊU CẦU MỚI) Giới hạn ký tự của MỖI trường (từ lỗi hay từ thay thế) —
+/// public để nơi khác (ví dụ nút "Thêm vào từ điển sửa lỗi chính tả" khi có
+/// vùng chọn, `trang_soan_thao.dart`) tự kiểm trước khi mở modal này, báo
+/// đúng con số nếu vượt quá, không viết chết số `500` ở nơi thứ hai.
+const gioiHanTuDienChinhTa = 500;
+
+/// [noiDungCanDua]: (YÊU CẦU MỚI) có nội dung sẵn cần đưa ngay vào từ điển —
+/// tự tìm/tạo một cặp RỖNG, điền nội dung đó vào trường "Từ bị lỗi chính tả
+/// hay gặp" (dòng 1) của cặp đó, cuộn tới giữa màn hình, và nhấp nháy nền
+/// vàng đậm vài giây để người dùng chú ý — xem `_dienNoiDungVaoCapRong`.
+Future<void> moModalTuDienChinhTa(
+  BuildContext context,
+  CaiDat caiDat, {
+  String? noiDungCanDua,
+}) {
   return Navigator.of(context).push<void>(
     MaterialPageRoute(
-      builder: (_) => _ManHinhTuDienChinhTa(caiDat: caiDat),
+      builder: (_) => _ManHinhTuDienChinhTa(caiDat: caiDat, noiDungCanDua: noiDungCanDua),
     ),
   );
 }
@@ -32,8 +46,9 @@ const _nhanThuThayThe = [
 ];
 
 class _ManHinhTuDienChinhTa extends StatefulWidget {
-  const _ManHinhTuDienChinhTa({required this.caiDat});
+  const _ManHinhTuDienChinhTa({required this.caiDat, this.noiDungCanDua});
   final CaiDat caiDat;
+  final String? noiDungCanDua;
 
   @override
   State<_ManHinhTuDienChinhTa> createState() => _ManHinhTuDienChinhTaState();
@@ -67,6 +82,14 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
   /// vừa thêm mới, xem `_themCap`.
   final Map<CapTuDien, GlobalKey> _khoaCap = {};
 
+  /// (YÊU CẦU MỚI) Cặp vừa được điền sẵn nội dung từ vùng chọn
+  /// ([_dienNoiDungVaoCapRong]) — dòng 1 (từ lỗi) của ĐÚNG cặp này nhấp
+  /// nháy nền vàng đậm vài giây để người dùng chú ý, rồi tự tắt hẳn
+  /// (`_capVuaThem = null`), không phải tô màu lâu dài.
+  CapTuDien? _capVuaThem;
+  bool _capVuaThemSang = true;
+  Timer? _henNhapNhayCapMoi;
+
   @override
   void initState() {
     super.initState();
@@ -81,11 +104,16 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
           .toList();
       _khoaCap[c] = GlobalKey();
     }
+    final noiDung = widget.noiDungCanDua;
+    if (noiDung != null && noiDung.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _dienNoiDungVaoCapRong(noiDung));
+    }
   }
 
   @override
   void dispose() {
     _henLuu?.cancel();
+    _henNhapNhayCapMoi?.cancel();
     _cuon.dispose();
     for (final o in _oLoi.values) {
       o.dispose();
@@ -96,6 +124,46 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
       }
     }
     super.dispose();
+  }
+
+  /// (YÊU CẦU MỚI) Tìm/tạo một cặp RỖNG, điền [noiDung] vào trường "Từ bị
+  /// lỗi chính tả hay gặp" (dòng 1) của cặp đó, cuộn tới giữa màn hình, rồi
+  /// nhấp nháy nền vàng đậm vài giây — xem giải thích đầy đủ ở
+  /// `moModalTuDienChinhTa`/[_capVuaThem].
+  void _dienNoiDungVaoCapRong(String noiDung) {
+    final capRongCo = _capRong;
+    final CapTuDien c;
+    if (capRongCo != null) {
+      c = capRongCo;
+    } else {
+      c = CapTuDien(loi: '');
+      setState(() {
+        _ds.add(c);
+        _oLoi[c] = TextEditingController();
+        _oThayThe[c] = [TextEditingController()];
+        _khoaCap[c] = GlobalKey();
+      });
+    }
+    setState(() {
+      c.loi = noiDung;
+      _oLoi[c]!.text = noiDung;
+      _kiemTraTrung();
+      _capVuaThem = c;
+      _capVuaThemSang = true;
+    });
+    _datLuu();
+    _cuonToiCap(c);
+    _henNhapNhayCapMoi?.cancel();
+    var lan = 0;
+    _henNhapNhayCapMoi = Timer.periodic(const Duration(milliseconds: 400), (t) {
+      lan++;
+      if (lan > 6) {
+        t.cancel();
+        if (mounted) setState(() => _capVuaThem = null);
+        return;
+      }
+      if (mounted) setState(() => _capVuaThemSang = !_capVuaThemSang);
+    });
   }
 
   /// Tự lưu xuống đĩa 500ms sau lần gõ cuối — không cần nút "Lưu" riêng,
@@ -234,11 +302,18 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
     // ưu tiên hơn nếu cả hai cùng xảy ra — dù thực tế cặp rỗng thì không
     // thể nào trùng được gì.
     bool noiBatRong = false,
+    // (YÊU CẦU MỚI) Dòng 1 của cặp vừa được điền sẵn từ vùng chọn — nền
+    // vàng đậm, nhấp nháy vài giây rồi tự tắt (xem [_capVuaThem]). Ưu tiên
+    // CAO NHẤT trong mọi kiểu tô nền/viền (đang cố tình gây chú ý ngay lúc
+    // đó, hơn cả cảnh báo đỏ hay viền rỗng xanh).
+    bool noiBatVangNhapNhay = false,
   }) {
-    final mauVien = canhBao != null
-        ? Colors.red.shade400
-        : (noiBatRong ? Colors.blue.shade700 : const Color(0xFFDADCE0));
-    final doRongVien = canhBao != null ? 1.0 : (noiBatRong ? 2.0 : 1.0);
+    final mauVien = noiBatVangNhapNhay
+        ? Colors.amber.shade800
+        : (canhBao != null
+            ? Colors.red.shade400
+            : (noiBatRong ? Colors.blue.shade700 : const Color(0xFFDADCE0)));
+    final doRongVien = noiBatVangNhapNhay ? 2.0 : (canhBao != null ? 1.0 : (noiBatRong ? 2.0 : 1.0));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -252,10 +327,10 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
               child: TextField(
                 controller: controller,
                 onChanged: onChanged,
-                // (YÊU CẦU MỚI) Giới hạn 500 ký tự cho MỌI trường của từ điển
-                // — `maxLength` tự kèm `LengthLimitingTextInputFormatter`,
-                // nên dán đoạn dài hơn cũng tự cắt bớt, không cần thêm gì.
-                maxLength: 500,
+                // (YÊU CẦU MỚI) Giới hạn ký tự cho MỌI trường của từ điển —
+                // `maxLength` tự kèm `LengthLimitingTextInputFormatter`, nên
+                // dán đoạn dài hơn cũng tự cắt bớt, không cần thêm gì.
+                maxLength: gioiHanTuDienChinhTa,
                 style: const TextStyle(fontSize: 15),
                 decoration: InputDecoration(
                   isDense: true,
@@ -264,8 +339,10 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
                   // viền thì quá mờ để nhận ra ngay, đặc biệt lúc không
                   // focus — tô luôn NỀN xanh nhạt cho cặp đang rỗng, không
                   // thể nào không thấy.
-                  filled: noiBatRong,
-                  fillColor: noiBatRong ? Colors.blue.shade50 : null,
+                  filled: noiBatRong || noiBatVangNhapNhay,
+                  fillColor: noiBatVangNhapNhay
+                      ? Colors.amber.shade600
+                      : (noiBatRong ? Colors.blue.shade50 : null),
                   border: OutlineInputBorder(
                     borderSide: BorderSide(color: mauVien, width: doRongVien),
                   ),
@@ -408,6 +485,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
                 // các cặp còn lại. Tự hết ngay khi cặp không còn rỗng nữa
                 // (gõ bất kỳ trường nào), tự hiện lại nếu xoá hết về rỗng.
                 noiBatRong: _laCapRong(c),
+                noiBatVangNhapNhay: c == _capVuaThem && _capVuaThemSang,
                 canhBao: _loiTrungTuLoi.contains(c)
                     ? 'Từ này đã có trong một cặp khác — các từ bị lỗi không được trùng nhau.'
                     : null,
@@ -415,6 +493,12 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
                   setState(() {
                     c.loi = gia;
                     _kiemTraTrung();
+                    // Người dùng tự gõ tiếp — coi như đã chú ý rồi, tắt
+                    // nhấp nháy ngay, không chờ hết vài giây.
+                    if (c == _capVuaThem) {
+                      _henNhapNhayCapMoi?.cancel();
+                      _capVuaThem = null;
+                    }
                   });
                   _datLuu();
                 },
