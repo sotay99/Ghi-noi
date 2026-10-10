@@ -971,7 +971,7 @@ class _ManHinhTuDienNhapLieuNhanhState
             ),
           ],
         ],
-      );
+      ];
 
   @override
   Widget build(BuildContext context) {
