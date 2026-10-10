@@ -6012,6 +6012,53 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (mounted) hienThongBaoGiua(context, 'Đã cắt và lưu vào bộ nhớ đệm', ganTren: true);
   }
 
+  /// (YÊU CẦU MỚI) Nút 📖 "Thêm vào Từ điển nhập liệu nhanh" ở hàng Copy/Cắt
+  /// khi đang có vùng chọn thật — mở ĐÚNG modal "Thêm nhanh vào từ điển
+  /// nhập liệu nhanh" (`_HopThoaiThemNhanhTuDien`), y hệt luồng từ nút 📖 ở
+  /// bảng 10 dòng lịch sử Bộ nhớ tạm, chỉ khác nguồn nội dung là vùng chọn
+  /// hiện tại thay vì một dòng lịch sử.
+  void _themVungChonVaoTuDienNhapLieuNhanh() {
+    final chon = _boDieuKhien.selection;
+    if (!chon.isValid || chon.isCollapsed) return;
+    final doan = _boDieuKhien.text.substring(chon.start, chon.end);
+    if (doan.isEmpty) return;
+    if (doan.length > CaiDat.gioiHanTuDienNhapLieuNhanh) {
+      hienThongBaoGiua(
+        context,
+        'Không thể thêm vào Từ điển nhập liệu nhanh, vì vượt quá 1000 ký tự',
+      );
+      return;
+    }
+    final goi = _macGoiDinhDangChoClipboard(doan, chon.start, chon.end);
+    showDialog<void>(
+      context: context,
+      builder: (_) => _HopThoaiThemNhanhTuDien(
+        doanNguon: doan,
+        goiDinhDangNguon: goi,
+        caiDat: widget.caiDat,
+      ),
+    );
+  }
+
+  /// (YÊU CẦU MỚI) Nút 📒 "Thêm vào Từ điển sửa lỗi chính tả" ở hàng Copy/Cắt
+  /// khi đang có vùng chọn thật — mở modal "Cài đặt từ điển sửa lỗi chính
+  /// tả" với [noiDungCanDua] đã có sẵn, modal đó tự tìm/tạo cặp rỗng, điền
+  /// vào dòng 1 và nhấp nháy nhắc chú ý (xem `moModalTuDienChinhTa`).
+  void _themVungChonVaoTuDienChinhTa() {
+    final chon = _boDieuKhien.selection;
+    if (!chon.isValid || chon.isCollapsed) return;
+    final doan = _boDieuKhien.text.substring(chon.start, chon.end);
+    if (doan.isEmpty) return;
+    if (doan.length > gioiHanTuDienChinhTa) {
+      hienThongBaoGiua(
+        context,
+        'Không thể thêm vào Từ điển sửa lỗi chính tả, vì vượt quá $gioiHanTuDienChinhTa ký tự',
+      );
+      return;
+    }
+    moModalTuDienChinhTa(context, widget.caiDat, noiDungCanDua: doan);
+  }
+
   /// Bấm liên tiếp quá nhanh vào "Paste" dễ dán trùng lặp (chạm hai lần
   /// trong lúc ngón tay chưa kịp rời màn hình cảm ứng) — sau mỗi lần bấm,
   /// tự "liệt" nút 1,5 giây (chỉ để mắt thấy, xem `_NutCongCuChu.bLiet`) rồi
@@ -14036,6 +14083,32 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// màn RẤT hẹp (ngưỡng 420, xem `_nguongManHinhRatHep` ở
   /// `thanh_cong_cu.dart`) thì nút này dời lên hàng trên cạnh "Dán" (xem
   /// `build`), không lặp lại ở đây.
+  /// (YÊU CẦU MỚI) Hai nút 📖 "Thêm vào Từ điển nhập liệu nhanh"/📒 "Thêm
+  /// vào Từ điển sửa lỗi chính tả" — LUÔN đứng ngay bên phải nút "Xoá đoạn
+  /// đang chọn" (⌫), bất kể màn rộng/hẹp (xem hai nơi gọi: [_hangCopyCutPaste]
+  /// và hàng của màn RẤT hẹp ở `build`) — nền xanh dương đậm "sáng lên" để
+  /// nổi bật so với Copy/Cắt/Xoá.
+  List<Widget> _haiNutThemVaoTuDien() => [
+        const SizedBox(width: 6),
+        _NutPhimAo(
+          nhan: '📖',
+          moTa: 'Thêm vào Từ điển nhập liệu nhanh',
+          mauNen: const Color(0xFF1A73E8),
+          mauVien: const Color(0xFF0B57D0),
+          rong: 40,
+          onTap: () => _bamCopyCutPasteOHangThayNav(_themVungChonVaoTuDienNhapLieuNhanh),
+        ),
+        const SizedBox(width: 6),
+        _NutPhimAo(
+          nhan: '📒',
+          moTa: 'Thêm vào Từ điển sửa lỗi chính tả',
+          mauNen: const Color(0xFF1A73E8),
+          mauVien: const Color(0xFF0B57D0),
+          rong: 40,
+          onTap: () => _bamCopyCutPasteOHangThayNav(_themVungChonVaoTuDienChinhTa),
+        ),
+      ];
+
   Widget _hangCopyCutPaste() {
     // Chữ xanh dương — nổi bật đúng ngữ cảnh "đang ở phía trên", khác hai nút
     // cùng tên ở Bộ phím nhanh (giữ màu mặc định).
@@ -14065,6 +14138,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             rong: 40,
             onTap: () => _bamCopyCutPasteOHangThayNav(_xoaChonOHangCopyCutPaste),
           ),
+          ..._haiNutThemVaoTuDien(),
         ],
       ],
     );
@@ -15038,21 +15112,29 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             // "abc" nữa (xem `_dsNutCongCu`, `coBoNhoTam: false` ở dưới).
             //
             // (YÊU CẦU MỚI) Màn RẤT hẹp + có vùng chọn thật: nút "Xoá" (y
-            // chang hình dạng/logic nút xoá ký tự của Bộ phím nhanh) đứng
-            // ngay bên TRÁI "Dán" — đây là nơi DUY NHẤT nó xuất hiện ở màn
-            // rất hẹp, không lặp lại ở hàng Copy/Cắt dưới (`_hangCopyCutPaste`
-            // đã tự ẩn nó khi `ratHep`).
+            // chang hình dạng/logic nút xoá ký tự của Bộ phím nhanh), kèm
+            // NGAY sau nó hai nút 📖/📒 ([_haiNutThemVaoTuDien] — LUÔN đi
+            // theo nút Xoá bất kể màn rộng/hẹp) — đứng ngay bên TRÁI "Dán",
+            // đây là nơi DUY NHẤT cả ba xuất hiện ở màn rất hẹp, không lặp
+            // lại ở hàng Copy/Cắt dưới (`_hangCopyCutPaste` đã tự ẩn khi
+            // `ratHep`).
             actions: [
               if (ratHep && _hienHangCopyCutPaste())
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: _NutPhimAo(
-                    nhan: '⌫',
-                    moTa: 'Xoá đoạn đang chọn',
-                    mauNen: Colors.red.shade50,
-                    mauVien: Colors.red.shade300,
-                    rong: 40,
-                    onTap: () => _bamCopyCutPasteOHangThayNav(_xoaChonOHangCopyCutPaste),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _NutPhimAo(
+                        nhan: '⌫',
+                        moTa: 'Xoá đoạn đang chọn',
+                        mauNen: Colors.red.shade50,
+                        mauVien: Colors.red.shade300,
+                        rong: 40,
+                        onTap: () => _bamCopyCutPasteOHangThayNav(_xoaChonOHangCopyCutPaste),
+                      ),
+                      ..._haiNutThemVaoTuDien(),
+                    ],
                   ),
                 ),
               _nutDanCongCu(),
@@ -16788,7 +16870,11 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
     }
     showDialog<void>(
       context: context,
-      builder: (_) => _HopThoaiThemNhanhTuDien(chiSoBoNhoTam: i, caiDat: widget.caiDat),
+      builder: (_) => _HopThoaiThemNhanhTuDien(
+        doanNguon: doan,
+        goiDinhDangNguon: BoNhoTamDanVanBan.dinhDang[i],
+        caiDat: widget.caiDat,
+      ),
     );
   }
 
@@ -17157,8 +17243,8 @@ class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNha
     return true;
   }
 
-  /// (YÊU CẦU MỚI) Nội dung tạm để trống, sẽ viết sau — chỉ cần khung modal
-  /// + nút X đỏ đóng đúng chuẩn đã thống nhất cho cả app.
+  /// (YÊU CẦU MỚI) Hướng dẫn đầy đủ cách dùng Từ điển nhập liệu nhanh —
+  /// cùng khuôn `_moHuongDanBoNhoTam` (danh sách bullet ngắn, dễ quét mắt).
   void _moHuongDan() {
     showDialog<void>(
       context: context,
@@ -17173,7 +17259,60 @@ class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNha
             ),
           ],
         ),
-        content: const SizedBox(width: 380),
+        content: const SizedBox(
+          width: 380,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '• Dán nhanh: bấm vào một dòng (hoặc gõ đúng phím chữ cái '
+                  'của dòng đó trên bàn phím vật lý) để dán ngay vào vị trí '
+                  'con trỏ trong khung soạn thảo. Dòng trống thì không bấm/'
+                  'gõ được gì.',
+                ),
+                SizedBox(height: 8),
+                Text(
+                  '• Ẩn/hiện bảng này: bấm nút 📖 ở thanh công cụ, hoặc dùng '
+                  'phím tắt đã chọn (xem/đổi ở mục "Phím tắt" trong Cài đặt) '
+                  '— mặc định là bấm Alt 2 lần liên tiếp.',
+                ),
+                SizedBox(height: 8),
+                Text(
+                  '• Ba tab: "Gần đây", "Q→M" (theo hàng phím vật lý) và '
+                  '"A→Z" (bảng chữ cái). Đổi tab bằng cách bấm chuột vào tab, '
+                  'hoặc bấm phím 1/2/3, hoặc phím mũi tên trái/phải — app tự '
+                  'nhớ tab đang mở cho lần sau.',
+                ),
+                SizedBox(height: 8),
+                Text(
+                  '• Cuộn xem hết 26 dòng trong một tab: vuốt tay, lăn chuột, '
+                  'kéo thanh cuộn, hoặc phím mũi tên lên/xuống để nhảy thẳng '
+                  'lên đầu/xuống cuối. Phím cách cuộn xen kẽ: đang ở đâu đó '
+                  'thì cuộn xuống cuối, đã ở cuối rồi thì cuộn lên đầu.',
+                ),
+                SizedBox(height: 8),
+                Text(
+                  '• Soạn nội dung cho từng dòng: bấm "Cài đặt" (ngay bên '
+                  'cạnh nút Hướng dẫn này) để gõ tay hoặc dán văn bản (giữ cả '
+                  'định dạng đậm/nghiêng/màu...) vào từng ô, đổi thứ tự giữa '
+                  'các dòng, hoặc đổi phím tắt ẩn/hiện bảng.',
+                ),
+                SizedBox(height: 8),
+                Text(
+                  '• Hai cách đưa thẳng một đoạn có sẵn vào từ điển, không '
+                  'cần gõ lại: (1) bôi đen một đoạn trong khung soạn thảo rồi '
+                  'bấm nút 📖 vừa hiện ra cạnh nút Xoá; (2) mở bảng "Bộ nhớ '
+                  'tạm để dán văn bản", bấm nút 📖 ở dòng lịch sử muốn đưa '
+                  'vào. Cả hai cùng mở một modal cho chọn dòng (trống hay đã '
+                  'có chữ đều được, có cảnh báo trước khi thay nội dung cũ) '
+                  'và giữ nguyên định dạng nếu đoạn gốc có.',
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -17348,7 +17487,14 @@ class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNha
                   style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
                 ),
                 TextButton.icon(
-                  onPressed: () => moModalTuDienNhapLieuNhanh(context, widget.caiDat),
+                  // (SỬA LỖI) Modal cài đặt có thể đổi nội dung/thứ tự 26
+                  // dòng — `setState` rỗng SAU KHI đóng để bảng này tự vẽ
+                  // lại ngay với dữ liệu mới nhất, không cần đóng/mở lại
+                  // bảng mới thấy (trước đây không có dòng này).
+                  onPressed: () async {
+                    await moModalTuDienNhapLieuNhanh(context, widget.caiDat);
+                    if (mounted) setState(() {});
+                  },
                   icon: const Icon(Icons.settings_outlined, size: 18),
                   label: const Text('Cài đặt'),
                   style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
@@ -17397,17 +17543,24 @@ class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNha
 
 /// (YÊU CẦU MỚI) Modal "Thêm nhanh vào từ điển nhập liệu nhanh" — mở từ nút
 /// 📖 ở mỗi dòng trong `_HopThoaiLichSuBoNhoTam` (bảng 10 dòng lịch sử của
-/// Bộ nhớ tạm). Tái dùng Y HỆT khuôn 3-tab/phím tắt/cuộn của
-/// `_HopThoaiTuDienNhapLieuNhanhState` (cùng `_tabThuTu`, cùng
-/// `CaiDat.tabTuDienNhapLieuNhanh` lưu lâu dài, cùng phím 1/2/3 + mũi tên +
-/// phím cách) — khác ở: phần đầu hiện SẴN đoạn nguồn (từ dòng Bộ nhớ tạm
-/// [chiSoBoNhoTam]) kèm nút Copy/"Thêm nhanh vào Dòng trống gần nhất", và
-/// bấm vào một trong 26 dòng (hoặc gõ đúng chữ cái của nó) là GHI nội dung
-/// nguồn vào dòng đó (không phải dán vào vị trí con trỏ như bảng gốc).
+/// Bộ nhớ tạm), VÀ từ nút 📖 mới ở hàng Copy/Cắt khi có vùng chọn thật
+/// (xem `_themVungChonVaoTuDienNhapLieuNhanh`) — cả hai nguồn chỉ khác nhau
+/// ở [doanNguon]/[goiDinhDangNguon] truyền vào, logic bên trong y hệt. Tái
+/// dùng Y HỆT khuôn 3-tab/phím tắt/cuộn của `_HopThoaiTuDienNhapLieuNhanhState`
+/// (cùng `_tabThuTu`, cùng `CaiDat.tabTuDienNhapLieuNhanh` lưu lâu dài, cùng
+/// phím 1/2/3 + mũi tên + phím cách) — khác ở: phần đầu hiện SẴN đoạn nguồn
+/// kèm nút Copy/"Thêm nhanh vào Dòng trống gần nhất", và bấm vào một trong
+/// 26 dòng (hoặc gõ đúng chữ cái của nó) là GHI nội dung nguồn vào dòng đó
+/// (không phải dán vào vị trí con trỏ như bảng gốc).
 class _HopThoaiThemNhanhTuDien extends StatefulWidget {
-  const _HopThoaiThemNhanhTuDien({required this.chiSoBoNhoTam, required this.caiDat});
+  const _HopThoaiThemNhanhTuDien({
+    required this.doanNguon,
+    required this.goiDinhDangNguon,
+    required this.caiDat,
+  });
 
-  final int chiSoBoNhoTam;
+  final String doanNguon;
+  final String? goiDinhDangNguon;
   final CaiDat caiDat;
 
   @override
@@ -17425,20 +17578,20 @@ class _HopThoaiThemNhanhTuDienState extends State<_HopThoaiThemNhanhTuDien>
   final _cuonController = ScrollController();
 
   /// (YÊU CẦU MỚI) Hiệu ứng nền cam nhấp nháy tuần hoàn (mờ→rõ→mờ..., mỗi
-  /// chiều 3,5 giây) ở dòng TRỐNG trên cùng của tab 2/tab 3 — `repeat(reverse:
+  /// chiều 2 giây) ở dòng TRỐNG trên cùng của tab 2/tab 3 — `repeat(reverse:
   /// true)` tự chạy đi-về mãi mãi giữa 0.0 và 1.0, dùng thẳng `.value` làm độ
   /// mờ của một lớp phủ màu cam (xem `_dong`).
   late final AnimationController _nhapNhayCam =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 3500))
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 2000))
         ..repeat(reverse: true);
 
   bool _vuaCopy = false;
   Timer? _henCopy;
 
-  String get _doanNguon => BoNhoTamDanVanBan.lichSu[widget.chiSoBoNhoTam] ?? '';
+  String get _doanNguon => widget.doanNguon;
 
   List<VungDinhDangDoanVan> get _vungDinhDangNguon {
-    final goi = BoNhoTamDanVanBan.dinhDang[widget.chiSoBoNhoTam];
+    final goi = widget.goiDinhDangNguon;
     if (goi == null) return const [];
     return giaiMaGoiDinhDang(goi, _doanNguon) ?? const [];
   }

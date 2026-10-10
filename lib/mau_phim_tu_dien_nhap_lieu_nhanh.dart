@@ -7,8 +7,8 @@
 
 import 'package:flutter/material.dart';
 
-/// Hàng phím TRÊN cùng của bàn phím vật lý — chữ ở nhãn "Phím X" tô xanh lá
-/// đậm.
+/// Hàng phím TRÊN cùng của bàn phím vật lý — chữ ở nhãn "Phím X" tô xanh
+/// dương đậm.
 const _hangTren = 'QWERTYUIOP';
 
 /// Hàng phím GIỮA — tô vàng đậm.
@@ -23,13 +23,13 @@ const _ganChanPhai = 'YUIOPHJKLNM';
 
 String chuCaiTuDienNhapLieuNhanh(int i) => String.fromCharCode('A'.codeUnitAt(0) + i);
 
-/// Xanh lá đậm (hàng trên) / vàng đậm (hàng giữa) / đỏ đậm (hàng dưới) —
+/// Xanh dương đậm (hàng trên) / vàng đậm (hàng giữa) / đỏ đậm (hàng dưới) —
 /// đúng 3 hàng phím chữ cái của bàn phím vật lý. Áp dụng cho MỌI nơi hiển
 /// thị "Phím X" (hoặc chữ cái rút gọn ở màn hẹp) liên quan tới Từ điển nhập
 /// liệu nhanh.
 Color mauChuPhimTuDienNhapLieuNhanh(int i) {
   final c = chuCaiTuDienNhapLieuNhanh(i);
-  if (_hangTren.contains(c)) return const Color(0xFF137333);
+  if (_hangTren.contains(c)) return const Color(0xFF1A56DB);
   if (_hangGiua.contains(c)) return const Color(0xFF9C6500);
   return const Color(0xFFC5221F);
 }
