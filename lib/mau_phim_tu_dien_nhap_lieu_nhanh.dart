@@ -37,6 +37,10 @@ Color mauChuPhimTuDienNhapLieuNhanh(int i) {
 bool ganChanPhimTuDienNhapLieuNhanh(int i) =>
     _ganChanPhai.contains(chuCaiTuDienNhapLieuNhanh(i));
 
+/// (YÊU CẦU MỚI) Độ đậm của gạch chân ở nhãn "Phím X" — mặc định
+/// (`decorationThickness: 1.0`) nhìn quá mảnh, tăng lên cho rõ.
+const double doDayGachChanTuDienNhapLieuNhanh = 2.2;
+
 /// Thứ tự 26 chỉ số (0=A..25=Z) đúng theo hàng phím Q-W-E-R-T-Y-U-I-O-P rồi
 /// A-S-D-F-G-H-J-K-L rồi Z-X-C-V-B-N-M của bàn phím vật lý, từ trái qua
 /// phải, từ trên xuống dưới — tính sẵn thành hằng số (đã kiểm đủ 26 chỉ số

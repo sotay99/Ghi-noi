@@ -11,11 +11,14 @@
 // `CaiDat.tuDienNhapLieuNhanh`).
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'cai_dat.dart';
+import 'dinh_dang_clip.dart';
+import 'dinh_dang_doan_van_tu_dien.dart';
 import 'lua_chon_phim_tat.dart';
 import 'mau_phim_tu_dien_nhap_lieu_nhanh.dart';
 
@@ -40,9 +43,22 @@ class _ManHinhTuDienNhapLieuNhanh extends StatefulWidget {
       _ManHinhTuDienNhapLieuNhanhState();
 }
 
+/// (YÊU CẦU MỚI) Intent riêng để "chiếm lại" Ctrl+V khỏi hành vi dán mặc
+/// định của `TextField` — y hệt cách màn hình soạn thảo chính đã làm ổn
+/// định cho Copy/Cắt/Dán của nó (`_YDinhPaste`/`Shortcuts`+`Actions` quanh ô
+/// soạn thảo), chỉ khác đích đến là nút "Dán" của ĐÚNG Ô đang có tiêu điểm
+/// trong 26 ô này (xem `_ManHinhTuDienNhapLieuNhanhState._focusNodes`).
+class _YDinhDanTuDien extends Intent {
+  const _YDinhDanTuDien();
+}
+
 class _ManHinhTuDienNhapLieuNhanhState
     extends State<_ManHinhTuDienNhapLieuNhanh> {
   late List<TextEditingController> _oNhap;
+
+  /// (YÊU CẦU MỚI) Một `FocusNode` riêng cho mỗi ô — để biết ô nào đang có
+  /// tiêu điểm khi Ctrl+V được bấm (xem `_YDinhDanTuDien`).
+  late List<FocusNode> _focusNodes;
 
   /// (YÊU CẦU MỚI) Đang ở chế độ "Thay đổi thứ tự giữa các dòng" — thay hết
   /// mọi thứ khác (công tắc, phím tắt, chú thích, 26 ô nhập + Copy/Dán/Xoá)
@@ -77,12 +93,16 @@ class _ManHinhTuDienNhapLieuNhanhState
       26,
       (i) => TextEditingController(text: widget.caiDat.tuDienNhapLieuNhanh[i]),
     );
+    _focusNodes = List.generate(26, (_) => FocusNode());
   }
 
   @override
   void dispose() {
     for (final o in _oNhap) {
       o.dispose();
+    }
+    for (final f in _focusNodes) {
+      f.dispose();
     }
     for (final h in _henCopy.values) {
       h.cancel();
@@ -93,22 +113,49 @@ class _ManHinhTuDienNhapLieuNhanhState
     super.dispose();
   }
 
+  /// Gõ tay (qua `onChanged`) hoặc xoá trắng — toạ độ định dạng CŨ (nếu có)
+  /// không còn đáng tin sau một lượt gõ tay (người dùng có thể đã thêm/xoá
+  /// ký tự ở bất kỳ đâu), bỏ hẳn cho an toàn — đơn giản hơn nhiều so với cố
+  /// dời từng vùng theo từng phím gõ, đúng yêu cầu "logic càng đơn giản
+  /// càng tốt". CHỈ "Dán"/Ctrl+V (xem `_doiDongKemDinhDang`) mới gán định
+  /// dạng mới.
   void _doiDong(int i, String gia) {
     widget.caiDat.tuDienNhapLieuNhanh[i] = gia;
     // (YÊU CẦU MỚI) Tự lưu ngay mỗi lần đổi, không cần nút Lưu riêng — xem
     // yêu cầu gốc. Không cần debounce 500ms như từ điển chính tả vì đây chỉ
     // ghi MỘT danh sách chuỗi (rẻ hơn hẳn việc ghi lại cả cây CapTuDien).
     widget.caiDat.luuTuDienNhapLieuNhanh();
+    widget.caiDat.datDinhDangTuDienNhapLieuNhanh(i, null);
+  }
+
+  /// (YÊU CẦU MỚI) Lưu CẢ chữ LẪN định dạng mới cho dòng [i] — dùng riêng
+  /// cho đường "Dán" (giữ định dạng), khác `_doiDong` (gõ tay, luôn xoá
+  /// định dạng cũ).
+  void _doiDongKemDinhDang(int i, String gia, List<VungDinhDangDoanVan>? vung) {
+    widget.caiDat.tuDienNhapLieuNhanh[i] = gia;
+    widget.caiDat.luuTuDienNhapLieuNhanh();
+    widget.caiDat.datDinhDangTuDienNhapLieuNhanh(
+      i,
+      (vung == null || vung.isEmpty) ? null : jsonEncode(vung.map((v) => v.toJson()).toList()),
+    );
   }
 
   /// (YÊU CẦU MỚI) Copy nội dung dòng [i] vào bộ nhớ đệm HỆ THỐNG — CHỦ Ý
   /// không ghi vào "Bộ nhớ tạm để dán văn bản" (lịch sử 10 dòng riêng của
-  /// tính năng khác), chỉ `Clipboard.setData` đơn thuần như Ctrl+C thường.
-  /// Bấm xong, nút tự đổi thành "Đã copy" (chữ xanh lá) 2 giây — bấm vào
-  /// trong lúc đó không làm gì cả (xem `_vuaCopy`, chặn ngay ở đầu hàm).
+  /// tính năng khác). Có định dạng thì thử ghi kèm `text/html` giữ định
+  /// dạng (y hệt `_phimAoCopy` ở màn hình soạn thảo chính) — thất bại/không
+  /// có thì rơi về `Clipboard.setData` chữ thô như trước giờ. Bấm xong, nút
+  /// tự đổi thành "Đã copy" (chữ xanh lá) 2 giây — bấm vào trong lúc đó
+  /// không làm gì cả (xem `_vuaCopy`, chặn ngay ở đầu hàm).
   Future<void> _copyDong(int i) async {
     if (_vuaCopy.contains(i)) return;
-    await Clipboard.setData(ClipboardData(text: _oNhap[i].text));
+    final doan = _oNhap[i].text;
+    final vung = widget.caiDat.docDinhDangTuDienNhapLieuNhanh(i);
+    final html = vung.isEmpty ? null : dungHtmlChoClipboard(doan, vung);
+    final daGhiGiauDinhDang = html != null && await ghiClipboardCoDinhDang(doan, html);
+    if (!daGhiGiauDinhDang) {
+      await Clipboard.setData(ClipboardData(text: doan));
+    }
     if (!mounted) return;
     setState(() => _vuaCopy.add(i));
     _henCopy[i]?.cancel();
@@ -120,7 +167,11 @@ class _ManHinhTuDienNhapLieuNhanhState
   /// (YÊU CẦU MỚI) Dán từ bộ nhớ đệm HỆ THỐNG vào ô nhập dòng [i] — vào
   /// đúng vị trí con trỏ nếu ô đang có vùng chọn/con trỏ hợp lệ, hoặc vào
   /// cuối văn bản của dòng đó nếu không (ô chưa từng được chạm vào,
-  /// `selection` không hợp lệ). Cùng cơ chế "Đã dán" 2 giây như `_copyDong`.
+  /// `selection` không hợp lệ). Thử lấy kèm định dạng từ `text/html` của
+  /// clipboard (y hệt cách "Bộ nhớ tạm để dán văn bản" đang làm ở màn hình
+  /// soạn thảo chính) — ĐƠN GIẢN HOÁ: gói định dạng mới (nếu có) THAY HẲN
+  /// định dạng cũ của dòng (không cố dời định dạng cũ theo đoạn vừa chèn).
+  /// Cùng cơ chế "Đã dán" 2 giây như `_copyDong`.
   Future<void> _danDong(int i) async {
     if (_vuaDan.contains(i)) return;
     final du = await Clipboard.getData('text/plain');
@@ -131,13 +182,28 @@ class _ManHinhTuDienNhapLieuNhanhState
     final chon = oDieuKhien.selection;
     final batDau = chon.isValid ? chon.start : vb.length;
     final ketThuc = chon.isValid ? chon.end : vb.length;
-    var moi = vb.replaceRange(batDau, ketThuc, chenGoc);
-    var viTriConTroMoi = batDau + chenGoc.length;
+    var chen = chenGoc;
+    var moi = vb.replaceRange(batDau, ketThuc, chen);
+    var viTriConTroMoi = batDau + chen.length;
     // (YÊU CẦU MỚI) Giới hạn 1000 ký tự — gán thẳng `.text` không tự cắt
     // như lúc gõ tay qua `maxLength`, phải tự cắt ở đây.
     if (moi.length > CaiDat.gioiHanTuDienNhapLieuNhanh) {
       moi = moi.substring(0, CaiDat.gioiHanTuDienNhapLieuNhanh);
       viTriConTroMoi = viTriConTroMoi.clamp(0, moi.length);
+      // Đoạn chèn thật đã bị cắt bớt — không còn khớp y nguyên [chen] nữa,
+      // bỏ hẳn định dạng cho an toàn (mất định dạng còn hơn gán sai chỗ).
+      chen = '';
+    }
+    List<VungDinhDangDoanVan>? vungMoi;
+    if (chen.isNotEmpty) {
+      final htmlClipboard = await docHtmlTuClipboard();
+      final maHoaGoi = tachGoiDinhDangTuHtml(htmlClipboard);
+      if (maHoaGoi != null) {
+        final vung = giaiMaGoiDinhDang(maHoaGoi, chen);
+        if (vung != null) {
+          vungMoi = [for (final v in vung) v.dich(batDau)];
+        }
+      }
     }
     setState(() {
       oDieuKhien.value = TextEditingValue(
@@ -146,7 +212,7 @@ class _ManHinhTuDienNhapLieuNhanhState
       );
       _vuaDan.add(i);
     });
-    _doiDong(i, moi);
+    _doiDongKemDinhDang(i, moi, vungMoi);
     _henDan[i]?.cancel();
     _henDan[i] = Timer(const Duration(seconds: 2), () {
       if (mounted) setState(() => _vuaDan.remove(i));
@@ -260,12 +326,19 @@ class _ManHinhTuDienNhapLieuNhanhState
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // (YÊU CẦU MỚI) CHỈ hai lựa chọn — khác bốn lựa chọn của
-                    // Micro/Ghi âm/Bộ nhớ tạm.
+                    // (YÊU CẦU MỚI) BA lựa chọn — khác bốn lựa chọn của
+                    // Micro/Ghi âm/Bộ nhớ tạm (gia đình tổ hợp hoàn toàn
+                    // khác, không bao giờ trùng).
+                    oLuaChon(
+                      loai: 'altDup',
+                      nhan: 'Bấm Alt 2 lần liên tiếp',
+                      giaiThich: 'Bấm phím Alt, buông ra, rồi bấm lại lần '
+                          'nữa trong khoảng 1 giây (mặc định).',
+                    ),
                     oLuaChon(
                       loai: 'altShift',
                       nhan: 'Alt + Shift',
-                      giaiThich: 'Giữ phím Alt và Shift cùng lúc (mặc định).',
+                      giaiThich: 'Giữ phím Alt và Shift cùng lúc.',
                     ),
                     oLuaChon(
                       loai: 'ctrl',
@@ -442,11 +515,19 @@ class _ManHinhTuDienNhapLieuNhanhState
   /// `_thuTuSapXep[p]` = chữ cái (0-25) đang đứng ở VỊ TRÍ HIỂN THỊ `p`.
   List<int> _thuTuSapXep = [];
 
+  /// (YÊU CẦU MỚI) Định dạng đi KÈM từng phần tử của `_dsSapXepTam`, cùng
+  /// chỉ số — kéo-thả phải mang CẢ định dạng đi theo nội dung (không thì
+  /// sau khi đổi vị trí, định dạng sẽ dính nhầm vào phím tắt chữ cái khác).
+  List<String?> _dsSapXepDinhDangTam = [];
+
   void _batDauSapXepLai() {
     setState(() {
       _thuTuSapXep =
           thuTuTuDienNhapLieuNhanhTheoKieu(widget.caiDat.thuTuTuDienNhapLieuNhanh);
       _dsSapXepTam = [for (final chuCai in _thuTuSapXep) _oNhap[chuCai].text];
+      _dsSapXepDinhDangTam = [
+        for (final chuCai in _thuTuSapXep) widget.caiDat.dinhDangTuDienNhapLieuNhanh[chuCai],
+      ];
       _dangSapXepLai = true;
     });
   }
@@ -455,6 +536,7 @@ class _ManHinhTuDienNhapLieuNhanhState
     setState(() {
       _dangSapXepLai = false;
       _dsSapXepTam = [];
+      _dsSapXepDinhDangTam = [];
       _thuTuSapXep = [];
       _chiSoDangKeo = null;
       _chiSoThaDuKien = null;
@@ -463,32 +545,39 @@ class _ManHinhTuDienNhapLieuNhanhState
 
   void _luuSapXepLai() {
     final moi = List<String>.of(_dsSapXepTam);
+    final moiDinhDang = List<String?>.of(_dsSapXepDinhDangTam);
     final thuTu = _thuTuSapXep;
     setState(() {
       for (var p = 0; p < 26; p++) {
         final chuCai = thuTu[p];
         widget.caiDat.tuDienNhapLieuNhanh[chuCai] = moi[p];
         _oNhap[chuCai].text = moi[p];
+        widget.caiDat.dinhDangTuDienNhapLieuNhanh[chuCai] = moiDinhDang[p];
       }
       _dangSapXepLai = false;
       _dsSapXepTam = [];
+      _dsSapXepDinhDangTam = [];
       _thuTuSapXep = [];
       _chiSoDangKeo = null;
       _chiSoThaDuKien = null;
     });
     widget.caiDat.luuTuDienNhapLieuNhanh();
+    widget.caiDat.luuDinhDangTuDienNhapLieuNhanh();
   }
 
   /// [nguon] (0-25) là vị trí ĐANG bị kéo; [dich] (0-26) là vị trí CHÈN
   /// (xem [_chiSoThaDuKien]) — đúng công thức xoá-rồi-chèn-lại tiêu chuẩn,
   /// trừ bớt 1 nếu nguồn nằm TRƯỚC đích (xoá nguồn làm mọi phần tử sau nó
-  /// dồn lên một bậc trước khi chèn).
+  /// dồn lên một bậc trước khi chèn). Dời CẢ `_dsSapXepDinhDangTam` theo
+  /// đúng cùng phép xoá-chèn, giữ định dạng dính đúng với nội dung của nó.
   void _apDungKeoTha(int nguon, int dich) {
     setState(() {
       final tu = _dsSapXepTam.removeAt(nguon);
+      final tuDinhDang = _dsSapXepDinhDangTam.removeAt(nguon);
       var d = dich;
       if (nguon < dich) d -= 1;
       _dsSapXepTam.insert(d, tu);
+      _dsSapXepDinhDangTam.insert(d, tuDinhDang);
       _chiSoThaDuKien = null;
       _chiSoDangKeo = null;
     });
@@ -595,6 +684,7 @@ class _ManHinhTuDienNhapLieuNhanhState
                       decoration: ganChanPhimTuDienNhapLieuNhanh(_thuTuSapXep[i])
                           ? TextDecoration.underline
                           : TextDecoration.none,
+                      decorationThickness: doDayGachChanTuDienNhapLieuNhanh,
                     ),
                   ),
                 ],
@@ -749,35 +839,96 @@ class _ManHinhTuDienNhapLieuNhanhState
             style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
           ),
           const SizedBox(height: 8),
-          for (final i in thuTuTuDienNhapLieuNhanhTheoKieu(widget.caiDat.thuTuTuDienNhapLieuNhanh)) ...[
-            const Divider(height: 24),
-            Text(
-              'Phím ${_chuCai(i)}',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: mauChuPhimTuDienNhapLieuNhanh(i),
-                decoration:
-                    ganChanPhimTuDienNhapLieuNhanh(i) ? TextDecoration.underline : TextDecoration.none,
+          // (YÊU CẦU MỚI) Bọc cả 26 ô trong MỘT `Shortcuts`/`Actions` để
+          // "chiếm lại" Ctrl+V — y hệt cách màn hình soạn thảo chính đã làm
+          // ổn định cho Copy/Cắt/Dán của nó — rồi gọi thẳng `_danDong` của
+          // ĐÚNG ô đang có tiêu điểm (`_focusNodes`), dán kèm định dạng
+          // giống như bấm nút "Dán" ngay dưới ô đó.
+          Shortcuts(
+            shortcuts: const {
+              SingleActivator(LogicalKeyboardKey.keyV, control: true): _YDinhDanTuDien(),
+            },
+            child: Actions(
+              actions: {
+                _YDinhDanTuDien: CallbackAction<_YDinhDanTuDien>(
+                  onInvoke: (_) {
+                    final i = _focusNodes.indexWhere((f) => f.hasFocus);
+                    if (i != -1) _danDong(i);
+                    return null;
+                  },
+                ),
+              },
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: _danhSachODong(),
               ),
             ),
-            const SizedBox(height: 4),
-            TextField(
-              controller: _oNhap[i],
-              onChanged: (gia) => _doiDong(i, gia),
-              maxLines: 3,
-              minLines: 1,
-              // (YÊU CẦU MỚI) Giới hạn 1000 ký tự — dán đoạn dài hơn cũng
-              // tự cắt bớt nhờ `maxLength`, không cần thêm gì.
-              maxLength: CaiDat.gioiHanTuDienNhapLieuNhanh,
-              style: const TextStyle(fontSize: 15),
-              decoration: const InputDecoration(
-                isDense: true,
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              ),
+          ),
+        ],
+      );
+
+  /// 26 khối "nhãn Phím X + ô nhập + xem trước định dạng (nếu có) + nút
+  /// Copy/Dán/Xoá", tách ra khỏi `_thanBinhThuong` để bọc gọn trong MỘT
+  /// `Shortcuts`/`Actions` (chiếm Ctrl+V) ở trên.
+  List<Widget> _danhSachODong() => [
+        for (final i in thuTuTuDienNhapLieuNhanhTheoKieu(widget.caiDat.thuTuTuDienNhapLieuNhanh)) ...[
+          const Divider(height: 24),
+          Text(
+            'Phím ${_chuCai(i)}',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: mauChuPhimTuDienNhapLieuNhanh(i),
+              decoration:
+                  ganChanPhimTuDienNhapLieuNhanh(i) ? TextDecoration.underline : TextDecoration.none,
+              decorationThickness: doDayGachChanTuDienNhapLieuNhanh,
             ),
-            const SizedBox(height: 4),
+          ),
+          const SizedBox(height: 4),
+          TextField(
+            controller: _oNhap[i],
+            focusNode: _focusNodes[i],
+            onChanged: (gia) => _doiDong(i, gia),
+            maxLines: 3,
+            minLines: 1,
+            // (YÊU CẦU MỚI) Giới hạn 1000 ký tự — dán đoạn dài hơn cũng
+            // tự cắt bớt nhờ `maxLength`, không cần thêm gì.
+            maxLength: CaiDat.gioiHanTuDienNhapLieuNhanh,
+            style: const TextStyle(fontSize: 15),
+            decoration: const InputDecoration(
+              isDense: true,
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+          ),
+          // (YÊU CẦU MỚI) Xem trước định dạng — CHỈ hiện khi dòng này có
+          // định dạng (dán từ "Dán"/Ctrl+V), ô nhập ở trên vẫn luôn là chữ
+          // thô (TextField không vẽ được định dạng theo từng đoạn trong lúc
+          // đang sửa) — đơn giản hoá đúng yêu cầu "logic càng đơn giản càng
+          // tốt": chỉ cần XEM ra được định dạng là đủ, không cần sửa trực
+          // tiếp trên chữ có định dạng.
+          Builder(builder: (context) {
+            final vung = widget.caiDat.docDinhDangTuDienNhapLieuNhanh(i);
+            if (vung.isEmpty) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F9FA),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFDADCE0)),
+                ),
+                child: vanBanCoDinhDangTuDien(
+                  _oNhap[i].text,
+                  vung,
+                  const TextStyle(fontSize: 14),
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 4),
             // (YÊU CẦU MỚI) Ba nút Copy/Dán/Xoá riêng cho từng dòng — Copy
             // và Dán tự đổi thành "Đã copy"/"Đã dán" (chữ xanh lá) 2 giây
             // sau khi bấm, bấm vào lúc đó không làm gì cả (xem `_copyDong`/
