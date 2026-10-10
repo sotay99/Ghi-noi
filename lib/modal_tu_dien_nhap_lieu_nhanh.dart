@@ -296,12 +296,14 @@ class _ManHinhTuDienNhapLieuNhanhState
                 ),
                 Flexible(
                   child: SingleChildScrollView(
+                    // (YÊU CẦU MỚI) `SelectableText.rich` thay cho
+                    // `vanBanCoDinhDangTuDien` (chỉ để NHÌN) — người dùng rê
+                    // chuột tạo vùng chọn thoải mái trong nội dung đầy đủ
+                    // này để tự copy một phần tuỳ ý, không chỉ nguyên dòng.
                     child: ValueListenableBuilder<List<VungDinhDangDoanVan>>(
                       valueListenable: _dinhDangLive[i],
-                      builder: (context, vung, _) => vanBanCoDinhDangTuDien(
-                        _oNhap[i].text,
-                        vung,
-                        const TextStyle(fontSize: 15),
+                      builder: (context, vung, _) => SelectableText.rich(
+                        spanCoDinhDangTuDien(_oNhap[i].text, vung, const TextStyle(fontSize: 15)),
                       ),
                     ),
                   ),

@@ -16769,6 +16769,29 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
     );
   }
 
+  /// (YÊU CẦU MỚI) Bấm nút 📖 ở dòng [i] — vượt quá 1000 ký tự (giới hạn
+  /// của một dòng Từ điển nhập liệu nhanh, `CaiDat.gioiHanTuDienNhapLieuNhanh`)
+  /// thì chỉ báo nhanh giữa màn hình, không mở modal. Hợp lệ thì mở modal
+  /// "Thêm nhanh vào từ điển nhập liệu nhanh" (`_HopThoaiThemNhanhTuDien`) —
+  /// modal đó đứng TRÊN bảng này nên `_khiPhim` ở trên (đọc
+  /// `ModalRoute.isCurrent`) tự ngăn phím số của bảng này kích hoạt trong
+  /// lúc đang mở, không cần cờ riêng.
+  void _bamThemNhanhVaoTuDien(int i) {
+    final doan = BoNhoTamDanVanBan.lichSu[i];
+    if (doan == null) return;
+    if (doan.length > CaiDat.gioiHanTuDienNhapLieuNhanh) {
+      hienThongBaoGiua(
+        context,
+        'Không thể thêm vào Từ điển nhập liệu nhanh, vì vượt quá 1000 ký tự',
+      );
+      return;
+    }
+    showDialog<void>(
+      context: context,
+      builder: (_) => _HopThoaiThemNhanhTuDien(chiSoBoNhoTam: i, caiDat: widget.caiDat),
+    );
+  }
+
   Widget _dong(int i) {
     final doan = BoNhoTamDanVanBan.lichSu[i];
     final rong = doan == null;
@@ -16895,25 +16918,17 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             padding: EdgeInsets.zero,
           ),
-          // (YÊU CẦU MỚI) Nút sao chép riêng — CHỈ ghi vào bộ nhớ đệm hệ
-          // thống (để dán lại ở bất cứ đâu, kể cả trong Từ điển nhập liệu
-          // nhanh), KHÔNG ghi thêm vào chính lịch sử 10 dòng này. Luôn là
-          // nút CUỐI trong `Row` nên tự sát mép phải modal.
+          // (YÊU CẦU MỚI) Nút "Thêm nhanh vào từ điển nhập liệu nhanh" —
+          // THAY cho nút sao chép cũ (đã bỏ hẳn, kể cả logic riêng của nó).
+          // Icon 📖 y hệt nút mở "Từ điển nhập liệu nhanh" ở thanh công cụ.
+          // Luôn là nút CUỐI trong `Row` nên tự sát mép phải modal.
           IconButton(
-            onPressed: rong
-                ? null
-                : () async {
-                    await Clipboard.setData(ClipboardData(text: doan!));
-                    if (mounted) {
-                      hienThongBaoGiua(context, 'Đã sao chép nội dung vào bộ nhớ đệm');
-                    }
-                  },
-            icon: Icon(
-              Icons.copy_outlined,
-              size: 16,
-              color: rong ? const Color(0xFF9AA0A6) : const Color(0xFF5F6368),
+            onPressed: rong ? null : () => _bamThemNhanhVaoTuDien(i),
+            icon: Opacity(
+              opacity: rong ? 0.35 : 1.0,
+              child: const Text('📖', style: TextStyle(fontSize: 16)),
             ),
-            tooltip: 'Sao chép nội dung dòng này vào bộ nhớ đệm',
+            tooltip: 'Thêm nhanh vào Từ điển nhập liệu nhanh',
             visualDensity: VisualDensity.compact,
             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             padding: EdgeInsets.zero,
@@ -17369,6 +17384,493 @@ class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNha
                         controller: _cuonController,
                         child: Column(
                           children: [for (final i in ds) _dong(i)],
+                        ),
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// (YÊU CẦU MỚI) Modal "Thêm nhanh vào từ điển nhập liệu nhanh" — mở từ nút
+/// 📖 ở mỗi dòng trong `_HopThoaiLichSuBoNhoTam` (bảng 10 dòng lịch sử của
+/// Bộ nhớ tạm). Tái dùng Y HỆT khuôn 3-tab/phím tắt/cuộn của
+/// `_HopThoaiTuDienNhapLieuNhanhState` (cùng `_tabThuTu`, cùng
+/// `CaiDat.tabTuDienNhapLieuNhanh` lưu lâu dài, cùng phím 1/2/3 + mũi tên +
+/// phím cách) — khác ở: phần đầu hiện SẴN đoạn nguồn (từ dòng Bộ nhớ tạm
+/// [chiSoBoNhoTam]) kèm nút Copy/"Thêm nhanh vào Dòng trống gần nhất", và
+/// bấm vào một trong 26 dòng (hoặc gõ đúng chữ cái của nó) là GHI nội dung
+/// nguồn vào dòng đó (không phải dán vào vị trí con trỏ như bảng gốc).
+class _HopThoaiThemNhanhTuDien extends StatefulWidget {
+  const _HopThoaiThemNhanhTuDien({required this.chiSoBoNhoTam, required this.caiDat});
+
+  final int chiSoBoNhoTam;
+  final CaiDat caiDat;
+
+  @override
+  State<_HopThoaiThemNhanhTuDien> createState() => _HopThoaiThemNhanhTuDienState();
+}
+
+class _HopThoaiThemNhanhTuDienState extends State<_HopThoaiThemNhanhTuDien>
+    with SingleTickerProviderStateMixin {
+  // KHÔNG được `const` — xem giải thích ở `_HopThoaiLichSuBoNhoTamState._phimSo`.
+  static final _phimChu = {
+    for (var i = 0; i < 26; i++) LogicalKeyboardKey(LogicalKeyboardKey.keyA.keyId + i): i,
+  };
+
+  late String _tab;
+  final _cuonController = ScrollController();
+
+  /// (YÊU CẦU MỚI) Hiệu ứng nền cam nhấp nháy tuần hoàn (mờ→rõ→mờ..., mỗi
+  /// chiều 3,5 giây) ở dòng TRỐNG trên cùng của tab 2/tab 3 — `repeat(reverse:
+  /// true)` tự chạy đi-về mãi mãi giữa 0.0 và 1.0, dùng thẳng `.value` làm độ
+  /// mờ của một lớp phủ màu cam (xem `_dong`).
+  late final AnimationController _nhapNhayCam =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 3500))
+        ..repeat(reverse: true);
+
+  bool _vuaCopy = false;
+  Timer? _henCopy;
+
+  String get _doanNguon => BoNhoTamDanVanBan.lichSu[widget.chiSoBoNhoTam] ?? '';
+
+  List<VungDinhDangDoanVan> get _vungDinhDangNguon {
+    final goi = BoNhoTamDanVanBan.dinhDang[widget.chiSoBoNhoTam];
+    if (goi == null) return const [];
+    return giaiMaGoiDinhDang(goi, _doanNguon) ?? const [];
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = _tabThuTu.contains(widget.caiDat.tabTuDienNhapLieuNhanh)
+        ? widget.caiDat.tabTuDienNhapLieuNhanh
+        : 'hang';
+    HardwareKeyboard.instance.addHandler(_khiPhim);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_khiPhim);
+    _cuonController.dispose();
+    _nhapNhayCam.dispose();
+    _henCopy?.cancel();
+    super.dispose();
+  }
+
+  void _doiTab(String t) {
+    if (_tab == t) return;
+    setState(() => _tab = t);
+    widget.caiDat.datTabTuDienNhapLieuNhanh(t);
+  }
+
+  void _doiTabTheoHuong(int delta) {
+    final vtMoi = (_tabThuTu.indexOf(_tab) + delta).clamp(0, _tabThuTu.length - 1);
+    _doiTab(_tabThuTu[vtMoi]);
+  }
+
+  void _cuonLenTrenCung() {
+    if (!_cuonController.hasClients) return;
+    _cuonController.animateTo(0, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
+  }
+
+  void _cuonXuongDuoiCung() {
+    if (!_cuonController.hasClients) return;
+    _cuonController.animateTo(
+      _cuonController.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+    );
+  }
+
+  void _cuonTheoPhimCach() {
+    if (!_cuonController.hasClients) return;
+    final oDuoiCung = _cuonController.offset >= _cuonController.position.maxScrollExtent - 2;
+    oDuoiCung ? _cuonLenTrenCung() : _cuonXuongDuoiCung();
+  }
+
+  /// Y hệt `_HopThoaiTuDienNhapLieuNhanhState._khiPhim`, chỉ khác hành động
+  /// cuối: gõ đúng chữ cái là GHI nội dung nguồn vào dòng đó (`_bamDong`),
+  /// không phải dán vào vị trí con trỏ.
+  bool _khiPhim(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+    if (!mounted) return false;
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return false;
+
+    final phim = event.logicalKey;
+    if (phim == LogicalKeyboardKey.digit1 || phim == LogicalKeyboardKey.numpad1) {
+      _doiTab('ganDay');
+      return true;
+    }
+    if (phim == LogicalKeyboardKey.digit2 || phim == LogicalKeyboardKey.numpad2) {
+      _doiTab('hang');
+      return true;
+    }
+    if (phim == LogicalKeyboardKey.digit3 || phim == LogicalKeyboardKey.numpad3) {
+      _doiTab('bangChuCai');
+      return true;
+    }
+    if (phim == LogicalKeyboardKey.arrowLeft) {
+      _doiTabTheoHuong(-1);
+      return true;
+    }
+    if (phim == LogicalKeyboardKey.arrowRight) {
+      _doiTabTheoHuong(1);
+      return true;
+    }
+    if (phim == LogicalKeyboardKey.arrowUp) {
+      _cuonLenTrenCung();
+      return true;
+    }
+    if (phim == LogicalKeyboardKey.arrowDown) {
+      _cuonXuongDuoiCung();
+      return true;
+    }
+    if (phim == LogicalKeyboardKey.space) {
+      _cuonTheoPhimCach();
+      return true;
+    }
+    final i = _phimChu[phim];
+    if (i == null) return false;
+    _bamDong(i);
+    return true;
+  }
+
+  List<int> _chiSoTheoTab() {
+    if (_tab == 'ganDay') {
+      final ds = List<int>.from(widget.caiDat.ganDayTuDienNhapLieuNhanh);
+      final thuTu = thuTuTuDienNhapLieuNhanhTheoKieu(widget.caiDat.thuTuTuDienNhapLieuNhanh);
+      ds.sort((a, b) => thuTu.indexOf(a).compareTo(thuTu.indexOf(b)));
+      return ds;
+    }
+    return thuTuTuDienNhapLieuNhanhTheoKieu(_tab);
+  }
+
+  String get _chuThichTab => switch (_tab) {
+        'ganDay' => 'Các dòng vừa được sử dụng gần đây, trong đó: Các màu '
+            'xanh đậm là gần đây nhất, các màu xanh nhạt là cũ hơn',
+        'hang' => 'Sắp xếp theo các hàng nút chữ cái trên bàn phím vật lý, '
+            'từ trái qua phải, từ trên xuống dưới, Phím nào có gạch chân là '
+            'ở bên phải',
+        _ => 'Các phím tắt chữ cái Sắp xếp theo Bảng chữ cái Alphabet quốc '
+            'tế từ A đến Z',
+      };
+
+  Color get _mauChuThichTab => switch (_tab) {
+        'ganDay' => const Color(0xFF137333),
+        'hang' => const Color(0xFFB06000),
+        _ => const Color(0xFF8430CE),
+      };
+
+  Widget _nutTab(String id, String nhanRong, String nhanHep, bool hep) {
+    final dangChon = _tab == id;
+    return Expanded(
+      child: InkWell(
+        onTap: () => _doiTab(id),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+          color: dangChon ? const Color(0xFF1A73E8) : const Color(0xFFF1F3F4),
+          alignment: Alignment.center,
+          child: Text(
+            hep ? nhanHep : nhanRong,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: dangChon ? Colors.white : const Color(0xFF5F6368),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Dòng TRỐNG đầu tiên trong [ds] (thứ tự hiển thị của một cách sắp xếp
+  /// cụ thể) — `null` nếu không còn dòng trống nào trong thứ tự đó.
+  int? _dongTrongDauTien(List<int> ds) {
+    for (final i in ds) {
+      if (widget.caiDat.tuDienNhapLieuNhanh[i].trim().isEmpty) return i;
+    }
+    return null;
+  }
+
+  /// Dòng trống dùng cho nút "Thêm nhanh vào Dòng trống gần nhất (Phím X)"
+  /// — tab "Gần đây" dùng ĐÚNG thứ tự của tab "Q→M" (trường hợp 2 trong yêu
+  /// cầu), hai tab còn lại dùng thứ tự của chính nó. `'hang'` và
+  /// `'bangChuCai'` cùng phủ đủ 26 chỉ số (chỉ khác thứ tự) nên "không còn
+  /// dòng trống theo thứ tự này" LUÔN đồng nghĩa "không còn dòng trống nào
+  /// trong cả 26 dòng" — đúng điều kiện liệt nút ở yêu cầu.
+  int? get _dongTrongGanNhatChoNut {
+    final kieu = _tab == 'bangChuCai' ? 'bangChuCai' : 'hang';
+    return _dongTrongDauTien(thuTuTuDienNhapLieuNhanhTheoKieu(kieu));
+  }
+
+  Future<void> _xacNhanThayThe(int i) async {
+    final dongY = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Thay thế nội dung đã có trong dòng này?'),
+        content: Text(
+          'Dòng Phím ${chuCaiTuDienNhapLieuNhanh(i)} này đã có nội dung — nội dung cũ sẽ bị mất, '
+          'thay bằng đoạn vừa chọn. Bạn có chắc chắn không?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Huỷ - Quay lại'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Có - Xác nhận thay thế'),
+          ),
+        ],
+      ),
+    );
+    if (dongY == true && mounted) _ghiVaoDong(i);
+  }
+
+  void _bamDong(int i) {
+    if (widget.caiDat.tuDienNhapLieuNhanh[i].trim().isEmpty) {
+      _ghiVaoDong(i);
+    } else {
+      _xacNhanThayThe(i);
+    }
+  }
+
+  void _ghiVaoDong(int i) {
+    final doan = _doanNguon;
+    widget.caiDat.tuDienNhapLieuNhanh[i] = doan;
+    widget.caiDat.luuTuDienNhapLieuNhanh();
+    final vung = _vungDinhDangNguon;
+    widget.caiDat.datDinhDangTuDienNhapLieuNhanh(
+      i,
+      vung.isEmpty ? null : jsonEncode(vung.map((v) => v.toJson()).toList()),
+    );
+    final chuCai = chuCaiTuDienNhapLieuNhanh(i);
+    Navigator.of(context).pop();
+    hienThongBaoGiua(
+      context,
+      'Đã Dán nội dung vào dòng nhập liệu nhanh thuộc Phím $chuCai',
+      ganTren: true,
+    );
+  }
+
+  Future<void> _copyNguon() async {
+    if (_vuaCopy) return;
+    final doan = _doanNguon;
+    final vung = _vungDinhDangNguon;
+    final html = vung.isEmpty ? null : dungHtmlChoClipboard(doan, vung);
+    final daGhiGiauDinhDang = html != null && await ghiClipboardCoDinhDang(doan, html);
+    if (!daGhiGiauDinhDang) {
+      await Clipboard.setData(ClipboardData(text: doan));
+    }
+    if (!mounted) return;
+    setState(() => _vuaCopy = true);
+    _henCopy?.cancel();
+    _henCopy = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _vuaCopy = false);
+    });
+  }
+
+  Widget _dong(int i, {required bool nhapNhayCam}) {
+    final chuCai = chuCaiTuDienNhapLieuNhanh(i);
+    final doanDong = widget.caiDat.tuDienNhapLieuNhanh[i];
+    final rong = doanDong.trim().isEmpty;
+    final doanHienThi = doanDong.replaceAll('\n', ' ');
+    final manHinhHep = MediaQuery.sizeOf(context).width < _TrangSoanThaoState._nguongManHinhHep;
+    final doMoi = widget.caiDat.doMoiTuDienNhapLieuNhanh(i);
+    final mauNenGanDay =
+        doMoi == null ? null : (doMoi < 5 ? const Color(0xFF81C995) : const Color(0xFFCEEAD6));
+
+    final noiDung = Container(
+      color: mauNenGanDay,
+      child: InkWell(
+        onTap: () => _bamDong(i),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+          child: Row(
+            children: [
+              // (YÊU CẦU MỚI) Nút dấu + bên trái — bấm vào đây HOẶC bấm vào
+              // nội dung dòng đều cùng một hành động (`_bamDong`).
+              IconButton(
+                onPressed: () => _bamDong(i),
+                icon: const Icon(Icons.add_circle_outline, size: 18),
+                tooltip: 'Thêm nội dung vào dòng này',
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                padding: EdgeInsets.zero,
+              ),
+              const SizedBox(width: 2),
+              Expanded(
+                child: Text(
+                  rong ? '(trống)' : doanHienThi,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: false,
+                  style: TextStyle(
+                    color: rong ? const Color(0xFF9AA0A6) : null,
+                    fontStyle: rong ? FontStyle.italic : FontStyle.normal,
+                  ),
+                ),
+              ),
+              SizedBox(width: manHinhHep ? 4 : 10),
+              Text(
+                manHinhHep ? chuCai : 'Phím $chuCai',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: mauChuPhimTuDienNhapLieuNhanh(i),
+                  decoration: ganChanPhimTuDienNhapLieuNhanh(i)
+                      ? TextDecoration.underline
+                      : TextDecoration.none,
+                  decorationThickness: doDayGachChanTuDienNhapLieuNhanh,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (!nhapNhayCam) return noiDung;
+    // (YÊU CẦU MỚI) Dòng trống trên cùng của tab 2/tab 3 — phủ một lớp màu
+    // cam lên trên, độ mờ chạy theo `_nhapNhayCam.value` (0.0 → 1.0 → 0.0,
+    // mỗi chiều 3,5 giây, lặp mãi).
+    return AnimatedBuilder(
+      animation: _nhapNhayCam,
+      builder: (context, child) => Stack(
+        children: [
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Container(
+                color: Color.lerp(
+                  const Color(0x00FF9800),
+                  const Color(0xFFFF9800),
+                  _nhapNhayCam.value,
+                ),
+              ),
+            ),
+          ),
+          child!,
+        ],
+      ),
+      child: noiDung,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final manHinhHepBeNgang =
+        MediaQuery.sizeOf(context).width < _TrangSoanThaoState._nguongManHinhHep;
+    final ds = _chiSoTheoTab();
+    // (YÊU CẦU MỚI) Chỉ tab 2 ("hang")/tab 3 ("bangChuCai") có hiệu ứng nhấp
+    // nháy ở dòng trống trên cùng — tab "Gần đây" không có khái niệm "dòng
+    // trống" đáng nhấn mạnh (toàn dòng ĐÃ dùng).
+    final dongNhapNhay = _tab == 'ganDay' ? null : _dongTrongDauTien(ds);
+    final caoKhungDong = (MediaQuery.sizeOf(context).height - 420).clamp(100.0, 420.0);
+    final rongModal = (MediaQuery.sizeOf(context).width - 64).clamp(420.0, 1600.0);
+    final dongTrongChoNut = _dongTrongGanNhatChoNut;
+
+    return AlertDialog(
+      title: Row(
+        children: [
+          const Expanded(child: Text('Thêm nhanh vào từ điển nhập liệu nhanh')),
+          IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.close, color: Colors.red),
+            tooltip: 'Đóng',
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
+      ),
+      scrollable: true,
+      content: SizedBox(
+        width: rongModal,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // (YÊU CẦU MỚI) Thanh ngang hiển thị đoạn nguồn — y hệt cách
+            // hiển thị một dòng trong bảng 10 dòng lịch sử của Bộ nhớ tạm.
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F3F4),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                _doanNguon.replaceAll('\n', ' '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                TextButton.icon(
+                  onPressed: _copyNguon,
+                  icon: Icon(
+                    _vuaCopy ? Icons.check : Icons.copy_outlined,
+                    size: 16,
+                    color: _vuaCopy ? Colors.green.shade700 : null,
+                  ),
+                  label: Text(
+                    _vuaCopy ? 'Đã copy' : 'Copy',
+                    style: TextStyle(color: _vuaCopy ? Colors.green.shade700 : null),
+                  ),
+                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6)),
+                ),
+                TextButton.icon(
+                  onPressed: dongTrongChoNut == null ? null : () => _ghiVaoDong(dongTrongChoNut),
+                  icon: const Icon(Icons.flash_on_outlined, size: 16),
+                  label: Text(
+                    dongTrongChoNut == null
+                        ? 'Thêm nhanh vào Dòng trống gần nhất'
+                        : 'Thêm nhanh vào Dòng trống gần nhất '
+                            '(Phím ${chuCaiTuDienNhapLieuNhanh(dongTrongChoNut)})',
+                  ),
+                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _nutTab('ganDay', 'Gần đây - Phím 1', 'Gần đây (1)', manHinhHepBeNgang),
+                _nutTab('hang', 'Sắp xếp Q → M - Phím 2', 'Q → M (2)', manHinhHepBeNgang),
+                _nutTab('bangChuCai', 'Sắp xếp A → Z - Phím 3', 'A → Z (3)', manHinhHepBeNgang),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(_chuThichTab, style: TextStyle(fontSize: 12, color: _mauChuThichTab)),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: caoKhungDong,
+              child: ds.isEmpty
+                  ? const Center(
+                      child: Text(
+                        '(Chưa có dòng nào được dán gần đây)',
+                        style: TextStyle(color: Color(0xFF9AA0A6), fontStyle: FontStyle.italic),
+                      ),
+                    )
+                  : Scrollbar(
+                      controller: _cuonController,
+                      thumbVisibility: true,
+                      child: SingleChildScrollView(
+                        controller: _cuonController,
+                        child: Column(
+                          children: [
+                            for (final i in ds) _dong(i, nhapNhayCam: i == dongNhapNhay),
+                          ],
                         ),
                       ),
                     ),

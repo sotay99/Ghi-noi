@@ -306,20 +306,12 @@ List<VungDinhDangDoanVan> apDungChinhSuaChoDinhDang(
   return ketQua;
 }
 
-/// Hiển thị [doan] có áp dụng [vung] (rỗng thì chỉ là `Text` chữ thô) —
-/// dùng để xem trước định dạng ở các dòng trong modal cài đặt "Từ điển nhập
-/// liệu nhanh". KHÔNG dùng ở bảng 26 dòng để dán nhanh hay modal "Thay đổi
-/// thứ tự giữa các dòng" — những nơi đó vẫn hiển thị chữ thô như trước.
-Widget vanBanCoDinhDangTuDien(
-  String doan,
-  List<VungDinhDangDoanVan> vung,
-  TextStyle goc, {
-  int? maxLines,
-  TextOverflow? overflow,
-}) {
-  if (vung.isEmpty || doan.isEmpty) {
-    return Text(doan, style: goc, maxLines: maxLines, overflow: overflow);
-  }
+/// Dựng cây `TextSpan` của [doan] theo [vung] — phần dùng chung giữa
+/// [vanBanCoDinhDangTuDien] (bọc trong `RichText`, chỉ để NHÌN) và modal
+/// "Xem đầy đủ nội dung của dòng này" (bọc trong `SelectableText.rich`, để
+/// người dùng rê chuột CHỌN/COPY được) — tách riêng để không viết hai lần.
+TextSpan spanCoDinhDangTuDien(String doan, List<VungDinhDangDoanVan> vung, TextStyle goc) {
+  if (vung.isEmpty || doan.isEmpty) return TextSpan(text: doan, style: goc);
   final diem = <int>{0, doan.length};
   for (final v in vung) {
     diem.add(v.batDau.clamp(0, doan.length));
@@ -336,8 +328,25 @@ Widget vanBanCoDinhDangTuDien(
     }
     spans.add(TextSpan(text: doan.substring(a, b), style: style));
   }
+  return TextSpan(style: goc, children: spans);
+}
+
+/// Hiển thị [doan] có áp dụng [vung] (rỗng thì chỉ là `Text` chữ thô) —
+/// dùng để xem trước định dạng ở các dòng trong modal cài đặt "Từ điển nhập
+/// liệu nhanh". KHÔNG dùng ở bảng 26 dòng để dán nhanh hay modal "Thay đổi
+/// thứ tự giữa các dòng" — những nơi đó vẫn hiển thị chữ thô như trước.
+Widget vanBanCoDinhDangTuDien(
+  String doan,
+  List<VungDinhDangDoanVan> vung,
+  TextStyle goc, {
+  int? maxLines,
+  TextOverflow? overflow,
+}) {
+  if (vung.isEmpty || doan.isEmpty) {
+    return Text(doan, style: goc, maxLines: maxLines, overflow: overflow);
+  }
   return RichText(
-    text: TextSpan(style: goc, children: spans),
+    text: spanCoDinhDangTuDien(doan, vung, goc),
     maxLines: maxLines,
     overflow: overflow ?? TextOverflow.clip,
   );
