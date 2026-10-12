@@ -4027,7 +4027,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             for (var i = 0; i < _tiLeMocTraiDoanSo.length; i++)
               if (_doanSoMocTrai[i] != null && vpCao != null)
                 Positioned(
-                  left: 12,
+                  // (YÊU CẦU MỚI) Dời sang mép PHẢI — chỉ nhãn CHÍNH
+                  // ("Đoạn số: N" ở đáy màn hình, `_nhanDoanSo`) còn giữ
+                  // mép trái như cũ.
+                  right: 12,
                   top: vpCao * _tiLeMocTraiDoanSo[i] - 13,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -7704,6 +7707,30 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     await ghiAmTheDongHan();
     _dongBangDieuKhienGhiAmNeuMo();
     if (mounted) setState(() => _trinhGhiAmMo = false);
+    // (YÊU CẦU MỚI) Lưới an toàn — bấm quá nhanh có lúc khiến vị trí token
+    // "đang ghi âm" (`_viTriTokenDangGhiThe`) đọc được ở trên không còn
+    // khớp đúng văn bản thật nữa (lệch vài ký tự vì một chỉnh sửa khác xảy
+    // ra gần như đồng thời), nên nhánh xoá trong `_huyThangBanGhiDangDoDang`
+    // bỏ qua, để sót lại thẻ "đang ghi âm" ma. Rà soát lại TOÀN VĂN BẢN sau
+    // 1 giây, độc lập hẳn với toạ độ đã lưu — còn sót thẻ nào thì xoá nốt.
+    Future.delayed(const Duration(seconds: 1), _raSoatVaXoaTheDangGhiAmConSot);
+  }
+
+  /// Xem giải thích ở nơi gọi — quét `tenTokenDangGhiAm` còn sót lại trong
+  /// văn bản (không dựa vào toạ độ đã lưu) rồi xoá, CHỈ khi trình ghi âm
+  /// THẬT SỰ đã đóng (`!_trinhGhiAmMo`) — tránh xoá nhầm một token đang ghi
+  /// THẬT nếu người dùng vừa mở ghi âm mới lại trong đúng 1 giây đó.
+  void _raSoatVaXoaTheDangGhiAmConSot() {
+    if (!mounted || _trinhGhiAmMo) return;
+    final vb = _boDieuKhien.text;
+    final vt = vb.indexOf(tenTokenDangGhiAm);
+    if (vt < 0) return;
+    final kt = vt + tenTokenDangGhiAm.length;
+    final moi = vb.replaceRange(vt, kt, '');
+    _dieuChinhVungToanVanSauKhiSua(vt, tenTokenDangGhiAm.length, 0);
+    _dieuChinhLoiChinhTaSauKhiSua(vt, tenTokenDangGhiAm.length, 0, vanBanCu: vb, vanBanMoi: moi);
+    _ghiVaoO(moi, vt.clamp(0, moi.length));
+    _henLuu();
   }
 
   /// Xoá token "〔Đang chuyển N 🎙️ mm:ss〕" của đúng thẻ [soThe] khỏi văn bản
@@ -14674,7 +14701,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         // `coBoNhoTam: false` để không hiện trùng 2 lần.
         if (widget.caiDat.boNhoTamDanVanBanBat && coBoNhoTam) _nutBoNhoTamCongCu(),
         IconButton(
-          onPressed: () => setState(() => _anThanhDinhDang = !_anThanhDinhDang),
+          // (SỬA LỖI — "vùng chọn bị ẩn mất khi bấm abc/Làm việc với AI")
+          // Bấm nút này cũng giành tiêu điểm khỏi `_oChu` như mọi nút khác —
+          // Flutter chỉ vẽ màu tô vùng chọn khi ô ĐANG giữ tiêu điểm, nên
+          // tiêu điểm rời đi là màu tô biến mất (logic vẫn áp dụng đúng vào
+          // đúng vùng, chỉ MẮT không thấy). Xin lại tiêu điểm ngay sau khi
+          // đổi xong — cùng hàm đã dùng cho Copy/Cắt/Dán/All.
+          onPressed: () {
+            setState(() => _anThanhDinhDang = !_anThanhDinhDang);
+            _giuFocusOChuSauKhiBam();
+          },
           // Emoji "chữ" — các nút khác trong hai thanh này đều dùng
           // Material Icon (`Icon(IconData)`), nhưng không có icon Material
           // nào diễn tả đúng "thanh định dạng chữ"; dùng `Text` với cùng cỡ

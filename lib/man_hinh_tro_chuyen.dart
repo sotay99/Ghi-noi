@@ -1110,19 +1110,38 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   /// Xoá hẳn token của [soThe] (dùng khi bấm "Xoá bản này và Đóng" lúc thẻ
   /// CHƯA hoàn thành) hoặc khi chuyển hoá LỖI — không để kẹt lại mãi.
   void _xoaTheChoChuyenChat(int soThe) {
-    if (!mounted) return;
-    final id = _idTheChoChuyenChat.remove(soThe);
-    if (id == null) return;
-    final vb = _oNhap.text;
-    for (final g in ['Đang ghi âm', 'Đang chuyển']) {
-      final token = '〔🎙️ $g #$id〕';
-      final i = vb.indexOf(token);
-      if (i != -1) {
-        setState(() => _oNhap.text = vb.replaceRange(i, i + token.length, ''));
-        _oNhap.selection = TextSelection.collapsed(offset: i);
-        return;
+    if (mounted) {
+      final id = _idTheChoChuyenChat.remove(soThe);
+      if (id != null) {
+        final vb = _oNhap.text;
+        for (final g in ['Đang ghi âm', 'Đang chuyển']) {
+          final token = '〔🎙️ $g #$id〕';
+          final i = vb.indexOf(token);
+          if (i != -1) {
+            setState(() => _oNhap.text = vb.replaceRange(i, i + token.length, ''));
+            _oNhap.selection = TextSelection.collapsed(offset: i);
+            break;
+          }
+        }
       }
     }
+    // (YÊU CẦU MỚI) Lưới an toàn — bấm "Xoá bản này và Đóng" quá nhanh có
+    // lúc khiến tra `id` ở trên không khớp (lệch nhịp với lúc token được
+    // ghi), để sót lại thẻ "đang ghi âm" ma trong ô nhập chat. Rà soát lại
+    // sau 1 giây bằng chính HÌNH DẠNG token (không cần biết `id`) — còn sót
+    // cái nào thì xoá nốt.
+    Future.delayed(const Duration(seconds: 1), _raSoatVaXoaTheGhiAmConSotChat);
+  }
+
+  /// Xem giải thích ở [_xoaTheChoChuyenChat] — quét token "〔🎙️ Đang ghi âm
+  /// #N〕" còn sót trong ô nhập chat (không dựa vào `id` đã lưu) rồi xoá.
+  void _raSoatVaXoaTheGhiAmConSotChat() {
+    if (!mounted) return;
+    final vb = _oNhap.text;
+    final m = RegExp('〔🎙️ Đang ghi âm #\\d+〕').firstMatch(vb);
+    if (m == null) return;
+    setState(() => _oNhap.text = vb.replaceRange(m.start, m.end, ''));
+    _oNhap.selection = TextSelection.collapsed(offset: m.start);
   }
 
   /// (SỬA LỖI cũ) Chèn tại đúng vị trí con trỏ (hoặc thay vùng đang chọn)
