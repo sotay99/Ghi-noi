@@ -1999,6 +1999,40 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   final _boDieuKhien = _BoDieuKhienChinhTa();
   final _oChu = FocusNode();
   final _cuonVanBan = ScrollController();
+
+  /// (YÊU CẦU MỚI) Vị trí CUỘN (không phải vị trí con trỏ) mà người dùng
+  /// vừa rời đi của MỖI tệp — CHỈ trong phiên này (không ghi đĩa, F5/mở lại
+  /// app là mất, mặc định về 0 cho mọi tệp). Giới hạn 20 tệp gần nhất
+  /// (`Map` giữ đúng thứ tự thêm vào — xoá-rồi-thêm-lại mỗi lần ghi để mục
+  /// vừa dùng luôn nổi lên CUỐI, nên mục bị đẩy ra khi đầy luôn là mục ÍT
+  /// DÙNG GẦN ĐÂY NHẤT — xem `_ghiNhoViTriCuon`/`_phucHoiViTriCuon`).
+  static const _gioiHanTepNhoViTriCuon = 20;
+  final Map<String, double> _viTriCuonTheoTep = {};
+
+  /// Gọi NGAY TRƯỚC KHI rời khỏi [_ghiChuHienTai] (chuyển sang tệp khác) —
+  /// chụp lại vị trí cuộn hiện tại để lần quay lại tệp này còn nhớ.
+  void _ghiNhoViTriCuon() {
+    if (!_cuonVanBan.hasClients) return;
+    final id = _ghiChuHienTai.id;
+    _viTriCuonTheoTep.remove(id);
+    _viTriCuonTheoTep[id] = _cuonVanBan.offset;
+    while (_viTriCuonTheoTep.length > _gioiHanTepNhoViTriCuon) {
+      _viTriCuonTheoTep.remove(_viTriCuonTheoTep.keys.first);
+    }
+  }
+
+  /// Gọi NGAY SAU KHI mở một tệp — cuộn tới đúng vị trí đã nhớ của tệp đó
+  /// (nếu phiên này đã từng ghé qua), hoặc lên ĐẦU (0) nếu chưa — đợi một
+  /// khung hình để `ScrollController` biết chiều cao nội dung MỚI (nội
+  /// dung tệp cũ có thể dài/ngắn khác hẳn), tránh `jumpTo` tới một offset
+  /// vượt quá `maxScrollExtent` hiện có.
+  void _phucHoiViTriCuon(String id) {
+    final viTri = _viTriCuonTheoTep[id] ?? 0.0;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_cuonVanBan.hasClients) return;
+      _cuonVanBan.jumpTo(viTri.clamp(0.0, _cuonVanBan.position.maxScrollExtent));
+    });
+  }
   final _micro = SpeechToText();
 
   // -------------------------------------------------------------- tìm kiếm
@@ -4163,15 +4197,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final rawNoiDung = _ghiChuHienTai.noiDung;
     final (banDau, khoiDinhDang, khoiDinhDangThuCong) = _tachCacKhoiDinhDang(rawNoiDung);
 
+    // (YÊU CẦU MỚI) Mặc định con trỏ ở ĐẦU tệp (0), không phải cuối văn bản
+    // như trước — xem giải thích đầy đủ ở `_moGhiChu`.
     if (banDau.isNotEmpty) {
-      _ghiVaoO(banDau, banDau.length);
+      _ghiVaoO(banDau, 0);
     } else {
       // Ghi chú vừa tạo, chưa từng có ký tự nào — tự hiện chú thích ngay từ
       // đầu, y hệt như vừa bấm nút "i", để người dùng lần đầu biết mỗi nút
       // dùng để làm gì.
       _hienChuThich = true;
     }
-    _neo = banDau.length;
+    _neo = 0;
     _viTriDaKiemTraChinhTa = banDau.length;
     if (khoiDinhDang != null) _apDungDinhDangAi(khoiDinhDang);
     if (khoiDinhDangThuCong != null) _apDungDinhDangThuCong(khoiDinhDangThuCong);
@@ -4847,6 +4883,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final g = widget.kho.timGhiChu(id);
     if (g == null) return;
     _ganDauDaMoTepChoLichSu(id);
+    // (YÊU CẦU MỚI) Nhớ vị trí cuộn của tệp SẮP RỜI ĐI trước khi đổi — xem
+    // `_ghiNhoViTriCuon`. Gọi `_phucHoiViTriCuon` cho tệp MỚI ở cuối hàm.
+    _ghiNhoViTriCuon();
 
     setState(() {
       _ghiChuHienTai = g;
@@ -4901,6 +4940,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _viTriChoVietHoa = null;
 
     widget.kho.datGhiChuDangMo(id);
+    _phucHoiViTriCuon(id);
   }
 
   // ----------------------------------------------------------------- micro
