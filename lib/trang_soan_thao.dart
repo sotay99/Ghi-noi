@@ -14834,7 +14834,64 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         padding: EdgeInsets.zero,
       );
 
-  List<Widget> _dsNutCongCu({bool coDan = true, bool coBoNhoTam = true}) => [
+  /// (YÊU CẦU MỚI) Cuộn lên đầu/xuống cuối văn bản — opacity 50% (thấy mờ
+  /// mờ tên tệp phía sau nếu tên tệp dài, ở màn hẹp hai nút này đứng ngay
+  /// trước tên tệp). Rê chuột vào HOẶC bấm vào đều cuộn ngay (yêu cầu gốc:
+  /// hữu ích cho chuột — cảm ứng không có "rê vào" nên vẫn bấm được).
+  void _cuonVanBanLenDauTrang() {
+    if (!_cuonVanBan.hasClients) return;
+    _cuonVanBan.animateTo(0, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+  }
+
+  void _cuonVanBanXuongCuoiTrang() {
+    if (!_cuonVanBan.hasClients) return;
+    _cuonVanBan.animateTo(
+      _cuonVanBan.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
+  }
+
+  List<Widget> _haiNutCuonLenXuong() => [
+        Opacity(
+          opacity: 0.5,
+          child: MouseRegion(
+            onEnter: (_) => _cuonVanBanLenDauTrang(),
+            child: IconButton(
+              onPressed: _cuonVanBanLenDauTrang,
+              icon: const Icon(Icons.arrow_upward, size: 20),
+              tooltip: 'Cuộn lên đầu văn bản',
+              visualDensity: VisualDensity.compact,
+              constraints: _kichThuocNutTren,
+              padding: EdgeInsets.zero,
+            ),
+          ),
+        ),
+        Opacity(
+          opacity: 0.5,
+          child: MouseRegion(
+            onEnter: (_) => _cuonVanBanXuongCuoiTrang(),
+            child: IconButton(
+              onPressed: _cuonVanBanXuongCuoiTrang,
+              icon: const Icon(Icons.arrow_downward, size: 20),
+              tooltip: 'Cuộn xuống cuối văn bản',
+              visualDensity: VisualDensity.compact,
+              constraints: _kichThuocNutTren,
+              padding: EdgeInsets.zero,
+            ),
+          ),
+        ),
+      ];
+
+  /// [coCuonLenXuong]: `false` ở hàng DƯỚI của màn hẹp — hai nút cuộn lên/
+  /// xuống đã dời lên hàng TRÊN (cùng dòng tên tệp, cạnh "Dán") ở màn hẹp,
+  /// xem `build()`, không lặp lại ở đây.
+  List<Widget> _dsNutCongCu({
+    bool coDan = true,
+    bool coBoNhoTam = true,
+    bool coCuonLenXuong = true,
+  }) => [
+        if (coCuonLenXuong) ..._haiNutCuonLenXuong(),
         IconButton(
           onPressed: _lichSuLui.isEmpty ? null : _lui,
           icon: const Icon(Icons.undo, size: 22),
@@ -15586,6 +15643,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: Row(mainAxisSize: MainAxisSize.min, children: _haiNutThemVaoTuDien()),
                 ),
+              // (YÊU CẦU MỚI) Hai nút cuộn lên đầu/xuống cuối — màn hẹp dời
+              // lên đây (cạnh "Dán"), tên tệp dài thấy mờ mờ phía sau nhờ
+              // opacity 50%. Màn RẤT hẹp + có vùng chọn thật thì ẨN hẳn,
+              // nhường chỗ cho nút Xoá + 📖/📒 ở trên — CHỈ đúng trường hợp
+              // đó mới ẩn (màn hẹp bình thường có vùng chọn vẫn hiện).
+              if (!(ratHep && _hienHangCopyCutPaste()))
+                Row(mainAxisSize: MainAxisSize.min, children: _haiNutCuonLenXuong()),
               _nutDanCongCu(),
               if (widget.caiDat.boNhoTamDanVanBanBat) _nutBoNhoTamCongCu(),
             ],
@@ -15604,7 +15668,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                         alignment: Alignment.centerRight,
                         child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
-                          child: Row(children: _dsNutCongCu(coDan: false, coBoNhoTam: false)),
+                          child: Row(
+                            children: _dsNutCongCu(
+                              coDan: false,
+                              coBoNhoTam: false,
+                              coCuonLenXuong: false,
+                            ),
+                          ),
                         ),
                       ),
                     ),

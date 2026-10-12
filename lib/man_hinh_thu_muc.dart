@@ -97,6 +97,10 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   static const _nhipNhayNhayMs = 770;
   static const _tongGiayNhayNhay = 10;
 
+  /// (YÊU CẦU MỚI) Cuộn lên đầu/xuống cuối danh sách thư mục/tệp hiện tại
+  /// — xem `_haiNutCuonLenXuongThuMuc`.
+  final _cuonDanhSachThuMuc = ScrollController();
+
   void _danhDauMucMoi(Iterable<String> ids) {
     if (ids.isEmpty) return;
     final luc = DateTime.now();
@@ -174,8 +178,53 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     _tuKhoaTimKiemNho = _oTimKiemThuMuc.text;
     _oTimKiemThuMuc.dispose();
     _nhipNhayNhay?.cancel();
+    _cuonDanhSachThuMuc.dispose();
     super.dispose();
   }
+
+  /// Xem giải thích ở `_haiNutCuonLenXuongThuMuc`.
+  void _cuonDanhSachThuMucLenDau() {
+    if (!_cuonDanhSachThuMuc.hasClients) return;
+    _cuonDanhSachThuMuc.animateTo(0,
+        duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+  }
+
+  void _cuonDanhSachThuMucXuongCuoi() {
+    if (!_cuonDanhSachThuMuc.hasClients) return;
+    _cuonDanhSachThuMuc.animateTo(
+      _cuonDanhSachThuMuc.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
+  }
+
+  /// (YÊU CẦU MỚI) Hai nút cuộn lên đầu/xuống cuối danh sách — opacity 50%
+  /// (thấy mờ mờ tên thư mục cha phía sau nếu tên dài), đứng ngay bên trái
+  /// nút "Thêm ghi chú". Rê chuột vào HOẶC bấm vào đều cuộn ngay.
+  List<Widget> _haiNutCuonLenXuongThuMuc() => [
+        Opacity(
+          opacity: 0.5,
+          child: MouseRegion(
+            onEnter: (_) => _cuonDanhSachThuMucLenDau(),
+            child: IconButton(
+              onPressed: _cuonDanhSachThuMucLenDau,
+              icon: const Icon(Icons.arrow_upward, size: 20),
+              tooltip: 'Cuộn lên đầu danh sách',
+            ),
+          ),
+        ),
+        Opacity(
+          opacity: 0.5,
+          child: MouseRegion(
+            onEnter: (_) => _cuonDanhSachThuMucXuongCuoi(),
+            child: IconButton(
+              onPressed: _cuonDanhSachThuMucXuongCuoi,
+              icon: const Icon(Icons.arrow_downward, size: 20),
+              tooltip: 'Cuộn xuống cuối danh sách',
+            ),
+          ),
+        ),
+      ];
 
   /// (YÊU CẦU MỚI) Tên thư mục "Bộ nhớ nội bộ" — khác nhau giữa bản web
   /// (đọc từ Trình duyệt web) và bản APK/iOS (đọc thẳng từ máy).
@@ -1072,36 +1121,45 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   /// `AppBar` cũ (title/leading/actions), chỉ dời vào hẳn trong `body` làm
   /// dòng thứ BA, dưới thanh địa chỉ.
   Widget _dongTenThuMucVaNutThem({required bool laNgoiNhaChung}) {
+    // (YÊU CẦU MỚI) Nền xanh dương cho cả thanh — đổi luôn màu chữ/icon
+    // sang trắng để còn đọc được (trừ tên thư mục gốc, vẫn giữ đỏ nổi bật
+    // như cũ, đủ tương phản trên nền xanh).
     return Material(
       elevation: 1,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        child: Row(
-          children: [
-            if (_duongDan.isNotEmpty)
-              IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: _veThuMucCha,
-              ),
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(left: _duongDan.isEmpty ? 16 : 0),
-                child: Text(
-                  _tenThuMucHienTai,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w500,
-                    // (YÊU CẦU MỚI) Đứng ngay gốc Bộ nhớ nội bộ — chữ đỏ,
-                    // phân biệt với tên các thư mục con bên trong.
-                    color: _thuMucHienTaiId == thuMucGoc ? Colors.red.shade700 : null,
+      color: const Color(0xFF1A73E8),
+      child: IconTheme(
+        data: const IconThemeData(color: Colors.white),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: Row(
+            children: [
+              if (_duongDan.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: _veThuMucCha,
+                ),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(left: _duongDan.isEmpty ? 16 : 0),
+                  child: Text(
+                    _tenThuMucHienTai,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w500,
+                      // (YÊU CẦU MỚI) Đứng ngay gốc Bộ nhớ nội bộ — chữ đỏ,
+                      // phân biệt với tên các thư mục con bên trong.
+                      color: _thuMucHienTaiId == thuMucGoc
+                          ? Colors.red.shade100
+                          : Colors.white,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-            ),
             // (YÊU CẦU MỚI) "Ngôi nhà chung" chỉ để CHỌN một trong 3 bộ
             // nhớ — không có gì để thêm/sửa ở chính mức này.
             if (!laNgoiNhaChung) ...[
+              ..._haiNutCuonLenXuongThuMuc(),
               IconButton(
                 onPressed: _themGhiChu,
                 icon: const Icon(Icons.note_add_outlined),
@@ -1154,6 +1212,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
               ),
             ],
           ],
+          ),
         ),
       ),
     );
@@ -1491,6 +1550,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                       ),
                     )
                   : ListView(
+                      controller: _cuonDanhSachThuMuc,
                       children: [
                         for (final t in noiDung!.thuMucCon)
                           ListTile(
