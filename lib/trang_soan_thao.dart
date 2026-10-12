@@ -3738,6 +3738,46 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             padding: EdgeInsets.zero,
             onPressed: _bamNutTichChon,
           ),
+          // (YÊU CẦU MỚI) "Aa" — Hoán đổi chữ Hoa/chữ thường của vùng chọn,
+          // xem `_apDungHoanDoiChuHoaThuong`.
+          IconButton(
+            iconSize: 20,
+            tooltip: 'Hoán đổi chữ Hoa chữ thường',
+            icon: const Text('Aa', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            visualDensity: matDoNut,
+            constraints: kichThuocNut,
+            padding: EdgeInsets.zero,
+            onPressed: () => _apDungHoanDoiChuHoaThuong(),
+          ),
+          PopupMenuButton<int>(
+            tooltip: 'Chọn kiểu Hoa/thường',
+            icon: const Icon(Icons.arrow_drop_down, size: 18),
+            padding: EdgeInsets.zero,
+            onSelected: (kieu) => _apDungHoanDoiChuHoaThuong(kieuCoDinh: kieu),
+            itemBuilder: (ctx) {
+              final chon = _boDieuKhien.selection;
+              if (!chon.isValid || chon.isCollapsed) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (Navigator.of(ctx).canPop()) Navigator.of(ctx).pop();
+                  if (mounted) {
+                    hienThongBaoGiua(
+                      context,
+                      'Chọn vùng văn bản trước khi hoán đổi chữ Hoa chữ thường',
+                    );
+                  }
+                });
+                return const [
+                  PopupMenuItem<int>(enabled: false, child: Text('Chưa có vùng chọn')),
+                ];
+              }
+              return const [
+                PopupMenuItem(value: 0, child: Text('Viết Hoa chữ đầu tiên ở tất cả các từ')),
+                PopupMenuItem(value: 1, child: Text('Viết Hoa tất cả các ký tự')),
+                PopupMenuItem(value: 2, child: Text('Viết thường tất cả các ký tự')),
+                PopupMenuItem(value: 3, child: Text('Viết Hoa chữ đầu tiên của từ đầu tiên')),
+              ];
+            },
+          ),
           // Nút Ghim — luôn ở CUỐI. Ghim thì thanh này hết tự ẩn sau mỗi lần
           // bấm nút định dạng (xem `_dongThanhDinhDangNeuChuaGhim`). Bấm
           // chính nút Ghim thì KHÔNG tự ẩn thanh (khác các nút định dạng
@@ -4213,6 +4253,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (khoiDinhDangThuCong != null) _apDungDinhDangThuCong(khoiDinhDangThuCong);
 
     _khoiTaoMicro();
+    // (YÊU CẦU MỚI) Màn hình RỘNG cả về chiều ngang LẪN chiều cao (máy tính
+    // bảng 12 inch trở lên, hoặc PC) — tự hiện VÀ ghim sẵn thanh định dạng
+    // ngay từ lúc vào app, không cần tự bấm nút ghim mỗi lần. Đợi khung
+    // hình đầu tiên vì `MediaQuery` lúc `initState` chưa chắc đã có kích
+    // thước MÀN HÌNH THẬT cuối cùng.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _tuGhimThanhDinhDangNeuManHinhLon();
+    });
     // Lắng nghe TOÀN CỤC (không phụ thuộc widget nào đang giữ tiêu điểm) —
     // phím tắt phải hoạt động kể cả đang gõ dở trong ô văn bản.
     HardwareKeyboard.instance.addHandler(_khiPhimTatMicro);
@@ -11655,6 +11703,71 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     return phanChu.trim().isEmpty;
   }
 
+  /// (YÊU CẦU MỚI) Chu kỳ hiện tại của nút "Aa" — mỗi lần bấm ĐƠN GIẢN (không
+  /// qua menu thả xuống) dùng đúng kiểu này rồi tăng lên 1 (mod 4), luân
+  /// phiên qua lại giữa 4 kiểu — xem `_apDungHoanDoiChuHoaThuong`.
+  int _chuKyHoanDoiChuHoa = 0;
+
+  /// Áp một trong 4 kiểu Hoa/thường lên vùng chọn hiện tại:
+  /// 0 = Viết hoa chữ đầu MỖI TỪ; 1 = Viết hoa TẤT CẢ; 2 = Viết thường TẤT
+  /// CẢ; 3 = Viết hoa chữ đầu CỦA TỪ ĐẦU TIÊN (những từ sau viết thường).
+  /// [kieuCoDinh] khác `null` khi bấm chọn trực tiếp từ menu thả xuống —
+  /// không đụng tới [_chuKyHoanDoiChuHoa] trong trường hợp đó, hai cách
+  /// bấm (nút chính/menu) độc lập hẳn với nhau. Không có vùng chọn (hoặc
+  /// vùng chọn rỗng) thì chỉ báo nhanh, không làm gì — không có "chữ thô"
+  /// nào để mà xoá sạch dù kết quả không đổi 1-1 ký tự (đổi hoa/thường
+  /// không bao giờ đổi ĐỘ DÀI chuỗi), nên không cần dời/co giãn `dinhDang`
+  /// hay bất kỳ vùng AI nào khác — chỉ thay THẲNG đúng đoạn chữ đó.
+  void _apDungHoanDoiChuHoaThuong({int? kieuCoDinh}) {
+    final chon = _boDieuKhien.selection;
+    if (!chon.isValid || chon.isCollapsed) {
+      hienThongBaoGiua(
+        context,
+        'Chọn vùng văn bản trước khi hoán đổi chữ Hoa chữ thường',
+      );
+      return;
+    }
+    final kieu = kieuCoDinh ?? (_chuKyHoanDoiChuHoa % 4);
+    if (kieuCoDinh == null) _chuKyHoanDoiChuHoa++;
+    final batDau = chon.start, ketThuc = chon.end;
+    final vb = _boDieuKhien.text;
+    final doan = vb.substring(batDau, ketThuc);
+    final doanMoi = _doiHoaThuongTheoKieu(doan, kieu);
+    if (doanMoi == doan) return;
+    _luuDiemMoc();
+    final moi = vb.replaceRange(batDau, ketThuc, doanMoi);
+    _ghiVaoO(moi, ketThuc);
+    _boDieuKhien.selection = TextSelection(baseOffset: batDau, extentOffset: ketThuc);
+    _henLuu();
+  }
+
+  String _doiHoaThuongTheoKieu(String doan, int kieu) {
+    switch (kieu) {
+      case 0:
+        final buf = StringBuffer();
+        var dauTu = true;
+        for (final r in doan.runes) {
+          final ch = String.fromCharCode(r);
+          final trang = ch.trim().isEmpty;
+          buf.write(dauTu && !trang ? ch.toUpperCase() : ch.toLowerCase());
+          dauTu = trang;
+        }
+        return buf.toString();
+      case 1:
+        return doan.toUpperCase();
+      case 2:
+        return doan.toLowerCase();
+      default:
+        final thuong = doan.toLowerCase();
+        for (var i = 0; i < thuong.length; i++) {
+          if (thuong[i].trim().isNotEmpty) {
+            return thuong.substring(0, i) + thuong[i].toUpperCase() + thuong.substring(i + 1);
+          }
+        }
+        return thuong;
+    }
+  }
+
   /// Nút "Tích chọn" (✅) ở thanh định dạng thủ công — TOGGLE theo từng đoạn
   /// văn mà con trỏ/vùng chọn hiện đang chạm tới (vùng chọn trải nhiều đoạn
   /// thì áp dụng độc lập cho từng đoạn — kể cả đoạn đầu/cuối chưa được chọn
@@ -14642,6 +14755,22 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// lại ngay, TRỪ KHI đã ghim (`widget.caiDat.ghimThanhDinhDang`) — xem
   /// `_dongThanhDinhDangNeuChuaGhim`.
   bool _anThanhDinhDang = true;
+
+  /// (YÊU CẦU MỚI) Màn hình rộng CẢ HAI chiều (ngang VÀ cao) — máy tính
+  /// bảng 12 inch trở lên hoặc PC — tự hiện thanh định dạng VÀ tự ghim
+  /// (nút ghim sáng lên) ngay khi vào app, không cần người dùng tự bấm.
+  /// Chỉ cần ĐỦ rộng ở một lần vào app là ghim lâu dài (ghi vào
+  /// `CaiDat`) — những lần sau đọc lại đúng giá trị đã ghim như mọi cài
+  /// đặt khác, không tự ý bỏ ghim nếu sau đó họ thu nhỏ cửa sổ.
+  void _tuGhimThanhDinhDangNeuManHinhLon() {
+    final kt = MediaQuery.sizeOf(context);
+    if (kt.width < 900 || kt.height < 900) return;
+    if (_anThanhDinhDang) setState(() => _anThanhDinhDang = false);
+    if (!widget.caiDat.ghimThanhDinhDang) {
+      widget.caiDat.datGhimThanhDinhDang(true);
+      setState(() {});
+    }
+  }
 
   /// Gọi ngay sau khi một nút trong thanh định dạng vừa kích hoạt xong logic
   /// của nó (áp định dạng, tích chọn...) — tự ẩn thanh lại, trừ khi người
