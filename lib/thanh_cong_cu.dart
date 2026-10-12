@@ -62,7 +62,12 @@ class ThanhCongCu extends StatelessWidget {
     this.thayNutBangCopyCutPaste = false,
     this.hangCopyCutPaste,
     required this.khiMoMenuCanReset,
+    required this.khiDongMenuAI,
   });
+
+  /// (SỬA LỖI — vùng chọn văn bản "biến mất" khi mở menu "Làm việc với AI")
+  /// Xem chú thích đầy đủ ở `_NutAIMenu.khiDongMenu` — truyền thẳng xuống.
+  final VoidCallback khiDongMenuAI;
 
   /// (YÊU CẦU MỚI) Gọi NGAY khi một trong ba menu thả xuống (Làm việc với
   /// AI/Thêm lựa chọn/Tài khoản và Cài đặt) vừa mở — ép màn hình đo lại và
@@ -375,6 +380,7 @@ class ThanhCongCu extends StatelessWidget {
                                       khiBamDoiCheDoLamViec: khiBamDoiCheDoLamViec,
                                       khoaMenuAI: khoaMenuAI,
                                       khiMoMenu: khiMoMenuCanReset,
+                                      khiDongMenu: khiDongMenuAI,
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -420,6 +426,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamDoiCheDoLamViec: khiBamDoiCheDoLamViec,
                               khoaMenuAI: khoaMenuAI,
                               khiMoMenu: khiMoMenuCanReset,
+                              khiDongMenu: khiDongMenuAI,
                             ),
                           ),
                           _NutCoChuThich(
@@ -1654,10 +1661,18 @@ class _NutAIMenu extends StatelessWidget {
     required this.khiBamDoiCheDoLamViec,
     required this.khoaMenuAI,
     required this.khiMoMenu,
+    required this.khiDongMenu,
   });
 
   /// Xem `ThanhCongCu.khiMoMenuCanReset`.
   final VoidCallback khiMoMenu;
+
+  /// (SỬA LỖI — vùng chọn văn bản "biến mất" khi mở menu này) Mở menu làm ô
+  /// soạn thảo MẤT tiêu điểm, nên Flutter ngừng vẽ màu nổi vùng chọn (vẫn
+  /// giữ ĐÚNG vùng chọn trong state, chỉ là KHÔNG VẼ) — gọi lại ngay sau khi
+  /// chọn một mục, để tiêu điểm (và màu vẽ vùng chọn) quay lại như cũ. Dùng
+  /// lại ĐÚNG hàm `_giuFocusOChuSauKhiBam` đã có sẵn cho Copy/Cắt/Dán/All.
+  final VoidCallback khiDongMenu;
 
   final bool rong;
   final VoidCallback khiBamCaiDatKiemTraToanVan;
@@ -1761,6 +1776,7 @@ class _NutAIMenu extends StatelessWidget {
             if (gia == 4) khiBamVietLaiToanVan();
             if (gia == 1) khiBamTroChuyenVeVanBan();
             if (gia == 12) khiBamDoiCheDoLamViec();
+            khiDongMenu();
           },
           // (VIỆC 3) Xem chú thích ở `_NutThemMenu` — cùng cơ chế: một
           // `ScrollController` mới mỗi lần menu mở, dùng chung giữa nút cuộn

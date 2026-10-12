@@ -16266,6 +16266,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 ),
                 khiBamBoPhimNhanh: _bamNutBoPhimNhanhCamUng,
                 khiMoMenuCanReset: _resetManHinhTruocKhiMoMenu,
+                khiDongMenuAI: _giuFocusOChuSauKhiBam,
                 boPhimNhanhDangMo: _boPhimNhanhCamUngMo,
                 noiBatBoPhimNhanh:
                     kIsWeb && (_thietBiHienTai == ThietBi.android || _thietBiHienTai == ThietBi.iphone),
