@@ -50,7 +50,9 @@ class _UngDungFlowriteWebDayDuState extends State<UngDungFlowriteWebDayDu> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flowrite — bản đầy đủ trên Web',
+      // (YÊU CẦU MỚI) Tên hiện ở tab trình duyệt — 3 emoji: Đám mây/Cuốn
+      // sách đang mở/Tay cầm bút viết.
+      title: 'Flowrite - ☁️📖✍️',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,

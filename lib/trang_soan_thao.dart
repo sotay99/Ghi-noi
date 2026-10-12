@@ -1364,6 +1364,14 @@ class _BoDieuKhienChinhTa extends TextEditingController {
   /// vì hết hiệu ứng thì chữ đã ở trong [text] rồi, không cần theo dõi nữa.
   final List<_VungDauCauMoi> dauCauMoi = [];
 
+  /// (YÊU CẦU MỚI) Vùng vừa được dán từ "Bộ nhớ tạm để dán văn bản" hoặc
+  /// "Từ điển nhập liệu nhanh" — nhấp nháy NỀN 3 giây để người dùng dễ thấy
+  /// đoạn vừa chèn vào. TÁI DÙNG đúng kiểu [_VungDauCauMoi] (cùng khuôn
+  /// batDau/ketThuc/sangMau/henNhapNhay) vì không cần thêm trường gì khác —
+  /// tách DANH SÁCH riêng (không gộp chung vào [dauCauMoi]) để không lẫn
+  /// với hiệu ứng dấu câu AI, dù lớp dữ liệu dùng chung được.
+  final List<_VungDauCauMoi> vungVuaDanTu = [];
+
   /// (VIỆC 4) Vùng đang chạy hiệu ứng nhấp nháy 1 giây của "Thay chỗ này"/
   /// "Tất cả" — cùng kiểu "hiệu ứng tạm thời" như `dauCauMoi` ở trên, không
   /// phải nguồn sự thật lâu dài.
@@ -1412,6 +1420,9 @@ class _BoDieuKhienChinhTa extends TextEditingController {
       x.henNhapNhay?.cancel();
     }
     for (final d in dauCauMoi) {
+      d.henNhapNhay?.cancel();
+    }
+    for (final d in vungVuaDanTu) {
       d.henNhapNhay?.cancel();
     }
     for (final v in hieuUngThayThe) {
@@ -1605,6 +1616,18 @@ class _BoDieuKhienChinhTa extends TextEditingController {
         batDau: d.batDau,
         ketThuc: d.ketThuc,
         style: TextStyle(backgroundColor: Colors.blue.shade200),
+      ));
+    }
+
+    // (YÊU CẦU MỚI) Vùng vừa dán từ Bộ nhớ tạm/Từ điển nhập liệu nhanh —
+    // nhấp nháy nền vàng đậm 3 giây, cùng cách vẽ với `dauCauMoi` ở trên.
+    for (final d in vungVuaDanTu) {
+      if (d.batDau < 0 || d.ketThuc > vb.length || d.batDau >= d.ketThuc) continue;
+      if (!d.sangMau) continue;
+      vung.add(_VungVe(
+        batDau: d.batDau,
+        ketThuc: d.ketThuc,
+        style: TextStyle(backgroundColor: Colors.amber.shade400),
       ));
     }
 
@@ -8690,6 +8713,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     _giuFocusOChuSauKhiBam();
     _cuonToiConTroNeuCan();
+    // (YÊU CẦU MỚI) Nhấp nháy nền 3 giây đúng đoạn vừa dán — giúp người
+    // dùng dễ thấy đoạn nào vừa được chèn vào.
+    _batNhapNhayVungVuaDanTu(batDau, batDau + chen.length);
     if (mounted) hienThongBaoGiua(context, thongBao, ganTren: true);
   }
 
@@ -11116,6 +11142,28 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _boDieuKhien.veLai();
   }
 
+  /// (YÊU CẦU MỚI) Hiệu ứng nhấp nháy NỀN đoạn [batDau, ketThuc) vừa dán từ
+  /// Bộ nhớ tạm/Từ điển nhập liệu nhanh — "mất đi hiện ra" nhanh, liên tục
+  /// đúng 3 giây (15 nhịp × 200ms) rồi tự dọn, cùng khuôn
+  /// `_batNhapNhayDauCauMoi` ở trên.
+  void _batNhapNhayVungVuaDanTu(int batDau, int ketThuc) {
+    if (batDau >= ketThuc) return;
+    final d = _VungDauCauMoi(batDau: batDau, ketThuc: ketThuc);
+    _boDieuKhien.vungVuaDanTu.add(d);
+    d.sangMau = true;
+    var dem = 0;
+    d.henNhapNhay = Timer.periodic(const Duration(milliseconds: 200), (t) {
+      dem++;
+      d.sangMau = !d.sangMau;
+      if (dem >= 15) {
+        t.cancel();
+        _boDieuKhien.vungVuaDanTu.remove(d);
+      }
+      if (mounted) _boDieuKhien.veLai();
+    });
+    _boDieuKhien.veLai();
+  }
+
   /// Người dùng bấm vào đoạn ĐỀ XUẤT (xanh) cạnh một đoạn "không phù hợp".
   /// Đổi toạ độ MÀN HÌNH (nơi ngón tay vừa chạm) thành đúng vị trí ký tự
   /// trong bài, rồi đặt con trỏ ngay đó — dùng `RenderEditable
@@ -12714,6 +12762,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 dong('Ctrl + X', tim('Ctrl+X')),
                 dong('Ctrl + C', tim('Ctrl+C')),
                 dong('Ctrl + V', tim('Ctrl+V')),
+                // (YÊU CẦU MỚI) Chỉ LIỆT KÊ — phím tắt này do HỆ ĐIỀU HÀNH/
+                // TRÌNH DUYỆT xử lý sẵn, app không tự viết logic riêng cho nó.
+                dong('Ctrl + Shift + V', 'Dán chữ thô, không kèm định dạng văn bản'),
                 dong('Ctrl + Enter', tim('Ctrl+Enter')),
                 deMuc('Định dạng văn bản'),
                 dong('Ctrl + B', tim('Ctrl+B')),

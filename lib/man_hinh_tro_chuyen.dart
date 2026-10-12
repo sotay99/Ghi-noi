@@ -1841,6 +1841,26 @@ class _TheDinhKem extends StatelessWidget {
   }
 }
 
+/// (YÊU CẦU MỚI) Bỏ các ký tự đánh dấu markdown-lite mà AI trả về (`#`/`##`/
+/// `###` tiêu đề, `**đậm**`, `*nghiêng*`/`_nghiêng_`, `` `mã` ``, gạch đầu
+/// dòng `- `/`* `) — CÙNG đúng những mẫu [_spanDongMarkdown]/[_spanDoanVanBan]
+/// dùng để hiển thị, chỉ khác là ở đây BỎ hẳn ký tự đánh dấu thay vì áp kiểu
+/// chữ — giữ lại đúng chữ thô bên trong. Dùng khi Sao chép tin nhắn AI
+/// (`_TinNhanAi`), để bộ nhớ đệm không dính ký tự định dạng ngầm.
+String _boDinhDangMarkdownNgam(String vanBan) {
+  return vanBan.split('\n').map((dong) {
+    var d = dong;
+    final de = RegExp(r'^(\s*)#{1,3}\s+').firstMatch(d);
+    if (de != null) d = '${de.group(1)}${d.substring(de.end)}';
+    d = d.replaceFirstMapped(RegExp(r'^(\s*)[-*]\s+'), (m) => '${m.group(1)}• ');
+    d = d.replaceAllMapped(
+      RegExp(r'\*\*(.+?)\*\*|\*(.+?)\*|_(.+?)_|`(.+?)`'),
+      (m) => m.group(1) ?? m.group(2) ?? m.group(3) ?? m.group(4) ?? '',
+    );
+    return d;
+  }).join('\n');
+}
+
 /// Sao chép [chu] vào bộ nhớ đệm của thiết bị, kèm thông báo ngắn — dùng
 /// CHUNG cho mọi nút "Sao chép" trong màn hình này (bong bóng người dùng,
 /// tin nhắn AI, khung kết quả riêng từng khối ```...```).
@@ -1982,7 +2002,7 @@ class _TinNhanAi extends StatelessWidget {
           _NutHanhDongNho(
             icon: Icons.copy,
             tooltip: 'Sao chép',
-            onTap: () => _saoChep(context, chu),
+            onTap: () => _saoChep(context, _boDinhDangMarkdownNgam(chu)),
           ),
       ],
     );

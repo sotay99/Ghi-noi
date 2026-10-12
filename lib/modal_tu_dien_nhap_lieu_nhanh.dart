@@ -134,7 +134,15 @@ class _ManHinhTuDienNhapLieuNhanhState
   /// lại) VÀ lưu lâu dài vào `CaiDat`. Dùng chung cho cả đường gõ tay
   /// ([_doiDong]) lẫn đường dán ([_doiDongKemDinhDang]).
   void _ganDinhDang(int i, List<VungDinhDangDoanVan> vung) {
-    _dinhDangLive[i].value = vung;
+    // (SỬA LỖI — nút "Xem đầy đủ..." không hiện/ẩn ngay lập tức) `List` so
+    // `==` theo DANH TÍNH (không theo phần tử) — khi [vung] tình cờ là
+    // CHÍNH xác cùng tham chiếu với giá trị cũ (ví dụ cả hai đều là danh
+    // sách rỗng trả về sớm từ `apDungChinhSuaChoDinhDang`), gán thẳng vào
+    // `ValueNotifier.value` bị nó tự so sánh thấy "giống" rồi BỎ QUA
+    // `notifyListeners` — nút ẩn/hiện và modal xem đầy đủ không vẽ lại kịp,
+    // phải đợi lần gõ KẾ TIẾP mới thấy đúng. Luôn bọc một danh sách MỚI để
+    // chắc chắn khác tham chiếu, ép notify mỗi lần gọi.
+    _dinhDangLive[i].value = List.of(vung);
     widget.caiDat.datDinhDangTuDienNhapLieuNhanh(
       i,
       vung.isEmpty ? null : jsonEncode(vung.map((v) => v.toJson()).toList()),
