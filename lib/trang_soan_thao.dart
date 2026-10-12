@@ -4728,6 +4728,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         builder: (_) => ManHinhThuMuc(
           kho: widget.kho,
           idGhiChuDangMo: _ghiChuHienTai.id,
+          caiDat: widget.caiDat,
         ),
       ),
     );
@@ -4758,18 +4759,24 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// đúng THỨ TỰ hiển thị của `ManHinhThuMuc` — TÁI DÙNG đúng
   /// `KhoDuLieu.noiDungThuMuc` (nguồn thứ tự DUY NHẤT, sắp theo tên không
   /// phân biệt hoa/thường), không tự bịa thứ tự khác.
-  List<GhiChuFile> _dsGhiChuCungThuMuc() =>
-      widget.kho.noiDungThuMuc(_ghiChuHienTai.chaId).ghiChuCon;
+  List<GhiChuFile> _dsGhiChuCungThuMuc() => widget.kho
+      .noiDungThuMuc(
+        _ghiChuHienTai.chaId,
+        nguoc: widget.caiDat.sapXepNguoc(_ghiChuHienTai.chaId),
+      )
+      .ghiChuCon;
 
-  /// (VIỆC 6b) "Tệp trước"/[buoc] = -1, "Tệp sau"/[buoc] = 1. Không có tệp
-  /// trước/sau (đang ở đầu/cuối danh sách) thì không làm gì — ưu tiên đơn
-  /// giản, tránh phức tạp hoá bằng thông báo riêng.
+  /// (VIỆC 6b) "Tệp trước"/[buoc] = -1, "Tệp sau"/[buoc] = 1. (YÊU CẦU MỚI)
+  /// KHÔNG còn dừng ở đầu/cuối — đi "vòng tròn khép kín": từ tệp đầu bấm
+  /// "Tệp trước" nhảy tới tệp CUỐI, từ tệp cuối bấm "Tệp sau" nhảy về tệp
+  /// ĐẦU (xem `_nutDieuHuongTep`, tô nền đỏ nhạt đúng nút đang ở biên đó).
+  /// Chỉ liệt hẳn khi thư mục CHỈ CÓ một tệp (không có gì khác để nhảy tới).
   Future<void> _chuyenTepTrongThuMuc(int buoc) async {
     final ds = _dsGhiChuCungThuMuc();
+    if (ds.length <= 1) return;
     final viTriHienTai = ds.indexWhere((g) => g.id == _ghiChuHienTai.id);
     if (viTriHienTai < 0) return;
-    final viTriMoi = viTriHienTai + buoc;
-    if (viTriMoi < 0 || viTriMoi >= ds.length) return;
+    final viTriMoi = (viTriHienTai + buoc) % ds.length;
     final tepMoi = ds[viTriMoi];
 
     // Lưu ghi chú đang mở TRƯỚC KHI chuyển — đúng luồng `_moManHinhThuMuc`
@@ -14414,7 +14421,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// đơn giản nhất mà không lỗi.
   static const _canhNutDieuHuongTep = 34.0;
 
-  Widget _nutVuongDieuHuongTep(IconData icon, String nhan, VoidCallback? khiBam) {
+  Widget _nutVuongDieuHuongTep(
+    IconData icon,
+    String nhan,
+    VoidCallback? khiBam, {
+    bool oBienGioi = false,
+  }) {
     return Tooltip(
       message: nhan,
       child: InkWell(
@@ -14424,7 +14436,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           height: _canhNutDieuHuongTep,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: oBienGioi ? Colors.red.shade50 : Colors.white,
             border: Border.all(color: const Color(0xFFDADCE0)),
           ),
           child: Icon(
@@ -14565,10 +14577,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // vùng chọn thật — không còn thay chỗ 4 nút điều hướng tệp ở đây nữa,
     // tránh hiện ra CÙNG LÚC ở cả hai nơi (lỗi người dùng báo). 4 nút điều
     // hướng tệp giờ LUÔN hiện, không đổi theo vùng chọn.
+    //
+    // (YÊU CẦU MỚI) Hai nút này KHÔNG còn bị xám/liệt ở đầu/cuối danh sách
+    // nữa — bấm ở biên thì NHẢY VÒNG (xem `_chuyenTepTrongThuMuc`), và nút
+    // đang ở đúng biên đó đổi nền đỏ nhạt để báo hiệu. Chỉ liệt hẳn khi thư
+    // mục CHỈ CÓ một tệp (không có gì khác để nhảy tới).
     final ds = _dsGhiChuCungThuMuc();
     final viTriHienTai = ds.indexWhere((g) => g.id == _ghiChuHienTai.id);
-    final coTruoc = viTriHienTai > 0;
-    final coSau = viTriHienTai >= 0 && viTriHienTai < ds.length - 1;
+    final coNhieuHonMotTep = ds.length > 1;
+    final oDauDanhSach = viTriHienTai == 0;
+    final oCuoiDanhSach = viTriHienTai == ds.length - 1;
     return Padding(
       padding: const EdgeInsets.only(left: 4),
       child: Row(
@@ -14579,12 +14597,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           _nutVuongDieuHuongTep(
             Icons.arrow_back,
             'Tệp trước',
-            coTruoc ? () => _chuyenTepTrongThuMuc(-1) : null,
+            coNhieuHonMotTep ? () => _chuyenTepTrongThuMuc(-1) : null,
+            oBienGioi: coNhieuHonMotTep && oDauDanhSach,
           ),
           _nutVuongDieuHuongTep(
             Icons.arrow_forward,
             'Tệp sau',
-            coSau ? () => _chuyenTepTrongThuMuc(1) : null,
+            coNhieuHonMotTep ? () => _chuyenTepTrongThuMuc(1) : null,
+            oBienGioi: coNhieuHonMotTep && oCuoiDanhSach,
           ),
         ],
       ),

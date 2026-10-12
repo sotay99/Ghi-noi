@@ -432,6 +432,26 @@ class CaiDat {
     await luuDinhDangTuDienNhapLieuNhanh();
   }
 
+  /// (YÊU CẦU MỚI) Chiều sắp xếp tên (A→Z/Z→A) của CÂY THƯ MỤC — lưu riêng
+  /// theo TỪNG thư mục (khoá là id thư mục, hoặc id "ngôi nhà chung"/gốc) —
+  /// `true` = Z→A (đảo ngược), vắng mặt (không có khoá) = A→Z (mặc định).
+  /// Thư mục luôn đứng TRÊN tệp bất kể chiều nào — chỉ thứ tự BÊN TRONG
+  /// từng nhóm bị đảo.
+  Map<String, bool> sapXepNguocTheoThuMuc = {};
+  static const _khoaSapXepNguocThuMuc = 'ghi_noi_sap_xep_nguoc_thu_muc';
+
+  bool sapXepNguoc(String thuMucId) => sapXepNguocTheoThuMuc[thuMucId] ?? false;
+
+  Future<void> datSapXepNguoc(String thuMucId, bool nguoc) async {
+    if (nguoc) {
+      sapXepNguocTheoThuMuc[thuMucId] = true;
+    } else {
+      sapXepNguocTheoThuMuc.remove(thuMucId);
+    }
+    final kho = await SharedPreferences.getInstance();
+    await kho.setString(_khoaSapXepNguocThuMuc, jsonEncode(sapXepNguocTheoThuMuc));
+  }
+
   /// Giải mã định dạng của dòng [i] thành danh sách vùng — rỗng nếu dòng đó
   /// không có định dạng/dữ liệu hỏng.
   List<VungDinhDangDoanVan> docDinhDangTuDienNhapLieuNhanh(int i) {
@@ -570,6 +590,21 @@ class CaiDat {
               (t) => t!.name == tenThietBiDaLuu,
               orElse: () => null,
             );
+    sapXepNguocTheoThuMuc = {};
+    final sapXepRaw = kho.getString(_khoaSapXepNguocThuMuc);
+    if (sapXepRaw != null) {
+      try {
+        final m = jsonDecode(sapXepRaw);
+        if (m is Map) {
+          sapXepNguocTheoThuMuc = {
+            for (final e in m.entries)
+              if (e.value == true) e.key as String: true,
+          };
+        }
+      } catch (_) {
+        // Dữ liệu hỏng — giữ A→Z cho mọi thư mục, không ném lỗi làm hỏng app.
+      }
+    }
   }
 
   /// `null` = xoá lựa chọn thủ công, quay về tự đoán.

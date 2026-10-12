@@ -30,6 +30,28 @@ String? loiTenKhongHopLe(String tenTho) {
   return null;
 }
 
+/// (YÊU CẦU MỚI) So sánh 2 tên theo thứ tự "tự nhiên" — chuỗi số bên trong
+/// (ví dụ "10") so sánh theo GIÁ TRỊ số, không so theo từng CHỮ SỐ một
+/// (tránh lỗi "tệp 10" bị xếp ngay sau "tệp 1" vì so chuỗi thô coi '1' <
+/// '2' trước khi kịp thấy chữ số thứ hai). Tách tên thành từng đoạn liên
+/// tục TOÀN SỐ hoặc TOÀN KHÔNG-SỐ, so khớp đoạn-với-đoạn theo đúng thứ tự,
+/// đoạn số so bằng giá trị `int`, đoạn chữ so như chuỗi thường (không phân
+/// biệt hoa/thường).
+int soSanhTenTuNhien(String a, String b) {
+  final re = RegExp(r'\d+|\D+');
+  final la = re.allMatches(a.toLowerCase()).map((m) => m.group(0)!).toList();
+  final lb = re.allMatches(b.toLowerCase()).map((m) => m.group(0)!).toList();
+  final n = la.length < lb.length ? la.length : lb.length;
+  for (var i = 0; i < n; i++) {
+    final ca = la[i], cb = lb[i];
+    final soA = int.tryParse(ca);
+    final soB = int.tryParse(cb);
+    final kq = (soA != null && soB != null) ? soA.compareTo(soB) : ca.compareTo(cb);
+    if (kq != 0) return kq;
+  }
+  return la.length.compareTo(lb.length);
+}
+
 class KhoDuLieu {
   static const _khoaDuLieu = 'ghi_noi_cay_du_lieu';
   static const _khoaGhiChuDangMo = 'ghi_noi_ghi_chu_dang_mo';
@@ -121,20 +143,26 @@ class KhoDuLieu {
   }
 
   /// Danh sách con trực tiếp của một thư mục: thư mục con và ghi chú, mỗi
-  /// loại sắp riêng theo tên.
+  /// loại sắp riêng theo tên — THEO ĐÚNG THỨ TỰ CON SỐ (xem [soSanhTenTuNhien],
+  /// "tệp 2" phải đứng trước "tệp 10", không phải so chuỗi ký tự thô). [nguoc]
+  /// = `true` đảo ngược (Z→A) — CHỈ đảo thứ tự BÊN TRONG mỗi loại, thư mục
+  /// vẫn luôn đứng trước ghi chú trong [thuMucCon]/[ghiChuCon] (nơi gọi tự ghép
+  /// hai danh sách này theo đúng thứ tự đó, xem `man_hinh_thu_muc.dart`).
   ({List<ThuMuc> thuMucCon, List<GhiChuFile> ghiChuCon}) noiDungThuMuc(
-    String chaId,
-  ) {
+    String chaId, {
+    bool nguoc = false,
+  }) {
     // (THÙNG RÁC) Mục đang nằm trong thùng rác (`thoiGianXoa != null`)
     // KHÔNG hiện ra ở đây dù `chaId` vẫn còn giữ nguyên vị trí cũ.
+    final dauNgoc = nguoc ? -1 : 1;
     final tm = thuMuc
         .where((t) => t.chaId == chaId && t.thoiGianXoa == null)
         .toList()
-      ..sort((a, b) => a.ten.toLowerCase().compareTo(b.ten.toLowerCase()));
+      ..sort((a, b) => dauNgoc * soSanhTenTuNhien(a.ten, b.ten));
     final gc = ghiChu
         .where((g) => g.chaId == chaId && g.thoiGianXoa == null)
         .toList()
-      ..sort((a, b) => a.ten.toLowerCase().compareTo(b.ten.toLowerCase()));
+      ..sort((a, b) => dauNgoc * soSanhTenTuNhien(a.ten, b.ten));
     return (thuMucCon: tm, ghiChuCon: gc);
   }
 

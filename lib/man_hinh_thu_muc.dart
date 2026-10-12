@@ -11,6 +11,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'cai_dat.dart';
 import 'kho_du_lieu.dart';
 import 'luu_va_chia_se_tep.dart';
 import 'mau_co_ban.dart';
@@ -33,10 +34,12 @@ class ManHinhThuMuc extends StatefulWidget {
     super.key,
     required this.kho,
     required this.idGhiChuDangMo,
+    required this.caiDat,
   });
 
   final KhoDuLieu kho;
   final String idGhiChuDangMo;
+  final CaiDat caiDat;
 
   @override
   State<ManHinhThuMuc> createState() => _ManHinhThuMucState();
@@ -823,6 +826,30 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     });
   }
 
+  /// (YÊU CẦU MỚI) "Chọn màu cho tên" ở thanh hành động "Chọn nhiều" — áp
+  /// màu vừa chọn cho TÊN của mọi mục (thư mục + tệp) đang tích chọn, dùng
+  /// lại đúng hộp chọn màu của thao tác một mục đơn (`_chonMau`), rồi tự
+  /// thoát luôn chế độ "Chọn nhiều".
+  Future<void> _chonMauNhieu() async {
+    final mau = await hienThiChonMauCoBanChoTen(
+      context,
+      tieuDe: 'Chọn màu cho tên',
+    );
+    if (mau == null) return;
+    for (final id in _dsThuMucDaChon) {
+      _kho.datMauThuMuc(id, mau.value);
+    }
+    for (final id in _dsGhiChuDaChon) {
+      _kho.datMauGhiChu(id, mau.value);
+    }
+    setState(() {
+      _dangChonNhieu = false;
+      _dsThuMucDaChon.clear();
+      _dsGhiChuDaChon.clear();
+    });
+    await _kho.luu();
+  }
+
   /// "Chuyển vào thùng rác" ở thanh hành động "Chọn nhiều" — không hỏi xác
   /// nhận, giống hệt khi làm với một mục đơn.
   Future<void> _xoaNhieuVaoThungRac() async {
@@ -915,6 +942,11 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                 onPressed: coChon ? () => _datNhieu(laCat: true) : null,
                 icon: const Icon(Icons.cut_outlined, size: 18),
                 label: const Text('Cắt (di chuyển)'),
+              ),
+              TextButton.icon(
+                onPressed: coChon ? _chonMauNhieu : null,
+                icon: const Icon(Icons.format_color_text_outlined, size: 18),
+                label: const Text('Chọn màu cho tên'),
               ),
               TextButton.icon(
                 onPressed: coChon ? _xoaNhieuVaoThungRac : null,
@@ -1196,19 +1228,47 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                     case 7:
                       _moTimKiemTrongThuMuc(_thuMucHienTaiId, _tenThuMucHienTai);
                       break;
+                    case 8:
+                      widget.caiDat.datSapXepNguoc(_thuMucHienTaiId, false);
+                      setState(() {});
+                      break;
+                    case 9:
+                      widget.caiDat.datSapXepNguoc(_thuMucHienTaiId, true);
+                      setState(() {});
+                      break;
                   }
                 },
-                itemBuilder: (ctx) => const [
-                  PopupMenuItem(value: 1, child: Text('Tạo thư mục mới')),
-                  PopupMenuItem(value: 6, child: Text('Nhập ZIP hoặc TXT vào đây')),
-                  PopupMenuDivider(),
-                  PopupMenuItem(value: 2, child: Text('Chọn nhiều')),
-                  PopupMenuItem(value: 3, child: Text('Tải và chia sẻ thư mục này')),
-                  PopupMenuItem(value: 4, child: Text('Thông tin thư mục này')),
-                  PopupMenuDivider(),
-                  PopupMenuItem(value: 5, child: Text('Thùng rác Nội bộ')),
-                  PopupMenuItem(value: 7, child: Text('Tìm kiếm trong này')),
-                ],
+                itemBuilder: (ctx) {
+                  final dangNguoc = widget.caiDat.sapXepNguoc(_thuMucHienTaiId);
+                  return [
+                    PopupMenuItem(
+                      value: 8,
+                      child: Row(children: [
+                        if (!dangNguoc) const Icon(Icons.check, size: 18),
+                        if (!dangNguoc) const SizedBox(width: 6),
+                        const Text('Sắp xếp A → Z'),
+                      ]),
+                    ),
+                    PopupMenuItem(
+                      value: 9,
+                      child: Row(children: [
+                        if (dangNguoc) const Icon(Icons.check, size: 18),
+                        if (dangNguoc) const SizedBox(width: 6),
+                        const Text('Sắp xếp Z → A'),
+                      ]),
+                    ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(value: 1, child: Text('Tạo thư mục mới')),
+                    const PopupMenuItem(value: 6, child: Text('Nhập ZIP hoặc TXT vào đây')),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(value: 2, child: Text('Chọn nhiều')),
+                    const PopupMenuItem(value: 3, child: Text('Tải và chia sẻ thư mục này')),
+                    const PopupMenuItem(value: 4, child: Text('Thông tin thư mục này')),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(value: 5, child: Text('Thùng rác Nội bộ')),
+                    const PopupMenuItem(value: 7, child: Text('Tìm kiếm trong này')),
+                  ];
+                },
               ),
             ],
           ],
@@ -1502,7 +1562,12 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     // (YÊU CẦU MỚI) "Ngôi nhà chung" không phải thư mục thật trong `_kho` —
     // KHÔNG đưa `_ngoiNhaChung` vào `noiDungThuMuc` (id không tồn tại).
     final laNgoiNhaChung = _thuMucHienTaiId == _ngoiNhaChung;
-    final noiDung = laNgoiNhaChung ? null : _kho.noiDungThuMuc(_thuMucHienTaiId);
+    final noiDung = laNgoiNhaChung
+        ? null
+        : _kho.noiDungThuMuc(
+            _thuMucHienTaiId,
+            nguoc: widget.caiDat.sapXepNguoc(_thuMucHienTaiId),
+          );
     final trong = noiDung == null
         ? false
         : noiDung.thuMucCon.isEmpty && noiDung.ghiChuCon.isEmpty;
