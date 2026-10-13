@@ -21,6 +21,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 import 'bo_nho_tam_dan_van_ban.dart';
 import 'cai_dat.dart';
 import 'dang_nhap_google.dart';
+import 'dong_bo_dam_may.dart';
 import 'doan_thiet_bi.dart';
 import 'mo_lien_ket_ngoai.dart';
 import 'nghe_resize_trinh_duyet.dart';
@@ -4335,6 +4336,23 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     } catch (e) {
       if (!mounted) return;
       hienThongBaoGiua(context, 'Đăng nhập Google thất bại: $e');
+    }
+  }
+
+  /// (BƯỚC 1-2 kế hoạch "Bộ nhớ đám mây") Mục "Đồng bộ lên đám mây" — đẩy
+  /// TOÀN BỘ cây local lên Firestore bằng tay, để tự kiểm tra đường ghi
+  /// chạy đúng. Chưa tự động, chưa đọc ngược từ cloud.
+  Future<void> _bamDongBoDamMay() async {
+    final uid = _nguoiDungDangNhap?.uid;
+    if (uid == null) return;
+    hienThongBaoGiua(context, 'Đang đồng bộ lên đám mây...');
+    try {
+      await DichVuDongBoDamMay.instance.dongBoToanBoLenDamMay(widget.kho, uid);
+      if (!mounted) return;
+      hienThongBaoGiua(context, 'Đã đồng bộ xong lên đám mây.');
+    } catch (e) {
+      if (!mounted) return;
+      hienThongBaoGiua(context, 'Đồng bộ lên đám mây thất bại: $e');
     }
   }
 
@@ -16319,6 +16337,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                         'Tài khoản Google'),
                 emailDaDangNhap: _nguoiDungDangNhap?.email,
                 urlAnhDaiDienDaDangNhap: _nguoiDungDangNhap?.photoURL,
+                khiBamDongBoDamMay: _bamDongBoDamMay,
                 boPhimNhanhDangMo: _boPhimNhanhCamUngMo,
                 noiBatBoPhimNhanh:
                     kIsWeb && (_thietBiHienTai == ThietBi.android || _thietBiHienTai == ThietBi.iphone),

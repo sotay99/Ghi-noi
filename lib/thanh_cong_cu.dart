@@ -67,6 +67,7 @@ class ThanhCongCu extends StatelessWidget {
     this.tenHienThiDaDangNhap,
     this.emailDaDangNhap,
     this.urlAnhDaiDienDaDangNhap,
+    required this.khiBamDongBoDamMay,
   });
 
   /// (SỬA LỖI — vùng chọn văn bản "biến mất" khi mở menu "Làm việc với AI")
@@ -79,6 +80,11 @@ class ThanhCongCu extends StatelessWidget {
   final String? tenHienThiDaDangNhap;
   final String? emailDaDangNhap;
   final String? urlAnhDaiDienDaDangNhap;
+
+  /// (BƯỚC 1-2 kế hoạch "Bộ nhớ đám mây") Nút tạm, chỉ hiện khi ĐÃ đăng
+  /// nhập — đẩy TOÀN BỘ cây local lên Firestore bằng tay, để tự kiểm tra
+  /// đường ghi/đọc trước khi chuyển sang tự động. Xem `_NutTaiKhoanMenu`.
+  final VoidCallback khiBamDongBoDamMay;
 
   /// (YÊU CẦU MỚI) Gọi NGAY khi một trong ba menu thả xuống (Làm việc với
   /// AI/Thêm lựa chọn/Tài khoản và Cài đặt) vừa mở — ép màn hình đo lại và
@@ -504,6 +510,7 @@ class ThanhCongCu extends StatelessWidget {
                               tenHienThiDaDangNhap: tenHienThiDaDangNhap,
                               emailDaDangNhap: emailDaDangNhap,
                               urlAnhDaiDienDaDangNhap: urlAnhDaiDienDaDangNhap,
+                              khiBamDongBoDamMay: khiBamDongBoDamMay,
                             ),
                           ),
                           ],
@@ -1524,7 +1531,12 @@ class _NutTaiKhoanMenu extends StatelessWidget {
     this.tenHienThiDaDangNhap,
     this.emailDaDangNhap,
     this.urlAnhDaiDienDaDangNhap,
+    required this.khiBamDongBoDamMay,
   });
+
+  /// (BƯỚC 1-2 kế hoạch "Bộ nhớ đám mây") Mục "Đồng bộ lên đám mây" — chỉ
+  /// hiện khi ĐANG đăng nhập, đẩy toàn bộ cây local lên Firestore bằng tay.
+  final VoidCallback khiBamDongBoDamMay;
 
   /// Mục "Đăng nhập tài khoản" — khi NÀO đang đăng nhập (xem
   /// [tenHienThiDaDangNhap]) thì tự đổi nhãn/logic thành "Đăng xuất"; nơi
@@ -1635,6 +1647,9 @@ class _NutTaiKhoanMenu extends StatelessWidget {
               case 5:
                 khiBamDangNhapGoogle();
                 break;
+              case 20:
+                khiBamDongBoDamMay();
+                break;
             }
           },
           itemBuilder: (ctx) {
@@ -1665,6 +1680,10 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                 // đường kẻ chia giữa hai mục này.
                 _mucMenuThem(8, 'Trò chuyện'),
                 _mucMenuThem(5, daDangNhap ? 'Đăng xuất' : 'Đăng nhập tài khoản'),
+                // (BƯỚC 1-2 kế hoạch "Bộ nhớ đám mây") Nút tạm để tự kiểm
+                // tra đường ghi lên Firestore — chỉ hiện khi đã đăng nhập,
+                // sẽ bỏ đi khi chuyển sang tự động đồng bộ ở bước sau.
+                if (daDangNhap) _mucMenuThem(20, 'Đồng bộ lên đám mây'),
                 // (YÊU CẦU MỚI) Đang đăng nhập — hiện tên + avatar của tài
                 // khoản ở dòng CUỐI CÙNG của menu, không bấm được (chỉ để
                 // xem, đăng xuất đã có mục riêng ngay phía trên).

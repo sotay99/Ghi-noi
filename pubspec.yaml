@@ -38,6 +38,9 @@ dependencies:
   firebase_core: ^3.8.0
   firebase_auth: ^5.3.1
   google_sign_in: ^6.2.1
+  # Bộ nhớ đám mây (cây thư mục/ghi chú đồng bộ theo tài khoản Google) —
+  # xem `lib/dong_bo_dam_may.dart`.
+  cloud_firestore: ^5.4.4
 
 dev_dependencies:
   flutter_lints: ^4.0.0
