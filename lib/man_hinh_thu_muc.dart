@@ -166,9 +166,12 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     // định đi thẳng tới thư mục đang chứa tệp mở ở trang soạn thảo.
     if (widget.boNhoDocLap) {
       // Cây đứng RIÊNG — luôn bắt đầu thẳng tại gốc của chính [kho] này,
-      // `_duongDan` để trống (không có "Ngôi nhà chung" phía trên) — xem
-      // chú thích ở `ManHinhThuMuc.boNhoDocLap`.
+      // KHÔNG nhớ vị trí cũ giữa các lần mở (mỗi lần mở là một phiên mới).
+      // Vẫn giữ `_ngoiNhaChung` trong `_duongDan` để nút lùi/thanh địa chỉ
+      // hiện ra như bình thường — chỉ CHẶN trước khi nó thật sự được dùng
+      // (xem `_thoatKhoiCayDocLap`, gọi từ `_veThuMucCha`/`_nhayToiViTri`).
       _thuMucHienTaiId = thuMucGoc;
+      _duongDan.addAll(_duongDanToiThuMuc(thuMucGoc));
     } else {
       final nhoId = _nhoThuMucId;
       final nhoDuongDan = _nhoDuongDan;
@@ -350,9 +353,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     }
     chuoi.add(thuMucGoc);
     final ds = chuoi.reversed.toList()..removeLast();
-    // Cây đứng riêng không có "Ngôi nhà chung" phía trên — xem chú thích ở
-    // `ManHinhThuMuc.boNhoDocLap`.
-    return widget.boNhoDocLap ? ds : [_ngoiNhaChung, ...ds];
+    return [_ngoiNhaChung, ...ds];
   }
 
   /// Id ghi chú vừa được nhảy tới qua "Vị trí Tệp đang soạn thảo" — tên của
@@ -401,8 +402,23 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
 
   bool _veThuMucCha() {
     if (_duongDan.isEmpty) return false;
+    if (_duongDan.last == _ngoiNhaChung && widget.boNhoDocLap) {
+      _thoatKhoiCayDocLap();
+      return true;
+    }
     setState(() => _thuMucHienTaiId = _duongDan.removeLast());
     return true;
+  }
+
+  /// (SỬA LỖI — không có đường ra khỏi cây đứng riêng) Cây đứng riêng (đám
+  /// mây) không có "Ngôi nhà chung" CỦA CHÍNH NÓ để quay về — bấm nút
+  /// lùi/icon ngôi nhà ở gốc của cây này nghĩa là THOÁT HẲN, trả lại đúng
+  /// "Ngôi nhà chung" của nơi đã mở ra nó: đóng CẢ màn hình thư mục đang
+  /// đứng (đây) LẪN trang soạn thảo riêng đã mở ra cây này (xem
+  /// `_moBoNhoDamMay` ở trang soạn thảo nội bộ) — hai `pop` liên tiếp.
+  void _thoatKhoiCayDocLap() {
+    Navigator.of(context).pop();
+    Navigator.of(context).pop();
   }
 
   Future<void> _themThuMuc() async {
@@ -1062,6 +1078,10 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
 
   void _nhayToiViTri(int viTri) {
     final chuoi = _chuoiDuongDan;
+    if (chuoi[viTri] == _ngoiNhaChung && widget.boNhoDocLap) {
+      _thoatKhoiCayDocLap();
+      return;
+    }
     setState(() {
       _thuMucHienTaiId = chuoi[viTri];
       _duongDan
@@ -1213,18 +1233,22 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     );
   }
 
-  /// (YÊU CẦU MỚI) Thanh ghim đáy màn hình, chỉ hiện ở gốc Bộ nhớ nội bộ —
-  /// chữ co giãn/tự xuống dòng theo bề ngang màn hình (`Wrap`/`Text` thường
-  /// trong `Padding` co giãn tự nhiên, không cần ép chiều cao cố định).
+  /// (YÊU CẦU MỚI) Thanh ghim đáy màn hình, chỉ hiện ở gốc mỗi cây — chữ co
+  /// giãn/tự xuống dòng theo bề ngang màn hình (`Wrap`/`Text` thường trong
+  /// `Padding` co giãn tự nhiên, không cần ép chiều cao cố định).
   Widget _thanhChuThichBoNhoNoiBo() {
-    final chu = kIsWeb
-        ? 'Bộ nhớ nội bộ này lưu tại trình duyệt web này của thiết bị, '
-            'riêng tư tuyệt đối, nếu xoá Tệp và dữ liệu trang web thì bộ '
-            'nhớ nội bộ này sẽ bị xoá theo. App tự động lưu file mỗi khi '
-            'có sự thay đổi mà không cần bấm nút lưu file.'
-        : 'Bộ nhớ nội bộ này lưu tại thiết bị, riêng tư và an toàn. App tự '
-            'động lưu file mỗi khi có sự thay đổi mà không cần bấm nút lưu '
-            'file.';
+    final chu = _laKhoDamMay
+        ? 'Bộ nhớ này lưu trên máy chủ đám mây, có thể truy cập bộ nhớ này '
+            'ở bất cứ thiết bị nào nếu có internet và đăng nhập bằng tài '
+            'khoản này, App tự động lưu file lên bộ nhớ đám mây khi soạn thảo'
+        : kIsWeb
+            ? 'Bộ nhớ nội bộ này lưu tại trình duyệt web này của thiết bị, '
+                'riêng tư tuyệt đối, nếu xoá Tệp và dữ liệu trang web thì bộ '
+                'nhớ nội bộ này sẽ bị xoá theo. App tự động lưu file mỗi khi '
+                'có sự thay đổi mà không cần bấm nút lưu file.'
+            : 'Bộ nhớ nội bộ này lưu tại thiết bị, riêng tư và an toàn. App '
+                'tự động lưu file mỗi khi có sự thay đổi mà không cần bấm '
+                'nút lưu file.';
     return Material(
       color: const Color(0xFFF1F3F4),
       child: SafeArea(
