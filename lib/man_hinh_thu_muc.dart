@@ -40,30 +40,41 @@ class ManHinhThuMuc extends StatefulWidget {
   const ManHinhThuMuc({
     super.key,
     required this.kho,
+    required this.khoNoiBo,
     required this.idGhiChuDangMo,
     required this.caiDat,
-    this.boNhoDocLap = false,
   });
 
+  /// Kho của GHI CHÚ ĐANG MỞ ở trang soạn thảo đã mở màn hình này — seed
+  /// cho vị trí đứng BAN ĐẦU, và là "kho đang chờ" — bấm vào một ghi chú
+  /// CÒN thuộc đúng kho này thì trả id về (`Navigator.pop`) cho trang đó;
+  /// bấm một ghi chú thuộc kho KHÁC (sau khi đã chuyển qua "Bộ nhớ trên đám
+  /// mây"/"Bộ nhớ nội bộ" ngay trong màn hình này) thì mở một trang soạn
+  /// thảo MỚI cho đúng kho đó — xem `_moGhiChuDuocChon`.
   final KhoDuLieu kho;
+
+  /// (YÊU CẦU MỚI) LUÔN là kho nội bộ thật của app (một instance DUY NHẤT
+  /// xuyên suốt cả phiên — xem `main.dart`) — khác [kho] khi trang soạn
+  /// thảo đã mở màn hình này đang mở một ghi chú ĐÁM MÂY. Cho phép người
+  /// dùng bấm "Bộ nhớ nội bộ" NGAY TRONG màn hình này để quay lại cây nội
+  /// bộ thật, dù đang đứng ở ghi chú đám mây nào, không cần thoát hẳn ra
+  /// ngoài — xem `_vaoBoNhoNoiBo`/`_vaoBoNhoDamMay`.
+  final KhoDuLieu khoNoiBo;
+
   final String idGhiChuDangMo;
   final CaiDat caiDat;
-
-  /// (SỬA LỖI — vào "Bộ nhớ trên đám mây" bị lẫn với "Ngôi nhà chung") `true`
-  /// cho một cây ĐỨNG RIÊNG (hiện chỉ dùng cho `KhoDuLieuDamMay`) — màn hình
-  /// này đứng thẳng ở `thuMucGoc` của ĐÚNG [kho] được giao, không còn mức ảo
-  /// "Ngôi nhà chung" (3 ô chọn Nội bộ/Đám mây/Chia sẻ) phía trên nữa. Thiếu
-  /// cờ này, lùi lại từ gốc cây đám mây sẽ về lại 3 ô đó — bấm "Bộ nhớ nội
-  /// bộ" ở ĐÓ vẫn chỉ vào gốc của [kho] HIỆN TẠI (vẫn là đám mây, không đổi
-  /// được kho) — một cái bẫy UI làm người dùng tưởng app xoá mất dữ liệu nội
-  /// bộ, trong khi dữ liệu thật không hề đụng tới.
-  final bool boNhoDocLap;
 
   @override
   State<ManHinhThuMuc> createState() => _ManHinhThuMucState();
 }
 
 class _ManHinhThuMucState extends State<ManHinhThuMuc> {
+  // (YÊU CẦU MỚI) Trước là getter trỏ thẳng `widget.kho` — giờ là FIELD
+  // TỰ ĐỔI ĐƯỢC, để người dùng bấm "Bộ nhớ nội bộ"/"Bộ nhớ trên đám mây"
+  // NGAY TRONG màn hình này mà không phải thoát ra — xem
+  // `_vaoBoNhoNoiBo`/`_vaoBoNhoDamMay`.
+  late KhoDuLieu _kho;
+
   String _thuMucHienTaiId = _ngoiNhaChung;
   final List<String> _duongDan = []; // Ngăn xếp id thư mục cha, để quay lại.
 
@@ -75,6 +86,11 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   List<String> _choDanGhiChuIds = [];
   bool _choDanLaCat = false;
   String _choDanTen = '';
+  // (YÊU CẦU MỚI) Kho NƠI ĐANG GIỮ bản cắt/sao chép — nhớ lại lúc bấm nút,
+  // để "Dán" biết đây là trong CÙNG kho (nhanh, các hàm sẵn có của
+  // `KhoDuLieu`) hay xuyên kho (nội bộ ⇄ đám mây, cần đọc nội dung ở kho
+  // nguồn rồi tạo mục MỚI ở kho đích — xem `_dan`).
+  KhoDuLieu? _choDanKho;
   bool get _coDangChoDan =>
       _choDanThuMucIds.isNotEmpty || _choDanGhiChuIds.isNotEmpty;
 
@@ -156,33 +172,23 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     return (ms ~/ _nhipNhayNhayMs).isEven;
   }
 
-  KhoDuLieu get _kho => widget.kho;
-
   @override
   void initState() {
     super.initState();
-    // (YÊU CẦU MỚI) Có nhớ từ lần mở trước (trong CÙNG phiên app) thì vào
-    // đúng chỗ đó; chưa có gì (lần đầu, hoặc vừa F5/mở lại app) thì mặc
-    // định đi thẳng tới thư mục đang chứa tệp mở ở trang soạn thảo.
-    if (widget.boNhoDocLap) {
-      // Cây đứng RIÊNG — luôn bắt đầu thẳng tại gốc của chính [kho] này,
-      // KHÔNG nhớ vị trí cũ giữa các lần mở (mỗi lần mở là một phiên mới).
-      // Vẫn giữ `_ngoiNhaChung` trong `_duongDan` để nút lùi/thanh địa chỉ
-      // hiện ra như bình thường — chỉ CHẶN trước khi nó thật sự được dùng
-      // (xem `_thoatKhoiCayDocLap`, gọi từ `_veThuMucCha`/`_nhayToiViTri`).
-      _thuMucHienTaiId = thuMucGoc;
-      _duongDan.addAll(_duongDanToiThuMuc(thuMucGoc));
+    _kho = widget.kho;
+    // (YÊU CẦU MỚI) Có nhớ từ lần mở trước (trong CÙNG phiên app, CÙNG kho
+    // ghi chú đang mở) thì vào đúng chỗ đó; chưa có gì (lần đầu, vừa F5,
+    // hay vừa đổi sang ghi chú ở kho khác) thì mặc định đi thẳng tới thư
+    // mục đang chứa tệp mở ở trang soạn thảo.
+    final nhoId = _nhoThuMucId;
+    final nhoDuongDan = _nhoDuongDan;
+    if (nhoId != null && nhoDuongDan != null && identical(_nhoKho, widget.kho)) {
+      _thuMucHienTaiId = nhoId;
+      _duongDan.addAll(nhoDuongDan);
     } else {
-      final nhoId = _nhoThuMucId;
-      final nhoDuongDan = _nhoDuongDan;
-      if (nhoId != null && nhoDuongDan != null && identical(_nhoKho, widget.kho)) {
-        _thuMucHienTaiId = nhoId;
-        _duongDan.addAll(nhoDuongDan);
-      } else {
-        final thuMucId = _thuMucChuaTepDangSoanThao;
-        _thuMucHienTaiId = thuMucId;
-        _duongDan.addAll(_duongDanToiThuMuc(thuMucId));
-      }
+      final thuMucId = _thuMucChuaTepDangSoanThao;
+      _thuMucHienTaiId = thuMucId;
+      _duongDan.addAll(_duongDanToiThuMuc(thuMucId));
     }
     // Có mục đang nhấp nháy từ lần mở trước (vẫn trong phiên app này) —
     // tiếp tục đếm nhịp luôn, đừng chờ tới lần `_danhDauMucMoi` kế tiếp.
@@ -200,13 +206,13 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   @override
   void dispose() {
     // Ghi lại NGAY LÚC rời màn hình — lần mở kế tiếp (vẫn trong phiên app
-    // này) đọc lại đúng ở `initState`. Cây đứng riêng (`boNhoDocLap`) luôn
-    // khởi động lại từ gốc mỗi lần mở — không cần (và không nên) nhớ gì.
-    if (!widget.boNhoDocLap) {
-      _nhoThuMucId = _thuMucHienTaiId;
-      _nhoDuongDan = List<String>.from(_duongDan);
-      _nhoKho = widget.kho;
-    }
+    // này, từ đúng kho ghi chú [widget.kho] này) đọc lại đúng ở `initState`.
+    // (Nhớ theo [widget.kho] — kho GHI CHÚ ĐANG MỞ lúc vào màn hình này —
+    // chứ không theo [_kho] hiện tại, vì [_kho] có thể đã đổi qua lại giữa
+    // nội bộ/đám mây ngay trong một lượt xem.)
+    _nhoThuMucId = _thuMucHienTaiId;
+    _nhoDuongDan = List<String>.from(_duongDan);
+    _nhoKho = widget.kho;
     _dangTimKiemNho = _dangTimKiem;
     _timKiemTrongThuMucIdNho = _timKiemTrongThuMucId;
     _timKiemTrongThuMucTenNho = _timKiemTrongThuMucTen;
@@ -263,8 +269,9 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
 
   /// (SỬA LỖI) `thuMucGoc` ('goc') là HẰNG SỐ DÙNG CHUNG cho MỌI cây (nội
   /// bộ lẫn đám mây) — chỉ kiểm `_thuMucHienTaiId == thuMucGoc` không đủ để
-  /// biết đây là gốc cây NÀO. Phải hỏi thẳng kiểu của `widget.kho`.
-  bool get _laKhoDamMay => widget.kho is KhoDuLieuDamMay;
+  /// biết đây là gốc cây NÀO. Phải hỏi thẳng kiểu của [_kho] HIỆN TẠI (có
+  /// thể đã đổi qua `_vaoBoNhoNoiBo`/`_vaoBoNhoDamMay`, khác `widget.kho`).
+  bool get _laKhoDamMay => _kho is KhoDuLieuDamMay;
 
   String get _tenThuMucHienTai {
     if (_thuMucHienTaiId == _ngoiNhaChung) return 'Chọn nơi lưu trữ';
@@ -283,41 +290,53 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     hienThongBaoGiua(context, 'Tính năng đang nâng cấp');
   }
 
-  /// "Bộ nhớ trên đám mây" — một cây HOÀN TOÀN TÁCH BIỆT khỏi cây nội bộ
-  /// (Mô hình B), chạy trên `KhoDuLieuDamMay` (xem `kho_du_lieu.dart`). Mở
-  /// ra bằng cách đẩy một `TrangSoanThao` MỚI dùng kho đó — chính nó đã tự
-  /// có nút "Thư mục" mở `ManHinhThuMuc` với kho đó, nên toàn bộ giao diện/
-  /// logic cây thư mục (tạo/đổi tên/xoá/sắp xếp/thùng rác...) hoạt động Y
-  /// HỆT cây nội bộ mà không cần sửa gì thêm ở hai màn hình đó.
-  Future<void> _moBoNhoDamMay() async {
+  /// (YÊU CẦU MỚI) Đổi [_kho] đang dùng NGAY TRONG màn hình này — không đẩy
+  /// trang nào mới, không rời khỏi đây — người dùng ra vào thoải mái giữa
+  /// nội bộ/đám mây, chỉ khi BẤM VÀO MỘT GHI CHÚ mới thật sự mở trang soạn
+  /// thảo (xem `_moGhiChuDuocChon`).
+  void _vaoBoNhoNoiBo() {
+    setState(() => _kho = widget.khoNoiBo);
+    _moThuMuc(thuMucGoc);
+  }
+
+  /// Cùng vai trò với `_vaoBoNhoNoiBo`, cho "Bộ nhớ trên đám mây" — một cây
+  /// HOÀN TOÀN TÁCH BIỆT (Mô hình B), chạy trên `KhoDuLieuDamMay`. Đã tải
+  /// MỘT LẦN (xem `_khoDamMayDungChung`, nhớ xuyên suốt phiên app) thì các
+  /// lần ra/vào sau không tải lại Firestore nữa.
+  Future<void> _vaoBoNhoDamMay() async {
+    final daCo = _khoDamMayDungChung;
+    if (daCo != null) {
+      setState(() => _kho = daCo);
+      _moThuMuc(thuMucGoc);
+      return;
+    }
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
       _bao('Cần đăng nhập Google trước (menu "Tài khoản và Cài đặt" ở trang soạn thảo).');
       return;
     }
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
-    );
+    setState(() => _dangTaiDamMay = true);
     try {
       final khoDamMay = KhoDuLieuDamMay(uid);
-      final idMoDau = await khoDamMay.tai();
+      await khoDamMay.tai();
       if (!mounted) return;
-      Navigator.of(context).pop(); // Đóng vòng xoay chờ.
-      Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => TrangSoanThao(
-          kho: khoDamMay,
-          caiDat: widget.caiDat,
-          ghiChuId: idMoDau,
-        ),
-      ));
+      _khoDamMayDungChung = khoDamMay;
+      setState(() {
+        _dangTaiDamMay = false;
+        _kho = khoDamMay;
+      });
+      _moThuMuc(thuMucGoc);
     } catch (e) {
       if (!mounted) return;
-      Navigator.of(context).pop();
+      setState(() => _dangTaiDamMay = false);
       _bao('Không mở được Bộ nhớ trên đám mây: $e');
     }
   }
+
+  /// `true` lúc đang tải Firestore cho LẦN ĐẦU vào "Bộ nhớ trên đám mây"
+  /// trong phiên app này — hiện vòng xoay nhỏ ngay tại ô đó thay vì một
+  /// hộp thoại chặn cả màn hình.
+  bool _dangTaiDamMay = false;
 
   // (YÊU CẦU MỚI) Bộ nhớ đệm "đang đứng ở đâu" — chỉ là biến `static` sống
   // trong RAM của phiên app hiện tại: F5 (web) hay tắt/mở lại app là mất,
@@ -334,10 +353,18 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   // khi ĐÚNG CÙNG MỘT `kho` (so bằng danh tính đối tượng) như lần ghi lại.
   static KhoDuLieu? _nhoKho;
 
+  /// (YÊU CẦU MỚI) Cây "Bộ nhớ trên đám mây" đã tải — `static` để dùng
+  /// CHUNG xuyên suốt cả phiên app, không chỉ trong một lần mở màn hình
+  /// này: ra/vào lại nhiều lần (kể cả đóng rồi mở lại màn hình) không tải
+  /// lại Firestore nữa, xem `_vaoBoNhoDamMay`.
+  static KhoDuLieu? _khoDamMayDungChung;
+
   /// Id thư mục cha của ghi chú đang mở ở trang soạn thảo — `null` nếu ghi
   /// chú đó không còn tồn tại (đã bị xoá) hay không rõ, lúc đó coi như gốc.
+  /// LUÔN tra trong `widget.kho` (kho THẬT của ghi chú đang mở) — không
+  /// phải [_kho] hiện tại, có thể đã đổi sang kho khác trong lượt xem này.
   String get _thuMucChuaTepDangSoanThao =>
-      _kho.timGhiChu(widget.idGhiChuDangMo)?.chaId ?? thuMucGoc;
+      widget.kho.timGhiChu(widget.idGhiChuDangMo)?.chaId ?? thuMucGoc;
 
   /// Dựng lại cả đường dẫn (ngăn xếp `_duongDan`, KHÔNG gồm chính [id]) từ
   /// "Ngôi nhà chung" đi xuống tới ĐÚNG thư mục [id] — dùng cho cả việc nhớ
@@ -374,6 +401,10 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   void _toiViTriTepDangSoanThao() {
     final thuMucId = _thuMucChuaTepDangSoanThao;
     setState(() {
+      // Đang đứng ở kho KHÁC (vừa bấm "Bộ nhớ trên đám mây" chẳng hạn) —
+      // "Vị trí Tệp đang soạn thảo" luôn trả về đúng kho CỦA GHI CHÚ ĐANG
+      // MỞ (`widget.kho`), không phải kho đang đứng.
+      _kho = widget.kho;
       _thuMucHienTaiId = thuMucId;
       _duongDan
         ..clear()
@@ -402,23 +433,29 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
 
   bool _veThuMucCha() {
     if (_duongDan.isEmpty) return false;
-    if (_duongDan.last == _ngoiNhaChung && widget.boNhoDocLap) {
-      _thoatKhoiCayDocLap();
-      return true;
-    }
     setState(() => _thuMucHienTaiId = _duongDan.removeLast());
     return true;
   }
 
-  /// (SỬA LỖI — không có đường ra khỏi cây đứng riêng) Cây đứng riêng (đám
-  /// mây) không có "Ngôi nhà chung" CỦA CHÍNH NÓ để quay về — bấm nút
-  /// lùi/icon ngôi nhà ở gốc của cây này nghĩa là THOÁT HẲN, trả lại đúng
-  /// "Ngôi nhà chung" của nơi đã mở ra nó: đóng CẢ màn hình thư mục đang
-  /// đứng (đây) LẪN trang soạn thảo riêng đã mở ra cây này (xem
-  /// `_moBoNhoDamMay` ở trang soạn thảo nội bộ) — hai `pop` liên tiếp.
-  void _thoatKhoiCayDocLap() {
-    Navigator.of(context).pop();
-    Navigator.of(context).pop();
+  /// (YÊU CẦU MỚI) Bấm vào một ghi chú — [_kho] HIỆN TẠI còn ĐÚNG kho của
+  /// trang soạn thảo đang chờ (`widget.kho`, chưa đổi qua kho khác trong
+  /// lượt xem này) thì trả id về như cũ (`Navigator.pop`); đã đổi sang kho
+  /// KHÁC (ví dụ đang đứng ở "Bộ nhớ trên đám mây" nhưng trang chờ là nội
+  /// bộ) thì không pop được nữa — mở hẳn một trang soạn thảo MỚI cho đúng
+  /// kho đang đứng.
+  void _moGhiChuDuocChon(String id) {
+    if (identical(_kho, widget.kho)) {
+      Navigator.of(context).pop(id);
+      return;
+    }
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => TrangSoanThao(
+        kho: _kho,
+        khoNoiBo: widget.khoNoiBo,
+        caiDat: widget.caiDat,
+        ghiChuId: id,
+      ),
+    ));
   }
 
   Future<void> _themThuMuc() async {
@@ -812,6 +849,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       _choDanThuMucIds = laThuMuc ? [id] : [];
       _choDanGhiChuIds = laThuMuc ? [] : [id];
       _choDanTen = ten;
+      _choDanKho = _kho;
     });
   }
 
@@ -819,45 +857,115 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     setState(() {
       _choDanThuMucIds = [];
       _choDanGhiChuIds = [];
+      _choDanKho = null;
     });
+  }
+
+  /// (YÊU CẦU MỚI) Sao chép MỘT ghi chú từ [khoNguon] sang [khoDich] (khác
+  /// kho — dùng khi Dán xuyên nội bộ ⇄ đám mây), giữ nguyên tên/màu/nội
+  /// dung. Trả về id MỚI bên kho đích.
+  String _saoChepGhiChuXuyenKho(
+    KhoDuLieu khoNguon,
+    GhiChuFile g,
+    KhoDuLieu khoDich,
+    String chaIdDich,
+  ) {
+    final ban = khoDich.taoGhiChuMoi(chaIdDich, noiDungBanDau: g.noiDung);
+    ban.ten = khoDich.tenKhongTrung(g.ten, chaIdDich, boQuaIdGhiChu: ban.id);
+    ban.mau = g.mau;
+    return ban.id;
+  }
+
+  /// Cùng vai trò với `_saoChepGhiChuXuyenKho`, cho thư mục — đệ quy sao
+  /// chép hết nội dung bên trong từ kho nguồn sang kho đích.
+  String _saoChepThuMucXuyenKho(
+    KhoDuLieu khoNguon,
+    ThuMuc t,
+    KhoDuLieu khoDich,
+    String chaIdDich,
+  ) {
+    final ban = khoDich.taoThuMucMoi(chaIdDich);
+    ban.ten = khoDich.tenKhongTrung(t.ten, chaIdDich, boQuaIdThuMuc: ban.id);
+    ban.mau = t.mau;
+    final noiDung = khoNguon.noiDungThuMuc(t.id);
+    for (final con in noiDung.thuMucCon) {
+      _saoChepThuMucXuyenKho(khoNguon, con, khoDich, ban.id);
+    }
+    for (final con in noiDung.ghiChuCon) {
+      _saoChepGhiChuXuyenKho(khoNguon, con, khoDich, ban.id);
+    }
+    return ban.id;
   }
 
   Future<void> _dan() async {
     if (!_coDangChoDan) return;
-    // (YÊU CẦU MỚI) Thu lại id THẬT SỰ nằm ở nơi vừa dán tới — với "Cắt"
-    // là chính id cũ (chỉ đổi `chaId`), với "Sao chép" là id bản SAO MỚI
-    // — để đánh dấu nhấp nháy icon 10 giây (`_danhDauMucMoi`).
-    final idsMoi = <String>[];
-    for (final id in _choDanThuMucIds) {
-      if (_choDanLaCat) {
-        if (id == _thuMucHienTaiId) {
-          _bao('Không thể chuyển vào chính nó.');
-          continue;
-        }
-        if (!_kho.diChuyenThuMuc(id, _thuMucHienTaiId)) {
-          _bao('Không thể chuyển thư mục vào chính con cháu của nó.');
-          continue;
-        }
-        idsMoi.add(id);
-      } else {
-        idsMoi.add(_kho.saoChepThuMuc(id, _thuMucHienTaiId).id);
-      }
+    // (YÊU CẦU MỚI) "Ngôi nhà chung" không phải một thư mục thật — không có
+    // chỗ nào để dán vào cả.
+    if (_thuMucHienTaiId == _ngoiNhaChung) {
+      _bao('Không thể dán ở đây — hãy vào một bộ nhớ trước.');
+      return;
     }
-    for (final id in _choDanGhiChuIds) {
-      if (_choDanLaCat) {
-        _kho.diChuyenGhiChu(id, _thuMucHienTaiId);
-        idsMoi.add(id);
-      } else {
-        idsMoi.add(_kho.saoChepGhiChu(id, _thuMucHienTaiId).id);
+    final khoNguon = _choDanKho ?? _kho;
+    // (YÊU CẦU MỚI) Dán XUYÊN KHO (nội bộ ⇄ đám mây) — kho nguồn (lúc bấm
+    // Sao chép/Cắt) khác kho đích (đang đứng bây giờ). Đưa từ đám mây vào
+    // nội bộ thì ghi thẳng vào máy; đưa từ nội bộ lên đám mây thì đẩy lên
+    // Firestore qua internet — cả hai chỉ khác nhau ở việc `_kho.luu()`
+    // (cho kho đích) VÀ `khoNguon.luu()` (cho kho nguồn, khi "Cắt") gọi
+    // đúng lớp `KhoDuLieu`/`KhoDuLieuDamMay` nào.
+    final xuyenKho = !identical(khoNguon, _kho);
+
+    // (YÊU CẦU MỚI) Thu lại id THẬT SỰ nằm ở nơi vừa dán tới — với "Cắt"
+    // CÙNG kho là chính id cũ (chỉ đổi `chaId`), còn lại (sao chép, hoặc
+    // cắt/chép XUYÊN kho) đều là id bản MỚI — để đánh dấu nhấp nháy icon
+    // 10 giây (`_danhDauMucMoi`).
+    final idsMoi = <String>[];
+    if (xuyenKho) {
+      for (final id in _choDanThuMucIds) {
+        final t = khoNguon.timThuMuc(id);
+        if (t == null) continue;
+        idsMoi.add(_saoChepThuMucXuyenKho(khoNguon, t, _kho, _thuMucHienTaiId));
+        if (_choDanLaCat) khoNguon.xoaThuMuc(id);
+      }
+      for (final id in _choDanGhiChuIds) {
+        final g = khoNguon.timGhiChu(id);
+        if (g == null) continue;
+        idsMoi.add(_saoChepGhiChuXuyenKho(khoNguon, g, _kho, _thuMucHienTaiId));
+        if (_choDanLaCat) khoNguon.xoaGhiChu(id);
+      }
+    } else {
+      for (final id in _choDanThuMucIds) {
+        if (_choDanLaCat) {
+          if (id == _thuMucHienTaiId) {
+            _bao('Không thể chuyển vào chính nó.');
+            continue;
+          }
+          if (!_kho.diChuyenThuMuc(id, _thuMucHienTaiId)) {
+            _bao('Không thể chuyển thư mục vào chính con cháu của nó.');
+            continue;
+          }
+          idsMoi.add(id);
+        } else {
+          idsMoi.add(_kho.saoChepThuMuc(id, _thuMucHienTaiId).id);
+        }
+      }
+      for (final id in _choDanGhiChuIds) {
+        if (_choDanLaCat) {
+          _kho.diChuyenGhiChu(id, _thuMucHienTaiId);
+          idsMoi.add(id);
+        } else {
+          idsMoi.add(_kho.saoChepGhiChu(id, _thuMucHienTaiId).id);
+        }
       }
     }
 
     setState(() {
       _choDanThuMucIds = [];
       _choDanGhiChuIds = [];
+      _choDanKho = null;
     });
     _danhDauMucMoi(idsMoi);
     await _kho.luu();
+    if (xuyenKho && _choDanLaCat) await khoNguon.luu();
   }
 
   // ------------------------------------------------------- "Chọn nhiều"
@@ -926,6 +1034,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       _choDanThuMucIds = _dsThuMucDaChon.toList();
       _choDanGhiChuIds = _dsGhiChuDaChon.toList();
       _choDanTen = ten;
+      _choDanKho = _kho;
       _dangChonNhieu = false;
       _dsThuMucDaChon.clear();
       _dsGhiChuDaChon.clear();
@@ -1078,10 +1187,6 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
 
   void _nhayToiViTri(int viTri) {
     final chuoi = _chuoiDuongDan;
-    if (chuoi[viTri] == _ngoiNhaChung && widget.boNhoDocLap) {
-      _thoatKhoiCayDocLap();
-      return;
-    }
     setState(() {
       _thuMucHienTaiId = chuoi[viTri];
       _duongDan
@@ -1192,12 +1297,18 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
         ListTile(
           leading: Icon(Icons.smartphone, color: Colors.blue.shade700),
           title: Text(_tenBoNhoNoiBo),
-          onTap: () => _moThuMuc(thuMucGoc),
+          onTap: _vaoBoNhoNoiBo,
         ),
         ListTile(
-          leading: Icon(Icons.cloud_outlined, color: Colors.lightBlue.shade400),
+          leading: _dangTaiDamMay
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(Icons.cloud_outlined, color: Colors.lightBlue.shade400),
           title: const Text('Bộ nhớ trên đám mây'),
-          onTap: _moBoNhoDamMay,
+          onTap: _dangTaiDamMay ? null : _vaoBoNhoDamMay,
         ),
         ListTile(
           leading: Icon(Icons.folder_shared_outlined, color: Colors.green.shade600),
@@ -1575,7 +1686,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   Widget _dongKetQuaTimGhiChu(GhiChuFile g) => ListTile(
         leading: const Icon(Icons.description_outlined),
         title: Text(g.ten, style: g.mau != null ? TextStyle(color: Color(g.mau!)) : null),
-        onTap: () => Navigator.of(context).pop(g.id),
+        onTap: () => _moGhiChuDuocChon(g.id),
         // (YÊU CẦU MỚI) Nút ba chấm ở mép phải — y chang menu ở ngoài cây.
         trailing: _menuBaChamGhiChu(g),
       );
@@ -1889,7 +2000,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                             selectedTileColor: const Color(0xFFE8F0FE),
                             onTap: _dangChonNhieu
                                 ? () => _toggleChonGhiChu(g.id)
-                                : () => Navigator.of(context).pop(g.id),
+                                : () => _moGhiChuDuocChon(g.id),
                             trailing: _dangChonNhieu
                                 ? null
                                 : PopupMenuButton<String>(

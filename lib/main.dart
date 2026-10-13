@@ -61,6 +61,7 @@ class _UngDungFlowriteState extends State<UngDungFlowrite> {
               )
             : TrangSoanThao(
                 kho: _kho,
+                khoNoiBo: _kho,
                 caiDat: _caiDat,
                 ghiChuId: _idGhiChuMoDau!,
               ),

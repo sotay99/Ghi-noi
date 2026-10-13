@@ -1984,11 +1984,21 @@ class TrangSoanThao extends StatefulWidget {
   const TrangSoanThao({
     super.key,
     required this.kho,
+    required this.khoNoiBo,
     required this.caiDat,
     required this.ghiChuId,
   });
 
+  /// Kho của GHI CHÚ ĐANG MỞ ở trang này — nội bộ hoặc đám mây.
   final KhoDuLieu kho;
+
+  /// (YÊU CẦU MỚI) LUÔN là kho nội bộ thật của app (một instance DUY NHẤT,
+  /// xuyên suốt cả phiên — xem `main.dart`) — khác [kho] khi trang này đang
+  /// mở một ghi chú ĐÁM MÂY. Cần truyền riêng để màn hình cây thư mục
+  /// (`ManHinhThuMuc`) luôn có đường quay lại ĐÚNG cây nội bộ thật, dù
+  /// đang đứng ở ghi chú đám mây nào — xem `ManHinhThuMuc.khoNoiBo`.
+  final KhoDuLieu khoNoiBo;
+
   final CaiDat caiDat;
   final String ghiChuId;
 
@@ -4768,11 +4778,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       MaterialPageRoute(
         builder: (_) => ManHinhThuMuc(
           kho: widget.kho,
+          khoNoiBo: widget.khoNoiBo,
           idGhiChuDangMo: _ghiChuHienTai.id,
           caiDat: widget.caiDat,
-          // (SỬA LỖI) Cây đám mây không có "Ngôi nhà chung" — xem chú thích
-          // đầy đủ ở `ManHinhThuMuc.boNhoDocLap`.
-          boNhoDocLap: widget.kho is KhoDuLieuDamMay,
         ),
       ),
     );
