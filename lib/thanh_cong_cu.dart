@@ -429,6 +429,37 @@ class ThanhCongCu extends StatelessWidget {
                               khiDongMenu: khiDongMenuAI,
                             ),
                           ),
+                          // Nhân bản nút "Bật/Tắt Bộ phím nhanh cho màn hình
+                          // cảm ứng" (trước đây chỉ có trong menu "+ Thêm lựa
+                          // chọn") ra thành một nút riêng ngay ngoài thanh
+                          // công cụ — dễ bấm hơn, không cần mở menu. Cả hai
+                          // đường (nút riêng này và mục trong menu Thêm) vẫn
+                          // cùng gọi một hàm `khiBamBoPhimNhanh` duy nhất, nên
+                          // luôn đồng bộ trạng thái với nhau.
+                          //
+                          // (YÊU CẦU MỚI) Dời nút này ra giữa "Làm việc với
+                          // AI" và "Xem thêm lựa chọn" — áp dụng cho mọi loại
+                          // màn hình (rộng/hẹp), vì cả hai đều dùng chung
+                          // danh sách này.
+                          _NutCoChuThich(
+                            hien: hienChuThich,
+                            chu: 'Phím nhanh cho màn hình cảm ứng',
+                            child: _nut(
+                              rong,
+                              Icons.keyboard,
+                              'Phím nhanh',
+                              'Phím nhanh',
+                              // Thông báo khi BẬT lên giờ do chính
+                              // `khiBamBoPhimNhanh` (_bamNutBoPhimNhanhCamUng
+                              // trong trang_soan_thao.dart) tự hiện — gọi
+                              // thẳng, không tự hiện thêm toast riêng ở đây
+                              // nữa (từng hiện HAI thông báo chồng nhau).
+                              khiBamBoPhimNhanh,
+                              mau: boPhimNhanhDangMo
+                                  ? const Color(0xFF1A73E8)
+                                  : const Color(0xFF5F6368),
+                            ),
+                          ),
                           _NutCoChuThich(
                             hien: hienChuThich,
                             chu: 'Xem thêm lựa chọn',
@@ -458,32 +489,6 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamBoNhoTam: khiBamBoNhoTam,
                               khiBamTroChuyen: khiBamTroChuyen,
                               khiMoMenu: khiMoMenuCanReset,
-                            ),
-                          ),
-                          // Nhân bản nút "Bật/Tắt Bộ phím nhanh cho màn hình
-                          // cảm ứng" (trước đây chỉ có trong menu "+ Thêm lựa
-                          // chọn") ra thành một nút riêng ngay ngoài thanh
-                          // công cụ — dễ bấm hơn, không cần mở menu. Cả hai
-                          // đường (nút riêng này và mục trong menu Thêm) vẫn
-                          // cùng gọi một hàm `khiBamBoPhimNhanh` duy nhất, nên
-                          // luôn đồng bộ trạng thái với nhau.
-                          _NutCoChuThich(
-                            hien: hienChuThich,
-                            chu: 'Phím nhanh cho màn hình cảm ứng',
-                            child: _nut(
-                              rong,
-                              Icons.keyboard,
-                              'Phím nhanh',
-                              'Phím nhanh',
-                              // Thông báo khi BẬT lên giờ do chính
-                              // `khiBamBoPhimNhanh` (_bamNutBoPhimNhanhCamUng
-                              // trong trang_soan_thao.dart) tự hiện — gọi
-                              // thẳng, không tự hiện thêm toast riêng ở đây
-                              // nữa (từng hiện HAI thông báo chồng nhau).
-                              khiBamBoPhimNhanh,
-                              mau: boPhimNhanhDangMo
-                                  ? const Color(0xFF1A73E8)
-                                  : const Color(0xFF5F6368),
                             ),
                           ),
                           ],
@@ -1741,6 +1746,10 @@ class _NutAIMenu extends StatelessWidget {
         child: PopupMenuButton<int>(
           key: khoaMenuAI,
           onOpened: khiMoMenu,
+          // (SỬA LỖI — màu tô vùng chọn vẫn mất nếu ĐÓNG menu mà KHÔNG chọn
+          // mục nào, ví dụ bấm ra ngoài) `onSelected` chỉ chạy khi có chọn
+          // mục; `onCanceled` lo phần còn lại.
+          onCanceled: khiDongMenu,
           padding: EdgeInsets.zero,
           splashRadius: 20,
           // (YÊU CẦU MỚI) Nền của menu "Làm việc với AI" — xanh lá NHẠT.

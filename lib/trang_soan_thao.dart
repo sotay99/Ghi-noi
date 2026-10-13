@@ -3311,6 +3311,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         ),
       ]);
     }
+    // (YÊU CẦU MỚI) Dòng cuối cùng của chữ gợi ý — áp dụng cho cả web và
+    // Android/iOS gốc.
+    cacDong.add(
+      const TextSpan(text: '\nApp luôn tự động lưu nội dung soạn thảo'),
+    );
     return RichText(
       text: TextSpan(
         style: TextStyle(fontSize: 17, height: 1.5, color: mauChuMo),
@@ -3754,6 +3759,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             icon: const Icon(Icons.arrow_drop_down, size: 18),
             padding: EdgeInsets.zero,
             onSelected: (kieu) => _apDungHoanDoiChuHoaThuong(kieuCoDinh: kieu),
+            // (SỬA LỖI — màu tô vùng chọn vẫn mất nếu ĐÓNG menu mà KHÔNG
+            // chọn mục nào, ví dụ bấm ra ngoài) `onSelected` chỉ chạy khi có
+            // chọn mục; thêm `onCanceled` để trả tiêu điểm lại ngay cả khi
+            // đóng menu theo cách khác.
+            onCanceled: _giuFocusOChuSauKhiBam,
             itemBuilder: (ctx) {
               final chon = _boDieuKhien.selection;
               if (!chon.isValid || chon.isCollapsed) {
@@ -11746,6 +11756,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _ghiVaoO(moi, ketThuc);
     _boDieuKhien.selection = TextSelection(baseOffset: batDau, extentOffset: ketThuc);
     _henLuu();
+    // (SỬA LỖI — màu tô vùng chọn "biến mất" sau khi bấm "Aa"/menu thả
+    // xuống của nó) Bấm nút/mục menu làm ô soạn thảo mất tiêu điểm, Flutter
+    // ngừng vẽ màu tô — vùng chọn ở trên vẫn ĐÚNG, chỉ cần tiêu điểm quay
+    // lại để được vẽ ra. Dùng lại đúng hàm đã dùng cho Copy/Cắt/Dán/All và
+    // menu "Làm việc với AI".
+    _giuFocusOChuSauKhiBam();
   }
 
   String _doiHoaThuongTheoKieu(String doan, int kieu) {
@@ -14856,8 +14872,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   /// (YÊU CẦU MỚI) Cuộn lên đầu/xuống cuối văn bản — opacity 50% (thấy mờ
   /// mờ tên tệp phía sau nếu tên tệp dài, ở màn hẹp hai nút này đứng ngay
-  /// trước tên tệp). Rê chuột vào HOẶC bấm vào đều cuộn ngay (yêu cầu gốc:
-  /// hữu ích cho chuột — cảm ứng không có "rê vào" nên vẫn bấm được).
+  /// trước tên tệp). CHỈ bấm vào mới cuộn — rê chuột không còn tác dụng
+  /// (đã bỏ `MouseRegion.onEnter` theo yêu cầu mới).
   void _cuonVanBanLenDauTrang() {
     if (!_cuonVanBan.hasClients) return;
     _cuonVanBan.animateTo(0, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
@@ -14875,30 +14891,24 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   List<Widget> _haiNutCuonLenXuong() => [
         Opacity(
           opacity: 0.5,
-          child: MouseRegion(
-            onEnter: (_) => _cuonVanBanLenDauTrang(),
-            child: IconButton(
-              onPressed: _cuonVanBanLenDauTrang,
-              icon: const Icon(Icons.arrow_upward, size: 20),
-              tooltip: 'Cuộn lên đầu văn bản',
-              visualDensity: VisualDensity.compact,
-              constraints: _kichThuocNutTren,
-              padding: EdgeInsets.zero,
-            ),
+          child: IconButton(
+            onPressed: _cuonVanBanLenDauTrang,
+            icon: const Icon(Icons.arrow_upward, size: 20),
+            tooltip: 'Cuộn lên đầu văn bản',
+            visualDensity: VisualDensity.compact,
+            constraints: _kichThuocNutTren,
+            padding: EdgeInsets.zero,
           ),
         ),
         Opacity(
           opacity: 0.5,
-          child: MouseRegion(
-            onEnter: (_) => _cuonVanBanXuongCuoiTrang(),
-            child: IconButton(
-              onPressed: _cuonVanBanXuongCuoiTrang,
-              icon: const Icon(Icons.arrow_downward, size: 20),
-              tooltip: 'Cuộn xuống cuối văn bản',
-              visualDensity: VisualDensity.compact,
-              constraints: _kichThuocNutTren,
-              padding: EdgeInsets.zero,
-            ),
+          child: IconButton(
+            onPressed: _cuonVanBanXuongCuoiTrang,
+            icon: const Icon(Icons.arrow_downward, size: 20),
+            tooltip: 'Cuộn xuống cuối văn bản',
+            visualDensity: VisualDensity.compact,
+            constraints: _kichThuocNutTren,
+            padding: EdgeInsets.zero,
           ),
         ),
       ];

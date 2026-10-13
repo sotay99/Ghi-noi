@@ -203,28 +203,22 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
 
   /// (YÊU CẦU MỚI) Hai nút cuộn lên đầu/xuống cuối danh sách — opacity 50%
   /// (thấy mờ mờ tên thư mục cha phía sau nếu tên dài), đứng ngay bên trái
-  /// nút "Thêm ghi chú". Rê chuột vào HOẶC bấm vào đều cuộn ngay.
+  /// nút "Thêm ghi chú". CHỈ bấm vào mới cuộn — rê chuột không còn tác dụng.
   List<Widget> _haiNutCuonLenXuongThuMuc() => [
         Opacity(
           opacity: 0.5,
-          child: MouseRegion(
-            onEnter: (_) => _cuonDanhSachThuMucLenDau(),
-            child: IconButton(
-              onPressed: _cuonDanhSachThuMucLenDau,
-              icon: const Icon(Icons.arrow_upward, size: 20),
-              tooltip: 'Cuộn lên đầu danh sách',
-            ),
+          child: IconButton(
+            onPressed: _cuonDanhSachThuMucLenDau,
+            icon: const Icon(Icons.arrow_upward, size: 20),
+            tooltip: 'Cuộn lên đầu danh sách',
           ),
         ),
         Opacity(
           opacity: 0.5,
-          child: MouseRegion(
-            onEnter: (_) => _cuonDanhSachThuMucXuongCuoi(),
-            child: IconButton(
-              onPressed: _cuonDanhSachThuMucXuongCuoi,
-              icon: const Icon(Icons.arrow_downward, size: 20),
-              tooltip: 'Cuộn xuống cuối danh sách',
-            ),
+          child: IconButton(
+            onPressed: _cuonDanhSachThuMucXuongCuoi,
+            icon: const Icon(Icons.arrow_downward, size: 20),
+            tooltip: 'Cuộn xuống cuối danh sách',
           ),
         ),
       ];
@@ -288,6 +282,11 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   String? _idMucCanNhayNhay;
   int _demLanNhayToiTep = 0;
 
+  /// (YÊU CẦU MỚI) Gắn vào đúng `ListTile` của tệp vừa nhảy tới — dùng để
+  /// cuộn màn hình tới đó NGAY SAU khi thư mục chứa nó vừa dựng xong, canh
+  /// nó ra CHÍNH GIỮA khung nhìn (không chỉ "vào trong khung nhìn").
+  final GlobalKey _khoaMucVuaNhayToi = GlobalKey();
+
   void _veTrangSoanThao() => Navigator.of(context).pop();
 
   void _toiViTriTepDangSoanThao() {
@@ -299,6 +298,16 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
         ..addAll(_duongDanToiThuMuc(thuMucId));
       _idMucCanNhayNhay = widget.idGhiChuDangMo;
       _demLanNhayToiTep++;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _khoaMucVuaNhayToi.currentContext;
+      if (ctx == null) return;
+      Scrollable.ensureVisible(
+        ctx,
+        alignment: 0.5,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
     });
   }
 
@@ -1733,6 +1742,9 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                           ),
                         for (final g in noiDung!.ghiChuCon)
                           ListTile(
+                            key: g.id == _idMucCanNhayNhay
+                                ? _khoaMucVuaNhayToi
+                                : null,
                             leading: _dangChonNhieu
                                 ? Row(
                                     mainAxisSize: MainAxisSize.min,
