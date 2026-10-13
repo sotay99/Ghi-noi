@@ -42,11 +42,22 @@ class ManHinhThuMuc extends StatefulWidget {
     required this.kho,
     required this.idGhiChuDangMo,
     required this.caiDat,
+    this.boNhoDocLap = false,
   });
 
   final KhoDuLieu kho;
   final String idGhiChuDangMo;
   final CaiDat caiDat;
+
+  /// (SỬA LỖI — vào "Bộ nhớ trên đám mây" bị lẫn với "Ngôi nhà chung") `true`
+  /// cho một cây ĐỨNG RIÊNG (hiện chỉ dùng cho `KhoDuLieuDamMay`) — màn hình
+  /// này đứng thẳng ở `thuMucGoc` của ĐÚNG [kho] được giao, không còn mức ảo
+  /// "Ngôi nhà chung" (3 ô chọn Nội bộ/Đám mây/Chia sẻ) phía trên nữa. Thiếu
+  /// cờ này, lùi lại từ gốc cây đám mây sẽ về lại 3 ô đó — bấm "Bộ nhớ nội
+  /// bộ" ở ĐÓ vẫn chỉ vào gốc của [kho] HIỆN TẠI (vẫn là đám mây, không đổi
+  /// được kho) — một cái bẫy UI làm người dùng tưởng app xoá mất dữ liệu nội
+  /// bộ, trong khi dữ liệu thật không hề đụng tới.
+  final bool boNhoDocLap;
 
   @override
   State<ManHinhThuMuc> createState() => _ManHinhThuMucState();
@@ -153,15 +164,22 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     // (YÊU CẦU MỚI) Có nhớ từ lần mở trước (trong CÙNG phiên app) thì vào
     // đúng chỗ đó; chưa có gì (lần đầu, hoặc vừa F5/mở lại app) thì mặc
     // định đi thẳng tới thư mục đang chứa tệp mở ở trang soạn thảo.
-    final nhoId = _nhoThuMucId;
-    final nhoDuongDan = _nhoDuongDan;
-    if (nhoId != null && nhoDuongDan != null && identical(_nhoKho, widget.kho)) {
-      _thuMucHienTaiId = nhoId;
-      _duongDan.addAll(nhoDuongDan);
+    if (widget.boNhoDocLap) {
+      // Cây đứng RIÊNG — luôn bắt đầu thẳng tại gốc của chính [kho] này,
+      // `_duongDan` để trống (không có "Ngôi nhà chung" phía trên) — xem
+      // chú thích ở `ManHinhThuMuc.boNhoDocLap`.
+      _thuMucHienTaiId = thuMucGoc;
     } else {
-      final thuMucId = _thuMucChuaTepDangSoanThao;
-      _thuMucHienTaiId = thuMucId;
-      _duongDan.addAll(_duongDanToiThuMuc(thuMucId));
+      final nhoId = _nhoThuMucId;
+      final nhoDuongDan = _nhoDuongDan;
+      if (nhoId != null && nhoDuongDan != null && identical(_nhoKho, widget.kho)) {
+        _thuMucHienTaiId = nhoId;
+        _duongDan.addAll(nhoDuongDan);
+      } else {
+        final thuMucId = _thuMucChuaTepDangSoanThao;
+        _thuMucHienTaiId = thuMucId;
+        _duongDan.addAll(_duongDanToiThuMuc(thuMucId));
+      }
     }
     // Có mục đang nhấp nháy từ lần mở trước (vẫn trong phiên app này) —
     // tiếp tục đếm nhịp luôn, đừng chờ tới lần `_danhDauMucMoi` kế tiếp.
@@ -179,10 +197,13 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   @override
   void dispose() {
     // Ghi lại NGAY LÚC rời màn hình — lần mở kế tiếp (vẫn trong phiên app
-    // này) đọc lại đúng ở `initState`.
-    _nhoThuMucId = _thuMucHienTaiId;
-    _nhoDuongDan = List<String>.from(_duongDan);
-    _nhoKho = widget.kho;
+    // này) đọc lại đúng ở `initState`. Cây đứng riêng (`boNhoDocLap`) luôn
+    // khởi động lại từ gốc mỗi lần mở — không cần (và không nên) nhớ gì.
+    if (!widget.boNhoDocLap) {
+      _nhoThuMucId = _thuMucHienTaiId;
+      _nhoDuongDan = List<String>.from(_duongDan);
+      _nhoKho = widget.kho;
+    }
     _dangTimKiemNho = _dangTimKiem;
     _timKiemTrongThuMucIdNho = _timKiemTrongThuMucId;
     _timKiemTrongThuMucTenNho = _timKiemTrongThuMucTen;
@@ -237,12 +258,20 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       ? 'Bộ nhớ nội bộ trong Trình duyệt web của thiết bị'
       : 'Bộ nhớ nội bộ trong thiết bị';
 
+  /// (SỬA LỖI) `thuMucGoc` ('goc') là HẰNG SỐ DÙNG CHUNG cho MỌI cây (nội
+  /// bộ lẫn đám mây) — chỉ kiểm `_thuMucHienTaiId == thuMucGoc` không đủ để
+  /// biết đây là gốc cây NÀO. Phải hỏi thẳng kiểu của `widget.kho`.
+  bool get _laKhoDamMay => widget.kho is KhoDuLieuDamMay;
+
   String get _tenThuMucHienTai {
     if (_thuMucHienTaiId == _ngoiNhaChung) return 'Chọn nơi lưu trữ';
-    // (YÊU CẦU MỚI) Đứng NGAY tại gốc Bộ nhớ nội bộ (không phải một thư mục
-    // con nào bên trong) — đổi tên hiển thị, xem màu ở `_dongTenThuMuc`.
-    if (_thuMucHienTaiId == thuMucGoc) return 'Bộ nhớ Nội bộ';
-    return _kho.timThuMuc(_thuMucHienTaiId)?.ten ?? 'Bộ nhớ Nội bộ';
+    // (YÊU CẦU MỚI) Đứng NGAY tại gốc (không phải một thư mục con nào bên
+    // trong) — đổi tên hiển thị, xem màu ở `_dongTenThuMuc`.
+    if (_thuMucHienTaiId == thuMucGoc) {
+      return _laKhoDamMay ? 'Bộ nhớ trên đám mây' : 'Bộ nhớ Nội bộ';
+    }
+    return _kho.timThuMuc(_thuMucHienTaiId)?.ten ??
+        (_laKhoDamMay ? 'Bộ nhớ trên đám mây' : 'Bộ nhớ Nội bộ');
   }
 
   /// (YÊU CẦU MỚI) "Bộ nhớ được chia sẻ với bạn" — để dành cho sau này,
@@ -321,7 +350,9 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     }
     chuoi.add(thuMucGoc);
     final ds = chuoi.reversed.toList()..removeLast();
-    return [_ngoiNhaChung, ...ds];
+    // Cây đứng riêng không có "Ngôi nhà chung" phía trên — xem chú thích ở
+    // `ManHinhThuMuc.boNhoDocLap`.
+    return widget.boNhoDocLap ? ds : [_ngoiNhaChung, ...ds];
   }
 
   /// Id ghi chú vừa được nhảy tới qua "Vị trí Tệp đang soạn thảo" — tên của
@@ -1063,7 +1094,9 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       // không phải một `ThuMuc` được lưu) — hiện "Nội bộ", chữ ĐỎ, phân
       // biệt hẳn với tên các thư mục con (xanh dương) phía sau.
       final laGocNoiBo = chuoi[i] == thuMucGoc;
-      final ten = laGocNoiBo ? 'Nội bộ' : (_kho.timThuMuc(chuoi[i])?.ten ?? '?');
+      final ten = laGocNoiBo
+          ? (_laKhoDamMay ? 'Đám mây' : 'Nội bộ')
+          : (_kho.timThuMuc(chuoi[i])?.ten ?? '?');
       final laCuoiCung = i == chuoi.length - 1;
       manh.add(const Padding(
         padding: EdgeInsets.symmetric(horizontal: 2),

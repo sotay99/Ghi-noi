@@ -4770,6 +4770,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           kho: widget.kho,
           idGhiChuDangMo: _ghiChuHienTai.id,
           caiDat: widget.caiDat,
+          // (SỬA LỖI) Cây đám mây không có "Ngôi nhà chung" — xem chú thích
+          // đầy đủ ở `ManHinhThuMuc.boNhoDocLap`.
+          boNhoDocLap: widget.kho is KhoDuLieuDamMay,
         ),
       ),
     );
