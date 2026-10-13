@@ -273,6 +273,31 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   /// thể đã đổi qua `_vaoBoNhoNoiBo`/`_vaoBoNhoDamMay`, khác `widget.kho`).
   bool get _laKhoDamMay => _kho is KhoDuLieuDamMay;
 
+  /// (YÊU CẦU MỚI) Icon thư mục/tệp tin ở cây "Bộ nhớ trên đám mây" — ghép
+  /// MỘT icon đám mây nhỏ đứng TRƯỚC icon thư mục/tệp tin gốc (không dùng
+  /// emoji — ghép hai `Icon` vector thật của Flutter), để phân biệt ngay
+  /// với cây nội bộ dù nhìn thoáng qua.
+  Widget _iconCoDamMay({required IconData iconChinh, required Color mauChinh}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.cloud, size: 15, color: Colors.lightBlue.shade400),
+        const SizedBox(width: 1),
+        Icon(iconChinh, color: mauChinh, size: 22),
+      ],
+    );
+  }
+
+  /// Icon thư mục — vàng, kèm đám mây đứng trước khi đang ở cây đám mây.
+  Widget _iconThuMuc() => _laKhoDamMay
+      ? _iconCoDamMay(iconChinh: Icons.folder, mauChinh: Colors.amber.shade700)
+      : Icon(Icons.folder, color: Colors.amber.shade700);
+
+  /// Icon tệp tin — kèm đám mây đứng trước khi đang ở cây đám mây.
+  Widget _iconGhiChu() => _laKhoDamMay
+      ? _iconCoDamMay(iconChinh: Icons.description_outlined, mauChinh: const Color(0xFF5F6368))
+      : const Icon(Icons.description_outlined);
+
   String get _tenThuMucHienTai {
     if (_thuMucHienTaiId == _ngoiNhaChung) return 'Chọn nơi lưu trữ';
     // (YÊU CẦU MỚI) Đứng NGAY tại gốc (không phải một thư mục con nào bên
@@ -1676,7 +1701,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       );
 
   Widget _dongKetQuaTimThuMuc(ThuMuc t) => ListTile(
-        leading: Icon(Icons.folder, color: Colors.amber.shade700),
+        leading: _iconThuMuc(),
         title: Text(t.ten, style: t.mau != null ? TextStyle(color: Color(t.mau!)) : null),
         onTap: () => _chonThuMucTuKetQuaTim(t),
         // (YÊU CẦU MỚI) Nút ba chấm ở mép phải — y chang menu ở ngoài cây.
@@ -1684,7 +1709,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       );
 
   Widget _dongKetQuaTimGhiChu(GhiChuFile g) => ListTile(
-        leading: const Icon(Icons.description_outlined),
+        leading: _iconGhiChu(),
         title: Text(g.ten, style: g.mau != null ? TextStyle(color: Color(g.mau!)) : null),
         onTap: () => _moGhiChuDuocChon(g.id),
         // (YÊU CẦU MỚI) Nút ba chấm ở mép phải — y chang menu ở ngoài cây.
@@ -1832,9 +1857,15 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
               _dongTenThuMucVaNutThem(laNgoiNhaChung: laNgoiNhaChung),
             ],
             Expanded(
-              child: laNgoiNhaChung
-                  ? _danhSachNgoiNhaChung()
-                  : trong
+              // (YÊU CẦU MỚI) Đang ở cây "Bộ nhớ trên đám mây" — nền xanh lá
+              // nhạt bao trùm khung nội dung, BẤT KỂ đang đứng ở thư mục
+              // nào — người dùng nhận biết ngay không cần đọc chữ, phân
+              // biệt rõ với cây nội bộ (không có nền).
+              child: Container(
+                color: _laKhoDamMay ? const Color(0xFFE6F4EA) : null,
+                child: laNgoiNhaChung
+                    ? _danhSachNgoiNhaChung()
+                    : trong
                   ? const Center(
                       child: Text(
                         'Thư mục trống',
@@ -1858,7 +1889,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                         value: _dsThuMucDaChon.contains(t.id),
                                         onChanged: (_) => _toggleChonThuMuc(t.id),
                                       ),
-                                      Icon(Icons.folder, color: Colors.amber.shade700),
+                                      _iconThuMuc(),
                                     ],
                                   )
                                 // Vàng rực để phân biệt ngay với icon ghi
@@ -1867,7 +1898,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                 // đầu nếu vừa dán/nhập/khôi phục tới đây.
                                 : Opacity(
                                     opacity: _hienIconLucNay(t.id) ? 1 : 0,
-                                    child: Icon(Icons.folder, color: Colors.amber.shade700),
+                                    child: _iconThuMuc(),
                                   ),
                             // Vừa được khôi phục từ Thùng rác và nhảy tới
                             // đây — nhấp nháy để thu hút chú ý, dùng lại
@@ -1971,12 +2002,12 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                         value: _dsGhiChuDaChon.contains(g.id),
                                         onChanged: (_) => _toggleChonGhiChu(g.id),
                                       ),
-                                      const Icon(Icons.description_outlined),
+                                      _iconGhiChu(),
                                     ],
                                   )
                                 : Opacity(
                                     opacity: _hienIconLucNay(g.id) ? 1 : 0,
-                                    child: const Icon(Icons.description_outlined),
+                                    child: _iconGhiChu(),
                                   ),
                             // (YÊU CẦU MỚI) Vừa nhảy tới đây qua nút "Vị trí
                             // Tệp đang soạn thảo" — phóng to/thu nhỏ vài lần
@@ -2071,6 +2102,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                           ),
                       ],
                     ),
+              ),
             ),
             // (YÊU CẦU MỚI) "Chọn nhiều" thay hẳn mọi thanh ghim đáy khác
             // (chú thích gốc/dán) bằng MỘT thanh hành động riêng.

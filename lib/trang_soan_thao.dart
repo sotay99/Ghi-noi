@@ -14747,8 +14747,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final mau = mauTen != null ? Color(mauTen) : Colors.black87;
     final style = TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: mau);
 
+    final Widget noiDung;
     if (_tenDangLuonSong) {
-      return _ChuLuonSong(
+      noiDung = _ChuLuonSong(
         chu: _tenController.text,
         mau: mau,
         coChu: 18,
@@ -14757,18 +14758,40 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           if (mounted) setState(() => _tenDangLuonSong = false);
         },
       );
+    } else {
+      // (YÊU CẦU MỚI) Bấm vào tên tệp không còn đặt con trỏ TẠI CHỖ để sửa
+      // nữa — mở một modal nhỏ chính giữa màn hình riêng (xem
+      // `_moModalDoiTenTep`), hiện đầy đủ tên (dù dài), có nút "Huỷ - quay
+      // lại"/"Lưu thay đổi", vẫn áp đúng các quy tắc cũ (ký tự cấm, độ dài,
+      // không trùng tên) qua `KhoDuLieu.doiTenGhiChu`.
+      noiDung = InkWell(
+        onTap: _moModalDoiTenTep,
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(_tenController.text, style: style, overflow: TextOverflow.ellipsis),
+        ),
+      );
     }
 
-    // (YÊU CẦU MỚI) Bấm vào tên tệp không còn đặt con trỏ TẠI CHỖ để sửa
-    // nữa — mở một modal nhỏ chính giữa màn hình riêng (xem
-    // `_moModalDoiTenTep`), hiện đầy đủ tên (dù dài), có nút "Huỷ - quay
-    // lại"/"Lưu thay đổi", vẫn áp đúng các quy tắc cũ (ký tự cấm, độ dài,
-    // không trùng tên) qua `KhoDuLieu.doiTenGhiChu`.
-    return InkWell(
-      onTap: _moModalDoiTenTep,
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Text(_tenController.text, style: style, overflow: TextOverflow.ellipsis),
+    // (YÊU CẦU MỚI) Ghi chú thuộc "Bộ nhớ trên đám mây" — khung tên tệp nền
+    // xanh lá nhạt + icon đám mây đứng trước tên, LUÔN LUÔN hiện (không phụ
+    // thuộc tên tệp là gì). Chỉ phủ ĐÚNG khung tên tệp này (nằm trong `title`
+    // của AppBar, tách biệt hẳn `actions`/`leading`) — không bao giờ chồng
+    // lên các nút khác cùng hàng ngang, dù màn rộng hay hẹp.
+    if (widget.kho is! KhoDuLieuDamMay) return noiDung;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE6F4EA),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.cloud, size: 18, color: Colors.green.shade700),
+          const SizedBox(width: 6),
+          Flexible(child: noiDung),
+        ],
       ),
     );
   }
