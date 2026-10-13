@@ -4356,6 +4356,40 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
   }
 
+  /// (BƯỚC 3 kế hoạch "Bộ nhớ đám mây") Tự động đồng bộ — hai hẹn giờ:
+  /// [_henDongBoDamMayNhe] là debounce THẬT (reset mỗi lần gọi lại, 3 giây
+  /// yên tay mới bắn), [_henDongBoDamMayTran] là TRẦN tối đa (chỉ đặt một
+  /// lần cho tới khi bắn xong, không bị reset) — gõ liên tục không ngừng tay
+  /// vẫn được đồng bộ ít nhất mỗi 15 giây, không bị trì hoãn vô thời hạn.
+  /// Không làm gì nếu CHƯA đăng nhập — chỉ local vẫn hoạt động bình thường.
+  Timer? _henDongBoDamMayNhe;
+  Timer? _henDongBoDamMayTran;
+
+  void _lenLichDongBoDamMay() {
+    if (_nguoiDungDangNhap == null) return;
+    _henDongBoDamMayNhe?.cancel();
+    _henDongBoDamMayNhe =
+        Timer(const Duration(seconds: 3), _dongBoNgayGhiChuHienTaiLenDamMay);
+    _henDongBoDamMayTran ??=
+        Timer(const Duration(seconds: 15), _dongBoNgayGhiChuHienTaiLenDamMay);
+  }
+
+  Future<void> _dongBoNgayGhiChuHienTaiLenDamMay() async {
+    _henDongBoDamMayNhe?.cancel();
+    _henDongBoDamMayNhe = null;
+    _henDongBoDamMayTran?.cancel();
+    _henDongBoDamMayTran = null;
+    final uid = _nguoiDungDangNhap?.uid;
+    if (uid == null) return;
+    try {
+      await DichVuDongBoDamMay.instance.dongBoMotGhiChu(_ghiChuHienTai, uid);
+    } catch (_) {
+      // Lỗi mạng/máy chủ tạm thời — không báo gì (sẽ ồn, vì có thể bắn mỗi
+      // 15 giây lúc đang gõ dài). Local vẫn luôn lưu đúng, chỉ cloud lỡ
+      // nhịp — lần gõ/đồng bộ kế tiếp sẽ tự thử lại.
+    }
+  }
+
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_khiPhimTatMicro);
@@ -4367,6 +4401,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     HardwareKeyboard.instance.removeHandler(_khiGoPhimBatKyTatChuThich);
     WidgetsBinding.instance.removeObserver(this);
     _dangKyDoiTrangThaiDangNhap?.cancel();
+    _henDongBoDamMayNhe?.cancel();
+    _henDongBoDamMayTran?.cancel();
     huyNgheResizeTrinhDuyet(_dangKyNgheResizeTrinhDuyet);
     huyThamDoChieuCaoVienPort(_dangKyThamDoChieuCaoVienPort);
     _hen?.cancel();
@@ -4543,6 +4579,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     widget.kho.suaNoiDungGhiChu(_ghiChuHienTai.id, noiDungLuu);
     await widget.kho.luu();
     _coThayDoiChuaLuu = false;
+    _lenLichDongBoDamMay();
   }
 
   /// Tách chuỗi lưu trữ thành (văn bản THẬT, khối AI mã hoá?, khối định dạng
@@ -4996,6 +5033,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void _moGhiChu(String id) {
     final g = widget.kho.timGhiChu(id);
     if (g == null) return;
+    // (BƯỚC 3 kế hoạch "Bộ nhớ đám mây") Rời khỏi ghi chú đang gõ — nếu còn
+    // đang chờ debounce đồng bộ cloud (xem `_lenLichDongBoDamMay`), đồng bộ
+    // NGAY cho ghi chú SẮP RỜI ĐI thay vì để treo tới tối đa 15 giây sau.
+    // Không `await` — không có lý do bắt người dùng đợi mạng mới chuyển tệp.
+    if (_henDongBoDamMayNhe != null) {
+      unawaited(_dongBoNgayGhiChuHienTaiLenDamMay());
+    }
     _ganDauDaMoTepChoLichSu(id);
     // (YÊU CẦU MỚI) Nhớ vị trí cuộn của tệp SẮP RỜI ĐI trước khi đổi — xem
     // `_ghiNhoViTriCuon`. Gọi `_phucHoiViTriCuon` cho tệp MỚI ở cuối hàm.

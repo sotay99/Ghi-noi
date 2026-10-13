@@ -58,6 +58,13 @@ class DichVuDongBoDamMay {
     }
   }
 
+  /// (BƯỚC 3 kế hoạch) Đồng bộ MỘT ghi chú — dùng cho autosave debounce lúc
+  /// đang soạn thảo, rẻ hơn hẳn đẩy lại cả cây mỗi lần gõ xong.
+  Future<void> dongBoMotGhiChu(GhiChuFile g, String uid) async {
+    final doc = _db.collection('users').doc(uid).collection('ghiChu').doc(g.id);
+    await doc.set(_ghiChuSangJson(g));
+  }
+
   Map<String, dynamic> _thuMucSangJson(ThuMuc t) => {
         'ten': t.ten,
         'chaId': t.chaId,
