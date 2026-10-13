@@ -55,6 +55,8 @@ on:
       - 'lib/thong_bao_giua.dart'
       - 'lib/trang_huong_dan.dart'
       - 'lib/ai_cau_hinh.dart'
+      - 'lib/firebase_options.dart'
+      - 'lib/dang_nhap_google.dart'
       - '.github/workflows/deploy-web-full.yml'
   workflow_dispatch:
 

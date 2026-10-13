@@ -14,11 +14,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart' show User;
 import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import 'bo_nho_tam_dan_van_ban.dart';
 import 'cai_dat.dart';
+import 'dang_nhap_google.dart';
 import 'doan_thiet_bi.dart';
 import 'mo_lien_ket_ngoai.dart';
 import 'nghe_resize_trinh_duyet.dart';
@@ -4221,6 +4223,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     });
     _boDieuKhien.addListener(_khiNguoiDungSua);
     _boDieuKhien.addListener(_capNhatTimKiemNeuDangMo);
+    // (YÊU CẦU MỚI) Đăng nhập Google — nghe thay đổi trạng thái để vẽ lại
+    // menu "Tài khoản và Cài đặt" (tên/avatar + đổi nhãn nút).
+    _nguoiDungDangNhap = DichVuDangNhapGoogle.instance.nguoiDungHienTai;
+    _dangKyDoiTrangThaiDangNhap =
+        DichVuDangNhapGoogle.instance.doiTrangThai.listen((nguoiDung) {
+      if (mounted) setState(() => _nguoiDungDangNhap = nguoiDung);
+    });
     // TextField (Material) không có tham số `onSelectionChanged` — đó là
     // API của EditableText, không lộ ra ở TextField. Vì
     // `_tinhTrangThaiDinhDangHienTai` vốn đã an toàn gọi mỗi lần selection
@@ -4308,6 +4317,27 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// khi cờ này đã lên, thay vì chỉ rút ngắn thời gian chờ.
   bool _coBanPhimVatLy = false;
 
+  /// (YÊU CẦU MỚI) Tài khoản Google đang đăng nhập — `null` là chưa đăng
+  /// nhập. Xem `_bamDangNhapGoogle`/`DichVuDangNhapGoogle`.
+  User? _nguoiDungDangNhap;
+  StreamSubscription<User?>? _dangKyDoiTrangThaiDangNhap;
+
+  /// Nút "Đăng nhập tài khoản"/"Đăng xuất" ở menu "Tài khoản và Cài đặt" —
+  /// tự quyết đăng nhập hay đăng xuất dựa theo [_nguoiDungDangNhap] HIỆN
+  /// TẠI lúc bấm (menu chỉ gọi đúng MỘT callback, không tách hai nút).
+  Future<void> _bamDangNhapGoogle() async {
+    try {
+      if (_nguoiDungDangNhap == null) {
+        await DichVuDangNhapGoogle.instance.dangNhap();
+      } else {
+        await DichVuDangNhapGoogle.instance.dangXuat();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      hienThongBaoGiua(context, 'Đăng nhập Google thất bại: $e');
+    }
+  }
+
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_khiPhimTatMicro);
@@ -4318,6 +4348,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     HardwareKeyboard.instance.removeHandler(_khiPhimTatLuiTien);
     HardwareKeyboard.instance.removeHandler(_khiGoPhimBatKyTatChuThich);
     WidgetsBinding.instance.removeObserver(this);
+    _dangKyDoiTrangThaiDangNhap?.cancel();
     huyNgheResizeTrinhDuyet(_dangKyNgheResizeTrinhDuyet);
     huyThamDoChieuCaoVienPort(_dangKyThamDoChieuCaoVienPort);
     _hen?.cancel();
@@ -16277,6 +16308,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 khiBamBoPhimNhanh: _bamNutBoPhimNhanhCamUng,
                 khiMoMenuCanReset: _resetManHinhTruocKhiMoMenu,
                 khiDongMenuAI: _giuFocusOChuSauKhiBam,
+                khiBamDangNhapGoogle: _bamDangNhapGoogle,
+                // `tenHienThiDaDangNhap` khác `null` LÀ tín hiệu "đang đăng
+                // nhập" cho `ThanhCongCu` — không được để `null` chỉ vì tài
+                // khoản không có sẵn displayName, nên dự phòng bằng email.
+                tenHienThiDaDangNhap: _nguoiDungDangNhap == null
+                    ? null
+                    : (_nguoiDungDangNhap!.displayName ??
+                        _nguoiDungDangNhap!.email ??
+                        'Tài khoản Google'),
+                emailDaDangNhap: _nguoiDungDangNhap?.email,
+                urlAnhDaiDienDaDangNhap: _nguoiDungDangNhap?.photoURL,
                 boPhimNhanhDangMo: _boPhimNhanhCamUngMo,
                 noiBatBoPhimNhanh:
                     kIsWeb && (_thietBiHienTai == ThietBi.android || _thietBiHienTai == ThietBi.iphone),

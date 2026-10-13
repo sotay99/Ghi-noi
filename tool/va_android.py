@@ -14,6 +14,14 @@ GOC = Path(sys.argv[1] if len(sys.argv) > 1 else '.')
 MANIFEST = GOC / 'android' / 'app' / 'src' / 'main' / 'AndroidManifest.xml'
 GRADLE_KTS = GOC / 'android' / 'app' / 'build.gradle.kts'
 GRADLE_GROOVY = GOC / 'android' / 'app' / 'build.gradle'
+SETTINGS_GRADLE_KTS = GOC / 'android' / 'settings.gradle.kts'
+
+# Đăng nhập Google cần file cấu hình app Android của Firebase. Cùng lý do với
+# khoá ký ở trên: android/ không nằm trong git nên file này KHÔNG thể chỉ đặt
+# một lần vào android/app/ — phải chép lại ở ĐÂY mỗi lần dựng. Không phải bí
+# mật cần giấu (xem chú thích ở `lib/firebase_options.dart`).
+GOOGLE_SERVICES_JSON = GOC / 'tool' / 'google-services.json'
+GOOGLE_SERVICES_PHIEN_BAN = '4.4.2'
 
 # Khoá ký CỐ ĐỊNH của Flowrite — một khoá DUY NHẤT, dùng lại cho MỌI lần
 # dựng, mãi mãi về sau. Không phải bí mật cần giấu (app chỉ cài tay, không
@@ -162,6 +170,52 @@ def _va_ky_ten() -> int:
     return 0
 
 
+def _them_google_services() -> int:
+    """Chép `google-services.json` vào android/app/, rồi khai plugin Gradle
+    "Google Services" (đọc file đó lúc build, sinh ra các hằng số project
+    mà `firebase_core` cần) ở CẢ HAI tệp Gradle theo đúng cú pháp khối
+    `plugins {}` kiểu mới (bản Flutter hiện tại dùng, thay cho `buildscript
+    { classpath ... }` kiểu cũ)."""
+    if not GOOGLE_SERVICES_JSON.exists():
+        print(f'LOI: khong thay {GOOGLE_SERVICES_JSON}', file=sys.stderr)
+        return 1
+    shutil.copyfile(GOOGLE_SERVICES_JSON, GOC / 'android' / 'app' / 'google-services.json')
+
+    if not SETTINGS_GRADLE_KTS.exists():
+        print(f'LOI: khong thay {SETTINGS_GRADLE_KTS}', file=sys.stderr)
+        return 1
+    chu = SETTINGS_GRADLE_KTS.read_text(encoding='utf-8')
+    chu, n1 = re.subn(
+        r'plugins \{',
+        'plugins {\n    id("com.google.gms.google-services") version '
+        f'"{GOOGLE_SERVICES_PHIEN_BAN}" apply false',
+        chu,
+        count=1,
+    )
+    if n1 == 0:
+        print(f'LOI: khong tim thay "plugins {{" trong {SETTINGS_GRADLE_KTS}', file=sys.stderr)
+        return 1
+    SETTINGS_GRADLE_KTS.write_text(chu, encoding='utf-8')
+
+    if not GRADLE_KTS.exists():
+        print(f'LOI: khong thay {GRADLE_KTS}', file=sys.stderr)
+        return 1
+    chu = GRADLE_KTS.read_text(encoding='utf-8')
+    chu, n2 = re.subn(
+        r'plugins \{',
+        'plugins {\n    id("com.google.gms.google-services")',
+        chu,
+        count=1,
+    )
+    if n2 == 0:
+        print(f'LOI: khong tim thay "plugins {{" trong {GRADLE_KTS}', file=sys.stderr)
+        return 1
+    GRADLE_KTS.write_text(chu, encoding='utf-8')
+
+    print('Da them google-services.json + plugin Gradle cho Dang nhap Google.')
+    return 0
+
+
 def main() -> int:
     if not MANIFEST.exists():
         print(f'Khong thay {MANIFEST}', file=sys.stderr)
@@ -174,6 +228,10 @@ def main() -> int:
     ket_qua_ky = _va_ky_ten()
     if ket_qua_ky != 0:
         return ket_qua_ky
+
+    ket_qua_google = _them_google_services()
+    if ket_qua_google != 0:
+        return ket_qua_google
 
     chu = MANIFEST.read_text(encoding='utf-8')
 

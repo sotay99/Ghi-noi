@@ -3,15 +3,18 @@
 // cho phần soạn thảo, lib/man_hinh_thu_muc.dart cho phần quản lý thư mục, và
 // lib/kho_du_lieu.dart cho phần lưu trữ.
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import 'cai_dat.dart';
 import 'chan_esc_lui_trang.dart';
+import 'firebase_options.dart';
 import 'kho_du_lieu.dart';
 import 'trang_soan_thao.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const UngDungFlowrite());
 }
 

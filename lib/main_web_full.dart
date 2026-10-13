@@ -9,15 +9,18 @@
 // nhưng CHƯA được kiểm chứng kỹ như Web Speech API tự viết tay ở
 // `main_web_test.dart`) — việc thay động cơ mic cho web là bước sau.
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import 'cai_dat.dart';
 import 'chan_esc_lui_trang.dart';
+import 'firebase_options.dart';
 import 'kho_du_lieu.dart';
 import 'trang_soan_thao.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const UngDungFlowriteWebDayDu());
 }
 

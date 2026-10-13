@@ -63,11 +63,22 @@ class ThanhCongCu extends StatelessWidget {
     this.hangCopyCutPaste,
     required this.khiMoMenuCanReset,
     required this.khiDongMenuAI,
+    required this.khiBamDangNhapGoogle,
+    this.tenHienThiDaDangNhap,
+    this.emailDaDangNhap,
+    this.urlAnhDaiDienDaDangNhap,
   });
 
   /// (SỬA LỖI — vùng chọn văn bản "biến mất" khi mở menu "Làm việc với AI")
   /// Xem chú thích đầy đủ ở `_NutAIMenu.khiDongMenu` — truyền thẳng xuống.
   final VoidCallback khiDongMenuAI;
+
+  /// (YÊU CẦU MỚI) Đăng nhập/đăng xuất Google — xem chú thích đầy đủ ở
+  /// `_NutTaiKhoanMenu`, truyền thẳng xuống.
+  final VoidCallback khiBamDangNhapGoogle;
+  final String? tenHienThiDaDangNhap;
+  final String? emailDaDangNhap;
+  final String? urlAnhDaiDienDaDangNhap;
 
   /// (YÊU CẦU MỚI) Gọi NGAY khi một trong ba menu thả xuống (Làm việc với
   /// AI/Thêm lựa chọn/Tài khoản và Cài đặt) vừa mở — ép màn hình đo lại và
@@ -489,6 +500,10 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamBoNhoTam: khiBamBoNhoTam,
                               khiBamTroChuyen: khiBamTroChuyen,
                               khiMoMenu: khiMoMenuCanReset,
+                              khiBamDangNhapGoogle: khiBamDangNhapGoogle,
+                              tenHienThiDaDangNhap: tenHienThiDaDangNhap,
+                              emailDaDangNhap: emailDaDangNhap,
+                              urlAnhDaiDienDaDangNhap: urlAnhDaiDienDaDangNhap,
                             ),
                           ),
                           ],
@@ -1505,7 +1520,23 @@ class _NutTaiKhoanMenu extends StatelessWidget {
     required this.khiBamBoNhoTam,
     required this.khiBamTroChuyen,
     required this.khiMoMenu,
+    required this.khiBamDangNhapGoogle,
+    this.tenHienThiDaDangNhap,
+    this.emailDaDangNhap,
+    this.urlAnhDaiDienDaDangNhap,
   });
+
+  /// Mục "Đăng nhập tài khoản" — khi NÀO đang đăng nhập (xem
+  /// [tenHienThiDaDangNhap]) thì tự đổi nhãn/logic thành "Đăng xuất"; nơi
+  /// gọi (`trang_soan_thao.dart`) tự quyết đăng nhập hay đăng xuất dựa theo
+  /// đúng trạng thái đang có, menu này không tự giữ trạng thái.
+  final VoidCallback khiBamDangNhapGoogle;
+
+  /// Khác `null` nghĩa là ĐANG đăng nhập — tên/avatar hiện thêm ở dòng CUỐI
+  /// CÙNG của menu. Cả ba đều `null` cùng lúc khi chưa đăng nhập.
+  final String? tenHienThiDaDangNhap;
+  final String? emailDaDangNhap;
+  final String? urlAnhDaiDienDaDangNhap;
 
   final bool rong;
   final VoidCallback khiBamCaiDatMicro;
@@ -1601,9 +1632,13 @@ class _NutTaiKhoanMenu extends StatelessWidget {
               case 8:
                 khiBamTroChuyen();
                 break;
+              case 5:
+                khiBamDangNhapGoogle();
+                break;
             }
           },
           itemBuilder: (ctx) {
+            final daDangNhap = tenHienThiDaDangNhap != null;
             final cuon = ScrollController();
             return [
               _mucDongMenu(cuon,
@@ -1629,11 +1664,55 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                 // phía TRÊN "Đăng nhập tài khoản" — cùng nhóm, không có
                 // đường kẻ chia giữa hai mục này.
                 _mucMenuThem(8, 'Trò chuyện'),
-                _mucMenuThem(5, 'Đăng nhập tài khoản'),
+                _mucMenuThem(5, daDangNhap ? 'Đăng xuất' : 'Đăng nhập tài khoản'),
+                // (YÊU CẦU MỚI) Đang đăng nhập — hiện tên + avatar của tài
+                // khoản ở dòng CUỐI CÙNG của menu, không bấm được (chỉ để
+                // xem, đăng xuất đã có mục riêng ngay phía trên).
+                if (daDangNhap) _dongTaiKhoanDaDangNhap(),
               ]),
             ];
           },
         ),
+      ),
+    );
+  }
+
+  Widget _dongTaiKhoanDaDangNhap() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 14,
+            backgroundColor: const Color(0xFFE0E0E0),
+            backgroundImage: urlAnhDaiDienDaDangNhap != null
+                ? NetworkImage(urlAnhDaiDienDaDangNhap!)
+                : null,
+            child: urlAnhDaiDienDaDangNhap == null
+                ? const Icon(Icons.person, size: 16, color: Color(0xFF9AA0A6))
+                : null,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  tenHienThiDaDangNhap ?? '',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (emailDaDangNhap != null)
+                  Text(
+                    emailDaDangNhap!,
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF5F6368)),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

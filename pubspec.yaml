@@ -30,6 +30,14 @@ dependencies:
   # sẵn. Hỗ trợ cả Android lẫn Web (trên Web mở input file có capture, trình
   # duyệt tự xin quyền camera).
   image_picker: ^1.1.2
+  # Đăng nhập Google (nút "Đăng nhập tài khoản" ở menu "Tài khoản và Cài
+  # đặt") — firebase_core khởi tạo kết nối tới project `flowrite219` (đã
+  # dùng sẵn cho Firebase Hosting), firebase_auth giữ trạng thái đăng nhập,
+  # google_sign_in lấy thông tin tài khoản Google bên Android (Web dùng
+  # thẳng `signInWithPopup` của firebase_auth, không cần gói này).
+  firebase_core: ^3.8.0
+  firebase_auth: ^5.3.1
+  google_sign_in: ^6.2.1
 
 dev_dependencies:
   flutter_lints: ^4.0.0

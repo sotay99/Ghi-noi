@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "1081343450729",
+    "project_id": "flowrite219",
+    "storage_bucket": "flowrite219.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1081343450729:android:0ddbecc02fa7384c338cf8",
+        "android_client_info": {
+          "package_name": "com.flowrite.flowrite"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1081343450729-j3dajngu0na4mmr24jrr80hi4cft01vp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.flowrite.flowrite",
+            "certificate_hash": "4faa28fdad7ef9ac13076b095901847903eb84c5"
+          }
+        },
+        {
+          "client_id": "1081343450729-4d9v665910273u696a530j9iruj57p0l.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDSRo0ia7UQ2cxI8QQX_JcD2fLEPB7Va9s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1081343450729-4d9v665910273u696a530j9iruj57p0l.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
