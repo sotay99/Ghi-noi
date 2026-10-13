@@ -4,6 +4,7 @@
 
 import 'dart:convert';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'mo_hinh.dart';
@@ -594,4 +595,112 @@ class KhoDuLieu {
     }
     return (soThuMuc: tongThuMuc, soGhiChu: tongGhiChu, tongByte: tongByte);
   }
+}
+
+/// "Bộ nhớ trên đám mây" (Mô hình B — một cây HOÀN TOÀN TÁCH BIỆT khỏi cây
+/// nội bộ, không phải mirror/đồng bộ MỌI ghi chú local, xem thảo luận trong
+/// lịch sử trò chuyện lúc thiết kế). Mỗi tài khoản Google một cây riêng,
+/// lưu tại `users/{uid}/thuMucDamMay` và `users/{uid}/ghiChuDamMay` trên
+/// Firestore thay vì SharedPreferences.
+///
+/// CHỦ Ý kế thừa (`extends`) thay vì viết lại — toàn bộ logic thao tác cây
+/// (tạo/đổi tên/di chuyển/sao chép/thùng rác/sắp xếp tự nhiên/nhập zip...)
+/// ở lớp cha chỉ động vào hai danh sách `thuMuc`/`ghiChu` TRONG BỘ NHỚ, hoàn
+/// toàn không đụng gì tới nơi lưu trữ — chỉ `tai()`/`luu()` mới chạm
+/// SharedPreferences. Ghi đè đúng hai hàm đó là đủ để TOÀN BỘ phần còn lại
+/// (và vì vậy, cả `ManHinhThuMuc`/`TrangSoanThao` dùng nó) hoạt động Y HỆT
+/// cây nội bộ, không cần sửa một dòng nào ở hai màn hình đó — đúng yêu cầu
+/// "giao diện và logic như cây thư mục của bộ nhớ nội bộ".
+class KhoDuLieuDamMay extends KhoDuLieu {
+  KhoDuLieuDamMay(this.uid);
+
+  final String uid;
+  final _db = FirebaseFirestore.instance;
+
+  CollectionReference<Map<String, dynamic>> get _colThuMuc =>
+      _db.collection('users').doc(uid).collection('thuMucDamMay');
+  CollectionReference<Map<String, dynamic>> get _colGhiChu =>
+      _db.collection('users').doc(uid).collection('ghiChuDamMay');
+
+  /// "Ảnh chụp" nội dung (mã hoá JSON) của lần `tai()`/`luu()` gần nhất —
+  /// so để biết mục nào THẬT SỰ đổi trước khi ghi lên Firestore ở `luu()`,
+  /// tránh ghi lại nguyên cây mỗi lần (tốn quota — mỗi DOCUMENT ghi là một
+  /// lượt tính phí, khác hẳn SharedPreferences chỉ có MỘT khoá duy nhất).
+  Map<String, String> _anhThuMuc = {};
+  Map<String, String> _anhGhiChu = {};
+
+  void _chupAnh() {
+    _anhThuMuc = {for (final t in thuMuc) t.id: jsonEncode(t.toJson())};
+    _anhGhiChu = {for (final g in ghiChu) g.id: jsonEncode(g.toJson())};
+  }
+
+  @override
+  Future<String> tai() async {
+    thuMuc.clear();
+    ghiChu.clear();
+
+    final tmSnap = await _colThuMuc.get();
+    for (final d in tmSnap.docs) {
+      thuMuc.add(ThuMuc.fromJson({...d.data(), 'id': d.id}));
+    }
+    final gcSnap = await _colGhiChu.get();
+    for (final d in gcSnap.docs) {
+      ghiChu.add(GhiChuFile.fromJson({...d.data(), 'id': d.id}));
+    }
+
+    if (donDepThungRacQuaHan()) await luu();
+    _chupAnh();
+
+    final conHoatDong = ghiChu.where((g) => g.thoiGianXoa == null);
+    if (conHoatDong.isNotEmpty) return conHoatDong.first.id;
+    final moi = taoGhiChuMoi(thuMucGoc);
+    await luu();
+    return moi.id;
+  }
+
+  @override
+  Future<void> luu() async {
+    final batch = _db.batch();
+    var coGhi = false;
+
+    for (final t in thuMuc) {
+      final j = jsonEncode(t.toJson());
+      if (_anhThuMuc[t.id] != j) {
+        batch.set(_colThuMuc.doc(t.id), t.toJson());
+        coGhi = true;
+      }
+    }
+    for (final idCu in _anhThuMuc.keys) {
+      if (thuMuc.every((t) => t.id != idCu)) {
+        batch.delete(_colThuMuc.doc(idCu));
+        coGhi = true;
+      }
+    }
+
+    for (final g in ghiChu) {
+      final j = jsonEncode(g.toJson());
+      if (_anhGhiChu[g.id] != j) {
+        batch.set(_colGhiChu.doc(g.id), g.toJson());
+        coGhi = true;
+      }
+    }
+    for (final idCu in _anhGhiChu.keys) {
+      if (ghiChu.every((g) => g.id != idCu)) {
+        batch.delete(_colGhiChu.doc(idCu));
+        coGhi = true;
+      }
+    }
+
+    if (coGhi) await batch.commit();
+    _chupAnh();
+  }
+
+  /// (SỬA LỖI) Lớp cha ghi "ghi chú đang mở" vào MỘT khoá SharedPreferences
+  /// DÙNG CHUNG cho cả app — nếu không ghi đè, mở/chuyển ghi chú TRONG cây
+  /// đám mây sẽ ĐÈ MẤT khoá đó, khiến lần khởi động SAU của cây NỘI BỘ cố mở
+  /// nhầm một id thuộc cây đám mây (không tìm thấy, lặng lẽ sai). Cây đám
+  /// mây chỉ vào được qua điều hướng tay (không phải màn hình khởi động của
+  /// app) nên không cần nhớ "đang mở gì" giữa các lần mở app — bỏ qua hẳn.
+  @override
+  Future<void> datGhiChuDangMo(String id) async {}
 }

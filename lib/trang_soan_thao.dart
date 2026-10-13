@@ -21,7 +21,6 @@ import 'package:speech_to_text/speech_to_text.dart';
 import 'bo_nho_tam_dan_van_ban.dart';
 import 'cai_dat.dart';
 import 'dang_nhap_google.dart';
-import 'dong_bo_dam_may.dart';
 import 'doan_thiet_bi.dart';
 import 'mo_lien_ket_ngoai.dart';
 import 'nghe_resize_trinh_duyet.dart';
@@ -4339,57 +4338,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
   }
 
-  /// (BƯỚC 1-2 kế hoạch "Bộ nhớ đám mây") Mục "Đồng bộ lên đám mây" — đẩy
-  /// TOÀN BỘ cây local lên Firestore bằng tay, để tự kiểm tra đường ghi
-  /// chạy đúng. Chưa tự động, chưa đọc ngược từ cloud.
-  Future<void> _bamDongBoDamMay() async {
-    final uid = _nguoiDungDangNhap?.uid;
-    if (uid == null) return;
-    hienThongBaoGiua(context, 'Đang đồng bộ lên đám mây...');
-    try {
-      await DichVuDongBoDamMay.instance.dongBoToanBoLenDamMay(widget.kho, uid);
-      if (!mounted) return;
-      hienThongBaoGiua(context, 'Đã đồng bộ xong lên đám mây.');
-    } catch (e) {
-      if (!mounted) return;
-      hienThongBaoGiua(context, 'Đồng bộ lên đám mây thất bại: $e');
-    }
-  }
-
-  /// (BƯỚC 3 kế hoạch "Bộ nhớ đám mây") Tự động đồng bộ — hai hẹn giờ:
-  /// [_henDongBoDamMayNhe] là debounce THẬT (reset mỗi lần gọi lại, 3 giây
-  /// yên tay mới bắn), [_henDongBoDamMayTran] là TRẦN tối đa (chỉ đặt một
-  /// lần cho tới khi bắn xong, không bị reset) — gõ liên tục không ngừng tay
-  /// vẫn được đồng bộ ít nhất mỗi 15 giây, không bị trì hoãn vô thời hạn.
-  /// Không làm gì nếu CHƯA đăng nhập — chỉ local vẫn hoạt động bình thường.
-  Timer? _henDongBoDamMayNhe;
-  Timer? _henDongBoDamMayTran;
-
-  void _lenLichDongBoDamMay() {
-    if (_nguoiDungDangNhap == null) return;
-    _henDongBoDamMayNhe?.cancel();
-    _henDongBoDamMayNhe =
-        Timer(const Duration(seconds: 3), _dongBoNgayGhiChuHienTaiLenDamMay);
-    _henDongBoDamMayTran ??=
-        Timer(const Duration(seconds: 15), _dongBoNgayGhiChuHienTaiLenDamMay);
-  }
-
-  Future<void> _dongBoNgayGhiChuHienTaiLenDamMay() async {
-    _henDongBoDamMayNhe?.cancel();
-    _henDongBoDamMayNhe = null;
-    _henDongBoDamMayTran?.cancel();
-    _henDongBoDamMayTran = null;
-    final uid = _nguoiDungDangNhap?.uid;
-    if (uid == null) return;
-    try {
-      await DichVuDongBoDamMay.instance.dongBoMotGhiChu(_ghiChuHienTai, uid);
-    } catch (_) {
-      // Lỗi mạng/máy chủ tạm thời — không báo gì (sẽ ồn, vì có thể bắn mỗi
-      // 15 giây lúc đang gõ dài). Local vẫn luôn lưu đúng, chỉ cloud lỡ
-      // nhịp — lần gõ/đồng bộ kế tiếp sẽ tự thử lại.
-    }
-  }
-
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_khiPhimTatMicro);
@@ -4401,8 +4349,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     HardwareKeyboard.instance.removeHandler(_khiGoPhimBatKyTatChuThich);
     WidgetsBinding.instance.removeObserver(this);
     _dangKyDoiTrangThaiDangNhap?.cancel();
-    _henDongBoDamMayNhe?.cancel();
-    _henDongBoDamMayTran?.cancel();
     huyNgheResizeTrinhDuyet(_dangKyNgheResizeTrinhDuyet);
     huyThamDoChieuCaoVienPort(_dangKyThamDoChieuCaoVienPort);
     _hen?.cancel();
@@ -4579,7 +4525,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     widget.kho.suaNoiDungGhiChu(_ghiChuHienTai.id, noiDungLuu);
     await widget.kho.luu();
     _coThayDoiChuaLuu = false;
-    _lenLichDongBoDamMay();
   }
 
   /// Tách chuỗi lưu trữ thành (văn bản THẬT, khối AI mã hoá?, khối định dạng
@@ -5033,13 +4978,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void _moGhiChu(String id) {
     final g = widget.kho.timGhiChu(id);
     if (g == null) return;
-    // (BƯỚC 3 kế hoạch "Bộ nhớ đám mây") Rời khỏi ghi chú đang gõ — nếu còn
-    // đang chờ debounce đồng bộ cloud (xem `_lenLichDongBoDamMay`), đồng bộ
-    // NGAY cho ghi chú SẮP RỜI ĐI thay vì để treo tới tối đa 15 giây sau.
-    // Không `await` — không có lý do bắt người dùng đợi mạng mới chuyển tệp.
-    if (_henDongBoDamMayNhe != null) {
-      unawaited(_dongBoNgayGhiChuHienTaiLenDamMay());
-    }
     _ganDauDaMoTepChoLichSu(id);
     // (YÊU CẦU MỚI) Nhớ vị trí cuộn của tệp SẮP RỜI ĐI trước khi đổi — xem
     // `_ghiNhoViTriCuon`. Gọi `_phucHoiViTriCuon` cho tệp MỚI ở cuối hàm.
@@ -16381,7 +16319,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                         'Tài khoản Google'),
                 emailDaDangNhap: _nguoiDungDangNhap?.email,
                 urlAnhDaiDienDaDangNhap: _nguoiDungDangNhap?.photoURL,
-                khiBamDongBoDamMay: _bamDongBoDamMay,
                 boPhimNhanhDangMo: _boPhimNhanhCamUngMo,
                 noiBatBoPhimNhanh:
                     kIsWeb && (_thietBiHienTai == ThietBi.android || _thietBiHienTai == ThietBi.iphone),

@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,6 +22,12 @@ import 'modal_thong_tin_muc.dart';
 import 'modal_thung_rac.dart';
 import 'tai_ve_ghi_chu.dart';
 import 'thong_bao_giua.dart';
+// (YÊU CẦU MỚI) "Bộ nhớ trên đám mây" — mở một `TrangSoanThao`/`ManHinhThuMuc`
+// KHÁC, cùng y hệt giao diện/logic, chỉ khác `kho` truyền vào
+// (`KhoDuLieuDamMay` thay vì `KhoDuLieu` nội bộ). Import vòng lại
+// `trang_soan_thao.dart` (file đó cũng import file này cho nút "Thư mục") —
+// Dart cho phép import vòng giữa hai thư viện, không phải lỗi.
+import 'trang_soan_thao.dart';
 import 'zip_thu_muc.dart';
 
 /// (YÊU CẦU MỚI) "Ngôi nhà chung" — một mức ẢO đứng TRÊN `thuMucGoc` thật,
@@ -148,7 +155,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     // định đi thẳng tới thư mục đang chứa tệp mở ở trang soạn thảo.
     final nhoId = _nhoThuMucId;
     final nhoDuongDan = _nhoDuongDan;
-    if (nhoId != null && nhoDuongDan != null) {
+    if (nhoId != null && nhoDuongDan != null && identical(_nhoKho, widget.kho)) {
       _thuMucHienTaiId = nhoId;
       _duongDan.addAll(nhoDuongDan);
     } else {
@@ -175,6 +182,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     // này) đọc lại đúng ở `initState`.
     _nhoThuMucId = _thuMucHienTaiId;
     _nhoDuongDan = List<String>.from(_duongDan);
+    _nhoKho = widget.kho;
     _dangTimKiemNho = _dangTimKiem;
     _timKiemTrongThuMucIdNho = _timKiemTrongThuMucId;
     _timKiemTrongThuMucTenNho = _timKiemTrongThuMucTen;
@@ -237,10 +245,46 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     return _kho.timThuMuc(_thuMucHienTaiId)?.ten ?? 'Bộ nhớ Nội bộ';
   }
 
-  /// (YÊU CẦU MỚI) "Bộ nhớ trên đám mây"/"Bộ nhớ được chia sẻ với bạn" —
-  /// để dành cho sau này (đăng nhập Google), chưa làm gì cả ngoài báo biết.
+  /// (YÊU CẦU MỚI) "Bộ nhớ được chia sẻ với bạn" — để dành cho sau này,
+  /// chưa làm gì cả ngoài báo biết.
   void _baoDangNangCap() {
     hienThongBaoGiua(context, 'Tính năng đang nâng cấp');
+  }
+
+  /// "Bộ nhớ trên đám mây" — một cây HOÀN TOÀN TÁCH BIỆT khỏi cây nội bộ
+  /// (Mô hình B), chạy trên `KhoDuLieuDamMay` (xem `kho_du_lieu.dart`). Mở
+  /// ra bằng cách đẩy một `TrangSoanThao` MỚI dùng kho đó — chính nó đã tự
+  /// có nút "Thư mục" mở `ManHinhThuMuc` với kho đó, nên toàn bộ giao diện/
+  /// logic cây thư mục (tạo/đổi tên/xoá/sắp xếp/thùng rác...) hoạt động Y
+  /// HỆT cây nội bộ mà không cần sửa gì thêm ở hai màn hình đó.
+  Future<void> _moBoNhoDamMay() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      _bao('Cần đăng nhập Google trước (menu "Tài khoản và Cài đặt" ở trang soạn thảo).');
+      return;
+    }
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    try {
+      final khoDamMay = KhoDuLieuDamMay(uid);
+      final idMoDau = await khoDamMay.tai();
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Đóng vòng xoay chờ.
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => TrangSoanThao(
+          kho: khoDamMay,
+          caiDat: widget.caiDat,
+          ghiChuId: idMoDau,
+        ),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      _bao('Không mở được Bộ nhớ trên đám mây: $e');
+    }
   }
 
   // (YÊU CẦU MỚI) Bộ nhớ đệm "đang đứng ở đâu" — chỉ là biến `static` sống
@@ -251,6 +295,12 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   // dùng field thường (field thường mất theo State khi màn hình đóng).
   static String? _nhoThuMucId;
   static List<String>? _nhoDuongDan;
+  // (SỬA LỖI) `static` nên DÙNG CHUNG cho MỌI instance của màn hình này —
+  // kể cả hai cây TÁCH BIỆT (nội bộ/đám mây, Mô hình B). Không ghi thêm
+  // field này thì mở cây đám mây SAU KHI đã từng mở cây nội bộ sẽ lỡ dùng
+  // nhớ của cây KIA (id thư mục không tồn tại ở cây này) — chỉ dùng bộ nhớ
+  // khi ĐÚNG CÙNG MỘT `kho` (so bằng danh tính đối tượng) như lần ghi lại.
+  static KhoDuLieu? _nhoKho;
 
   /// Id thư mục cha của ghi chú đang mở ở trang soạn thảo — `null` nếu ghi
   /// chú đó không còn tồn tại (đã bị xoá) hay không rõ, lúc đó coi như gốc.
@@ -1094,7 +1144,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
         ListTile(
           leading: Icon(Icons.cloud_outlined, color: Colors.lightBlue.shade400),
           title: const Text('Bộ nhớ trên đám mây'),
-          onTap: _baoDangNangCap,
+          onTap: _moBoNhoDamMay,
         ),
         ListTile(
           leading: Icon(Icons.folder_shared_outlined, color: Colors.green.shade600),

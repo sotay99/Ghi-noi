@@ -57,7 +57,6 @@ on:
       - 'lib/ai_cau_hinh.dart'
       - 'lib/firebase_options.dart'
       - 'lib/dang_nhap_google.dart'
-      - 'lib/dong_bo_dam_may.dart'
       - '.github/workflows/deploy-web-full.yml'
   workflow_dispatch:
 
