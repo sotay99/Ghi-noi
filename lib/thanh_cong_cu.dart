@@ -1583,12 +1583,16 @@ class _NutTaiKhoanMenu extends StatelessWidget {
           splashRadius: 20,
           // (YÊU CẦU MỚI) Nền của menu "Tài khoản và Cài đặt" — vàng NHẠT.
           color: Colors.yellow.shade50,
+          // (YÊU CẦU MỚI) Đã đăng nhập — nền nút đổi sang xanh lá nhạt, báo
+          // ngay không cần mở menu ra mới biết.
           child: rong
               ? Container(
                   height: 32,
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: tenHienThiDaDangNhap != null
+                        ? const Color(0xFFE6F4EA)
+                        : Colors.white,
                     border: Border.all(color: const Color(0xFFDADCE0)),
                     borderRadius: BorderRadius.circular(16),
                   ),
@@ -1606,8 +1610,10 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                   width: 42,
                   height: 38,
                   alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
+                  decoration: BoxDecoration(
+                    color: tenHienThiDaDangNhap != null
+                        ? const Color(0xFFE6F4EA)
+                        : Colors.white,
                     shape: BoxShape.circle,
                   ),
                   child: haiIcon,

@@ -4236,9 +4236,31 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // (YÊU CẦU MỚI) Đăng nhập Google — nghe thay đổi trạng thái để vẽ lại
     // menu "Tài khoản và Cài đặt" (tên/avatar + đổi nhãn nút).
     _nguoiDungDangNhap = DichVuDangNhapGoogle.instance.nguoiDungHienTai;
+    // (YÊU CẦU MỚI) Báo "Đã đăng nhập vào tài khoản..." mỗi lần CHUYỂN từ
+    // chưa đăng nhập sang đã đăng nhập — bắt đúng cả hai trường hợp bằng
+    // MỘT nơi duy nhất (không cần tự báo riêng ở `_bamDangNhapGoogle`):
+    // 1) Bấm "Đăng nhập tài khoản" thật trong phiên này (mọi nền tảng).
+    // 2) Riêng bản WEB: vừa tải lại/mở lại trang mà trình duyệt đã nhớ sẵn
+    //    phiên đăng nhập từ trước — `authStateChanges()` luôn bắn NGAY sự
+    //    kiện đầu tiên là trạng thái hiện có lúc vừa subscribe, dùng cờ
+    //    [laLanDauNgheDangNhap] để nhận ra đây là lần đầu (khôi phục) chứ
+    //    không phải một lượt đăng nhập mới. Android/iOS CỐ Ý bỏ qua lần đầu
+    //    (không nên nhắc mỗi lần mở app nếu đã đăng nhập sẵn).
+    var laLanDauNgheDangNhap = true;
     _dangKyDoiTrangThaiDangNhap =
         DichVuDangNhapGoogle.instance.doiTrangThai.listen((nguoiDung) {
-      if (mounted) setState(() => _nguoiDungDangNhap = nguoiDung);
+      if (!mounted) return;
+      final laLanDau = laLanDauNgheDangNhap;
+      laLanDauNgheDangNhap = false;
+      setState(() => _nguoiDungDangNhap = nguoiDung);
+      if (nguoiDung == null) return;
+      if (laLanDau && !kIsWeb) return;
+      final ten = nguoiDung.displayName ?? nguoiDung.email ?? 'Google';
+      hienThongBaoGiua(
+        context,
+        'Đã đăng nhập vào tài khoản $ten',
+        thoiGian: const Duration(seconds: 5),
+      );
     });
     // TextField (Material) không có tham số `onSelectionChanged` — đó là
     // API của EditableText, không lộ ra ở TextField. Vì
@@ -4340,6 +4362,25 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       if (_nguoiDungDangNhap == null) {
         await DichVuDangNhapGoogle.instance.dangNhap();
       } else {
+        // (YÊU CẦU MỚI) Hỏi lại trước khi đăng xuất thật.
+        final chac = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Đăng xuất'),
+            content: const Text('Bạn có chắc chắn muốn đăng xuất không?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Huỷ'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Đăng xuất'),
+              ),
+            ],
+          ),
+        );
+        if (chac != true) return;
         await DichVuDangNhapGoogle.instance.dangXuat();
       }
     } catch (e) {
@@ -14779,6 +14820,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // của AppBar, tách biệt hẳn `actions`/`leading`) — không bao giờ chồng
     // lên các nút khác cùng hàng ngang, dù màn rộng hay hẹp.
     if (widget.kho is! KhoDuLieuDamMay) return noiDung;
+    // (YÊU CẦU MỚI) Màn hình RẤT hẹp — bớt icon đám mây, chỉ còn nền xanh lá
+    // nhạt, đỡ chật chỗ cho tên tệp.
+    final ratHep = MediaQuery.sizeOf(context).width < 420;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -14788,8 +14832,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.cloud, size: 18, color: Colors.green.shade700),
-          const SizedBox(width: 6),
+          if (!ratHep) ...[
+            Icon(Icons.cloud, size: 18, color: Colors.green.shade700),
+            const SizedBox(width: 6),
+          ],
           Flexible(child: noiDung),
         ],
       ),
@@ -15689,6 +15735,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // ngược lại công cụ bị ép chật tới mức khó bấm trúng.
     final appBar = manHinhHep
         ? AppBar(
+            // (SỬA LỖI — nút lùi thừa ở dòng tên tệp khi trang này được MỞ
+            // RA bằng Navigator.push, ví dụ ghi chú đám mây) Không đặt
+            // `leading` riêng cho màn hẹp như màn rộng (`_nutDieuHuongTep`)
+            // — Flutter mặc định TỰ chèn một nút lùi vào `leading` bất cứ
+            // khi nào trang đứng trên một trang khác có thể pop về (đúng
+            // trường hợp trang này được mở bằng `Navigator.push`). Bấm nút
+            // thừa đó vô tình pop về đúng màn hình đã mở ra trang này —
+            // chưa bao giờ là luồng điều hướng mong muốn, tắt hẳn.
+            automaticallyImplyLeading: false,
             // Màn hình hẹp: bốn nút thư mục/mở rộng/tệp trước/tệp sau KHÔNG
             // còn nằm cùng dòng với tên tệp nữa — dồn hết xuống dòng dưới,
             // sát mép trái, cùng dòng với Lùi/Tiến/Lưu/Ẩn-hiện-định-dạng.
