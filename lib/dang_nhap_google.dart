@@ -18,7 +18,22 @@ class DichVuDangNhapGoogle {
   DichVuDangNhapGoogle._();
   static final DichVuDangNhapGoogle instance = DichVuDangNhapGoogle._();
 
-  final _googleSignIn = GoogleSignIn(scopes: const ['email']);
+  // (SỬA LỖI — trang trắng sau khi F5 lúc đã đăng nhập) Trước đây đây là
+  // field khởi tạo NGAY (`final _googleSignIn = GoogleSignIn(...)`) — dựng
+  // `GoogleSignIn()` chạy NGAY LÚC `DichVuDangNhapGoogle.instance` được
+  // chạm tới lần đầu, mà việc đó xảy ra VÔ ĐIỀU KIỆN mỗi lần mở trang
+  // (`TrangSoanThao.initState`, đọc `nguoiDungHienTai`) — kể cả trên WEB,
+  // dù code này chỉ thật sự DÙNG `GoogleSignIn` trên Android (xem chú thích
+  // đầu tệp). Trên web, dựng `GoogleSignIn()` khiến gói `google_sign_in_web`
+  // tự khởi động Google Identity Services và tự thử "đăng nhập lặng lẽ" lại
+  // phiên cũ — khi đang có phiên đăng nhập thật, bước tự thử đó có lúc ném
+  // lỗi KHÔNG BẮT ĐƯỢC (uncaught, trong `google_sign_in_web.dart`), sập cả
+  // trang ngay từ lúc khởi động → màn hình trắng. Đổi sang getter LƯỜI —
+  // chỉ dựng khi THẬT SỰ được gọi tới (luồng Android, `if (!kIsWeb)`), nên
+  // trên web không bao giờ chạm tới `GoogleSignIn()` nữa.
+  GoogleSignIn? _googleSignInLuuTru;
+  GoogleSignIn get _googleSignIn =>
+      _googleSignInLuuTru ??= GoogleSignIn(scopes: const ['email']);
 
   User? get nguoiDungHienTai => FirebaseAuth.instance.currentUser;
 
