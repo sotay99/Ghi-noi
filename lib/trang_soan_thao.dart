@@ -4565,6 +4565,21 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 
   Future<void> _luuVanBan() async {
+    // (SỬA LỖI — "đi qua lại giữa các tệp đám mây bị lag") Trước đây hàm
+    // này LUÔN gọi `suaNoiDungGhiChu` (tự đặt `capNhat = DateTime.now()`,
+    // xem `kho_du_lieu.dart`) rồi `await widget.kho.luu()`, BẤT KỂ có gì
+    // thật sự thay đổi hay không — mỗi lần bấm "Tệp trước/sau" đều gọi hàm
+    // này một lượt. Với bộ nhớ NỘI BỘ, `luu()` chỉ ghi SharedPreferences,
+    // gần như tức thì, không ai để ý. Với bộ nhớ ĐÁM MÂY
+    // (`KhoDuLieuDamMay.luu()`), đổi `capNhat` khiến "ảnh chụp" JSON của
+    // ghi chú LUÔN khác bản cũ — `luu()` tưởng nhầm nội dung thật đã đổi,
+    // tự `await batch.commit()` lên Firestore (một lượt round-trip mạng
+    // thật) dù người dùng chỉ lướt qua xem, không gõ gì cả — đúng cảm giác
+    // "lag" mỗi lần chuyển tệp. `_coThayDoiChuaLuu` (đặt `true` ở `_henLuu`,
+    // đúng mỗi lần có gõ/sửa định dạng thật) đã sẵn có để biết CHÍNH XÁC có
+    // gì cần lưu hay không — không có gì mới thì khỏi đụng gì tới `kho`
+    // luôn, tự thoát ngay tại đây.
+    if (!_coThayDoiChuaLuu) return;
     _quetTuDienChinhTa();
     final khoiDinhDang = _macDinhDangAi();
     final khoiDinhDangThuCong = _macDinhDangThuCong();
