@@ -11076,6 +11076,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           : 'Chưa có văn bản nào để kiểm tra.');
       return;
     }
+    if (!_coTheDungAIVoiVanBan(vanBan, coVungChon: vungChon != null)) return;
 
     final daHuy = ValueNotifier<bool>(false);
     setState(() => _dangKiemTraToanVan = true);
@@ -12456,6 +12457,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (vanBanHienTai == _vanBanDaTinhDinhDang && chon == _luaChonDaTinhDinhDang) {
       return;
     }
+    // (YÊU CẦU MỚI) Vùng chọn đổi (kéo chọn, mũi tên, "Chọn tất cả"...) mà
+    // CHỮ không đổi — không đi qua đường gõ tay chèn/xoá ký tự nào cả, nên
+    // phải tự bắt riêng ở đây để vẫn coi là một lượt "gõ tay", thắng mic.
+    // (Đường `onTap` của `TextField` đã xử lý riêng lượt CHẠM không đổi vị
+    // trí con trỏ — ở đây bắt thêm các cách đổi vùng chọn KHÁC một cú chạm
+    // đơn, không trùng lặp có hại vì `_nguoiDungVuaGo` tự an toàn khi gọi
+    // nhiều lần.)
+    if (vanBanHienTai == _vanBanDaTinhDinhDang &&
+        chon != _luaChonDaTinhDinhDang &&
+        (_muonNghe || _micro.isListening)) {
+      _nguoiDungVuaGo();
+    }
     _vanBanDaTinhDinhDang = vanBanHienTai;
     _luaChonDaTinhDinhDang = chon;
 
@@ -13391,6 +13404,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           : 'Trang đang trống, không có gì để tóm tắt.');
       return;
     }
+    if (!_coTheDungAIVoiVanBan(vanBanGoc, coVungChon: vungChon != null)) return;
     var chonPhanTram = _tomTatNhoChonPhanTram;
     var phanTram = _tomTatNhoPhanTram;
     var chonCauLenh = _tomTatNhoChonCauLenh;
@@ -13564,6 +13578,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           : 'Trang đang trống, không có gì để mở rộng.');
       return;
     }
+    if (!_coTheDungAIVoiVanBan(vanBanGoc, coVungChon: vungChon != null)) return;
     var chonPhanTram = _moRongNhoChonPhanTram;
     var phanTram = _moRongNhoPhanTram;
     var chonCauLenh = _moRongNhoChonCauLenh;
@@ -13737,6 +13752,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           : 'Trang đang trống, không có gì để viết lại.');
       return;
     }
+    if (!_coTheDungAIVoiVanBan(vanBanGoc, coVungChon: vungChon != null)) return;
     final oCauLenh = TextEditingController(text: _vietLaiNhoCauLenh);
 
     showDialog<void>(
@@ -14105,6 +14121,26 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   TextSelection? _vungDangChonHopLe() {
     if (_epToanVanKhiCoVungChon) return null;
     return _vungChonThatSu();
+  }
+
+  /// (YÊU CẦU MỚI) Giới hạn ký tự khi dùng các mục "Làm việc với AI" tác
+  /// động lên TOÀN VĂN hoặc một VÙNG CHỌN (tóm tắt/mở rộng/viết lại/trò
+  /// chuyện/kiểm tra toàn văn/chính tả/dấu câu) — tránh gửi một văn bản quá
+  /// dài khiến yêu cầu AI chậm/tốn kém bất thường. Gọi NGAY ĐẦU mỗi hàm xử
+  /// lý, trước khi làm gì khác; trả `false` (và tự hiện thông báo giữa màn
+  /// hình) nếu vượt giới hạn — nơi gọi `return` ngay khi gặp `false`.
+  /// - Không có vùng chọn (áp dụng cho TOÀN VĂN): tối đa 20.000 ký tự.
+  /// - Có vùng chọn: tối đa 10.000 ký tự.
+  bool _coTheDungAIVoiVanBan(String vanBan, {required bool coVungChon}) {
+    final gioiHan = coVungChon ? 10000 : 20000;
+    if (vanBan.length <= gioiHan) return true;
+    hienThongBaoGiua(
+      context,
+      coVungChon
+          ? 'Vùng chọn vượt quá 10.000 ký tự - không thể sử dụng AI'
+          : 'Toàn bộ văn bản vượt quá 20.000 ký tự - không thể sử dụng AI',
+    );
+    return false;
   }
 
   /// Nút "Thay thế đoạn đã chọn" ở modal kết quả (tóm tắt/mở rộng/viết lại
@@ -16183,6 +16219,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           // thêm — không ảnh hưởng gì tới việc di chuyển
                           // con trỏ/chọn vùng bằng chạm như cũ.
                           onTap: () {
+                            // (YÊU CẦU MỚI) Chạm vào khung soạn thảo cũng phải
+                            // coi như một lượt "gõ tay" để thắng mic — kể cả
+                            // khi con trỏ KHÔNG đổi vị trí (chạm đúng chỗ đang
+                            // nhấp nháy), trường hợp mà việc chỉ nghe `selection`
+                            // đổi (nếu có) không tự bắt ra được. `onTap` luôn
+                            // bắn sau MỖI lần chạm thật, bất kể con trỏ dời đi
+                            // hay giữ y vị trí cũ.
+                            if (_muonNghe || _micro.isListening) _nguoiDungVuaGo();
                             if (!_choChamLaiDeBatBanPhimAo) return;
                             _choChamLaiDeBatBanPhimAo = false;
                             SystemChannels.textInput.invokeMethod<void>('TextInput.show');

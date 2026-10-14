@@ -1280,6 +1280,17 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   Future<void> _gui() async {
     final cauHoi = _oNhap.text.trim();
     if (cauHoi.isEmpty || _dangGui) return;
+    // (YÊU CẦU MỚI) Giới hạn ký tự cho MỖI LẦN gửi tin nhắn — khác với
+    // `_GioiHanKyTuChat` (chỉ chặn khung nhập không cho gõ/dán quá
+    // 100.000 ký tự); đây là một mức thấp hơn, chặn hẳn việc GỬI nếu câu
+    // hỏi người dùng tự gõ đã vượt quá 10.000 ký tự.
+    if (cauHoi.length > 10000) {
+      hienThongBaoGiua(
+        context,
+        'Tin nhắn vượt quá 10.000 ký tự - không thể gửi',
+      );
+      return;
+    }
     _oNhap.clear();
 
     final laLuotDau = widget.lichSu.isEmpty;
@@ -1288,6 +1299,27 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     final dinhKem = _dinhKemHienTai != LoaiDinhKemTroChuyen.khong
         ? _dinhKemHienTai
         : (laLuotDau ? LoaiDinhKemTroChuyen.toanVan : LoaiDinhKemTroChuyen.khong);
+
+    // (YÊU CẦU MỚI) Cùng giới hạn ký tự áp cho mọi mục "Làm việc với AI"
+    // khác trong trang soạn thảo — áp cho phần văn bản ĐÍNH KÈM gửi theo
+    // tin nhắn (khác với giới hạn 10.000 ký tự cho riêng câu hỏi tự gõ ở
+    // trên).
+    if (dinhKem == LoaiDinhKemTroChuyen.toanVan &&
+        widget.layVanBanHienTai().length > 20000) {
+      hienThongBaoGiua(
+        context,
+        'Toàn bộ văn bản vượt quá 20.000 ký tự - không thể sử dụng AI',
+      );
+      return;
+    }
+    if (dinhKem == LoaiDinhKemTroChuyen.doanChon &&
+        (_noiDungDoanChonDinhKem ?? '').length > 10000) {
+      hienThongBaoGiua(
+        context,
+        'Vùng chọn vượt quá 10.000 ký tự - không thể sử dụng AI',
+      );
+      return;
+    }
 
     String? noiDungDinhKem;
     String choAi;
@@ -1672,6 +1704,19 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                           maxLines: null,
                           keyboardType: TextInputType.multiline,
                           textInputAction: TextInputAction.newline,
+                          // (YÊU CẦU MỚI) Chạm/tạo vùng chọn trong khung nhập
+                          // cũng phải coi như một lượt "gõ tay" để thắng mic —
+                          // kể cả khi con trỏ KHÔNG đổi vị trí (chạm đúng chỗ
+                          // đang nhấp nháy) nên `_khiONhapDoi` (chỉ bắt được
+                          // lúc `selection` thật sự đổi) không tự bắt ra.
+                          // `onTap` của `TextField` luôn bắn sau MỖI lần chạm
+                          // thật vào khung, dù con trỏ dời đi hay giữ y vị trí
+                          // cũ.
+                          onTap: () {
+                            if (_micDangNghe || _dangTamTatMicChatDeGo) {
+                              _nguoiDungVuaGoChat();
+                            }
+                          },
                           // (YÊU CẦU MỚI) Giới hạn 100.000 ký tự — dán đoạn
                           // dài hơn thì tự cắt bớt, kèm thông báo nhanh.
                           inputFormatters: [
