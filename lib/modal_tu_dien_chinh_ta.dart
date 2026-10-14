@@ -39,6 +39,24 @@ Future<void> moModalTuDienChinhTa(
   );
 }
 
+/// Một kết quả khớp của thanh tìm kiếm trong modal từ điển — [laLoi] phân
+/// biệt dòng "Từ bị lỗi chính tả" ([chiSoThayThe] bỏ qua, luôn -1) với một
+/// trong các dòng "Từ thay thế" (xác định bởi [chiSoThayThe]).
+class _KetQuaTimTuDien {
+  _KetQuaTimTuDien({
+    required this.cap,
+    required this.laLoi,
+    required this.chiSoThayThe,
+    required this.batDau,
+    required this.ketThuc,
+  });
+  final CapTuDien cap;
+  final bool laLoi;
+  final int chiSoThayThe;
+  final int batDau;
+  final int ketThuc;
+}
+
 const _nhanThuThayThe = [
   'Từ thay thế vào thứ nhất',
   'Từ thay thế vào thứ hai',
@@ -63,6 +81,15 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
 
   /// Mỗi cặp có TỐI ĐA 3 ô — luôn có ít nhất ô "thứ nhất" (dù rỗng).
   final Map<CapTuDien, List<TextEditingController>> _oThayThe = {};
+
+  /// (YÊU CẦU MỚI — tìm kiếm trong từ điển) Một `FocusNode` riêng cho MỖI ô
+  /// (từ lỗi/từ thay thế) — cần để `_dieuHuongTimKiemTuDien` tự
+  /// `requestFocus()` đúng ô có kết quả khớp rồi đặt `selection` lên đúng
+  /// đoạn khớp, nhờ đó Flutter tự vẽ màu tô NỀN của chính selection đó lên
+  /// đoạn ký tự khớp — y hệt cách trang soạn thảo chính giữ màu tô vùng
+  /// chọn, không cần tự vẽ thêm painter riêng cho từng ô nhỏ rời rạc này.
+  final Map<CapTuDien, FocusNode> _focusLoi = {};
+  final Map<CapTuDien, List<FocusNode>> _focusThayThe = {};
 
   /// Cặp đang hiện cảnh báo "từ thay thế giống hệt từ lỗi" hoặc "từ lỗi bị
   /// trùng với một cặp khác" (mục 5) — vẽ viền đỏ + dòng chữ đỏ ngay dưới ô
@@ -90,6 +117,18 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
   bool _capVuaThemSang = true;
   Timer? _henNhapNhayCapMoi;
 
+  // ------------------------------------------------- Tìm kiếm trong từ điển
+
+  /// (YÊU CẦU MỚI) Thanh tìm kiếm riêng cho modal này — mở bằng nút kính
+  /// lúp cạnh "+ Thêm cặp từ". Y khuôn thanh tìm kiếm ở trang soạn thảo
+  /// chính (ô nhập, số kết quả, mũi tên lên/xuống, nút X xanh lá, nút Tắt
+  /// đỏ) nhưng KHÔNG có thanh thay thế ở dưới.
+  bool _hienThanhTimKiemTuDien = false;
+  final _oTimKiemTuDien = TextEditingController();
+  final _focusTimKiemTuDien = FocusNode();
+  List<_KetQuaTimTuDien> _ketQuaTimTuDien = [];
+  int _chiSoTimTuDienHienTai = -1;
+
   @override
   void initState() {
     super.initState();
@@ -103,11 +142,14 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
           .map((s) => TextEditingController(text: s))
           .toList();
       _khoaCap[c] = GlobalKey();
+      _focusLoi[c] = FocusNode();
+      _focusThayThe[c] = _oThayThe[c]!.map((_) => FocusNode()).toList();
     }
     final noiDung = widget.noiDungCanDua;
     if (noiDung != null && noiDung.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _dienNoiDungVaoCapRong(noiDung));
     }
+    _oTimKiemTuDien.addListener(_capNhatKetQuaTimTuDien);
   }
 
   @override
@@ -115,6 +157,8 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
     _henLuu?.cancel();
     _henNhapNhayCapMoi?.cancel();
     _cuon.dispose();
+    _oTimKiemTuDien.dispose();
+    _focusTimKiemTuDien.dispose();
     for (final o in _oLoi.values) {
       o.dispose();
     }
@@ -123,7 +167,106 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
         o.dispose();
       }
     }
+    for (final f in _focusLoi.values) {
+      f.dispose();
+    }
+    for (final ds in _focusThayThe.values) {
+      for (final f in ds) {
+        f.dispose();
+      }
+    }
     super.dispose();
+  }
+
+  /// Quét lại TOÀN BỘ danh sách — khớp cả chữ Hoa/thường (so sánh ở dạng
+  /// chữ thường), tìm trong TẤT CẢ các dòng (từ lỗi VÀ mọi từ thay thế) của
+  /// TẤT CẢ các cặp. Gọi lại mỗi khi [_oTimKiemTuDien] đổi; danh sách từ
+  /// điển nhỏ nên quét lại từ đầu mỗi lần không tốn gì đáng kể.
+  void _capNhatKetQuaTimTuDien() {
+    final tuKhoa = _oTimKiemTuDien.text;
+    final ketQuaCu = _chiSoTimTuDienHienTai >= 0 && _chiSoTimTuDienHienTai < _ketQuaTimTuDien.length
+        ? _ketQuaTimTuDien[_chiSoTimTuDienHienTai]
+        : null;
+    final moi = <_KetQuaTimTuDien>[];
+    if (tuKhoa.isNotEmpty) {
+      final tuKhoaThuong = tuKhoa.toLowerCase();
+      for (final c in _ds) {
+        void quet(String text, bool laLoi, int chiSoThayThe) {
+          final textThuong = text.toLowerCase();
+          var tu = 0;
+          while (true) {
+            final vt = textThuong.indexOf(tuKhoaThuong, tu);
+            if (vt < 0) break;
+            moi.add(_KetQuaTimTuDien(
+              cap: c,
+              laLoi: laLoi,
+              chiSoThayThe: chiSoThayThe,
+              batDau: vt,
+              ketThuc: vt + tuKhoa.length,
+            ));
+            tu = vt + 1;
+          }
+        }
+
+        quet(_oLoi[c]!.text, true, -1);
+        for (var i = 0; i < _oThayThe[c]!.length; i++) {
+          quet(_oThayThe[c]![i].text, false, i);
+        }
+      }
+    }
+    setState(() {
+      _ketQuaTimTuDien = moi;
+      if (ketQuaCu == null) {
+        _chiSoTimTuDienHienTai = moi.isEmpty ? -1 : 0;
+      } else {
+        final vtCu = moi.indexWhere((k) => k.cap == ketQuaCu.cap &&
+            k.laLoi == ketQuaCu.laLoi &&
+            k.chiSoThayThe == ketQuaCu.chiSoThayThe &&
+            k.batDau == ketQuaCu.batDau);
+        _chiSoTimTuDienHienTai = vtCu >= 0 ? vtCu : (moi.isEmpty ? -1 : 0);
+      }
+    });
+    if (_chiSoTimTuDienHienTai >= 0) _nhayToiKetQuaTimTuDien(_ketQuaTimTuDien[_chiSoTimTuDienHienTai]);
+  }
+
+  void _dieuHuongTimKiemTuDien(int chieu) {
+    if (_ketQuaTimTuDien.isEmpty) return;
+    setState(() {
+      _chiSoTimTuDienHienTai =
+          (_chiSoTimTuDienHienTai + chieu) % _ketQuaTimTuDien.length;
+      if (_chiSoTimTuDienHienTai < 0) _chiSoTimTuDienHienTai += _ketQuaTimTuDien.length;
+    });
+    _nhayToiKetQuaTimTuDien(_ketQuaTimTuDien[_chiSoTimTuDienHienTai]);
+  }
+
+  /// Cuộn tới đúng cặp chứa kết quả, rồi đặt tiêu điểm + vùng chọn lên ĐÚNG
+  /// đoạn ký tự khớp của đúng ô — Flutter tự vẽ màu tô NỀN của selection lên
+  /// đúng đoạn đó, y hệt cách giữ màu tô vùng chọn ở trang soạn thảo chính.
+  void _nhayToiKetQuaTimTuDien(_KetQuaTimTuDien k) {
+    _cuonToiCap(k.cap);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final focus = k.laLoi ? _focusLoi[k.cap] : _focusThayThe[k.cap]?[k.chiSoThayThe];
+      final oDk = k.laLoi ? _oLoi[k.cap] : _oThayThe[k.cap]?[k.chiSoThayThe];
+      if (focus == null || oDk == null) return;
+      focus.requestFocus();
+      oDk.selection = TextSelection(baseOffset: k.batDau, extentOffset: k.ketThuc);
+    });
+  }
+
+  void _dongTimKiemTuDien() {
+    setState(() {
+      _hienThanhTimKiemTuDien = false;
+      _ketQuaTimTuDien = [];
+      _chiSoTimTuDienHienTai = -1;
+    });
+  }
+
+  void _moTimKiemTuDien() {
+    setState(() => _hienThanhTimKiemTuDien = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusTimKiemTuDien.requestFocus();
+    });
   }
 
   /// (YÊU CẦU MỚI) Tìm/tạo một cặp RỖNG, điền [noiDung] vào trường "Từ bị
@@ -142,6 +285,8 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
         _oLoi[c] = TextEditingController();
         _oThayThe[c] = [TextEditingController()];
         _khoaCap[c] = GlobalKey();
+        _focusLoi[c] = FocusNode();
+        _focusThayThe[c] = [FocusNode()];
       });
     }
     setState(() {
@@ -216,6 +361,8 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
       _oLoi[c] = TextEditingController();
       _oThayThe[c] = [TextEditingController()];
       _khoaCap[c] = GlobalKey();
+      _focusLoi[c] = FocusNode();
+      _focusThayThe[c] = [FocusNode()];
     });
     // Đợi khung hình kế tiếp (sau khi `ListView` đã dựng thêm cặp mới, biết
     // được chiều cao thật mới) rồi mới cuộn — cuộn ngay trong `setState` sẽ
@@ -233,6 +380,10 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
       _loiTrungThayThe.remove(c);
       _loiTrungTuLoi.remove(c);
       _khoaCap.remove(c);
+      _focusLoi.remove(c)?.dispose();
+      for (final f in _focusThayThe.remove(c) ?? <FocusNode>[]) {
+        f.dispose();
+      }
     });
     widget.caiDat.luuTuDienChinhTa();
   }
@@ -248,6 +399,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
     if (ds.length >= 3) return;
     setState(() {
       ds.add(TextEditingController());
+      _focusThayThe[c]!.add(FocusNode());
       _dongBoThayThe(c);
     });
     _datLuu();
@@ -258,6 +410,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
   void _xoaHangTuThayThe(CapTuDien c, int chiSo) {
     setState(() {
       _oThayThe[c]!.removeAt(chiSo).dispose();
+      _focusThayThe[c]!.removeAt(chiSo).dispose();
       _dongBoThayThe(c);
       _kiemTraTrung();
     });
@@ -294,6 +447,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
     required TextEditingController controller,
     required String goiY,
     required void Function(String) onChanged,
+    FocusNode? focusNode,
     String? canhBao,
     VoidCallback? khiXoaHang,
     // (YÊU CẦU MỚI) Cặp từ đang RỖNG hoàn toàn — viền xanh dương đậm ở mọi
@@ -326,6 +480,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
             Expanded(
               child: TextField(
                 controller: controller,
+                focusNode: focusNode,
                 onChanged: onChanged,
                 // (YÊU CẦU MỚI) Giới hạn ký tự cho MỌI trường của từ điển —
                 // `maxLength` tự kèm `LengthLimitingTextInputFormatter`, nên
@@ -427,6 +582,13 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
         // màn hình lên xuống vẫn thấy, không cần cuộn lên tận đầu mới bấm
         // được. Hiện tên đầy đủ kèm icon, không rút gọn chỉ còn icon.
         actions: [
+          // (YÊU CẦU MỚI) Nút kính lúp — mở thanh tìm kiếm riêng của modal
+          // này, cạnh "+ Thêm cặp từ".
+          IconButton(
+            icon: const Icon(Icons.search),
+            tooltip: 'Tìm trong từ điển',
+            onPressed: _hienThanhTimKiemTuDien ? _dongTimKiemTuDien : _moTimKiemTuDien,
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: TextButton.icon(
@@ -446,8 +608,12 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          controller: _cuon,
+        child: Column(
+          children: [
+            if (_hienThanhTimKiemTuDien) _thanhTimKiemTuDien(),
+            Expanded(
+              child: ListView(
+                controller: _cuon,
           // (SỬA LỖI — "bấm Thêm cặp từ không tự cuộn tới cặp rỗng")
           // `Scrollable.ensureVisible` cần context CỦA ĐÚNG WIDGET đích đã
           // THẬT SỰ được dựng (`currentContext` khác `null`) — nhưng
@@ -479,6 +645,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
               _oNhap(
                 nhan: 'Từ bị lỗi chính tả hay gặp',
                 controller: _oLoi[c]!,
+                focusNode: _focusLoi[c],
                 goiY: 'Ví dụ: vd, mik, ...',
                 // (YÊU CẦU MỚI) Cặp rỗng hoàn toàn (xem `_capRong`) — viền
                 // xanh dương đậm ở MỌI trường trong cặp đó, phân biệt với
@@ -508,6 +675,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
                 _oNhap(
                   nhan: _nhanThuThayThe[i],
                   controller: _oThayThe[c]![i],
+                  focusNode: _focusThayThe[c]?[i],
                   goiY: i == 0 ? 'Để trống = đề xuất xoá' : 'Từ thay thế thêm',
                   noiBatRong: _laCapRong(c),
                   canhBao: i == 0 && _loiTrungThayThe.contains(c)
@@ -544,7 +712,69 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
               ),
             ],
           ],
+              ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  /// Thanh tìm kiếm nổi ngay dưới AppBar — y khuôn `_thanhTimKiem` của trang
+  /// soạn thảo chính (ô nhập, số kết quả, mũi tên lên/xuống, nút X xanh lá,
+  /// nút Tắt đỏ) nhưng KHÔNG có thanh thay thế ở dưới.
+  Widget _thanhTimKiemTuDien() {
+    return Container(
+      key: const ValueKey('thanhTimKiemTuDien'),
+      width: double.infinity,
+      color: const Color(0xFFF5F5F5),
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _oTimKiemTuDien,
+              focusNode: _focusTimKiemTuDien,
+              decoration: const InputDecoration(
+                isDense: true,
+                hintText: 'Tìm trong từ điển...',
+                border: OutlineInputBorder(),
+              ),
+              onSubmitted: (_) => _dieuHuongTimKiemTuDien(1),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _ketQuaTimTuDien.isEmpty
+                ? '0/0'
+                : '${_chiSoTimTuDienHienTai + 1}/${_ketQuaTimTuDien.length}',
+            style: const TextStyle(fontSize: 13, color: Color(0xFF5F6368)),
+          ),
+          IconButton(
+            icon: const Icon(Icons.keyboard_arrow_up),
+            tooltip: 'Kết quả trước',
+            onPressed: _ketQuaTimTuDien.isEmpty ? null : () => _dieuHuongTimKiemTuDien(-1),
+          ),
+          IconButton(
+            icon: const Icon(Icons.keyboard_arrow_down),
+            tooltip: 'Kết quả tiếp theo',
+            onPressed: _ketQuaTimTuDien.isEmpty ? null : () => _dieuHuongTimKiemTuDien(1),
+          ),
+          IconButton(
+            icon: Icon(Icons.close, color: Colors.green.shade700),
+            tooltip: 'Xoá nội dung tìm',
+            onPressed: () => _oTimKiemTuDien.clear(),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+            ),
+            onPressed: _dongTimKiemTuDien,
+            child: const Text('Tắt'),
+          ),
+        ],
       ),
     );
   }
