@@ -13975,8 +13975,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// cần cơ chế callback nào thêm.
   final Map<String, List<TinNhanTroChuyen>> _troChuyenTheoTep = {};
 
+  /// (YÊU CẦU MỚI) Câu đang gõ dở, CHƯA gửi, trong khung nhập của kênh
+  /// chat — CÙNG khuôn với [_troChuyenTheoTep] (khoá theo
+  /// `_ghiChuHienTai.id`, chỉ sống trong RAM của phiên hiện tại): thoát
+  /// kênh chat ra rồi vào lại (của ĐÚNG tệp này) vẫn thấy câu đang gõ dở,
+  /// chứ không chỉ riêng lịch sử các tin đã gửi.
+  final Map<String, String> _draftTroChuyenTheoTep = {};
+
   void _moTroChuyenVeVanBan() {
-    final lichSu = _troChuyenTheoTep.putIfAbsent(_ghiChuHienTai.id, () => []);
+    final idTep = _ghiChuHienTai.id;
+    final lichSu = _troChuyenTheoTep.putIfAbsent(idTep, () => []);
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ManHinhTroChuyen(
@@ -13989,6 +13997,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           // mà soát tiếp nếu Micro kênh chat còn lặp/lộn chữ sau các lần
           // sửa trước, thay vì tiếp tục đoán mò.
           ghiNhatKyMicro: _ghiNhatKyMicro,
+          draftBanDau: _draftTroChuyenTheoTep[idTep],
+          khiDoiDraft: (chu) => _draftTroChuyenTheoTep[idTep] = chu,
         ),
       ),
     );
@@ -15208,6 +15218,23 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           onPressed: () {
             setState(() => _anThanhDinhDang = !_anThanhDinhDang);
             _giuFocusOChuSauKhiBam();
+            // (YÊU CẦU MỚI) Bấm nút này LUÔN ép ẩn bàn phím ảo — bất kể lúc
+            // bấm nó đang hiện hay đang ẩn sẵn, và bất kể đang ẨN hay HIỆN
+            // thanh định dạng (cả hai chiều bấm đều ép ẩn, không chỉ một
+            // chiều). CHỈ áp dụng khi không có bàn phím vật lý gắn ngoài —
+            // bàn phím vật lý không đụng gì tới bàn phím ảo nên ép ẩn ở đó
+            // vô nghĩa. Ghi đè lên hành vi "giữ nguyên trạng thái" của
+            // `_giuFocusOChuSauKhiBam()` ở trên — mượn đúng cơ chế ép ẩn đã
+            // có ở `_resetManHinhTruocKhiMoMenu` (gọi `TextInput.hide` +
+            // khoá tạm `readOnly` qua `_epAnBanPhimAoKhiGiuFocus`, tự mở lại
+            // sau 600ms).
+            if (!_coBanPhimVatLy) {
+              SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+              setState(() => _epAnBanPhimAoKhiGiuFocus = true);
+              Future.delayed(const Duration(milliseconds: 600), () {
+                if (mounted) setState(() => _epAnBanPhimAoKhiGiuFocus = false);
+              });
+            }
           },
           // Emoji "chữ" — các nút khác trong hai thanh này đều dùng
           // Material Icon (`Icon(IconData)`), nhưng không có icon Material

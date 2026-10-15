@@ -48,7 +48,21 @@ class ManHinhTroChuyen extends StatefulWidget {
     required this.layDoanVanDangChon,
     required this.caiDat,
     this.ghiNhatKyMicro,
+    this.draftBanDau,
+    this.khiDoiDraft,
   });
+
+  /// (YÊU CẦU MỚI) Nội dung đang soạn dở trong khung nhập, CHƯA gửi, của
+  /// LẦN GẦN NHẤT màn hình này mở cho đúng tệp ghi chú này — điền sẵn vào
+  /// [_oNhap] lúc mở, để thoát ra vào lại vẫn thấy câu đang gõ dở. `null`
+  /// nếu chưa có gì hoặc lần trước đã gửi/xoá hết.
+  final String? draftBanDau;
+
+  /// Gọi lại mỗi khi nội dung khung nhập đổi (kể cả về rỗng sau khi gửi) —
+  /// nơi gọi (`trang_soan_thao.dart`) tự lưu vào một bộ nhớ tạm RIÊNG cho
+  /// MỖI tệp ghi chú (`_draftTroChuyenTheoTep`), chỉ sống trong RAM của
+  /// phiên app hiện tại, không ghi xuống đĩa.
+  final void Function(String)? khiDoiDraft;
 
   /// Đọc phím tắt Micro/Ghi âm đã cài (`caiDat.phimTatMicro`/`phimTatGhiAm`)
   /// — CÙNG phím tắt với trang soạn thảo chính, hoạt động y hệt trong kênh
@@ -1246,9 +1260,27 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
       _dinhKemHienTai = LoaiDinhKemTroChuyen.doanChon;
       _noiDungDoanChonDinhKem = doan;
     }
+    // (YÊU CẦU MỚI) Điền sẵn câu đang gõ dở của LẦN TRƯỚC (nếu có) — đặt
+    // con trỏ ở cuối, giống như đang gõ tiếp. Không dùng `_micTuDoiONhap`
+    // (cờ đó chỉ để phân biệt "đổi do mic" với "đổi do người dùng gõ tay",
+    // không liên quan ở đây) vì đây là lúc mới MỞ màn hình, `_khiONhapDoi`
+    // chưa kịp đăng ký lắng nghe.
+    final draft = widget.draftBanDau;
+    if (draft != null && draft.isNotEmpty) {
+      _oNhap.value = TextEditingValue(
+        text: draft,
+        selection: TextSelection.collapsed(offset: draft.length),
+      );
+    }
     _oNhap.addListener(_khiONhapDoi);
+    _oNhap.addListener(_khiDoiNoiDungDraft);
     HardwareKeyboard.instance.addHandler(_khiPhimCucBoTroChuyen);
   }
+
+  /// (YÊU CẦU MỚI) Báo lại cho nơi gọi mỗi khi nội dung khung nhập đổi —
+  /// kể cả do mic tự chèn (không chỉ gõ tay), vì câu đang "nói dở" cũng nên
+  /// được nhớ lại y hệt câu "gõ dở" nếu thoát ra giữa lúc đó.
+  void _khiDoiNoiDungDraft() => widget.khiDoiDraft?.call(_oNhap.text);
 
   @override
   void dispose() {
@@ -1259,6 +1291,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     _henGoXongMicChat?.cancel();
     if (_micDangNghe) _micro.stop();
     _oNhap.removeListener(_khiONhapDoi);
+    _oNhap.removeListener(_khiDoiNoiDungDraft);
     _oNhap.dispose();
     _focusONhap.dispose();
     _cuon.dispose();
