@@ -16639,6 +16639,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 khiBamChepTatCa: () => _chepTatCa(),
                 khiBamChepRoiXoaTatCa: _chepRoiXoaTatCa,
                 khiBamXoaTatCa: () => _xoaTatCa(),
+                khiBamChonTatCaTrongMenuThem: _phimAoChonTatCa,
                 khiBamDanhSachPhimTat: _moDanhSachPhimTat,
                 khiBamTimKiem: () => _hienThanhTimKiem ? _dongTimKiem() : _moTimKiem(),
                 khiBamTroChuyen: _moThongBaoTroChuyenDangNangCap,

@@ -8,6 +8,7 @@
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'cai_dat.dart';
 import 'kho_du_lieu.dart';
@@ -225,16 +226,79 @@ class _ManHinhChonKhoiDongState extends State<_ManHinhChonKhoiDong> {
     hienThongBaoGiua(context, 'Tính năng đang nâng cấp');
   }
 
+  /// Hộp thoại đặt tên khi TẠO MỚI (thư mục hoặc tệp) — Y HỆT
+  /// `_hoiTenMoiTao` ở `man_hinh_thu_muc.dart`: tên gợi ý điền sẵn và được
+  /// bôi đen toàn bộ, kiểm tên ngay khi bấm Lưu, sai thì báo lỗi tại chỗ.
+  Future<String?> _hoiTenMoiTao({
+    required String tieuDe,
+    required String tenGoiY,
+  }) {
+    final kho = _kho!;
+    final bo = TextEditingController(text: tenGoiY)
+      ..selection = TextSelection(baseOffset: 0, extentOffset: tenGoiY.length);
+    String? loi;
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, capNhat) {
+          return AlertDialog(
+            title: Text(tieuDe),
+            content: TextField(
+              controller: bo,
+              autofocus: true,
+              maxLength: doDaiTenToiDa,
+              inputFormatters: [FilteringTextInputFormatter.deny(kyTuCamTrongTen)],
+              decoration: InputDecoration(errorText: loi),
+              onSubmitted: (_) {
+                final k = kho.loiTenTrongThuMuc(bo.text, _thuMucHienTaiId);
+                if (k != null) {
+                  capNhat(() => loi = k);
+                  return;
+                }
+                Navigator.of(ctx).pop(bo.text.trim());
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(null),
+                child: const Text('Huỷ'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final k = kho.loiTenTrongThuMuc(bo.text, _thuMucHienTaiId);
+                  if (k != null) {
+                    capNhat(() => loi = k);
+                    return;
+                  }
+                  Navigator.of(ctx).pop(bo.text.trim());
+                },
+                child: const Text('Lưu'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _taoThuMucMoi() async {
     final kho = _kho!;
-    kho.taoThuMucMoi(_thuMucHienTaiId);
+    final goiY = kho.tenThuMucGoiY(_thuMucHienTaiId);
+    final ten = await _hoiTenMoiTao(tieuDe: 'Thư mục mới', tenGoiY: goiY);
+    if (ten == null || !mounted) return;
+    final t = kho.taoThuMucMoi(_thuMucHienTaiId);
+    t.ten = ten;
     await kho.luu();
     if (mounted) setState(() {});
   }
 
   Future<void> _taoTepMoi() async {
     final kho = _kho!;
-    kho.taoGhiChuMoi(_thuMucHienTaiId);
+    final goiY = kho.tenGhiChuGoiY(_thuMucHienTaiId);
+    final ten = await _hoiTenMoiTao(tieuDe: 'Ghi chú mới', tenGoiY: goiY);
+    if (ten == null || !mounted) return;
+    final g = kho.taoGhiChuMoi(_thuMucHienTaiId);
+    g.ten = ten;
     await kho.luu();
     if (mounted) setState(() {});
   }
@@ -259,15 +323,19 @@ class _ManHinhChonKhoiDongState extends State<_ManHinhChonKhoiDong> {
         ),
         title: Text(laChonThuMuc ? 'Chọn thư mục' : 'Chọn tệp'),
         actions: [
+          // (SỬA LỖI — icon biến mất trên bản dựng thật) Dùng emoji (Text)
+          // thay `Icon(IconData)` — icon Material không được dùng ở BẤT KỲ
+          // nơi nào khác trong app có thể bị bộ dựng "tree-shake" (lược
+          // bỏ) mất trên bản release, dù code không lỗi gì, xem CLAUDE.md.
           if (!_laNgoiNhaChung)
             IconButton(
-              icon: const Icon(Icons.create_new_folder_outlined),
+              icon: const Text('📁', style: TextStyle(fontSize: 20)),
               tooltip: 'Tạo thư mục mới',
               onPressed: _taoThuMucMoi,
             ),
           if (!_laNgoiNhaChung && !laChonThuMuc)
             IconButton(
-              icon: const Icon(Icons.note_add_outlined),
+              icon: const Text('📝', style: TextStyle(fontSize: 20)),
               tooltip: 'Tạo tệp văn bản mới',
               onPressed: _taoTepMoi,
             ),
@@ -343,8 +411,17 @@ class _ManHinhChonKhoiDongState extends State<_ManHinhChonKhoiDong> {
     final rong = noiDung.thuMucCon.isEmpty &&
         (!laChonTep || noiDung.ghiChuCon.isEmpty);
     if (rong) {
-      return const Center(
-        child: Text('Thư mục trống', style: TextStyle(color: Color(0xFF9AA0A6))),
+      return Center(
+        child: Text(
+          // (SỬA LỖI — chú thích không sát nghĩa) Mode chọn THƯ MỤC không
+          // hiện tệp ra nên trống chỉ có thể là "hết thư mục con", không
+          // phải "trống hoàn toàn" (có thể còn tệp bên trong, chỉ là
+          // không liên quan tới việc chọn thư mục ở đây).
+          laChonTep
+              ? 'Thư mục trống'
+              : 'Trong này không còn thư mục con nào nữa',
+          style: const TextStyle(color: Color(0xFF9AA0A6)),
+        ),
       );
     }
     return ListView(

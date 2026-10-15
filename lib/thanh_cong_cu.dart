@@ -56,6 +56,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamChepTatCa,
     required this.khiBamChepRoiXoaTatCa,
     required this.khiBamXoaTatCa,
+    required this.khiBamChonTatCaTrongMenuThem,
     required this.khiBamDanhSachPhimTat,
     required this.khiBamTimKiem,
     required this.khiBamTroChuyen,
@@ -246,6 +247,10 @@ class ThanhCongCu extends StatelessWidget {
   final VoidCallback khiBamChepTatCa;
   final VoidCallback khiBamChepRoiXoaTatCa;
   final VoidCallback khiBamXoaTatCa;
+
+  /// (YÊU CẦU MỚI) Mục "Chọn tất cả" trong menu "+ Thêm lựa chọn" — ngay
+  /// dưới "Xoá tất cả" — truyền thẳng xuống `_NutThemMenu`.
+  final VoidCallback khiBamChonTatCaTrongMenuThem;
 
   /// Gắn với mục "Danh sách phím tắt", ngay dưới "Kiểu gõ bàn phím".
   final VoidCallback khiBamDanhSachPhimTat;
@@ -488,6 +493,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamChepTatCa: khiBamChepTatCa,
                               khiBamChepRoiXoaTatCa: khiBamChepRoiXoaTatCa,
                               khiBamXoaTatCa: khiBamXoaTatCa,
+                              khiBamChonTatCaTrongMenuThem: khiBamChonTatCaTrongMenuThem,
                               khiBamDanhSachPhimTat: khiBamDanhSachPhimTat,
                               khiBamTimKiem: khiBamTimKiem,
                               khiMoMenu: khiMoMenuCanReset,
@@ -1368,6 +1374,7 @@ class _NutThemMenu extends StatelessWidget {
     required this.khiBamChepTatCa,
     required this.khiBamChepRoiXoaTatCa,
     required this.khiBamXoaTatCa,
+    required this.khiBamChonTatCaTrongMenuThem,
     required this.khiBamDanhSachPhimTat,
     required this.khiBamTimKiem,
     required this.khiMoMenu,
@@ -1389,6 +1396,12 @@ class _NutThemMenu extends StatelessWidget {
   final VoidCallback khiBamChepTatCa;
   final VoidCallback khiBamChepRoiXoaTatCa;
   final VoidCallback khiBamXoaTatCa;
+
+  /// (YÊU CẦU MỚI) Mục "Chọn tất cả" — ngay dưới "Xoá tất cả" — tạo vùng
+  /// chọn toàn bộ văn bản, dùng LẠI đúng hàm của nút "All" tròn ngoài
+  /// thanh công cụ (`_NutAllTron`/`_phimAoChonTatCa`), không viết lại.
+  final VoidCallback khiBamChonTatCaTrongMenuThem;
+
   final VoidCallback khiBamDanhSachPhimTat;
 
   /// Mục 8b: "Tìm kiếm và thay thế" dời vào đây, đúng vị trí mà "Thêm
@@ -1453,6 +1466,9 @@ class _NutThemMenu extends StatelessWidget {
               case 22:
                 khiBamXoaTatCa();
                 break;
+              case 28:
+                khiBamChonTatCaTrongMenuThem();
+                break;
               case 25:
                 khiBamTimKiem();
                 break;
@@ -1477,6 +1493,7 @@ class _NutThemMenu extends StatelessWidget {
                 _mucMenuThem(20, 'Sao chép tất cả'),
                 _mucMenuThem(21, 'Sao chép rồi xoá tất cả'),
                 _mucMenuThem(22, 'Xoá tất cả'),
+                _mucMenuThem(28, 'Chọn tất cả'),
                 _dividerMenu(),
                 // "Thêm ảnh"/"Chụp ảnh (camera)" đã dời sang menu "Làm việc
                 // với AI" (đổi tên "Chuyển hình ảnh thành văn bản") — "Cài

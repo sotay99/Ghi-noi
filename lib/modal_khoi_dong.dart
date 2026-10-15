@@ -59,6 +59,15 @@ class _ManHinhCaiDatKhoiDongState extends State<_ManHinhCaiDatKhoiDong> {
   KhoDuLieu? _tepKho;
   String? _tepId;
 
+  /// (SỬA LỖI — "có lúc chọn được B, có lúc bấm không ăn, cứ bị ép về A")
+  /// TRƯỚC ĐÂY đây là một GETTER tính lại bằng cách so `_tepKho`/`_tepId`
+  /// với tệp đang mở ở trang soạn thảo — radio B hễ vô tình trùng tệp
+  /// đang mở (ví dụ vừa dùng B để tự chọn lại ĐÚNG tệp đang mở) là bị tính
+  /// NGƯỢC thành A, không cách nào giữ ở B được nữa. Đổi thành một CỜ
+  /// riêng, người dùng bấm A/B là đổi THẲNG cờ này, không suy luận ngược
+  /// từ dữ liệu khác.
+  bool _subA = true;
+
   @override
   void initState() {
     super.initState();
@@ -86,18 +95,19 @@ class _ManHinhCaiDatKhoiDongState extends State<_ManHinhCaiDatKhoiDong> {
         _tepId = c.khoiDongTepId;
       }
     }
-  }
 
-  bool get _tepHienTaiLaDamMay => widget.khoHienTai is KhoDuLieuDamMay;
-
-  /// Lựa chọn 3 đang chỉ đúng tệp ĐANG MỞ ở trang soạn thảo — đây là ranh
-  /// giới hiển thị giữa sub-lựa chọn A ("tệp đang soạn thảo") và B ("chọn
-  /// tệp trong cây thư mục"); cả hai cùng ghi vào ĐÚNG MỘT chỗ lưu
-  /// (`khoiDongTep*`), chỉ khác cách lấy được tệp đó.
-  bool get _laSubA {
-    if (_tepKho == null || _tepId != widget.ghiChuHienTai.id) return false;
-    final tepLaDamMay = _tepKho is KhoDuLieuDamMay;
-    return tepLaDamMay == _tepHienTaiLaDamMay;
+    // Chỉ dùng MỘT LẦN lúc mở modal, để đoán ban đầu sub-lựa chọn nào hợp
+    // lý hơn (không ảnh hưởng gì tới việc bấm đổi A/B sau đó) — tệp đã
+    // lưu sẵn TRÙNG với tệp đang mở ở trang soạn thảo thì khả năng cao là
+    // do A tạo ra, còn lại (hoặc chưa chọn gì) thì để A làm mặc định theo
+    // đúng yêu cầu "mặc định là lựa chọn A".
+    if (_tepKho != null &&
+        _tepId == widget.ghiChuHienTai.id &&
+        (_tepKho is KhoDuLieuDamMay) == (widget.khoHienTai is KhoDuLieuDamMay)) {
+      _subA = true;
+    } else if (_tepKho != null) {
+      _subA = false;
+    }
   }
 
   Future<void> _luu() async {
@@ -142,7 +152,15 @@ class _ManHinhCaiDatKhoiDongState extends State<_ManHinhCaiDatKhoiDong> {
   }
 
   Future<void> _datKieu(String kieu) async {
+    final truocDo = _kieu;
     setState(() => _kieu = kieu);
+    // (YÊU CẦU MỚI) Mới CHUYỂN VÀO lựa chọn 3 (trước đó đang ở lựa chọn
+    // khác) — mặc định sub-lựa chọn A, tự ghim luôn tệp đang mở để lựa
+    // chọn 3 hợp lệ (lưu được) ngay, không cần bấm thêm gì.
+    if (kieu == 'tepChiDinh' && truocDo != 'tepChiDinh') {
+      await _chonTepDangSoanThao();
+      return;
+    }
     if (_hopLe(kieu)) await _luu();
   }
 
@@ -177,11 +195,17 @@ class _ManHinhCaiDatKhoiDongState extends State<_ManHinhCaiDatKhoiDong> {
   /// Tự ghim ĐÚNG tệp đang mở ở trang soạn thảo (sub-lựa chọn A).
   Future<void> _chonTepDangSoanThao() async {
     setState(() {
+      _subA = true;
       _tepKho = widget.khoHienTai;
       _tepId = widget.ghiChuHienTai.id;
     });
     if (_kieu == 'tepChiDinh') await _luu();
   }
+
+  /// Chuyển sang sub-lựa chọn B — CHỈ đổi cờ hiển thị, KHÔNG đụng gì tới
+  /// `_tepKho`/`_tepId` (nếu đã từng chọn một tệp qua B trước đó, giữ
+  /// nguyên, không bắt chọn lại từ đầu).
+  void _chonSubB() => setState(() => _subA = false);
 
   /// Đường dẫn đầy đủ (từ gốc) của thư mục [id] trong [kho] — "Tên gốc" (Bộ
   /// nhớ Nội bộ/Bộ nhớ trên đám mây) rồi tới từng thư mục cha, cách nhau
@@ -278,7 +302,7 @@ class _ManHinhCaiDatKhoiDongState extends State<_ManHinhCaiDatKhoiDong> {
                     RadioListTile<bool>(
                       contentPadding: EdgeInsets.zero,
                       value: true,
-                      groupValue: _laSubA,
+                      groupValue: _subA,
                       activeColor: _mauChinh,
                       title: Text('Mở tệp ${widget.ghiChuHienTai.ten} đang soạn thảo'),
                       onChanged: (_) => _chonTepDangSoanThao(),
@@ -286,12 +310,12 @@ class _ManHinhCaiDatKhoiDongState extends State<_ManHinhCaiDatKhoiDong> {
                     RadioListTile<bool>(
                       contentPadding: EdgeInsets.zero,
                       value: false,
-                      groupValue: _laSubA,
+                      groupValue: _subA,
                       activeColor: _mauChinh,
                       title: const Text('Chọn tệp trong cây thư mục'),
-                      onChanged: (_) {}, // Chỉ bấm nút "Chọn tệp" bên dưới mới có tác dụng.
+                      onChanged: (_) => _chonSubB(),
                     ),
-                    if (!_laSubA)
+                    if (!_subA)
                       Padding(
                         padding: const EdgeInsets.only(left: 32, bottom: 8),
                         child: _nutChonViTri(
