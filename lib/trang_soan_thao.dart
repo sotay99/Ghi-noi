@@ -12539,18 +12539,31 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (vanBanHienTai == _vanBanDaTinhDinhDang && chon == _luaChonDaTinhDinhDang) {
       return;
     }
-    // (YÊU CẦU MỚI) Vùng chọn đổi (kéo chọn, mũi tên, "Chọn tất cả"...) mà
-    // CHỮ không đổi — không đi qua đường gõ tay chèn/xoá ký tự nào cả, nên
-    // phải tự bắt riêng ở đây để vẫn coi là một lượt "gõ tay", thắng mic.
-    // (Đường `onTap` của `TextField` đã xử lý riêng lượt CHẠM không đổi vị
-    // trí con trỏ — ở đây bắt thêm các cách đổi vùng chọn KHÁC một cú chạm
-    // đơn, không trùng lặp có hại vì `_nguoiDungVuaGo` tự an toàn khi gọi
-    // nhiều lần.)
-    if (vanBanHienTai == _vanBanDaTinhDinhDang &&
-        chon != _luaChonDaTinhDinhDang &&
-        (_muonNghe || _micro.isListening)) {
-      _nguoiDungVuaGo();
-    }
+    // (SỬA LỖI — "mic ngắt tiếng sau khi ngừng nói vài giây, phải chạm/gõ
+    // tay mới chịu bắt lại") Bản trước ở ĐÂY có thêm một nhánh: hễ vùng
+    // chọn đổi mà chữ không đổi, trong lúc mic đang nghe, là gọi thẳng
+    // `_nguoiDungVuaGo()` (NGẮT HẲN phiên đang nghe, hẹn giờ bật lại sau
+    // vài giây theo "Cài đặt Micro"). Ý định đúng là bắt lượt KÉO CHỌN/
+    // MŨI TÊN thật — nhưng hàm này chạy trên MỌI `notifyListeners()` của
+    // `_boDieuKhien`, kể cả những lượt không phải người dùng chủ động đổi
+    // vùng chọn (ví dụ dội lại từ chính bộ điều khiển trong lúc mic đang
+    // yên, không có gì đổi thật) — gọi `_nguoiDungVuaGo()` nhầm sẽ ngắt
+    // hẳn phiên mic đang nghe mà không ai biết, chỉ còn lại hẹn giờ bật
+    // lại cỡ vài giây — ĐÚNG triệu chứng người dùng báo: nói liên tục thì
+    // không sao (chữ luôn đổi, không rơi vào nhánh này), ngừng vài giây
+    // rồi nói lại thì im bặt (đã bị ngắt từ lúc ngừng, dù nút vẫn hiện
+    // "đang nghe" vì UI của `_nguoiDungVuaGo` tự bật lại rất nhanh).
+    //
+    // `_khiNguoiDungSua` (đăng ký RIÊNG, cũng nghe `_boDieuKhien`) đã tự xử
+    // lý đúng và AN TOÀN hơn nhiều cho đúng trường hợp "chữ không đổi,
+    // vùng chọn đổi" này từ trước — có hẳn hai lớp chặn dội ngược
+    // (`trungKhit`/`vuaGhiXong`) để không tưởng nhầm chính bộ điều khiển
+    // của mình là người dùng, và xử lý NHẸ TAY (chỉ đóng băng đoạn đang
+    // nhảy + dời neo, KHÔNG ngắt hẳn phiên nghe) cho cả lúc kéo chọn
+    // (`!chon.isCollapsed`) và dời con trỏ bằng mũi tên. Bỏ hẳn nhánh thêm
+    // ở đây — nó chỉ trùng lặp có hại, không cần thiết. Lượt CHẠM đúng tại
+    // vị trí con trỏ cũ (chữ và vùng chọn đều không đổi, nên không hàm nào
+    // ở đây bắt được) đã có `onTap` riêng của `TextField` xử lý.
     _vanBanDaTinhDinhDang = vanBanHienTai;
     _luaChonDaTinhDinhDang = chon;
 
