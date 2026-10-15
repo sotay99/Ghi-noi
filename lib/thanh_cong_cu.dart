@@ -64,6 +64,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiMoMenuCanReset,
     required this.khiDongMenuAI,
     required this.khiBamDangNhapGoogle,
+    required this.khiBamKhoiDongTep,
     this.tenHienThiDaDangNhap,
     this.emailDaDangNhap,
     this.urlAnhDaiDienDaDangNhap,
@@ -76,6 +77,10 @@ class ThanhCongCu extends StatelessWidget {
   /// (YÊU CẦU MỚI) Đăng nhập/đăng xuất Google — xem chú thích đầy đủ ở
   /// `_NutTaiKhoanMenu`, truyền thẳng xuống.
   final VoidCallback khiBamDangNhapGoogle;
+
+  /// (YÊU CẦU MỚI) Mục "Khi khởi động App: Mở tệp..." — truyền thẳng xuống
+  /// `_NutTaiKhoanMenu`.
+  final VoidCallback khiBamKhoiDongTep;
   final String? tenHienThiDaDangNhap;
   final String? emailDaDangNhap;
   final String? urlAnhDaiDienDaDangNhap;
@@ -501,6 +506,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamTroChuyen: khiBamTroChuyen,
                               khiMoMenu: khiMoMenuCanReset,
                               khiBamDangNhapGoogle: khiBamDangNhapGoogle,
+                              khiBamKhoiDongTep: khiBamKhoiDongTep,
                               tenHienThiDaDangNhap: tenHienThiDaDangNhap,
                               emailDaDangNhap: emailDaDangNhap,
                               urlAnhDaiDienDaDangNhap: urlAnhDaiDienDaDangNhap,
@@ -1521,6 +1527,7 @@ class _NutTaiKhoanMenu extends StatelessWidget {
     required this.khiBamTroChuyen,
     required this.khiMoMenu,
     required this.khiBamDangNhapGoogle,
+    required this.khiBamKhoiDongTep,
     this.tenHienThiDaDangNhap,
     this.emailDaDangNhap,
     this.urlAnhDaiDienDaDangNhap,
@@ -1531,6 +1538,9 @@ class _NutTaiKhoanMenu extends StatelessWidget {
   /// gọi (`trang_soan_thao.dart`) tự quyết đăng nhập hay đăng xuất dựa theo
   /// đúng trạng thái đang có, menu này không tự giữ trạng thái.
   final VoidCallback khiBamDangNhapGoogle;
+
+  /// (YÊU CẦU MỚI) Mục "Khi khởi động App: Mở tệp..." — mở `moModalKhoiDong`.
+  final VoidCallback khiBamKhoiDongTep;
 
   /// Khác `null` nghĩa là ĐANG đăng nhập — tên/avatar hiện thêm ở dòng CUỐI
   /// CÙNG của menu. Cả ba đều `null` cùng lúc khi chưa đăng nhập.
@@ -1641,6 +1651,9 @@ class _NutTaiKhoanMenu extends StatelessWidget {
               case 5:
                 khiBamDangNhapGoogle();
                 break;
+              case 27:
+                khiBamKhoiDongTep();
+                break;
             }
           },
           itemBuilder: (ctx) {
@@ -1655,7 +1668,7 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                 // menu, cùng kiểu dòng với "Cài đặt Micro"/"Cài đặt Hiển thị
                 // và tự động sửa" bên dưới.
                 _mucMenuThem(6, 'Language - Ngôn ngữ'),
-                _mucMenuThem(7, 'Mỗi khi khởi động Ứng dụng: Hiển thị Tệp...'),
+                _mucMenuThem(27, 'Khi khởi động App: Mở tệp...'),
                 _dividerMenu(),
                 _mucMenuThem(1, 'Cài đặt Micro'),
                 _mucMenuThem(2, 'Cài đặt Hiển thị và tự động sửa'),

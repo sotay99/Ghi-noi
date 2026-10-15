@@ -470,8 +470,106 @@ class CaiDat {
     }
   }
 
+  // --------------------------------------- "Khi khởi động App: Mở tệp..."
+
+  /// (YÊU CẦU MỚI) Một trong ba kiểu: 'ganDayNhat' (MẶC ĐỊNH) — mở lại
+  /// tệp đang soạn thảo gần đây nhất, dù thuộc bộ nhớ nội bộ hay đám mây;
+  /// 'tepTrong' — mở một tệp TRỐNG trong thư mục đã chọn
+  /// ([khoiDongThuMucLoai]/[khoiDongThuMucId]); 'tepChiDinh' — mở đúng
+  /// một tệp cố định ([khoiDongTepLoai]/[khoiDongTepId]). Xem
+  /// `khoi_dong_tep.dart` cho toàn bộ logic áp dụng lúc mở app.
+  String kieuMoKhiKhoiDong = 'ganDayNhat';
+
+  /// Chỉ có ý nghĩa khi [kieuMoKhiKhoiDong] == 'tepTrong'. [khoiDongThuMucLoai]
+  /// là 'noiBo' hoặc 'damMay'; [khoiDongThuMucUid] chỉ có giá trị khi là
+  /// 'damMay' (phát hiện đổi tài khoản Google — tài khoản khác thì coi
+  /// như thư mục không còn hợp lệ nữa).
+  String? khoiDongThuMucLoai;
+  String? khoiDongThuMucId;
+  String? khoiDongThuMucUid;
+
+  /// Chỉ có ý nghĩa khi [kieuMoKhiKhoiDong] == 'tepChiDinh' — dùng CHUNG
+  /// cho cả hai lựa chọn con A ("tệp đang soạn thảo", tự ghim ngay lúc
+  /// tích chọn) và B ("chọn tệp trong cây thư mục", tự duyệt cây) — cả
+  /// hai chỉ khác nhau ở CÁCH lấy được bộ ba này, còn lưu/áp dụng thì y
+  /// hệt nhau.
+  String? khoiDongTepLoai;
+  String? khoiDongTepId;
+  String? khoiDongTepUid;
+
+  static const _khoaKieuMoKhiKhoiDong = 'ghi_noi_kieu_mo_khi_khoi_dong';
+  static const _khoaKhoiDongThuMucLoai = 'ghi_noi_khoi_dong_thu_muc_loai';
+  static const _khoaKhoiDongThuMucId = 'ghi_noi_khoi_dong_thu_muc_id';
+  static const _khoaKhoiDongThuMucUid = 'ghi_noi_khoi_dong_thu_muc_uid';
+  static const _khoaKhoiDongTepLoai = 'ghi_noi_khoi_dong_tep_loai';
+  static const _khoaKhoiDongTepId = 'ghi_noi_khoi_dong_tep_id';
+  static const _khoaKhoiDongTepUid = 'ghi_noi_khoi_dong_tep_uid';
+
+  Future<void> luuCaiDatKhoiDong() async {
+    final kho = await SharedPreferences.getInstance();
+    await kho.setString(_khoaKieuMoKhiKhoiDong, kieuMoKhiKhoiDong);
+    Future<void> luuChuoi(String khoa, String? gia) =>
+        gia == null ? kho.remove(khoa) : kho.setString(khoa, gia);
+    await luuChuoi(_khoaKhoiDongThuMucLoai, khoiDongThuMucLoai);
+    await luuChuoi(_khoaKhoiDongThuMucId, khoiDongThuMucId);
+    await luuChuoi(_khoaKhoiDongThuMucUid, khoiDongThuMucUid);
+    await luuChuoi(_khoaKhoiDongTepLoai, khoiDongTepLoai);
+    await luuChuoi(_khoaKhoiDongTepId, khoiDongTepId);
+    await luuChuoi(_khoaKhoiDongTepUid, khoiDongTepUid);
+  }
+
+  /// (YÊU CẦU MỚI) Theo dõi tệp đang soạn thảo GẦN NHẤT thuộc BỘ NHỚ ĐÁM
+  /// MÂY — chỉ có ý nghĩa khi tệp gần nhất THỰC SỰ là đám mây; khi là nội
+  /// bộ thì để trống cả hai (lúc đó lựa chọn "gần đây nhất" đọc THẲNG cơ
+  /// chế "ghi chú đang mở" đã có sẵn của bộ nhớ nội bộ, tự nhớ đủ rồi,
+  /// không cần theo dõi thêm ở đây).
+  String? ganDayNhatDamMayId;
+  String? ganDayNhatDamMayUid;
+
+  static const _khoaGanDayNhatDamMayId = 'ghi_noi_gan_day_nhat_dam_may_id';
+  static const _khoaGanDayNhatDamMayUid = 'ghi_noi_gan_day_nhat_dam_may_uid';
+
+  /// Gọi mỗi khi MỞ một ghi chú MỚI, bất kể kho nào (xem `_moGhiChu` ở
+  /// `trang_soan_thao.dart`). [laDamMay] false thì chỉ cần xoá dấu vết đám
+  /// mây cũ — đã chuyển sang mở một ghi chú NỘI BỘ.
+  Future<void> ghiNhoGanDayNhat({
+    required bool laDamMay,
+    String? id,
+    String? uid,
+  }) async {
+    final kho = await SharedPreferences.getInstance();
+    if (!laDamMay) {
+      ganDayNhatDamMayId = null;
+      ganDayNhatDamMayUid = null;
+      await kho.remove(_khoaGanDayNhatDamMayId);
+      await kho.remove(_khoaGanDayNhatDamMayUid);
+      return;
+    }
+    ganDayNhatDamMayId = id;
+    ganDayNhatDamMayUid = uid;
+    if (id == null) {
+      await kho.remove(_khoaGanDayNhatDamMayId);
+    } else {
+      await kho.setString(_khoaGanDayNhatDamMayId, id);
+    }
+    if (uid == null) {
+      await kho.remove(_khoaGanDayNhatDamMayUid);
+    } else {
+      await kho.setString(_khoaGanDayNhatDamMayUid, uid);
+    }
+  }
+
   Future<void> tai() async {
     final kho = await SharedPreferences.getInstance();
+    kieuMoKhiKhoiDong = kho.getString(_khoaKieuMoKhiKhoiDong) ?? 'ganDayNhat';
+    khoiDongThuMucLoai = kho.getString(_khoaKhoiDongThuMucLoai);
+    khoiDongThuMucId = kho.getString(_khoaKhoiDongThuMucId);
+    khoiDongThuMucUid = kho.getString(_khoaKhoiDongThuMucUid);
+    khoiDongTepLoai = kho.getString(_khoaKhoiDongTepLoai);
+    khoiDongTepId = kho.getString(_khoaKhoiDongTepId);
+    khoiDongTepUid = kho.getString(_khoaKhoiDongTepUid);
+    ganDayNhatDamMayId = kho.getString(_khoaGanDayNhatDamMayId);
+    ganDayNhatDamMayUid = kho.getString(_khoaGanDayNhatDamMayUid);
     thoiGianBatLaiGiay = kho.getDouble(_khoaThoiGianBatLai) ?? 1.0;
     tuDongChenKhoangCach = kho.getBool(_khoaTuDongChenCach) ?? true;
     kiemTraChinhTaBangAI = kho.getBool(_khoaKiemTraChinhTaAI) ?? false;

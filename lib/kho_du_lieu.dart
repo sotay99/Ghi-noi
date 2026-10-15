@@ -633,6 +633,15 @@ class KhoDuLieuDamMay extends KhoDuLieu {
   final String uid;
   final _db = FirebaseFirestore.instance;
 
+  /// (YÊU CẦU MỚI) Cây "Bộ nhớ trên đám mây" đã tải — `static` để dùng
+  /// CHUNG xuyên suốt cả phiên app: `man_hinh_thu_muc.dart` (ra/vào lại
+  /// màn hình thư mục nhiều lần không tải lại Firestore), bộ chọn thư
+  /// mục/tệp lúc cài "Khi khởi động App: Mở tệp..." (`khoi_dong_tep.dart`),
+  /// và chính lúc khởi động app nếu lựa chọn khởi động cần mở một ghi chú
+  /// đám mây — cả ba nơi đọc/ghi ĐÚNG MỘT biến này để không ai vô tình tải
+  /// lại một bản THỨ HAI cho cùng một tài khoản trong cùng một phiên.
+  static KhoDuLieuDamMay? dungChung;
+
   static const _tienToKhoaCache = 'ghi_noi_cache_dam_may_';
 
   /// (YÊU CẦU MỚI — xem/soạn offline) Tổng dung lượng (byte UTF-8 thật của

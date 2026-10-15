@@ -16,6 +16,7 @@ import 'cai_dat.dart';
 import 'chan_esc_lui_trang.dart';
 import 'firebase_options.dart';
 import 'kho_du_lieu.dart';
+import 'khoi_dong_tep.dart';
 import 'trang_soan_thao.dart';
 
 void main() async {
@@ -37,6 +38,10 @@ class _UngDungFlowriteWebDayDuState extends State<UngDungFlowriteWebDayDu> {
   final _caiDat = CaiDat();
   String? _idGhiChuMoDau;
 
+  /// (YÊU CẦU MỚI — "Khi khởi động App: Mở tệp...") Xem giải thích đầy đủ ở
+  /// `main.dart` (cùng logic y hệt, chỉ khác giao diện khởi động).
+  KhoDuLieu? _khoMoDau;
+
   @override
   void initState() {
     super.initState();
@@ -44,10 +49,19 @@ class _UngDungFlowriteWebDayDuState extends State<UngDungFlowriteWebDayDu> {
   }
 
   Future<void> _napTruoc() async {
-    final id = await _kho.tai();
+    final idNoiBoMacDinh = await _kho.tai();
     await _caiDat.tai();
     if (!mounted) return;
-    setState(() => _idGhiChuMoDau = id);
+    final (khoChon, idChon) = await giaiQuyetKhoiDong(
+      khoNoiBo: _kho,
+      idNoiBoMacDinh: idNoiBoMacDinh,
+      caiDat: _caiDat,
+    );
+    if (!mounted) return;
+    setState(() {
+      _khoMoDau = khoChon;
+      _idGhiChuMoDau = idChon;
+    });
   }
 
   @override
@@ -69,7 +83,7 @@ class _UngDungFlowriteWebDayDuState extends State<UngDungFlowriteWebDayDu> {
                 body: Center(child: CircularProgressIndicator()),
               )
             : TrangSoanThao(
-                kho: _kho,
+                kho: _khoMoDau ?? _kho,
                 khoNoiBo: _kho,
                 caiDat: _caiDat,
                 ghiChuId: _idGhiChuMoDau!,

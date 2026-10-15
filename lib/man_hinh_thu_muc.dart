@@ -326,10 +326,10 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
 
   /// Cùng vai trò với `_vaoBoNhoNoiBo`, cho "Bộ nhớ trên đám mây" — một cây
   /// HOÀN TOÀN TÁCH BIỆT (Mô hình B), chạy trên `KhoDuLieuDamMay`. Đã tải
-  /// MỘT LẦN (xem `_khoDamMayDungChung`, nhớ xuyên suốt phiên app) thì các
-  /// lần ra/vào sau không tải lại Firestore nữa.
+  /// MỘT LẦN (xem `KhoDuLieuDamMay.dungChung`, nhớ xuyên suốt phiên app)
+  /// thì các lần ra/vào sau không tải lại Firestore nữa.
   Future<void> _vaoBoNhoDamMay() async {
-    final daCo = _khoDamMayDungChung;
+    final daCo = KhoDuLieuDamMay.dungChung;
     if (daCo != null) {
       setState(() => _kho = daCo);
       _moThuMuc(thuMucGoc);
@@ -345,7 +345,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       final khoDamMay = KhoDuLieuDamMay(uid);
       await khoDamMay.tai();
       if (!mounted) return;
-      _khoDamMayDungChung = khoDamMay;
+      KhoDuLieuDamMay.dungChung = khoDamMay;
       setState(() {
         _dangTaiDamMay = false;
         _kho = khoDamMay;
@@ -385,12 +385,6 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   // nhớ của cây KIA (id thư mục không tồn tại ở cây này) — chỉ dùng bộ nhớ
   // khi ĐÚNG CÙNG MỘT `kho` (so bằng danh tính đối tượng) như lần ghi lại.
   static KhoDuLieu? _nhoKho;
-
-  /// (YÊU CẦU MỚI) Cây "Bộ nhớ trên đám mây" đã tải — `static` để dùng
-  /// CHUNG xuyên suốt cả phiên app, không chỉ trong một lần mở màn hình
-  /// này: ra/vào lại nhiều lần (kể cả đóng rồi mở lại màn hình) không tải
-  /// lại Firestore nữa, xem `_vaoBoNhoDamMay`.
-  static KhoDuLieu? _khoDamMayDungChung;
 
   /// Id thư mục cha của ghi chú đang mở ở trang soạn thảo — `null` nếu ghi
   /// chú đó không còn tồn tại (đã bị xoá) hay không rõ, lúc đó coi như gốc.

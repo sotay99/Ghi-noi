@@ -49,6 +49,7 @@ import 'man_hinh_thu_muc.dart';
 import 'mau_phim_tu_dien_nhap_lieu_nhanh.dart';
 import 'modal_bo_nho_tam.dart';
 import 'modal_cai_dat_kiem_tra_toan_van.dart';
+import 'modal_khoi_dong.dart';
 import 'modal_tu_dien_chinh_ta.dart';
 import 'modal_tu_dien_nhap_lieu_nhanh.dart';
 import 'modal_nghe_lai_ghi_am.dart';
@@ -4221,6 +4222,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     super.initState();
     _ghiChuHienTai = widget.kho.timGhiChu(widget.ghiChuId)!;
     _ganDauDaMoTepChoLichSu(widget.ghiChuId);
+    _ghiNhoGanDayNhatChoKhoiDong();
     _thietBiHienTai = widget.caiDat.thietBiChonTay ?? doanThietBi();
     // Chỉ có tác dụng trên web (no-op ở Android/iOS gốc) — hiện đúng cảnh
     // báo CỦA CHÍNH TRÌNH DUYỆT (không tự đặt chữ được) khi bấm F5/đóng
@@ -5082,6 +5084,22 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     await widget.kho.luu();
   }
 
+  /// (YÊU CẦU MỚI — "Khi khởi động App: Mở tệp...") Ghi lại tệp đang soạn
+  /// thảo gần đây nhất, bất kể kho nào — chỉ dùng cho lựa chọn "Mở tệp
+  /// đang soạn thảo gần đây nhất" lúc khởi động app tiếp theo (xem
+  /// `khoi_dong_tep.dart`). Gọi mỗi lần MỞ (kể cả lần đầu ở `initState`)
+  /// hay CHUYỂN ghi chú — `widget.kho` ở đây LUÔN đúng kho của
+  /// `_ghiChuHienTai` (hai field cùng đổi trong cùng `_moGhiChu`/
+  /// `initState`, không bao giờ lệch pha).
+  void _ghiNhoGanDayNhatChoKhoiDong() {
+    final laDamMay = widget.kho is KhoDuLieuDamMay;
+    unawaited(widget.caiDat.ghiNhoGanDayNhat(
+      laDamMay: laDamMay,
+      id: laDamMay ? _ghiChuHienTai.id : null,
+      uid: laDamMay ? (widget.kho as KhoDuLieuDamMay).uid : null,
+    ));
+  }
+
   void _moGhiChu(String id) {
     final g = widget.kho.timGhiChu(id);
     if (g == null) return;
@@ -5094,6 +5112,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _ghiChuHienTai = g;
       _tenController.text = g.ten;
     });
+    _ghiNhoGanDayNhatChoKhoiDong();
 
     // (SỬA LỖI định dạng/khối mã hoá "dính" từ tệp cũ sang tệp mới) Trước
     // đây hàm này ghi thẳng `g.noiDung` — có thể còn mang khối AI/định dạng
@@ -16587,6 +16606,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 khiMoMenuCanReset: _resetManHinhTruocKhiMoMenu,
                 khiDongMenuAI: _giuFocusOChuSauKhiBam,
                 khiBamDangNhapGoogle: _bamDangNhapGoogle,
+                khiBamKhoiDongTep: () => moModalKhoiDong(
+                  context,
+                  caiDat: widget.caiDat,
+                  khoNoiBo: widget.khoNoiBo,
+                  khoHienTai: widget.kho,
+                  ghiChuHienTai: _ghiChuHienTai,
+                ),
                 // `tenHienThiDaDangNhap` khác `null` LÀ tín hiệu "đang đăng
                 // nhập" cho `ThanhCongCu` — không được để `null` chỉ vì tài
                 // khoản không có sẵn displayName, nên dự phòng bằng email.
