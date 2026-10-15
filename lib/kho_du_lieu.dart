@@ -2,6 +2,7 @@
 // dưới một khoá JSON duy nhất. Đủ cho một app chỉ lưu ghi chú văn bản, không
 // cần tới cơ sở dữ liệu thật.
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -11,6 +12,14 @@ import 'mo_hinh.dart';
 
 /// Độ dài tối đa của tên thư mục/ghi chú.
 const doDaiTenToiDa = 100;
+
+/// (YÊU CẦU MỚI) Giới hạn ký tự NỘI DUNG của một tệp — số tròn, tính sao
+/// cho khi chạm trần này thì tệp lưu ra khoảng 2MB (văn bản tiếng Việt
+/// UTF-8 trung bình ~1,8-2,2 byte/ký tự do nhiều nguyên âm có dấu thanh
+/// cần 2-3 byte/ký tự; cộng thêm khối định dạng mã hoá gắn lúc lưu); nặng
+/// dấu hơn mức trung bình thì tệp có thể nhích lên hơn 2MB một chút, chấp
+/// nhận được. Xem `_apDungGioiHanKyTuMotTep` ở `trang_soan_thao.dart`.
+const gioiHanKyTuMotTep = 1000000;
 
 /// Ký tự bị cấm trong tên thư mục/ghi chú — đúng bộ ký tự Windows cấm dùng
 /// trong tên file, chặt nhất trong các hệ điều hành phổ biến nên áp dụng
@@ -603,6 +612,13 @@ class KhoDuLieu {
 /// lưu tại `users/{uid}/thuMucDamMay` và `users/{uid}/ghiChuDamMay` trên
 /// Firestore thay vì SharedPreferences.
 ///
+/// (YÊU CẦU MỚI — xem/soạn offline) Ném ra khi `KhoDuLieuDamMay.tai()`
+/// không gọi được Firestore (mất mạng, hoặc bất kỳ lỗi nào khác) VÀ cũng
+/// chưa có bản nào từng lưu xuống đĩa cho tài khoản này trên MÁY này —
+/// không có gì để hiện cả. Nơi gọi (`man_hinh_thu_muc.dart`) bắt riêng lỗi
+/// này để báo "Vui lòng kết nối internet" thay vì một lỗi chung mơ hồ.
+class ChuaCoMangVaChuaCoCacheOffline implements Exception {}
+
 /// CHỦ Ý kế thừa (`extends`) thay vì viết lại — toàn bộ logic thao tác cây
 /// (tạo/đổi tên/di chuyển/sao chép/thùng rác/sắp xếp tự nhiên/nhập zip...)
 /// ở lớp cha chỉ động vào hai danh sách `thuMuc`/`ghiChu` TRONG BỘ NHỚ, hoàn
@@ -616,6 +632,26 @@ class KhoDuLieuDamMay extends KhoDuLieu {
 
   final String uid;
   final _db = FirebaseFirestore.instance;
+
+  static const _tienToKhoaCache = 'ghi_noi_cache_dam_may_';
+
+  /// (YÊU CẦU MỚI — xem/soạn offline) Tổng dung lượng (byte UTF-8 thật của
+  /// JSON) dành cho bản lưu xuống đĩa của ghi chú đám mây — ưu tiên giữ
+  /// ghi chú có `capNhat` gần đây nhất, cắt bớt ghi chú cũ hơn nếu vượt.
+  /// Thư mục (nhẹ, chỉ tên/cấu trúc) LUÔN giữ đủ, không tính vào đây — chỉ
+  /// nội dung ghi chú mới đáng kể về dung lượng.
+  static const gioiHanDungLuongCacheDamMay = 3 * 1024 * 1024;
+
+  /// `true` nếu dữ liệu đang hiển thị là bản lưu TRÊN ĐĨA từ lần có mạng
+  /// gần nhất (không phải vừa tải tươi từ Firestore) — xem `tai()`. Màn
+  /// hình thư mục/trang soạn thảo đọc cờ này để hiện dải "Đang xem bản
+  /// ngoại tuyến".
+  bool dangXemBanNgoaiTuyen = false;
+
+  /// `true` nếu có thay đổi (sửa nội dung, tạo/xoá/đổi tên...) chưa kịp
+  /// đẩy lên Firestore — đặt ở `luu()` khi offline, tắt lại khi một lượt
+  /// `luu()` sau đó đẩy lên Firestore thành công.
+  bool coThayDoiChuaDongBo = false;
 
   CollectionReference<Map<String, dynamic>> get _colThuMuc =>
       _db.collection('users').doc(uid).collection('thuMucDamMay');
@@ -636,30 +672,89 @@ class KhoDuLieuDamMay extends KhoDuLieu {
 
   @override
   Future<String> tai() async {
-    thuMuc.clear();
-    ghiChu.clear();
+    try {
+      thuMuc.clear();
+      ghiChu.clear();
 
-    final tmSnap = await _colThuMuc.get();
-    for (final d in tmSnap.docs) {
-      thuMuc.add(ThuMuc.fromJson({...d.data(), 'id': d.id}));
+      final tmSnap = await _colThuMuc.get();
+      for (final d in tmSnap.docs) {
+        thuMuc.add(ThuMuc.fromJson({...d.data(), 'id': d.id}));
+      }
+      final gcSnap = await _colGhiChu.get();
+      for (final d in gcSnap.docs) {
+        ghiChu.add(GhiChuFile.fromJson({...d.data(), 'id': d.id}));
+      }
+
+      // Firestore vừa trả lời được — chắc chắn đang online. Tắt cờ offline
+      // TRƯỚC khi có thể gọi `luu()` ngay dưới đây (dọn thùng rác quá hạn),
+      // để `luu()` không hiểu nhầm vẫn đang offline mà bỏ qua Firestore.
+      dangXemBanNgoaiTuyen = false;
+
+      if (donDepThungRacQuaHan()) await luu();
+      _chupAnh();
+      coThayDoiChuaDongBo = false;
+      // Lưu lại ngay một bản cho lần offline sau — không chờ (không ai cần
+      // đợi việc này xong mới được dùng app).
+      unawaited(_ghiCacheDiaOffline());
+
+      final conHoatDong = ghiChu.where((g) => g.thoiGianXoa == null);
+      if (conHoatDong.isNotEmpty) return conHoatDong.first.id;
+      final moi = taoGhiChuMoi(thuMucGoc);
+      await luu();
+      return moi.id;
+    } catch (e) {
+      // Mất mạng (hoặc Firestore lỗi vì bất kỳ lý do gì khác) — thử bản đã
+      // lưu xuống đĩa từ lần có mạng gần nhất trên MÁY này.
+      thuMuc.clear();
+      ghiChu.clear();
+      final coCache = await _docCacheDiaOffline();
+      if (!coCache) throw ChuaCoMangVaChuaCoCacheOffline();
+
+      _chupAnh();
+      dangXemBanNgoaiTuyen = true;
+
+      final conHoatDong = ghiChu.where((g) => g.thoiGianXoa == null);
+      if (conHoatDong.isNotEmpty) return conHoatDong.first.id;
+      // Cực hiếm: có cache nhưng không còn ghi chú nào hoạt động trong đó
+      // (ví dụ bị cắt hết vì vượt hạn mức dung lượng) — không tự tạo mới
+      // lúc offline, coi như hết cache dùng được.
+      throw ChuaCoMangVaChuaCoCacheOffline();
     }
-    final gcSnap = await _colGhiChu.get();
-    for (final d in gcSnap.docs) {
-      ghiChu.add(GhiChuFile.fromJson({...d.data(), 'id': d.id}));
-    }
-
-    if (donDepThungRacQuaHan()) await luu();
-    _chupAnh();
-
-    final conHoatDong = ghiChu.where((g) => g.thoiGianXoa == null);
-    if (conHoatDong.isNotEmpty) return conHoatDong.first.id;
-    final moi = taoGhiChuMoi(thuMucGoc);
-    await luu();
-    return moi.id;
   }
 
   @override
   Future<void> luu() async {
+    if (dangXemBanNgoaiTuyen) {
+      // Đang (hoặc nghi đang) offline — thử lại NGAY ở đây, đơn giản hơn
+      // hẳn so với tự dò mạng riêng: có mạng lại thì đẩy thẳng lên
+      // Firestore + tắt cờ offline; vẫn lỗi thì rơi xuống nhánh dưới, chỉ
+      // ghi tạm xuống đĩa, giữ cờ.
+      try {
+        await _dayLenFirestore();
+        dangXemBanNgoaiTuyen = false;
+        coThayDoiChuaDongBo = false;
+        unawaited(_ghiCacheDiaOffline());
+      } catch (_) {
+        coThayDoiChuaDongBo = true;
+        await _ghiCacheDiaOffline();
+      }
+      return;
+    }
+
+    try {
+      await _dayLenFirestore();
+      unawaited(_ghiCacheDiaOffline());
+    } catch (_) {
+      // Mất mạng ngay GIỮA lúc đang online (ví dụ rớt wifi lúc đang gõ) —
+      // không mất gì cả: hạ xuống coi như offline, lưu tạm xuống đĩa, lần
+      // `luu()` kế tiếp sẽ tự thử đẩy lại.
+      dangXemBanNgoaiTuyen = true;
+      coThayDoiChuaDongBo = true;
+      await _ghiCacheDiaOffline();
+    }
+  }
+
+  Future<void> _dayLenFirestore() async {
     final batch = _db.batch();
     var coGhi = false;
 
@@ -693,6 +788,62 @@ class KhoDuLieuDamMay extends KhoDuLieu {
 
     if (coGhi) await batch.commit();
     _chupAnh();
+  }
+
+  String get _khoaCache => '$_tienToKhoaCache$uid';
+
+  /// Ghi một bản xuống đĩa (SharedPreferences, khoá riêng theo `uid`, tách
+  /// biệt hẳn khoá của bộ nhớ NỘI BỘ) để còn mở lại được lúc mất mạng.
+  /// Giữ TOÀN BỘ thư mục (nhẹ) nhưng CHỈ giữ ghi chú trong hạn mức
+  /// `gioiHanDungLuongCacheDamMay` — ưu tiên `capNhat` gần đây nhất. Ghi
+  /// chú bị cắt bớt vì vượt hạn mức không báo gì ngay lúc này — lặng lẽ
+  /// không mở offline được, giống hệt một ghi chú chưa từng đồng bộ.
+  Future<void> _ghiCacheDiaOffline() async {
+    final ghiChuTheoMoi = List<GhiChuFile>.of(ghiChu)
+      ..sort((a, b) => b.capNhat.compareTo(a.capNhat));
+    final giuLai = <GhiChuFile>[];
+    var tongByte = 0;
+    for (final g in ghiChuTheoMoi) {
+      final byte = utf8.encode(jsonEncode(g.toJson())).length;
+      // Luôn giữ ÍT NHẤT ghi chú đầu tiên (mới nhất) dù một mình nó đã vượt
+      // hạn mức (tệp rất dài) — còn hơn cache trống hoàn toàn.
+      if (giuLai.isNotEmpty && tongByte + byte > gioiHanDungLuongCacheDamMay) {
+        continue;
+      }
+      giuLai.add(g);
+      tongByte += byte;
+    }
+    final j = {
+      'thuMuc': thuMuc.map((t) => t.toJson()).toList(),
+      'ghiChu': giuLai.map((g) => g.toJson()).toList(),
+    };
+    final kho = await SharedPreferences.getInstance();
+    await kho.setString(_khoaCache, jsonEncode(j));
+  }
+
+  /// Đọc lại bản đã ghi ở `_ghiCacheDiaOffline` — trả `false` nếu tài
+  /// khoản này trên máy này chưa từng có bản nào (chưa từng vào Bộ nhớ
+  /// đám mây lúc có mạng).
+  Future<bool> _docCacheDiaOffline() async {
+    final kho = await SharedPreferences.getInstance();
+    final tho = kho.getString(_khoaCache);
+    if (tho == null) return false;
+    final j = jsonDecode(tho) as Map<String, dynamic>;
+    for (final t in (j['thuMuc'] as List<dynamic>? ?? const [])) {
+      thuMuc.add(ThuMuc.fromJson(t as Map<String, dynamic>));
+    }
+    for (final g in (j['ghiChu'] as List<dynamic>? ?? const [])) {
+      ghiChu.add(GhiChuFile.fromJson(g as Map<String, dynamic>));
+    }
+    return true;
+  }
+
+  /// (YÊU CẦU MỚI) Xoá hẳn bản cache ngoại tuyến của MỘT tài khoản — gọi
+  /// lúc đăng xuất, để máy dùng chung không lộ ghi chú đám mây của người
+  /// vừa đăng xuất cho người đăng nhập kế tiếp.
+  static Future<void> xoaCacheOffline(String uid) async {
+    final kho = await SharedPreferences.getInstance();
+    await kho.remove('$_tienToKhoaCache$uid');
   }
 
   /// (SỬA LỖI) Lớp cha ghi "ghi chú đang mở" vào MỘT khoá SharedPreferences

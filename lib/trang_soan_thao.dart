@@ -3919,6 +3919,29 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// đồng bộ, lúc đó cờ này đã tắt rồi — nên còn hai lớp chắn nữa bên dưới.
   bool _tuSua = false;
 
+  /// (YÊU CẦU MỚI — giới hạn ký tự một tệp) Bật lên trong lúc NẠP một ghi
+  /// chú có sẵn (`initState`/`_moGhiChu`) — tệp đó có thể đã dài hơn
+  /// `gioiHanKyTuMotTep` từ trước khi có giới hạn này (hoặc import từ nơi
+  /// khác); `_ghiVaoO` đọc cờ này để biết KHÔNG được chặn/cắt bớt trong
+  /// lúc nạp, chỉ chặn khi người dùng tự gõ/dán thêm.
+  bool _dangTrongLucMoGhiChu = false;
+
+  Timer? _henCanhBaoGioiHanKyTuMotTep;
+
+  /// Thông báo "đã chạm trần N ký tự một tệp" — gộp lại, tối đa một lần
+  /// mỗi 2 giây (gõ liên tục khi đã chạm trần dễ gọi hàm này mỗi phím bấm,
+  /// dồn thông báo dày đặc gây rối mắt không cần thiết).
+  void _baoVuotGioiHanKyTuMotTep() {
+    if (_henCanhBaoGioiHanKyTuMotTep != null) return;
+    hienThongBaoGiua(
+      context,
+      'Tệp đã vượt quá ${gioiHanKyTuMotTep ~/ 1000}.000 ký tự - không thể nhập thêm',
+    );
+    _henCanhBaoGioiHanKyTuMotTep = Timer(const Duration(seconds: 2), () {
+      _henCanhBaoGioiHanKyTuMotTep = null;
+    });
+  }
+
   /// Nội dung, vị trí con trỏ và thời điểm của lần ghi gần nhất do chính ta
   /// thực hiện. Dùng để nhận ra đâu là trạng thái bộ gõ báo ngược về.
   String _chuGanNhat = '';
@@ -4290,6 +4313,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     // (YÊU CẦU MỚI) Mặc định con trỏ ở ĐẦU tệp (0), không phải cuối văn bản
     // như trước — xem giải thích đầy đủ ở `_moGhiChu`.
+    //
+    // (YÊU CẦU MỚI — giới hạn ký tự một tệp) Nạp một ghi chú ĐÃ CÓ SẴN có
+    // thể dài hơn `gioiHanKyTuMotTep` (tệp cũ từ trước khi có giới hạn này,
+    // hoặc import từ nơi khác) — `_ghiVaoO` không được chặn/cắt bớt trong
+    // trường hợp NẠP, chỉ chặn khi NGƯỜI DÙNG tự gõ/dán thêm.
+    _dangTrongLucMoGhiChu = true;
     if (banDau.isNotEmpty) {
       _ghiVaoO(banDau, 0);
     } else {
@@ -4298,6 +4327,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // dùng để làm gì.
       _hienChuThich = true;
     }
+    _dangTrongLucMoGhiChu = false;
     _neo = 0;
     _viTriDaKiemTraChinhTa = banDau.length;
     if (khoiDinhDang != null) _apDungDinhDangAi(khoiDinhDang);
@@ -4381,7 +4411,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           ),
         );
         if (chac != true) return;
+        // (YÊU CẦU MỚI — xem/soạn offline) Xoá hẳn bản cache ngoại tuyến
+        // của tài khoản VỪA đăng xuất — máy dùng chung không được để lộ
+        // ghi chú đám mây của người này cho người đăng nhập kế tiếp. Lấy
+        // `uid` TRƯỚC khi đăng xuất — sau khi đăng xuất `currentUser` về
+        // `null`, không còn biết xoá đúng khoá nào nữa.
+        final uidVuaDangXuat = _nguoiDungDangNhap?.uid;
         await DichVuDangNhapGoogle.instance.dangXuat();
+        if (uidVuaDangXuat != null) {
+          unawaited(KhoDuLieuDamMay.xoaCacheOffline(uidVuaDangXuat));
+        }
       }
     } catch (e) {
       if (!mounted) return;
@@ -4426,6 +4465,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _boDieuKhien.removeListener(_khiVungChonCoTheDoi);
     _bomDongHoTheGhiAm?.cancel();
     _dangKyMucAmTheGhiAm?.cancel();
+    _henCanhBaoGioiHanKyTuMotTep?.cancel();
     _thoiLuongTheGhiAmDangGhi.dispose();
     _nhanTrangThaiGhiAmGheDe.dispose();
     _soTheChoBangDieuKhien.dispose();
@@ -5067,11 +5107,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _boDieuKhien.dinhDang.clear();
     final (banDau, khoiDinhDang, khoiDinhDangThuCong) = _tachCacKhoiDinhDang(g.noiDung);
 
+    // (YÊU CẦU MỚI — giới hạn ký tự một tệp) Y hệt `initState`: đây là NẠP
+    // một ghi chú có sẵn (có thể dài hơn giới hạn từ trước khi có nó), không
+    // phải người dùng gõ/dán thêm — đừng để `_ghiVaoO` chặn/cắt bớt.
+    _dangTrongLucMoGhiChu = true;
     if (banDau.isEmpty) {
       _ghiVaoO('', 0);
     } else {
       _ghiVaoO(banDau, banDau.length);
     }
+    _dangTrongLucMoGhiChu = false;
     if (khoiDinhDang != null) _apDungDinhDangAi(khoiDinhDang);
     if (khoiDinhDangThuCong != null) _apDungDinhDangThuCong(khoiDinhDangThuCong);
     _neo = banDau.length;
@@ -9552,6 +9597,28 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Mọi lần ghi do máy thực hiện đều đi qua đây, để ghi nhớ nội dung, vị trí
   /// con trỏ và thời điểm — ba thứ dùng để nhận ra trạng thái bộ gõ báo về.
   void _ghiVaoO(String chu, int viTri) {
+    // (YÊU CẦU MỚI — giới hạn ký tự một tệp) Chặn ở ĐÚNG MỘT nơi duy nhất —
+    // mọi đường ghi chữ vào ô soạn thảo (gõ tay, dán, micro, AI áp kết
+    // quả, từ điển sửa lỗi, Lùi lại/Tiến tới...) đều đi qua hàm này, nên
+    // chặn tại đây là chặn được HẾT, không cần rải điều kiện ra nhiều nơi.
+    // Bỏ qua hẳn lúc đang NẠP một ghi chú có sẵn (`_dangTrongLucMoGhiChu`)
+    // — tệp cũ có thể đã dài hơn giới hạn từ trước, không được cắt mất chữ
+    // của người dùng chỉ vì mở lại tệp. Chỉ chặn khi chữ MỚI dài hơn chữ
+    // CŨ (`_chuGanNhat`, mốc trước lượt ghi này) — xoá bớt dù tệp vẫn còn
+    // đang vượt trần vẫn luôn được phép.
+    if (!_dangTrongLucMoGhiChu &&
+        chu.length > gioiHanKyTuMotTep &&
+        chu.length > _chuGanNhat.length) {
+      chu = _chuGanNhat.length >= gioiHanKyTuMotTep
+          // Đã ở/qua trần từ trước rồi mà vẫn cố thêm nữa — chặn đứng,
+          // giữ nguyên y như cũ.
+          ? _chuGanNhat
+          // Lượt này mới vượt qua trần (ví dụ dán một đoạn dài) — cắt đúng
+          // ngay tại trần, giữ phần đầu.
+          : chu.substring(0, gioiHanKyTuMotTep);
+      viTri = viTri.clamp(0, chu.length);
+      _baoVuotGioiHanKyTuMotTep();
+    }
     // Nếu văn bản và vị trí con trỏ ĐÃ ĐÚNG NGUYÊN như bộ điều khiển đang giữ
     // (trường hợp phổ biến nhất: gõ tay chèn một ký tự, không có hoán đổi
     // dấu câu, không đụng vùng khoá) thì bỏ qua việc ghi lại `.value` —
@@ -15988,6 +16055,29 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                         widget.caiDat.datAnGoiYTaiApk(true);
                         setState(() {});
                       },
+                    ),
+                  ],
+                ),
+              ),
+            // (YÊU CẦU MỚI — xem/soạn offline) Ghi chú đám mây đang mở từ
+            // bản cache trên đĩa (mất mạng, hoặc chưa đồng bộ kịp một thay
+            // đổi nào) — báo thẳng, đừng để người dùng tưởng nhầm mọi thứ
+            // đã an toàn trên đám mây.
+            if (widget.kho is KhoDuLieuDamMay &&
+                (widget.kho as KhoDuLieuDamMay).dangXemBanNgoaiTuyen)
+              Container(
+                width: double.infinity,
+                color: const Color(0xFFFCE8E6),
+                padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+                child: const Row(
+                  children: [
+                    Icon(Icons.cloud_off, size: 18, color: Color(0xFFB3261E)),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Đang xem bản ngoại tuyến — sẽ đồng bộ khi có mạng.',
+                        style: TextStyle(fontSize: 13, color: Color(0xFFB3261E)),
+                      ),
                     ),
                   ],
                 ),

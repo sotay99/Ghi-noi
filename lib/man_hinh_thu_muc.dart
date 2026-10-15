@@ -351,6 +351,14 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
         _kho = khoDamMay;
       });
       _moThuMuc(thuMucGoc);
+    } on ChuaCoMangVaChuaCoCacheOffline {
+      // (YÊU CẦU MỚI — xem/soạn offline) Mất mạng VÀ máy này chưa từng có
+      // bản cache nào cho tài khoản này (chưa từng vào Bộ nhớ đám mây lúc
+      // có mạng) — không có gì để hiện, nói thẳng cần có mạng, không đổ
+      // lỗi mơ hồ.
+      if (!mounted) return;
+      setState(() => _dangTaiDamMay = false);
+      _bao('Vui lòng kết nối internet.');
     } catch (e) {
       if (!mounted) return;
       setState(() => _dangTaiDamMay = false);
@@ -1856,6 +1864,27 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
               if (_duongDan.isNotEmpty) _thanhDiaChi(),
               _dongTenThuMucVaNutThem(laNgoiNhaChung: laNgoiNhaChung),
             ],
+            // (YÊU CẦU MỚI — xem/soạn offline) Đang xem bản cache trên đĩa
+            // (mất mạng, hoặc chưa đồng bộ kịp) — báo thẳng ngay tại màn
+            // hình thư mục, không chỉ ở trang soạn thảo.
+            if (_laKhoDamMay && (_kho as KhoDuLieuDamMay).dangXemBanNgoaiTuyen)
+              Container(
+                width: double.infinity,
+                color: const Color(0xFFFCE8E6),
+                padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+                child: const Row(
+                  children: [
+                    Icon(Icons.cloud_off, size: 18, color: Color(0xFFB3261E)),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Đang xem bản ngoại tuyến — sẽ đồng bộ khi có mạng.',
+                        style: TextStyle(fontSize: 13, color: Color(0xFFB3261E)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Expanded(
               // (YÊU CẦU MỚI) Đang ở cây "Bộ nhớ trên đám mây" — nền xanh lá
               // nhạt bao trùm khung nội dung, BẤT KỂ đang đứng ở thư mục
