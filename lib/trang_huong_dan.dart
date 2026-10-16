@@ -136,13 +136,21 @@ class _Hero extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // (YÊU CẦU MỚI) Logo Flowrite thật — thay cho icon mic tạm trước
+          // đây. `assets/logo.png` đã tự có nền xanh dương bo góc riêng, chỉ
+          // cần viền trắng mỏng để tách khỏi nền gradient cùng tông màu.
           Container(
-            padding: const EdgeInsets.all(14),
+            width: 64,
+            height: 64,
+            padding: const EdgeInsets.all(2),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(16),
+              color: Colors.white.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(18),
             ),
-            child: const Icon(Icons.mic, color: Colors.white, size: 32),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.asset('assets/logo.png'),
+            ),
           ),
           const SizedBox(height: 20),
           const Text(

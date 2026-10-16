@@ -68,6 +68,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamKhoiDongTep,
     required this.khiBamDieuKhoan,
     required this.khiBamBaoMat,
+    required this.khiBamLuyenGoPhim,
     this.tenHienThiDaDangNhap,
     this.emailDaDangNhap,
     this.urlAnhDaiDienDaDangNhap,
@@ -90,6 +91,9 @@ class ThanhCongCu extends StatelessWidget {
 
   /// (YÊU CẦU MỚI) Mục "Bảo mật và quyền riêng tư" — truyền thẳng xuống `_NutTaiKhoanMenu`.
   final VoidCallback khiBamBaoMat;
+
+  /// (YÊU CẦU MỚI) Mục "Luyện gõ phím bằng 10 ngón tay" — truyền thẳng xuống `_NutThemMenu`.
+  final VoidCallback khiBamLuyenGoPhim;
   final String? tenHienThiDaDangNhap;
   final String? emailDaDangNhap;
   final String? urlAnhDaiDienDaDangNhap;
@@ -505,6 +509,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamDanhSachPhimTat: khiBamDanhSachPhimTat,
                               khiBamTimKiem: khiBamTimKiem,
                               khiMoMenu: khiMoMenuCanReset,
+                              khiBamLuyenGoPhim: khiBamLuyenGoPhim,
                             ),
                           ),
                           _NutCoChuThich(
@@ -1388,6 +1393,7 @@ class _NutThemMenu extends StatelessWidget {
     required this.khiBamDanhSachPhimTat,
     required this.khiBamTimKiem,
     required this.khiMoMenu,
+    required this.khiBamLuyenGoPhim,
   });
 
   final bool rong;
@@ -1424,6 +1430,10 @@ class _NutThemMenu extends StatelessWidget {
 
   /// Xem `ThanhCongCu.khiMoMenuCanReset`.
   final VoidCallback khiMoMenu;
+
+  /// (YÊU CẦU MỚI) Mục "Luyện gõ phím bằng 10 ngón tay" — mở modal mời bấm
+  /// link tìm kiếm Google.
+  final VoidCallback khiBamLuyenGoPhim;
 
   @override
   Widget build(BuildContext context) {
@@ -1481,6 +1491,9 @@ class _NutThemMenu extends StatelessWidget {
                 break;
               case 25:
                 khiBamTimKiem();
+                break;
+              case 5:
+                khiBamLuyenGoPhim();
                 break;
             }
           },

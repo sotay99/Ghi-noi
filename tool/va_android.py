@@ -23,6 +23,18 @@ SETTINGS_GRADLE_KTS = GOC / 'android' / 'settings.gradle.kts'
 GOOGLE_SERVICES_JSON = GOC / 'tool' / 'google-services.json'
 GOOGLE_SERVICES_PHIEN_BAN = '4.4.2'
 
+# (YÊU CẦU MỚI) Icon app — logo Flowrite (trang giấy bẻ góc + bút + sóng
+# âm). `flutter create` tự sinh ic_launcher.png RIÊNG cho từng mật độ màn
+# hình (mdpi/hdpi/xhdpi/xxhdpi/xxxhdpi) bằng icon Flutter mặc định — dựng
+# SẴN đúng kích thước cho từng mật độ ở `tool/icon/cho_android/` (tên thư
+# mục KHÔNG được là "android" — `.gitignore` có dòng "android/" (không có
+# "/" ở đầu) nên khớp CẢ thư mục con tên "android" nằm sâu bên trong, không
+# chỉ riêng thư mục gốc do `flutter create` sinh ra; xem
+# `tool/dung_icon.py`, chạy tay khi cần đổi logo) để chỉ việc CHÉP ĐÈ, không
+# cần công cụ render ảnh nào lúc build (máy CI không có cairosvg).
+ICON_ANDROID_DIR = GOC / 'tool' / 'icon' / 'cho_android'
+ICON_ANDROID_MAT_DO = ('mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi')
+
 # Khoá ký CỐ ĐỊNH của Flowrite — một khoá DUY NHẤT, dùng lại cho MỌI lần
 # dựng, mãi mãi về sau. Không phải bí mật cần giấu (app chỉ cài tay, không
 # lên Google Play, khoá này không bảo vệ gì có giá trị) — commit thẳng vào
@@ -216,6 +228,36 @@ def _them_google_services() -> int:
     return 0
 
 
+def _va_icon() -> int:
+    """Chép icon Flowrite đè lên ic_launcher.png mặc định của Flutter, ở
+    MỌI mật độ màn hình — chép CẢ `ic_launcher.png` lẫn `ic_launcher_round.png`
+    nếu bản Flutter đang dùng có sinh ra tệp đó (một số bản sinh, một số
+    không), chỉ chép tệp nào `flutter create` đã thực sự tạo ra."""
+    thieu = [d for d in ICON_ANDROID_MAT_DO if not (ICON_ANDROID_DIR / f'mipmap-{d}.png').exists()]
+    if thieu:
+        print(f'LOI: thieu icon da dung san cho mat do {thieu} trong {ICON_ANDROID_DIR}', file=sys.stderr)
+        return 1
+
+    so_chep = 0
+    for d in ICON_ANDROID_MAT_DO:
+        nguon = ICON_ANDROID_DIR / f'mipmap-{d}.png'
+        thu_muc = GOC / 'android' / 'app' / 'src' / 'main' / 'res' / f'mipmap-{d}'
+        if not thu_muc.is_dir():
+            continue
+        for ten in ('ic_launcher.png', 'ic_launcher_round.png'):
+            dich = thu_muc / ten
+            if dich.exists():
+                shutil.copyfile(nguon, dich)
+                so_chep += 1
+
+    if so_chep == 0:
+        print('LOI: khong chep duoc icon nao — cay mipmap co the da doi cau truc', file=sys.stderr)
+        return 1
+
+    print(f'Da thay {so_chep} icon ic_launcher bang logo Flowrite.')
+    return 0
+
+
 def main() -> int:
     if not MANIFEST.exists():
         print(f'Khong thay {MANIFEST}', file=sys.stderr)
@@ -232,6 +274,10 @@ def main() -> int:
     ket_qua_google = _them_google_services()
     if ket_qua_google != 0:
         return ket_qua_google
+
+    ket_qua_icon = _va_icon()
+    if ket_qua_icon != 0:
+        return ket_qua_icon
 
     chu = MANIFEST.read_text(encoding='utf-8')
 

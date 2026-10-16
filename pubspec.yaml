@@ -59,3 +59,8 @@ dependency_overrides:
 
 flutter:
   uses-material-design: true
+  # Logo Flowrite (trang giấy bẻ góc + bút + sóng âm) — dùng ở Hero của
+  # trang Hướng dẫn (xem `lib/trang_huong_dan.dart`). Icon app (Android/Web)
+  # KHÔNG đi qua đường này — xem `tool/va_android.py`/`tool/va_web.py`.
+  assets:
+    - assets/logo.png

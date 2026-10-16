@@ -100,6 +100,7 @@ jobs:
             --org=com.flowrite \
             /tmp/khung-web
           cp -r /tmp/khung-web/web ./web
+          python3 tool/va_web.py .
 
       # BỎ HẲN Service Worker/offline — sau nhiều lần vá cơ chế "F5 luôn lấy
       # bản mới" cho chiến lược PWA mặc định (offline-first) mà vẫn không
