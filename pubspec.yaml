@@ -45,6 +45,10 @@ dependencies:
   # gạch chân xanh dương (xem `lib/mo_lien_ket_ngoai_io.dart`). Web vẫn dùng
   # thẳng `dart:html` (không cần gói này).
   url_launcher: ^6.3.1
+  # (YÊU CẦU MỚI) Dải "Có bản APK mới" — đọc số build hiện tại của máy
+  # (`PackageInfo.buildNumber`, gắn lúc CI build bằng `--build-number`) để so
+  # với Release mới nhất trên GitHub. Xem `lib/kiem_tra_cap_nhat.dart`.
+  package_info_plus: ^8.1.1
 
 dev_dependencies:
   flutter_lints: ^4.0.0

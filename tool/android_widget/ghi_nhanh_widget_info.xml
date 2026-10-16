@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- `android:configure` trỏ THẲNG vào MainActivity — không có Activity cấu
+     hình riêng (xem MainActivity.kt: Dart tự nhận biết `widgetAction=config`
+     qua kênh `flowrite/widget` và hiện đúng màn hình chọn ghi chú). -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp"
+    android:minHeight="40dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="40dp"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/ghi_nhanh_widget"
+    android:configure="com.flowrite.flowrite.MainActivity"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen" />

@@ -36,6 +36,7 @@ import 'man_hinh_tro_chuyen.dart';
 import 'tin_nhan_tro_chuyen.dart';
 import 'canh_bao_roi_trang.dart';
 import 'kho_du_lieu.dart';
+import 'kiem_tra_cap_nhat.dart';
 import 'modal_bao_mat.dart';
 import 'modal_dieu_khoan.dart';
 import 'modal_luyen_go_phim.dart';
@@ -2081,6 +2082,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     });
   }
   final _micro = SpeechToText();
+
+  /// (YÊU CẦU MỚI) Số hiệu Release mới nhất, chỉ khi CAO HƠN bản đang chạy —
+  /// `null` nghĩa là chưa kiểm xong hoặc đang là bản mới nhất rồi. Xem
+  /// `lib/kiem_tra_cap_nhat.dart`.
+  int? _banApkMoiPhatHien;
 
   // -------------------------------------------------------------- tìm kiếm
 
@@ -4298,6 +4304,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     });
     _boDieuKhien.addListener(_khiNguoiDungSua);
     _boDieuKhien.addListener(_capNhatTimKiemNeuDangMo);
+    // (YÊU CẦU MỚI) Dải "Có bản APK mới" — chỉ gọi mạng trên bản APK thật,
+    // KHÔNG trên web (web không có khái niệm "bản cũ cài trên máy").
+    if (!kIsWeb) {
+      kiemTraBanApkMoiHon().then((banMoi) {
+        if (mounted && banMoi != null) setState(() => _banApkMoiPhatHien = banMoi);
+      });
+    }
     // (YÊU CẦU MỚI) Đăng nhập Google — nghe thay đổi trạng thái để vẽ lại
     // menu "Tài khoản và Cài đặt" (tên/avatar + đổi nhãn nút).
     _nguoiDungDangNhap = DichVuDangNhapGoogle.instance.nguoiDungHienTai;
@@ -16419,6 +16432,43 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       color: const Color(0xFF1565C0),
                       onPressed: () {
                         widget.caiDat.datAnGoiYTaiApk(true);
+                        setState(() {});
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            // (YÊU CẦU MỚI) Dải "Có bản APK mới" — CHỈ trên bản APK thật
+            // (`!kIsWeb`, ngược hẳn dải "Tải app APK" ở trên). Đóng thì nhớ
+            // ĐÚNG số hiệu bản này (`daDongGoiYCapNhatApkBanSo`) — có bản
+            // mới hơn nữa thì dải lại hiện, khác "ẩn vĩnh viễn".
+            if (!kIsWeb &&
+                _banApkMoiPhatHien != null &&
+                _banApkMoiPhatHien! > widget.caiDat.daDongGoiYCapNhatApkBanSo)
+              Container(
+                width: double.infinity,
+                color: const Color(0xFFE3F2FD),
+                padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+                child: Row(
+                  children: [
+                    const Icon(Icons.system_update, size: 18, color: Color(0xFF1565C0)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Đã có bản APK mới (v$_banApkMoiPhatHien) — cập nhật để dùng bản ổn định nhất.',
+                        style: const TextStyle(fontSize: 13, color: Color(0xFF1565C0)),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () =>
+                          moLienKetNgoai('https://github.com/sotay99/ghi-noi/releases/latest'),
+                      child: const Text('Tải bản mới'),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      color: const Color(0xFF1565C0),
+                      onPressed: () {
+                        widget.caiDat.datDaDongGoiYCapNhatApkBanSo(_banApkMoiPhatHien!);
                         setState(() {});
                       },
                     ),

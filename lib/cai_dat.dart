@@ -275,6 +275,23 @@ class CaiDat {
 
   static const _khoaAnGoiYTaiApk = 'ghi_noi_an_goi_y_tai_apk';
 
+  /// Dải thông báo "Có bản APK mới" (xem `lib/kiem_tra_cap_nhat.dart`) — số
+  /// hiệu bản phát hành (tag Release, ví dụ `206`) người dùng đã bấm X đóng
+  /// LẦN GẦN NHẤT. `0` = chưa đóng lần nào. Mỗi khi có bản MỚI HƠN số này,
+  /// dải lại hiện ra — khác `anGoiYTaiApk` ở trên (đóng là ẩn VĨNH VIỄN,
+  /// không phân biệt bản nào), vì bản thân thông báo cập nhật phải sống
+  /// lại mỗi lần có bản mới hơn bản đã từng đóng.
+  int daDongGoiYCapNhatApkBanSo = 0;
+
+  static const _khoaDaDongGoiYCapNhatApkBanSo =
+      'ghi_noi_da_dong_goi_y_cap_nhat_apk_ban_so';
+
+  Future<void> datDaDongGoiYCapNhatApkBanSo(int banSo) async {
+    daDongGoiYCapNhatApkBanSo = banSo;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setInt(_khoaDaDongGoiYCapNhatApkBanSo, banSo);
+  }
+
   /// "Từ điển sửa lỗi chính tả của bạn" — danh sách cặp (từ lỗi/từ thay
   /// thế) người dùng tự khai ở `ManHinhTuDienChinhTa`. Đây là THAM CHIẾU
   /// THẬT (không phải bản sao) — màn hình đó tự thêm/xoá/sửa thẳng vào danh
@@ -791,6 +808,7 @@ class CaiDat {
     tuDongChuanHoaNgoac = kho.getBool(_khoaTuDongChuanHoaNgoac) ?? true;
     tuDongDongBangKyTuDacBiet = kho.getBool(_khoaTuDongDongBangKyTuDacBiet) ?? true;
     anGoiYTaiApk = kho.getBool(_khoaAnGoiYTaiApk) ?? false;
+    daDongGoiYCapNhatApkBanSo = kho.getInt(_khoaDaDongGoiYCapNhatApkBanSo) ?? 0;
     tuDienChinhTaBatHoatDong =
         kho.getBool(_khoaTuDienChinhTaBatHoatDong) ?? true;
     final tuDienRaw = kho.getString(_khoaTuDienChinhTa);

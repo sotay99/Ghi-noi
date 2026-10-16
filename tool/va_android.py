@@ -35,6 +35,13 @@ GOOGLE_SERVICES_PHIEN_BAN = '4.4.2'
 ICON_ANDROID_DIR = GOC / 'tool' / 'icon' / 'cho_android'
 ICON_ANDROID_MAT_DO = ('mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi')
 
+# (YÊU CẦU MỚI) Widget "Ghi nhanh" ở màn hình chính Android — nguồn Kotlin/
+# XML commit sẵn ở đây (tên thư mục "android_widget", KHÔNG phải "android"
+# trần, tránh đúng cái bẫy `.gitignore` đã gặp với icon ở trên), chép vào
+# đúng vị trí trong cây android/ do `flutter create` sinh ra mỗi lần dựng.
+WIDGET_SRC_DIR = GOC / 'tool' / 'android_widget'
+KOTLIN_PKG_DIR = GOC / 'android' / 'app' / 'src' / 'main' / 'kotlin' / 'com' / 'flowrite' / 'flowrite'
+
 # Khoá ký CỐ ĐỊNH của Flowrite — một khoá DUY NHẤT, dùng lại cho MỌI lần
 # dựng, mãi mãi về sau. Không phải bí mật cần giấu (app chỉ cài tay, không
 # lên Google Play, khoá này không bảo vệ gì có giá trị) — commit thẳng vào
@@ -258,6 +265,77 @@ def _va_icon() -> int:
     return 0
 
 
+def _va_widget() -> int:
+    """Chép MainActivity.kt (thay bản mặc định của `flutter create`) +
+    GhiNhanhWidgetProvider.kt vào cây Kotlin, layout/xml của widget vào
+    res/, rồi khai <receiver> cho widget và intent-filter
+    ACTION_APPWIDGET_CONFIGURE cho MainActivity trong AndroidManifest.xml."""
+    if not KOTLIN_PKG_DIR.is_dir():
+        print(f'LOI: khong thay {KOTLIN_PKG_DIR}', file=sys.stderr)
+        return 1
+
+    thieu = [t for t in ('MainActivity.kt', 'GhiNhanhWidgetProvider.kt',
+                          'ghi_nhanh_widget.xml', 'ghi_nhanh_widget_info.xml')
+             if not (WIDGET_SRC_DIR / t).exists()]
+    if thieu:
+        print(f'LOI: thieu nguon widget {thieu} trong {WIDGET_SRC_DIR}', file=sys.stderr)
+        return 1
+
+    shutil.copyfile(WIDGET_SRC_DIR / 'MainActivity.kt', KOTLIN_PKG_DIR / 'MainActivity.kt')
+    shutil.copyfile(
+        WIDGET_SRC_DIR / 'GhiNhanhWidgetProvider.kt',
+        KOTLIN_PKG_DIR / 'GhiNhanhWidgetProvider.kt',
+    )
+
+    res = GOC / 'android' / 'app' / 'src' / 'main' / 'res'
+    (res / 'layout').mkdir(parents=True, exist_ok=True)
+    (res / 'xml').mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(WIDGET_SRC_DIR / 'ghi_nhanh_widget.xml', res / 'layout' / 'ghi_nhanh_widget.xml')
+    shutil.copyfile(
+        WIDGET_SRC_DIR / 'ghi_nhanh_widget_info.xml', res / 'xml' / 'ghi_nhanh_widget_info.xml',
+    )
+
+    chu = MANIFEST.read_text(encoding='utf-8')
+
+    if 'GhiNhanhWidgetProvider' not in chu:
+        khoi_receiver = (
+            '        <receiver android:name=".GhiNhanhWidgetProvider" android:exported="false">\n'
+            '            <intent-filter>\n'
+            '                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>\n'
+            '            </intent-filter>\n'
+            '            <meta-data android:name="android.appwidget.provider"\n'
+            '                android:resource="@xml/ghi_nhanh_widget_info"/>\n'
+            '        </receiver>\n'
+        )
+        chu, n = re.subn(r'(\s*)</application>', khoi_receiver + r'\1</application>', chu, count=1)
+        if n == 0:
+            print('LOI: khong tim thay </application> de chen <receiver>', file=sys.stderr)
+            return 1
+
+    if 'APPWIDGET_CONFIGURE' not in chu:
+        khoi_intent = (
+            '            <intent-filter>\n'
+            '                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE"/>\n'
+            '            </intent-filter>\n'
+        )
+        # Chen vao NGAY SAU intent-filter MAIN/LAUNCHER co san cua
+        # MainActivity (mau flutter create luon co dung mot khoi do) —
+        # khop ca cap <activity ...>...</activity> dau tien chua tu
+        # ".MainActivity" (dau cham, duong dan tuong doi chuan cua
+        # flutter create), roi chen truoc </activity> dong cua CHINH no.
+        m = re.search(r'<activity\s+android:name="\.MainActivity"[^>]*>.*?</activity>', chu, re.S)
+        if not m:
+            print('LOI: khong tim thay khoi <activity> cua MainActivity', file=sys.stderr)
+            return 1
+        doan_cu = m.group(0)
+        doan_moi = doan_cu.replace('</activity>', khoi_intent + '        </activity>')
+        chu = chu.replace(doan_cu, doan_moi, 1)
+
+    MANIFEST.write_text(chu, encoding='utf-8')
+    print('Da them widget "Ghi nhanh" vao Android.')
+    return 0
+
+
 def main() -> int:
     if not MANIFEST.exists():
         print(f'Khong thay {MANIFEST}', file=sys.stderr)
@@ -278,6 +356,10 @@ def main() -> int:
     ket_qua_icon = _va_icon()
     if ket_qua_icon != 0:
         return ket_qua_icon
+
+    ket_qua_widget = _va_widget()
+    if ket_qua_widget != 0:
+        return ket_qua_widget
 
     chu = MANIFEST.read_text(encoding='utf-8')
 

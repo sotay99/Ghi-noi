@@ -9,8 +9,11 @@ import 'package:flutter/material.dart';
 import 'cai_dat.dart';
 import 'chan_esc_lui_trang.dart';
 import 'firebase_options.dart';
+import 'ghi_chu_nhanh_widget.dart';
 import 'kho_du_lieu.dart';
 import 'khoi_dong_tep.dart';
+import 'man_hinh_go_nhanh_widget.dart';
+import 'man_hinh_widget_cau_hinh.dart';
 import 'trang_soan_thao.dart';
 
 void main() async {
@@ -37,6 +40,15 @@ class _UngDungFlowriteState extends State<UngDungFlowrite> {
   /// xong (đang hiện vòng xoay chờ).
   KhoDuLieu? _khoMoDau;
 
+  /// (YÊU CẦU MỚI) Activity này được mở ra từ nút trên widget "Ghi nhanh"
+  /// ở màn hình chính Android (`config` lúc hệ thống tự mở sau khi vừa đặt
+  /// widget, `quick` lúc bấm nút "Ghi nhanh") — `null` nghĩa là mở BÌNH
+  /// THƯỜNG (bấm icon app, hoặc nút "Mở app" của widget, không có Intent
+  /// extra gì) VÀ đã đọc xong (không còn ở trạng thái "chưa biết"), luồng
+  /// khởi động cũ chạy tiếp y như trước, không đụng gì.
+  YeuCauMoTuWidget? _yeuCauWidget;
+  bool _daDocYeuCauWidget = false;
+
   @override
   void initState() {
     super.initState();
@@ -44,6 +56,17 @@ class _UngDungFlowriteState extends State<UngDungFlowrite> {
   }
 
   Future<void> _napTruoc() async {
+    final yeuCauWidget = await docYeuCauMoTuWidget();
+    if (!mounted) return;
+    if (yeuCauWidget != null) {
+      setState(() {
+        _yeuCauWidget = yeuCauWidget;
+        _daDocYeuCauWidget = true;
+      });
+      return;
+    }
+    _daDocYeuCauWidget = true;
+
     final idNoiBoMacDinh = await _kho.tai();
     await _caiDat.tai();
     if (!mounted) return;
@@ -61,6 +84,7 @@ class _UngDungFlowriteState extends State<UngDungFlowrite> {
 
   @override
   Widget build(BuildContext context) {
+    final yeuCauWidget = _yeuCauWidget;
     return MaterialApp(
       title: 'Flowrite',
       debugShowCheckedModeBanner: false,
@@ -79,17 +103,26 @@ class _UngDungFlowriteState extends State<UngDungFlowrite> {
       // `SelectionArea` chỉ thêm khả năng kéo-chọn, không chặn `onTap`.
       builder: (context, child) => SelectionArea(child: child!),
       home: ChanEscLuiTrang(
-        child: _idGhiChuMoDau == null
+        child: !_daDocYeuCauWidget
             ? const Scaffold(
                 backgroundColor: Colors.white,
                 body: Center(child: CircularProgressIndicator()),
               )
-            : TrangSoanThao(
-                kho: _khoMoDau ?? _kho,
-                khoNoiBo: _kho,
-                caiDat: _caiDat,
-                ghiChuId: _idGhiChuMoDau!,
-              ),
+            : yeuCauWidget != null
+                ? (yeuCauWidget.hanhDong == 'config'
+                    ? ManHinhWidgetCauHinh(idWidget: yeuCauWidget.idWidget)
+                    : ManHinhGoNhanhWidget(idWidget: yeuCauWidget.idWidget))
+                : _idGhiChuMoDau == null
+                    ? const Scaffold(
+                        backgroundColor: Colors.white,
+                        body: Center(child: CircularProgressIndicator()),
+                      )
+                    : TrangSoanThao(
+                        kho: _khoMoDau ?? _kho,
+                        khoNoiBo: _kho,
+                        caiDat: _caiDat,
+                        ghiChuId: _idGhiChuMoDau!,
+                      ),
       ),
     );
   }
