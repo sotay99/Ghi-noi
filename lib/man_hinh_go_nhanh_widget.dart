@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import 'ghi_chu_nhanh_widget.dart';
 import 'kho_du_lieu.dart';
+import 'mo_hinh.dart';
 
 class ManHinhGoNhanhWidget extends StatefulWidget {
   const ManHinhGoNhanhWidget({super.key, required this.idWidget});
