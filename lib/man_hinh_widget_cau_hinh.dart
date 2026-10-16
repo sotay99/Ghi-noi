@@ -44,8 +44,10 @@ class _ManHinhWidgetCauHinhState extends State<ManHinhWidgetCauHinh> {
     if (kq == null) {
       // Người dùng bấm Back thoát bộ chọn — không có gì để lưu, nhưng vẫn
       // phải đóng Activity (không thể giữ widget ở trạng thái "đang cấu
-      // hình" lơ lửng), coi như huỷ đặt widget.
-      Navigator.of(context).maybePop();
+      // hình" lơ lửng), coi như huỷ đặt widget. Đây là route GỐC của app
+      // (không phải trang soạn thảo bình thường) nên `Navigator.pop` không
+      // tự đóng được Activity — phải gọi thẳng native `finish()`.
+      await huyCauHinhWidget();
       return;
     }
     if (kq.kho is KhoDuLieuDamMay) {

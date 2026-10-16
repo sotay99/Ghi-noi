@@ -78,3 +78,15 @@ Future<void> hoanTatCauHinhWidget(int idWidget) async {
     // Không có kênh — không có gì để báo, bỏ qua.
   }
 }
+
+/// Người dùng bấm Back/huỷ ở bộ chọn ghi chú trong màn hình cấu hình —
+/// tự đóng Activity (mặc định RESULT_CANCELED, đúng ý "huỷ đặt widget").
+/// `Navigator.pop` ở Dart không tự làm được việc này vì đây là route GỐC
+/// của app, không có gì để pop lên.
+Future<void> huyCauHinhWidget() async {
+  try {
+    await _kenh.invokeMethod('huyCauHinh');
+  } catch (_) {
+    // Không có kênh — bỏ qua.
+  }
+}
