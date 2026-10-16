@@ -7,6 +7,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'quyen_admin.dart';
 import 'vong_song_am.dart';
 
 class ThanhCongCu extends StatelessWidget {
@@ -69,6 +70,10 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamDieuKhoan,
     required this.khiBamBaoMat,
     required this.khiBamLuyenGoPhim,
+    required this.khiBamCaiDatUngDung,
+    required this.khiBamGopY,
+    required this.khiBamQuanLyGopY,
+    required this.khiBamDanhSachUser,
     this.tenHienThiDaDangNhap,
     this.emailDaDangNhap,
     this.urlAnhDaiDienDaDangNhap,
@@ -94,6 +99,21 @@ class ThanhCongCu extends StatelessWidget {
 
   /// (YÊU CẦU MỚI) Mục "Luyện gõ phím bằng 10 ngón tay" — truyền thẳng xuống `_NutThemMenu`.
   final VoidCallback khiBamLuyenGoPhim;
+
+  /// (YÊU CẦU MỚI) Mục "Cài đặt Ứng dụng vào Thiết bị" — truyền thẳng xuống `_NutThemMenu`.
+  final VoidCallback khiBamCaiDatUngDung;
+
+  /// (YÊU CẦU MỚI) Mục "Góp ý thêm, báo lỗi về ứng dụng" — truyền thẳng xuống `_NutThemMenu`.
+  final VoidCallback khiBamGopY;
+
+  /// (YÊU CẦU MỚI — chỉ admin) Mục "Các ý kiến góp ý, báo lỗi của user" —
+  /// truyền thẳng xuống `_NutTaiKhoanMenu`.
+  final VoidCallback khiBamQuanLyGopY;
+
+  /// (YÊU CẦU MỚI — chỉ admin) Mục "Các User đã đăng nhập" — truyền thẳng
+  /// xuống `_NutTaiKhoanMenu`.
+  final VoidCallback khiBamDanhSachUser;
+
   final String? tenHienThiDaDangNhap;
   final String? emailDaDangNhap;
   final String? urlAnhDaiDienDaDangNhap;
@@ -510,6 +530,8 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamTimKiem: khiBamTimKiem,
                               khiMoMenu: khiMoMenuCanReset,
                               khiBamLuyenGoPhim: khiBamLuyenGoPhim,
+                              khiBamCaiDatUngDung: khiBamCaiDatUngDung,
+                              khiBamGopY: khiBamGopY,
                             ),
                           ),
                           _NutCoChuThich(
@@ -528,6 +550,8 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamKhoiDongTep: khiBamKhoiDongTep,
                               khiBamDieuKhoan: khiBamDieuKhoan,
                               khiBamBaoMat: khiBamBaoMat,
+                              khiBamQuanLyGopY: khiBamQuanLyGopY,
+                              khiBamDanhSachUser: khiBamDanhSachUser,
                               tenHienThiDaDangNhap: tenHienThiDaDangNhap,
                               emailDaDangNhap: emailDaDangNhap,
                               urlAnhDaiDienDaDangNhap: urlAnhDaiDienDaDangNhap,
@@ -1103,6 +1127,7 @@ class _DongMenuCoTheBam extends StatelessWidget {
     required this.child,
     this.height = 34,
     this.padding = const EdgeInsets.symmetric(horizontal: 14),
+    this.mauNen,
   });
 
   final int gia;
@@ -1110,18 +1135,48 @@ class _DongMenuCoTheBam extends StatelessWidget {
   final double height;
   final EdgeInsetsGeometry padding;
 
+  /// (YÊU CẦU MỚI) Tô cả NỀN của dòng — khác [noiBat] của `_mucMenuThem`
+  /// (chỉ đổi màu CHỮ) — dùng cho mục cần nổi bật mạnh hơn hẳn mọi mục khác
+  /// trong menu, xem `_mucMenuThemNoiBatXanh`.
+  final Color? mauNen;
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () => Navigator.pop<int>(context, gia),
       child: Container(
         constraints: BoxConstraints(minHeight: height),
+        margin: mauNen != null
+            ? const EdgeInsets.symmetric(horizontal: 8, vertical: 3)
+            : EdgeInsets.zero,
         padding: padding,
         alignment: Alignment.centerLeft,
+        decoration: mauNen != null
+            ? BoxDecoration(color: mauNen, borderRadius: BorderRadius.circular(8))
+            : null,
         child: child,
       ),
     );
   }
+}
+
+/// (YÊU CẦU MỚI) Mục "Cài đặt Ứng dụng vào Thiết bị" — nền xanh dương đậm,
+/// chữ trắng đậm kèm icon, để nổi bật hẳn so với các dòng text thường
+/// khác trong menu "+ Thêm lựa chọn", thu hút ánh nhìn người dùng.
+Widget _mucMenuThemNoiBatXanh(int gia, String chu) {
+  return _DongMenuCoTheBam(
+    gia: gia,
+    mauNen: const Color(0xFF1A73E8),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.install_mobile, size: 17, color: Colors.white),
+        const SizedBox(width: 8),
+        Text(chu,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+      ],
+    ),
+  );
 }
 
 /// Một dòng trong menu thả xuống của nút dấu cộng — cao vừa đủ chữ, viền sát
@@ -1394,6 +1449,8 @@ class _NutThemMenu extends StatelessWidget {
     required this.khiBamTimKiem,
     required this.khiMoMenu,
     required this.khiBamLuyenGoPhim,
+    required this.khiBamCaiDatUngDung,
+    required this.khiBamGopY,
   });
 
   final bool rong;
@@ -1434,6 +1491,13 @@ class _NutThemMenu extends StatelessWidget {
   /// (YÊU CẦU MỚI) Mục "Luyện gõ phím bằng 10 ngón tay" — mở modal mời bấm
   /// link tìm kiếm Google.
   final VoidCallback khiBamLuyenGoPhim;
+
+  /// (YÊU CẦU MỚI) Mục "Cài đặt Ứng dụng vào Thiết bị" — nổi bật nền xanh
+  /// dương đậm, ngay phía trên "Chia sẻ ứng dụng...".
+  final VoidCallback khiBamCaiDatUngDung;
+
+  /// (YÊU CẦU MỚI) Mục "Góp ý thêm, báo lỗi về ứng dụng" — mở `moModalGopY`.
+  final VoidCallback khiBamGopY;
 
   @override
   Widget build(BuildContext context) {
@@ -1495,6 +1559,12 @@ class _NutThemMenu extends StatelessWidget {
               case 5:
                 khiBamLuyenGoPhim();
                 break;
+              case 29:
+                khiBamCaiDatUngDung();
+                break;
+              case 7:
+                khiBamGopY();
+                break;
             }
           },
           // (VIỆC 3) Một `ScrollController` MỚI mỗi lần menu mở — `itemBuilder`
@@ -1535,6 +1605,9 @@ class _NutThemMenu extends StatelessWidget {
                 _mucMenuThem(23, 'Danh sách phím tắt'),
                 _mucMenuThem(5, 'Luyện gõ phím bằng 10 ngón tay'),
                 _dividerMenu(),
+                // (YÊU CẦU MỚI) Nổi bật nền xanh dương đậm — thu hút ánh
+                // nhìn, ngay phía TRÊN "Chia sẻ ứng dụng...".
+                _mucMenuThemNoiBatXanh(29, 'Cài đặt Ứng dụng vào Thiết bị'),
                 _mucMenuThem(6, 'Chia sẻ ứng dụng này đến với mọi người'),
                 _mucMenuThem(7, 'Góp ý thêm, báo lỗi về ứng dụng'),
                 _mucMenuThem(8, 'Donate ủng hộ-cảm ơn tác giả'),
@@ -1565,6 +1638,8 @@ class _NutTaiKhoanMenu extends StatelessWidget {
     required this.khiBamKhoiDongTep,
     required this.khiBamDieuKhoan,
     required this.khiBamBaoMat,
+    required this.khiBamQuanLyGopY,
+    required this.khiBamDanhSachUser,
     this.tenHienThiDaDangNhap,
     this.emailDaDangNhap,
     this.urlAnhDaiDienDaDangNhap,
@@ -1584,6 +1659,15 @@ class _NutTaiKhoanMenu extends StatelessWidget {
 
   /// (YÊU CẦU MỚI) Mục "Bảo mật và quyền riêng tư" — mở `TrangBaoMat`.
   final VoidCallback khiBamBaoMat;
+
+  /// (YÊU CẦU MỚI — chỉ admin) Mục "Các ý kiến góp ý, báo lỗi của user" —
+  /// mở `moModalQuanLyGopY`. Chỉ hiện trong danh sách khi
+  /// `laAdminEmail(emailDaDangNhap)`, xem [build].
+  final VoidCallback khiBamQuanLyGopY;
+
+  /// (YÊU CẦU MỚI — chỉ admin) Mục "Các User đã đăng nhập" — mở
+  /// `moModalDanhSachUser`. Cùng điều kiện hiện với [khiBamQuanLyGopY].
+  final VoidCallback khiBamDanhSachUser;
 
   /// Khác `null` nghĩa là ĐANG đăng nhập — tên/avatar hiện thêm ở dòng CUỐI
   /// CÙNG của menu. Cả ba đều `null` cùng lúc khi chưa đăng nhập.
@@ -1703,6 +1787,12 @@ class _NutTaiKhoanMenu extends StatelessWidget {
               case 4:
                 khiBamBaoMat();
                 break;
+              case 30:
+                khiBamQuanLyGopY();
+                break;
+              case 31:
+                khiBamDanhSachUser();
+                break;
             }
           },
           itemBuilder: (ctx) {
@@ -1733,6 +1823,14 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                 // đường kẻ chia giữa hai mục này.
                 _mucMenuThem(8, 'Trò chuyện'),
                 _mucMenuThem(5, daDangNhap ? 'Đăng xuất' : 'Đăng nhập bằng tài khoản Google'),
+                // (YÊU CẦU MỚI — chỉ admin) Hai mục quản lý, CHỈ hiện khi
+                // đang đăng nhập ĐÚNG một trong hai email admin — đây chỉ
+                // là lớp ẨN/HIỆN giao diện, quyền THẬT nằm ở luật Firestore
+                // (xem `quyen_admin.dart`).
+                if (daDangNhap && laAdminEmail(emailDaDangNhap)) ...[
+                  _mucMenuThem(30, 'Các ý kiến góp ý, báo lỗi của user'),
+                  _mucMenuThem(31, 'Các User đã đăng nhập'),
+                ],
                 // (YÊU CẦU MỚI) Đang đăng nhập — hiện tên + avatar của tài
                 // khoản ở dòng CUỐI CÙNG của menu, không bấm được (chỉ để
                 // xem, đăng xuất đã có mục riêng ngay phía trên).

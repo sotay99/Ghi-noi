@@ -10,6 +10,7 @@
 //   của máy, lấy access/id token rồi đổi sang credential cho Firebase —
 //   `signInWithPopup` không chạy được trên Android.
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
@@ -48,6 +49,7 @@ class DichVuDangNhapGoogle {
   Future<void> dangNhap() async {
     if (kIsWeb) {
       await FirebaseAuth.instance.signInWithPopup(GoogleAuthProvider());
+      await _ghiHoSoNguoiDung(FirebaseAuth.instance.currentUser);
       return;
     }
     final taiKhoan = await _googleSignIn.signIn();
@@ -58,6 +60,33 @@ class DichVuDangNhapGoogle {
       idToken: xacThuc.idToken,
     );
     await FirebaseAuth.instance.signInWithCredential(credential);
+    await _ghiHoSoNguoiDung(FirebaseAuth.instance.currentUser);
+  }
+
+  /// (YÊU CẦU MỚI) Ghi/cập nhật hồ sơ `users/{uid}` mỗi lần đăng nhập thành
+  /// công — phục vụ màn hình admin "Các User đã đăng nhập"
+  /// (`modal_danh_sach_user.dart`). Trước đây KHÔNG ghi gì ở đây cả (doc
+  /// gốc `users/{uid}` chỉ có các subcollection riêng của bộ nhớ đám mây).
+  /// `lanDauDangNhap` chỉ đặt khi doc CHƯA từng có — những lần đăng nhập
+  /// sau chỉ cập nhật `lanCuoiDangNhap` cùng email/tên/ảnh mới nhất. Lỗi ở
+  /// đây (mất mạng, luật Firestore...) không được làm hỏng cả luồng đăng
+  /// nhập — bắt lại, bỏ qua im lặng.
+  Future<void> _ghiHoSoNguoiDung(User? nguoiDung) async {
+    if (nguoiDung == null) return;
+    try {
+      final doc = FirebaseFirestore.instance.collection('users').doc(nguoiDung.uid);
+      final hienCo = await doc.get();
+      final du = <String, dynamic>{
+        'email': nguoiDung.email,
+        'tenHienThi': nguoiDung.displayName,
+        'urlAnhDaiDien': nguoiDung.photoURL,
+        'lanCuoiDangNhap': FieldValue.serverTimestamp(),
+      };
+      if (!hienCo.exists) du['lanDauDangNhap'] = FieldValue.serverTimestamp();
+      await doc.set(du, SetOptions(merge: true));
+    } catch (_) {
+      // Không chặn luồng đăng nhập chỉ vì ghi hồ sơ thất bại.
+    }
   }
 
   Future<void> dangXuat() async {

@@ -38,6 +38,10 @@ import 'canh_bao_roi_trang.dart';
 import 'kho_du_lieu.dart';
 import 'kiem_tra_cap_nhat.dart';
 import 'modal_bao_mat.dart';
+import 'modal_cai_dat_ung_dung.dart';
+import 'modal_danh_sach_user.dart';
+import 'modal_gop_y.dart';
+import 'modal_quan_ly_gop_y.dart';
 import 'modal_dieu_khoan.dart';
 import 'modal_luyen_go_phim.dart';
 import 'tu_dien_dam_may.dart';
@@ -16977,6 +16981,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   MaterialPageRoute(builder: (_) => const TrangBaoMat()),
                 ),
                 khiBamLuyenGoPhim: () => moModalLuyenGoPhim(context),
+                khiBamCaiDatUngDung: () => moModalCaiDatUngDung(context),
+                khiBamGopY: () => moModalGopY(
+                  context,
+                  emailDaDangNhap: _nguoiDungDangNhap?.email,
+                ),
+                khiBamQuanLyGopY: () => moModalQuanLyGopY(context),
+                khiBamDanhSachUser: () => moModalDanhSachUser(context),
                 // `tenHienThiDaDangNhap` khác `null` LÀ tín hiệu "đang đăng
                 // nhập" cho `ThanhCongCu` — không được để `null` chỉ vì tài
                 // khoản không có sẵn displayName, nên dự phòng bằng email.
