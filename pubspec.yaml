@@ -48,7 +48,10 @@ dependencies:
   # (YÊU CẦU MỚI) Dải "Có bản APK mới" — đọc số build hiện tại của máy
   # (`PackageInfo.buildNumber`, gắn lúc CI build bằng `--build-number`) để so
   # với Release mới nhất trên GitHub. Xem `lib/kiem_tra_cap_nhat.dart`.
-  package_info_plus: ^8.1.1
+  # (SỬA LỖI build đỏ) 8.x kéo theo win32 ^5.x — xung đột với share_plus
+  # (đòi win32 ^6.x) đã có sẵn trong app, cùng kiểu lỗi đã gặp với
+  # file_picker ở trên. Nâng lên 10.x theo đúng gợi ý CI đưa ra.
+  package_info_plus: ^10.2.2
 
 dev_dependencies:
   flutter_lints: ^4.0.0
