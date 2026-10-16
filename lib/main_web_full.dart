@@ -76,6 +76,10 @@ class _UngDungFlowriteWebDayDuState extends State<UngDungFlowriteWebDayDu> {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1A73E8)),
         scaffoldBackgroundColor: Colors.white,
       ),
+      // (YÊU CẦU MỚI) Xem giải thích đầy đủ ở `main.dart` — bọc toàn app
+      // trong một `SelectionArea` để tên nút/mục menu/nội dung mọi trang
+      // chọn/copy được như text thường.
+      builder: (context, child) => SelectionArea(child: child!),
       home: ChanEscLuiTrang(
         child: _idGhiChuMoDau == null
             ? const Scaffold(

@@ -34,55 +34,37 @@ class ManHinhHuongDan extends StatelessWidget {
                     children: [
                       _HopMoDau(),
                       SizedBox(height: 28),
-                      _MucLon(so: 'I', tieuDe: 'Vì sao Flowrite ra đời?'),
+                      _MucLon(so: 'I', tieuDe: 'Nói và gõ tay cùng lúc'),
                       SizedBox(height: 14),
                       _Doan(_doan1),
-                      SizedBox(height: 12),
+                      SizedBox(height: 28),
+                      _MucLon(so: 'II', tieuDe: 'Quản lý nhiều ghi chú, chuyển tệp trong một nhịp'),
+                      SizedBox(height: 14),
                       _Doan(_doan2),
-                      SizedBox(height: 12),
-                      _OGoiY(
-                        icon: Icons.error_outline,
-                        mau: Color(0xFFD93025),
-                        mauNen: Color(0xFFFCE8E6),
-                        tieuDe: 'Nỗi bức xúc chưa app nào giải quyết',
-                        noiDung: _oGoiY1,
-                      ),
-                      SizedBox(height: 28),
-                      _MucLon(so: 'II', tieuDe: 'Nhanh gấp bội — có số liệu hẳn hoi'),
                       SizedBox(height: 14),
-                      _Doan(_doan3),
-                      SizedBox(height: 18),
-                      _HangTheThongKe(),
-                      SizedBox(height: 18),
-                      _Doan(_doan4),
-                      SizedBox(height: 28),
-                      _MucLon(so: 'III', tieuDe: 'Hai nỗi đau, một lời giải'),
-                      SizedBox(height: 14),
-                      _Doan(_doan5),
-                      SizedBox(height: 14),
-                      _TheHanChe(
-                        mau: Color(0xFFB06000),
-                        mauNen: Color(0xFFFEF7E0),
-                        icon: Icons.record_voice_over_outlined,
-                        tieuDe: 'Nói — nhanh nhưng dễ vấp',
-                        gachDau: _hanCheNoi,
-                      ),
-                      SizedBox(height: 12),
                       _TheHanChe(
                         mau: Color(0xFF185ABC),
                         mauNen: Color(0xFFE8F0FE),
-                        icon: Icons.keyboard_outlined,
-                        tieuDe: 'Gõ tay — chuẩn nhưng chậm và mỏi',
-                        gachDau: _hanCheGo,
+                        icon: Icons.folder_copy_outlined,
+                        tieuDe: 'Phần lớn app ghi chú khác chưa chú trọng điều này',
+                        gachDau: _dacDiemDaTep,
                       ),
-                      SizedBox(height: 14),
-                      _Doan(_doan6),
                       SizedBox(height: 28),
-                      _MucLon(so: 'IV', tieuDe: 'Flowrite dành cho ai?'),
+                      _MucLon(so: 'III', tieuDe: 'Trợ lý AI đi kèm'),
                       SizedBox(height: 14),
-                      _Doan(_doan7),
+                      _Doan(_doan3),
                       SizedBox(height: 14),
-                      _DanhSachDoiTuong(),
+                      _TheHanChe(
+                        mau: Color(0xFF9334E6),
+                        mauNen: Color(0xFFF3E8FD),
+                        icon: Icons.auto_awesome_outlined,
+                        tieuDe: 'Không cần rời khỏi app',
+                        gachDau: _dacDiemAi,
+                      ),
+                      SizedBox(height: 28),
+                      _MucLon(so: 'IV', tieuDe: 'Đồng bộ nhiều thiết bị'),
+                      SizedBox(height: 14),
+                      _Doan(_doan4),
                       SizedBox(height: 28),
                       _MucLon(so: 'V', tieuDe: 'Bí quyết để nhanh hơn nữa'),
                       SizedBox(height: 14),
@@ -231,8 +213,8 @@ class _HopMoDau extends StatelessWidget {
       child: const _Doan(
         'Nói và gõ tay, xưa nay luôn phải **chọn một**: bật giọng nói thì '
         'tắt bàn phím, ngồi gõ thì im giọng nói. Flowrite phá bỏ luật đó — '
-        'để bạn ==nói và gõ cùng lúc, không lẫn không đè lên nhau==, ra chữ '
-        'nhanh hơn hẳn cách làm cũ.',
+        'bạn ==nói và gõ cùng lúc, không lẫn không đè lên nhau==, lại còn '
+        'quản lý nhiều ghi chú, có AI hỗ trợ, đồng bộ mọi thiết bị.',
       ),
     );
   }
@@ -461,167 +443,6 @@ class _TheHanChe extends StatelessWidget {
   }
 }
 
-// -------------------------------------------------------------- thống kê
-
-class _HangTheThongKe extends StatelessWidget {
-  const _HangTheThongKe();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: const [
-        _TheThongKe(
-          icon: Icons.keyboard_outlined,
-          mau: Color(0xFF185ABC),
-          nhan: 'Gõ tay thông thường',
-          soLieu: '≈ 35–45 từ/phút',
-        ),
-        SizedBox(height: 10),
-        _TheThongKe(
-          icon: Icons.record_voice_over_outlined,
-          mau: Color(0xFFB06000),
-          nhan: 'Nói chuyện bình thường',
-          soLieu: '≈ 130–150 từ/phút',
-        ),
-        SizedBox(height: 10),
-        _TheThongKe(
-          icon: Icons.bolt,
-          mau: Color(0xFF188038),
-          nhan: 'Nói + gõ tay xen kẽ trong Flowrite',
-          soLieu: 'Gấp 3–4 lần cách gõ tay thuần tuý',
-          noiBat: true,
-        ),
-      ],
-    );
-  }
-}
-
-class _TheThongKe extends StatelessWidget {
-  const _TheThongKe({
-    required this.icon,
-    required this.mau,
-    required this.nhan,
-    required this.soLieu,
-    this.noiBat = false,
-  });
-
-  final IconData icon;
-  final Color mau;
-  final String nhan;
-  final String soLieu;
-  final bool noiBat;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: noiBat ? mau : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: noiBat ? mau : const Color(0xFFE0E0E0)),
-        boxShadow: noiBat
-            ? [BoxShadow(color: mau.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 4))]
-            : null,
-      ),
-      // Xếp dọc, không xếp ngang: nhãn và số liệu cùng nằm trên một hàng thì
-      // hàng chữ dài (như "Nói + gõ tay xen kẽ trong Flowrite") ép ô còn lại
-      // hẹp tới mức vỡ chữ ra từng ký tự một trên màn hình điện thoại. Xếp
-      // dọc thì nhãn và số liệu đều được dùng toàn bộ bề ngang, không bao
-      // giờ bị bóp bất kể màn hình rộng hay hẹp.
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: noiBat ? Colors.white : mau, size: 22),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  nhan,
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    color: noiBat ? Colors.white : const Color(0xFF5F6368),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            soLieu,
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
-              color: noiBat ? Colors.white : mau,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// -------------------------------------------------------------- đối tượng
-
-class _DanhSachDoiTuong extends StatelessWidget {
-  const _DanhSachDoiTuong();
-
-  static const _muc = [
-    (Icons.menu_book_outlined, 'Nhà văn, người viết truyện', 'tuôn trào mạch cảm xúc bằng lời nói, không bị ngắt quãng vì gõ chậm.'),
-    (Icons.campaign_outlined, 'Người viết content, chạy quảng cáo', 'ra bản nháp nhanh gấp nhiều lần, còn thời gian đầu tư vào chỉnh sửa.'),
-    (Icons.smart_toy_outlined, 'Người soạn lệnh (prompt) cho AI', 'mô tả yêu cầu dài, chi tiết, nhiều ràng buộc mà không ngại gõ mỏi tay.'),
-    (Icons.code_outlined, 'Người làm "vibe coding" — lập trình bằng cách mô tả ý tưởng cho AI viết code', 'diễn giải logic phức tạp bằng lời, để AI hiện thực hoá thành mã nguồn.'),
-    (Icons.school_outlined, 'Sinh viên, người ghi chú bài giảng', 'ghi lại ý chính ngay khi đang nghe, không sợ chậm tay lỡ mất câu sau.'),
-    (Icons.directions_walk_outlined, 'Người bận rộn, tranh thủ lúc di chuyển', 'đọc chính tả khi đang đi, đang chờ, rồi về gõ tay chỉnh sửa cho gọn.'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        for (final (icon, ten, moTa) in _muc)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F0FE),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(icon, color: _mauChinh, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        ten,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        moTa,
-                        style: const TextStyle(fontSize: 13.5, color: Color(0xFF5F6368), height: 1.4),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-}
-
 // ---------------------------------------------------------------- trích dẫn
 
 class _TrichDan extends StatelessWidget {
@@ -642,10 +463,8 @@ class _TrichDan extends StatelessWidget {
           const Icon(Icons.format_quote, color: Colors.white70, size: 30),
           const SizedBox(height: 8),
           const Text(
-            'Kết hợp cả năm điều trên — nói và gõ không xung đột, bàn phím '
-            'tốt, bộ gõ đúng ngôn ngữ, đôi tay đã luyện mười ngón, và một '
-            'chiếc micro nghe rõ từng lời — bạn sẽ đứng vào nhóm những người '
-            'soạn thảo văn bản nhanh nhất thế giới.',
+            'Nói nhanh, gõ chính xác, chuyển tệp tức khắc, có AI hỗ trợ, và '
+            'mở đúng ghi chú ở bất kỳ thiết bị nào — đó là Flowrite.',
             style: TextStyle(color: Colors.white, fontSize: 16.5, fontWeight: FontWeight.w700, height: 1.5),
           ),
           const SizedBox(height: 14),
@@ -663,70 +482,37 @@ class _TrichDan extends StatelessWidget {
 // ------------------------------------------------------------------- văn bản
 
 const _doan1 =
-    'Bạn đã bao giờ rơi vào tình huống này chưa: đang **thao thao bất tuyệt** '
-    'đọc chính tả cho điện thoại ghi lại, chợt nhận ra mình lỡ dùng sai một '
-    'từ hoặc muốn chêm ngay một con số vào giữa câu — thế là phải dừng nói, '
-    'bấm nút tắt micro, gõ sửa, rồi bấm mở micro lại, cố nhớ xem mình đang '
-    'nói dở tới đâu? Từng ứng dụng ghi âm chuyển chữ trên thị trường, dù tốt '
-    'đến mấy, đều buộc bạn chọn MỘT trong hai: hoặc là **nói**, hoặc là **gõ** '
-    '— không có ứng dụng nào cho phép hai việc đó diễn ra ĐAN XEN một cách '
-    'tự nhiên, an toàn, không giẫm chân lên nhau.';
+    'Phần lớn app ghi âm chuyển chữ buộc bạn chọn MỘT trong hai: hoặc **nói**, '
+    'hoặc **gõ**. Flowrite để cả hai diễn ra ĐAN XEN tự nhiên — nói một câu '
+    'dài, rồi đưa tay gõ chèn ngay một từ, một con số — không cần tắt micro, '
+    'không lo giọng nói và ký tự gõ tay ==đá nhau làm hỏng câu==.';
 
 const _doan2 =
-    'Flowrite sinh ra chính là để giải quyết đúng nỗi bức xúc đó. Bạn có thể '
-    'nói một câu dài, rồi ngay lập tức đưa tay gõ chèn một từ, một con số, '
-    'một dấu câu — mà không cần tắt micro thủ công, không lo chữ bị lặp, '
-    'không lo giọng nói và ký tự gõ tay "đá nhau" làm hỏng cả câu. Đây là bài '
-    'toán tưởng chừng đơn giản nhưng **cực kỳ khó làm cho đúng**: ứng dụng '
-    'phải tự nhận biết ký tự nào đến từ giọng nói, ký tự nào đến từ bàn '
-    'phím, để ứng xử khác nhau trong từng tình huống — điều mà rất ít ứng '
-    'dụng chịu đầu tư làm tới nơi tới chốn.';
+    'Ghi chú được tổ chức theo **thư mục lồng nhau** như một cây thư mục '
+    'thật — không phải một danh sách dài vô tổ chức. Và khi đang soạn một '
+    'tệp, bạn chuyển ngay sang tệp kế tiếp trong cùng thư mục bằng nút '
+    '**"Tệp trước/Tệp sau"** ngay tại màn hình soạn thảo.';
 
-const _oGoiY1 =
-    'Tất cả các ứng dụng gõ chính tả phổ biến hiện nay coi giọng nói và bàn '
-    'phím là **hai chế độ tách biệt**: bật cái này thì tắt cái kia. Flowrite '
-    'là nỗ lực để hai chế độ đó ==chạy song song thật sự==, không phải giả '
-    'lập bằng cách bật tắt luân phiên.';
+const _dacDiemDaTep = [
+  'Chuyển qua ghi chú khác KHÔNG phải quay lại màn hình thư mục rồi bấm mở lại từng cái — chỉ một nút, ngay tại chỗ đang soạn.',
+  'Hết tệp cuối tự vòng về tệp đầu (và ngược lại) — không bao giờ "kẹt ở biên".',
+  'Tìm nhanh trong thư mục, và tuỳ chọn mở sẵn đúng ghi chú mỗi khi khởi động app.',
+];
 
 const _doan3 =
-    'Tốc độ nói của một người bình thường nhanh hơn tốc độ gõ tay của người '
-    'gõ giỏi rất nhiều lần. Đây không phải là con số Flowrite tự nhận, mà là '
-    'những mức tham khảo phổ biến vẫn được nhắc tới khi so sánh tốc độ nói '
-    'và tốc độ gõ của con người:';
+    'Không cần rời Flowrite để dùng AI — mọi tính năng AI nằm sẵn trong '
+    'thanh công cụ, xử lý ngay trên văn bản đang soạn.';
+
+const _dacDiemAi = [
+  'Kiểm tra chính tả, tóm tắt, viết lại cả bài hoặc một đoạn đang chọn.',
+  'Trò chuyện hỏi đáp ngay trong app để brainstorm hoặc hỏi về nội dung bài viết.',
+  'Đọc ảnh chụp hoặc file âm thanh, tự động chuyển thành văn bản.',
+];
 
 const _doan4 =
-    'Con số ~~gấp 3-4 lần~~ ở trên là ước tính MINH HOẠ cho trải nghiệm '
-    'thực tế khi bạn dùng Flowrite: phần lớn nội dung tuôn ra bằng giọng nói '
-    'với tốc độ gần bằng lúc bạn nói chuyện, chỉ xen vào những đoạn gõ tay '
-    'ngắn để sửa lỗi hoặc thêm chi tiết — chứ không phải một phép đo khoa '
-    'học chính xác tuyệt đối cho mọi người, mọi giọng nói, mọi ngôn ngữ.';
-
-const _doan5 =
-    'Không có cách soạn thảo nào là hoàn hảo tuyệt đối — nói và gõ tay mỗi '
-    'cách đều có điểm mạnh và điểm yếu riêng. Vấn đề không phải là chọn bên '
-    'nào, mà là **để mỗi cách làm đúng phần việc nó giỏi nhất**.';
-
-const _hanCheNoi = [
-  'Bộ nhận dạng giọng nói vẫn có lúc nghe sai từ, đặc biệt với tên riêng, thuật ngữ chuyên ngành, hay khi môi trường ồn.',
-  'Nói tự nhiên thường ra câu không có cấu trúc logic chặt chẽ như văn viết — nhiều từ đệm, câu dài lan man.',
-  'Dấu câu (phẩy, chấm, xuống dòng) thường bị thiếu hoặc đặt sai chỗ, vì khi nói ít ai tự nhắc "chấm câu" giữa chừng.',
-];
-
-const _hanCheGo = [
-  'Tốc độ gõ bị giới hạn bởi tốc độ ngón tay — kể cả người gõ nhanh cũng khó vượt qua tốc độ nói chuyện bình thường.',
-  'Gõ liên tục trong thời gian dài gây mỏi tay, mỏi cổ tay, và với điện thoại là mỏi cả hai ngón cái.',
-  'Cúi nhìn màn hình gõ lâu dễ mỏi cổ, mỏi mắt — một vấn đề tư thế quen thuộc của thời đại cầm điện thoại cả ngày.',
-];
-
-const _doan6 =
-    'Flowrite để giọng nói lo phần **tốc độ** — tuôn ý tưởng ra thật nhanh — '
-    'và để đôi tay lo phần **độ chính xác** — sửa lỗi chính tả, thêm dấu câu, '
-    'chỉnh câu chữ cho logic — ngay tại chỗ, ngay lúc đang nói, không cần '
-    'dừng lại quy trình nào cả. Hai điểm yếu tự triệt tiêu lẫn nhau.';
-
-const _doan7 =
-    'Bất kỳ ai cần tạo ra văn bản NHIỀU và NHANH đều được lợi từ Flowrite, '
-    'nhưng có vài nhóm người sẽ thấy sự khác biệt rõ rệt nhất:';
+    'Đăng nhập tài khoản Google (**hoàn toàn tuỳ chọn**) để mở đúng ghi chú '
+    'đó ở một thiết bị khác — điện thoại, máy tính, trình duyệt nào cũng '
+    'thấy cùng một dữ liệu.';
 
 const _doan8 =
     'Bản thân ứng dụng chỉ là một nửa câu chuyện — nửa còn lại nằm ở chính '

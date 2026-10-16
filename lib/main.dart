@@ -69,6 +69,15 @@ class _UngDungFlowriteState extends State<UngDungFlowrite> {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1A73E8)),
         scaffoldBackgroundColor: Colors.white,
       ),
+      // (YÊU CẦU MỚI) Bọc TOÀN APP trong một `SelectionArea` DUY NHẤT — tên
+      // mọi nút, mọi mục trong menu thả xuống, nội dung mọi trang (Hướng
+      // dẫn, Điều khoản, Bảo mật...) đều chọn/copy được như text thường,
+      // không cần sửa riêng từng nơi. Overlay của `showMenu`/`PopupMenuButton`
+      // vẫn nằm trong `Navigator` được `builder` bọc nên cũng được tính.
+      // Không ảnh hưởng vùng soạn thảo chính (`TextField`/`EditableText` tự
+      // quản lý vùng chọn riêng của nó) hay việc bấm nút bình thường —
+      // `SelectionArea` chỉ thêm khả năng kéo-chọn, không chặn `onTap`.
+      builder: (context, child) => SelectionArea(child: child!),
       home: ChanEscLuiTrang(
         child: _idGhiChuMoDau == null
             ? const Scaffold(

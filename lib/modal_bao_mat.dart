@@ -119,8 +119,7 @@ class TrangBaoMat extends StatelessWidget {
                 const SizedBox(height: 12),
                 const DoanPhapLy(
                   'Bạn có thể xoá ghi chú, đăng xuất, hoặc gỡ app bất cứ '
-                  'lúc nào. Muốn xoá hẳn dữ liệu đã đồng bộ trên tài khoản '
-                  'Google, liên hệ theo thông tin ở phần 9 bên dưới.',
+                  'lúc nào. Xoá hẳn dữ liệu đã đồng bộ trên tài khoản Google.',
                 ),
                 const SizedBox(height: 22),
 
@@ -135,8 +134,8 @@ class TrangBaoMat extends StatelessWidget {
                 const MucLonPhapLy(so: '9', tieuDe: 'Liên hệ'),
                 const SizedBox(height: 12),
                 const DoanPhapLy(
-                  'Có thắc mắc về quyền riêng tư, hoặc muốn yêu cầu xoá dữ '
-                  'liệu, liên hệ qua một trong các cách sau:',
+                  'Có thắc mắc, góp ý, báo lỗi, vui lòng liên hệ qua một '
+                  'trong các cách sau:',
                 ),
                 const SizedBox(height: 12),
                 HopNoiBatPhapLy(
