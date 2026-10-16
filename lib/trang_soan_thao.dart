@@ -40,6 +40,7 @@ import 'kiem_tra_cap_nhat.dart';
 import 'modal_bao_mat.dart';
 import 'modal_cai_dat_ung_dung.dart';
 import 'modal_danh_sach_user.dart';
+import 'modal_donate.dart';
 import 'modal_gop_y.dart';
 import 'modal_quan_ly_gop_y.dart';
 import 'modal_dieu_khoan.dart';
@@ -16988,6 +16989,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 ),
                 khiBamQuanLyGopY: () => moModalQuanLyGopY(context),
                 khiBamDanhSachUser: () => moModalDanhSachUser(context),
+                khiBamDonate: () => moModalDonate(context),
                 // `tenHienThiDaDangNhap` khác `null` LÀ tín hiệu "đang đăng
                 // nhập" cho `ThanhCongCu` — không được để `null` chỉ vì tài
                 // khoản không có sẵn displayName, nên dự phòng bằng email.

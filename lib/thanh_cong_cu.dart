@@ -72,6 +72,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamLuyenGoPhim,
     required this.khiBamCaiDatUngDung,
     required this.khiBamGopY,
+    required this.khiBamDonate,
     required this.khiBamQuanLyGopY,
     required this.khiBamDanhSachUser,
     this.tenHienThiDaDangNhap,
@@ -105,6 +106,9 @@ class ThanhCongCu extends StatelessWidget {
 
   /// (YÊU CẦU MỚI) Mục "Góp ý thêm, báo lỗi về ứng dụng" — truyền thẳng xuống `_NutThemMenu`.
   final VoidCallback khiBamGopY;
+
+  /// (YÊU CẦU MỚI) Mục "Donate ủng hộ-cảm ơn tác giả" — truyền thẳng xuống `_NutThemMenu`.
+  final VoidCallback khiBamDonate;
 
   /// (YÊU CẦU MỚI — chỉ admin) Mục "Các ý kiến góp ý, báo lỗi của user" —
   /// truyền thẳng xuống `_NutTaiKhoanMenu`.
@@ -532,6 +536,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamLuyenGoPhim: khiBamLuyenGoPhim,
                               khiBamCaiDatUngDung: khiBamCaiDatUngDung,
                               khiBamGopY: khiBamGopY,
+                              khiBamDonate: khiBamDonate,
                             ),
                           ),
                           _NutCoChuThich(
@@ -1451,6 +1456,7 @@ class _NutThemMenu extends StatelessWidget {
     required this.khiBamLuyenGoPhim,
     required this.khiBamCaiDatUngDung,
     required this.khiBamGopY,
+    required this.khiBamDonate,
   });
 
   final bool rong;
@@ -1498,6 +1504,9 @@ class _NutThemMenu extends StatelessWidget {
 
   /// (YÊU CẦU MỚI) Mục "Góp ý thêm, báo lỗi về ứng dụng" — mở `moModalGopY`.
   final VoidCallback khiBamGopY;
+
+  /// (YÊU CẦU MỚI) Mục "Donate ủng hộ-cảm ơn tác giả" — mở `moModalDonate`.
+  final VoidCallback khiBamDonate;
 
   @override
   Widget build(BuildContext context) {
@@ -1564,6 +1573,9 @@ class _NutThemMenu extends StatelessWidget {
                 break;
               case 7:
                 khiBamGopY();
+                break;
+              case 8:
+                khiBamDonate();
                 break;
             }
           },
