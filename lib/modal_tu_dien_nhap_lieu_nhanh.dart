@@ -17,10 +17,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'cai_dat.dart';
+import 'dang_nhap_google.dart';
 import 'dinh_dang_clip.dart';
 import 'dinh_dang_doan_van_tu_dien.dart';
 import 'lua_chon_phim_tat.dart';
 import 'mau_phim_tu_dien_nhap_lieu_nhanh.dart';
+import 'thong_bao_giua.dart';
+import 'tu_dien_dam_may.dart';
 
 const _mauChinh = Color(0xFF1A73E8);
 
@@ -95,18 +98,102 @@ class _ManHinhTuDienNhapLieuNhanhState
   final Map<int, Timer> _henCopy = {};
   final Map<int, Timer> _henDan = {};
 
+  // --------------------------------------------- (YÊU CẦU MỚI) 2 bộ nhớ
+
+  /// 'noiBo' hoặc 'damMay' — bộ nhớ ĐANG XEM/SỬA trong modal này. Mặc định
+  /// mở ra đúng bộ nhớ nào đang BẬT (loại trừ nhau — xem công tắc "Bật Từ
+  /// điển nhập liệu nhanh"); cả hai cùng tắt thì mặc định Nội bộ.
+  late String _tab;
+
+  /// Bản đám mây của tài khoản đang đăng nhập — `null` nếu chưa đăng nhập.
+  /// Lấy từ `TuDienNhapLieuNhanhDamMay.dungChung` (đã tải sẵn lúc đăng
+  /// nhập, xem `trang_soan_thao.dart`); modal này KHÔNG tự tải lại trừ khi
+  /// biến đó lỡ chưa có (phòng hờ, hiếm khi xảy ra).
+  TuDienNhapLieuNhanhDamMay? _kho;
+
+  bool get _dangODamMay => _tab == 'damMay';
+
+  String _docDong(int i) =>
+      _dangODamMay ? (_kho?.dong[i] ?? '') : widget.caiDat.tuDienNhapLieuNhanh[i];
+
+  String? _docDinhDangRaw(int i) =>
+      _dangODamMay ? _kho?.dinhDang[i] : widget.caiDat.dinhDangTuDienNhapLieuNhanh[i];
+
+  List<VungDinhDangDoanVan> _docDinhDang(int i) {
+    final raw = _docDinhDangRaw(i);
+    if (raw == null) return const [];
+    try {
+      final ds = jsonDecode(raw);
+      if (ds is! List) return const [];
+      final doDai = _docDong(i).length;
+      return ds
+          .map((j) => VungDinhDangDoanVan.tuJson(j, doDai))
+          .whereType<VungDinhDangDoanVan>()
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Ghi chữ dòng [i] vào ĐÚNG bộ nhớ đang xem — Nội bộ thì ghi thẳng vào
+  /// `widget.caiDat` (y hệt trước đây); Đám mây thì ghi lên tài khoản NGAY
+  /// (xem `TuDienNhapLieuNhanhDamMay` — không chờ "nạp đầy lúc trống" như
+  /// cài đặt thường, đây là XEM/SỬA SỐNG trực tiếp nội dung trên tài khoản).
+  Future<void> _ghiDong(int i, String gia) async {
+    if (_dangODamMay) {
+      await _kho?.ghiDong(i, gia);
+    } else {
+      widget.caiDat.tuDienNhapLieuNhanh[i] = gia;
+      await widget.caiDat.luuTuDienNhapLieuNhanh();
+    }
+  }
+
+  Future<void> _ghiDinhDangRaw(int i, String? goi) async {
+    if (_dangODamMay) {
+      await _kho?.ghiDinhDang(i, goi);
+    } else {
+      await widget.caiDat.datDinhDangTuDienNhapLieuNhanh(i, goi);
+    }
+  }
+
+  /// Tab "Bộ nhớ Đám mây" chỉ bấm được khi đã đăng nhập — chưa đăng nhập
+  /// thì cảnh báo, giữ nguyên ở "Bộ nhớ Nội bộ".
+  Future<void> _doiTabNguon(String tab) async {
+    if (_tab == tab) return;
+    if (tab == 'damMay') {
+      final uid = DichVuDangNhapGoogle.instance.nguoiDungHienTai?.uid;
+      if (uid == null) {
+        if (mounted) {
+          hienThongBaoGiua(context, 'Vui lòng đăng nhập tài khoản Google trước.');
+        }
+        return;
+      }
+      var kho = _kho ?? TuDienNhapLieuNhanhDamMay.dungChung;
+      if (kho == null || kho.uid != uid) {
+        kho = TuDienNhapLieuNhanhDamMay(uid);
+        await kho.tai();
+        TuDienNhapLieuNhanhDamMay.dungChung = kho;
+      }
+      _kho = kho;
+      if (!mounted) return;
+    }
+    setState(() {
+      _tab = tab;
+      for (var i = 0; i < 26; i++) {
+        _oNhap[i].text = _docDong(i);
+        _dinhDangLive[i].value = _docDinhDang(i);
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
-    _oNhap = List.generate(
-      26,
-      (i) => TextEditingController(text: widget.caiDat.tuDienNhapLieuNhanh[i]),
-    );
+    _kho = TuDienNhapLieuNhanhDamMay.dungChung;
+    _tab = (_kho != null && _kho!.bat) ? 'damMay' : 'noiBo';
+    _oNhap = List.generate(26, (i) => TextEditingController(text: _docDong(i)));
     _focusNodes = List.generate(26, (_) => FocusNode());
-    _dinhDangLive = List.generate(
-      26,
-      (i) => ValueNotifier(widget.caiDat.docDinhDangTuDienNhapLieuNhanh(i)),
-    );
+    _dinhDangLive = List.generate(26, (i) => ValueNotifier(_docDinhDang(i)));
   }
 
   @override
@@ -143,10 +230,10 @@ class _ManHinhTuDienNhapLieuNhanhState
     // phải đợi lần gõ KẾ TIẾP mới thấy đúng. Luôn bọc một danh sách MỚI để
     // chắc chắn khác tham chiếu, ép notify mỗi lần gọi.
     _dinhDangLive[i].value = List.of(vung);
-    widget.caiDat.datDinhDangTuDienNhapLieuNhanh(
+    unawaited(_ghiDinhDangRaw(
       i,
       vung.isEmpty ? null : jsonEncode(vung.map((v) => v.toJson()).toList()),
-    );
+    ));
   }
 
   /// Gõ tay (qua `onChanged`) hoặc xoá trắng — (YÊU CẦU MỚI) không còn bỏ
@@ -156,12 +243,10 @@ class _ManHinhTuDienNhapLieuNhanhState
   /// dạng ở đó — chỉ ký tự THẬT SỰ bị đổi mới mất định dạng, phần còn lại
   /// giữ nguyên.
   void _doiDong(int i, String gia) {
-    final cu = widget.caiDat.tuDienNhapLieuNhanh[i];
-    widget.caiDat.tuDienNhapLieuNhanh[i] = gia;
+    final cu = _docDong(i);
     // (YÊU CẦU MỚI) Tự lưu ngay mỗi lần đổi, không cần nút Lưu riêng — xem
-    // yêu cầu gốc. Không cần debounce 500ms như từ điển chính tả vì đây chỉ
-    // ghi MỘT danh sách chuỗi (rẻ hơn hẳn việc ghi lại cả cây CapTuDien).
-    widget.caiDat.luuTuDienNhapLieuNhanh();
+    // yêu cầu gốc. Đám mây ghi thẳng lên tài khoản ngay (xem `_ghiDong`).
+    unawaited(_ghiDong(i, gia));
     _ganDinhDang(i, apDungChinhSuaChoDinhDang(_dinhDangLive[i].value, cu, gia));
   }
 
@@ -179,8 +264,7 @@ class _ManHinhTuDienNhapLieuNhanhState
     String gia,
     List<VungDinhDangDoanVan>? vungChenThem,
   ) {
-    widget.caiDat.tuDienNhapLieuNhanh[i] = gia;
-    widget.caiDat.luuTuDienNhapLieuNhanh();
+    unawaited(_ghiDong(i, gia));
     final conLai = apDungChinhSuaChoDinhDang(_dinhDangLive[i].value, cu, gia);
     _ganDinhDang(i, [...conLai, ...(vungChenThem ?? const [])]);
   }
@@ -631,7 +715,7 @@ class _ManHinhTuDienNhapLieuNhanhState
           thuTuTuDienNhapLieuNhanhTheoKieu(widget.caiDat.thuTuTuDienNhapLieuNhanh);
       _dsSapXepTam = [for (final chuCai in _thuTuSapXep) _oNhap[chuCai].text];
       _dsSapXepDinhDangTam = [
-        for (final chuCai in _thuTuSapXep) widget.caiDat.dinhDangTuDienNhapLieuNhanh[chuCai],
+        for (final chuCai in _thuTuSapXep) _docDinhDangRaw(chuCai),
       ];
       _dangSapXepLai = true;
     });
@@ -652,12 +736,20 @@ class _ManHinhTuDienNhapLieuNhanhState
     final moi = List<String>.of(_dsSapXepTam);
     final moiDinhDang = List<String?>.of(_dsSapXepDinhDangTam);
     final thuTu = _thuTuSapXep;
+    final dangODamMay = _dangODamMay;
+    final dongDamMay = dangODamMay ? List<String>.of(_kho!.dong) : null;
+    final dinhDangDamMay = dangODamMay ? List<String?>.of(_kho!.dinhDang) : null;
     setState(() {
       for (var p = 0; p < 26; p++) {
         final chuCai = thuTu[p];
-        widget.caiDat.tuDienNhapLieuNhanh[chuCai] = moi[p];
+        if (dangODamMay) {
+          dongDamMay![chuCai] = moi[p];
+          dinhDangDamMay![chuCai] = moiDinhDang[p];
+        } else {
+          widget.caiDat.tuDienNhapLieuNhanh[chuCai] = moi[p];
+          widget.caiDat.dinhDangTuDienNhapLieuNhanh[chuCai] = moiDinhDang[p];
+        }
         _oNhap[chuCai].text = moi[p];
-        widget.caiDat.dinhDangTuDienNhapLieuNhanh[chuCai] = moiDinhDang[p];
       }
       _dangSapXepLai = false;
       _dsSapXepTam = [];
@@ -666,8 +758,12 @@ class _ManHinhTuDienNhapLieuNhanhState
       _chiSoDangKeo = null;
       _chiSoThaDuKien = null;
     });
-    widget.caiDat.luuTuDienNhapLieuNhanh();
-    widget.caiDat.luuDinhDangTuDienNhapLieuNhanh();
+    if (dangODamMay) {
+      unawaited(_kho!.ghiToanBo(dongDamMay!, dinhDangDamMay!));
+    } else {
+      widget.caiDat.luuTuDienNhapLieuNhanh();
+      widget.caiDat.luuDinhDangTuDienNhapLieuNhanh();
+    }
   }
 
   /// [nguon] (0-25) là vị trí ĐANG bị kéo; [dich] (0-26) là vị trí CHÈN
@@ -853,9 +949,52 @@ class _ManHinhTuDienNhapLieuNhanhState
         ],
       );
 
+  /// (YÊU CẦU MỚI — 2 bộ nhớ) Hai "tab" dính sát nhau, góc vuông, dùng chọn
+  /// bộ nhớ đang xem/sửa — y hệt yêu cầu: không có khoảng hở, không bo
+  /// tròn. Đứng TRÊN dòng "Bật Từ điển nhập liệu nhanh".
+  Widget _thanChonNguon() => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(child: _nutTabNguon('noiBo', 'Bộ nhớ Nội bộ')),
+              Expanded(child: _nutTabNguon('damMay', 'Bộ nhớ Đám mây')),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _dangODamMay
+                ? 'Từ điển này trong Bộ nhớ Đám mây lâu dài trên internet của tài khoản đang đăng nhập vào'
+                : 'Từ điển này trong Bộ nhớ nội bộ lâu dài của thiết bị (hoặc của trình duyệt)',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.red.shade700),
+          ),
+          const SizedBox(height: 16),
+        ],
+      );
+
+  Widget _nutTabNguon(String tab, String nhan) {
+    final dangChon = _tab == tab;
+    return InkWell(
+      onTap: () => _doiTabNguon(tab),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        color: dangChon ? _mauChinh : const Color(0xFFF1F3F4),
+        alignment: Alignment.center,
+        child: Text(
+          nhan,
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: dangChon ? Colors.white : const Color(0xFF5F6368),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _thanBinhThuong() => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _thanChonNguon(),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
@@ -871,11 +1010,20 @@ class _ManHinhTuDienNhapLieuNhanhState
                   ),
                 ),
                 Switch(
-                  value: widget.caiDat.tuDienNhapLieuNhanhBat,
+                  value: _dangODamMay ? (_kho?.bat ?? false) : widget.caiDat.tuDienNhapLieuNhanhBat,
                   activeThumbColor: _mauChinh,
-                  onChanged: (gia) {
-                    setState(() => widget.caiDat.tuDienNhapLieuNhanhBat = gia);
-                    widget.caiDat.datTuDienNhapLieuNhanhBat(gia);
+                  onChanged: (gia) async {
+                    // (YÊU CẦU MỚI — 2 bộ nhớ) Loại trừ nhau: bật bộ này thì
+                    // tự tắt bộ kia; tắt thì chỉ tắt đúng bộ đang bật, không
+                    // đụng bộ kia (có thể tắt cả hai cùng lúc).
+                    if (_dangODamMay) {
+                      await _kho?.ghiBat(gia);
+                      if (gia) await widget.caiDat.datTuDienNhapLieuNhanhBat(false);
+                    } else {
+                      await widget.caiDat.datTuDienNhapLieuNhanhBat(gia);
+                      if (gia && (_kho?.bat ?? false)) await _kho?.ghiBat(false);
+                    }
+                    if (mounted) setState(() {});
                   },
                 ),
               ],
@@ -928,12 +1076,6 @@ class _ManHinhTuDienNhapLieuNhanhState
             ),
           ),
           const SizedBox(height: 16),
-          // (YÊU CẦU MỚI) Dòng chú thích mới — đứng TRƯỚC dòng chú thích cũ.
-          const Text(
-            'Từ điển được lưu lâu dài trong bộ nhớ nội bộ của thiết bị.',
-            style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
-          ),
-          const SizedBox(height: 6),
           const Text(
             'Mỗi dòng ứng với một phím chữ cái trên bàn phím vật lý — gõ '
             'sẵn đoạn văn bản muốn dán nhanh vào dòng tương ứng. Mở bảng '
@@ -1081,6 +1223,9 @@ class _ManHinhTuDienNhapLieuNhanhState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // (YÊU CẦU MỚI — 2 bộ nhớ) Nền xanh lá nhạt khi đang ở tab Đám mây —
+      // phân biệt rõ đang xem/sửa bộ nhớ nào, kể cả lúc đang sắp xếp lại.
+      backgroundColor: _dangODamMay ? const Color(0xFFE6F4EA) : null,
       appBar: AppBar(
         backgroundColor: _mauChinh,
         foregroundColor: Colors.white,
@@ -1095,6 +1240,7 @@ class _ManHinhTuDienNhapLieuNhanhState
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
+            if (_dangSapXepLai) _thanChonNguon(),
             _dangSapXepLai ? _thanSapXepLai() : _thanBinhThuong(),
           ],
         ),

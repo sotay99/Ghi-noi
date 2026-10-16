@@ -387,6 +387,20 @@ class CaiDat {
     await kho.setString(_khoaTabTuDienNhapLieuNhanh, gt);
   }
 
+  /// (YÊU CẦU MỚI — 2 bộ nhớ từ điển) Tab Nội bộ/Đám mây xem gần nhất trong
+  /// modal "Cài đặt từ điển sửa lỗi chính tả" — `'noiBo'` | `'damMay'`. Chỉ
+  /// áp dụng cho từ điển sửa lỗi chính tả (bật/tắt không loại trừ nhau nên
+  /// không có "tab nào đang bật" duy nhất để tự suy ra, phải nhớ riêng).
+  /// Mặc định `'noiBo'` cho lần đầu.
+  String tabNguonTuDienChinhTa = 'noiBo';
+  static const _khoaTabNguonTuDienChinhTa = 'ghi_noi_tab_nguon_tu_dien_chinh_ta';
+
+  Future<void> datTabNguonTuDienChinhTa(String gt) async {
+    tabNguonTuDienChinhTa = gt;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setString(_khoaTabNguonTuDienChinhTa, gt);
+  }
+
   /// (YÊU CẦU MỚI) Lịch sử dán gần nhất ở bảng 26 dòng — trước đây chỉ là
   /// biến tĩnh trong bộ nhớ (mất khi F5), giờ lưu lâu dài. Phần tử ở CUỐI
   /// danh sách là lần dán MỚI NHẤT; tối đa 10 phần tử.
@@ -812,6 +826,7 @@ class CaiDat {
     }
     thuTuTuDienNhapLieuNhanh = kho.getString(_khoaThuTuTuDienNhapLieuNhanh) ?? 'hang';
     tabTuDienNhapLieuNhanh = kho.getString(_khoaTabTuDienNhapLieuNhanh) ?? 'hang';
+    tabNguonTuDienChinhTa = kho.getString(_khoaTabNguonTuDienChinhTa) ?? 'noiBo';
     final ganDayRaw = kho.getString(_khoaGanDayTuDienNhapLieuNhanh);
     if (ganDayRaw != null) {
       try {

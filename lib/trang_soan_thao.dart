@@ -36,6 +36,7 @@ import 'man_hinh_tro_chuyen.dart';
 import 'tin_nhan_tro_chuyen.dart';
 import 'canh_bao_roi_trang.dart';
 import 'kho_du_lieu.dart';
+import 'tu_dien_dam_may.dart';
 import 'theo_doi_tap_doi_phim.dart';
 import 'vong_song_am.dart';
 import 'mau_co_ban.dart';
@@ -4282,6 +4283,20 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       setState(() => _nguoiDungDangNhap = nguoiDung);
       if (nguoiDung == null) return;
       unawaited(_dongBoCaiDatTuTaiKhoanKhiDangNhap(nguoiDung.uid));
+      // (YÊU CẦU MỚI — 2 bộ nhớ từ điển) Tải hai bộ từ điển ĐÁM MÂY của tài
+      // khoản MỌI LẦN phát hiện có đăng nhập (kể cả phiên cũ tự khôi phục —
+      // khác với auto bật/tắt ngay dưới đây) — cần có sẵn SẴN SÀNG để quét
+      // chính tả/mở modal/mở bảng 26 dòng dùng được ngay, không phải đợi.
+      unawaited(_taiTuDienDamMayLucDangNhap(nguoiDung.uid));
+      // Auto bật/tắt "Từ điển nhập liệu nhanh" theo tài khoản — CHỈ áp dụng
+      // đúng MỘT LẦN lúc đăng nhập THẬT, KHÔNG áp dụng lúc phiên cũ tự khôi
+      // phục (dùng ĐÚNG cùng điều kiện phân biệt hai trường hợp này mà đoạn
+      // hiện toast dưới đây đang dùng — web không phân biệt được "vừa bấm
+      // đăng nhập" khỏi "tải lại trang với phiên cũ", nên coi cả hai là
+      // "đăng nhập thật" trên web, y hệt cách toast đang xử lý).
+      if (!(laLanDau && !kIsWeb)) {
+        unawaited(_apDungAutoBatTuDienNhapLieuNhanhKhiDangNhapThat(nguoiDung.uid));
+      }
       if (laLanDau && !kIsWeb) return;
       final ten = nguoiDung.displayName ?? nguoiDung.email ?? 'Google';
       hienThongBaoGiua(
@@ -4436,6 +4451,40 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (canNapDay.isNotEmpty) await kho.luu(canNapDay);
   }
 
+  /// (YÊU CẦU MỚI — 2 bộ nhớ từ điển) Tải hai bộ từ điển ĐÁM MÂY của tài
+  /// khoản [uid] vào `TuDienNhapLieuNhanhDamMay.dungChung`/
+  /// `TuDienChinhTaDamMay.dungChung` — gọi MỖI LẦN phát hiện có đăng nhập
+  /// (phiên mới hay phiên cũ khôi phục đều gọi), để modal/bảng 26 dòng/quét
+  /// chính tả luôn có dữ liệu sẵn sàng. KHÔNG tự bật/tắt gì cả — xem
+  /// `_apDungAutoBatTuDienNhapLieuNhanhKhiDangNhapThat` cho phần đó.
+  Future<void> _taiTuDienDamMayLucDangNhap(String uid) async {
+    final nhapLieuNhanh = TuDienNhapLieuNhanhDamMay(uid);
+    final chinhTa = TuDienChinhTaDamMay(uid);
+    await Future.wait([nhapLieuNhanh.tai(), chinhTa.tai()]);
+    TuDienNhapLieuNhanhDamMay.dungChung = nhapLieuNhanh;
+    TuDienChinhTaDamMay.dungChung = chinhTa;
+    if (mounted) {
+      setState(() {});
+      _quetTuDienChinhTa();
+    }
+  }
+
+  /// (YÊU CẦU MỚI — 2 bộ nhớ từ điển) Gọi đúng MỘT LẦN lúc đăng nhập THẬT
+  /// (xem nơi gọi, SAU KHI `_taiTuDienDamMayLucDangNhap` đã tải xong) — nếu
+  /// tài khoản đó có ÍT NHẤT một trong 26 dòng "Từ điển nhập liệu nhanh"
+  /// không trống, tự BẬT bộ nhớ Đám mây và TẮT bộ nhớ Nội bộ. Tài khoản còn
+  /// trống hết 26 dòng thì KHÔNG đụng gì tới hiện trạng Nội bộ (giữ y như
+  /// lúc chưa đăng nhập).
+  Future<void> _apDungAutoBatTuDienNhapLieuNhanhKhiDangNhapThat(String uid) async {
+    final kho = TuDienNhapLieuNhanhDamMay.dungChung;
+    if (kho == null || kho.uid != uid) return;
+    if (!kho.trong && !kho.bat) {
+      await kho.ghiBat(true);
+      await widget.caiDat.datTuDienNhapLieuNhanhBat(false);
+    }
+    if (mounted) setState(() {});
+  }
+
   /// Nút "Đăng nhập tài khoản"/"Đăng xuất" ở menu "Tài khoản và Cài đặt" —
   /// tự quyết đăng nhập hay đăng xuất dựa theo [_nguoiDungDangNhap] HIỆN
   /// TẠI lúc bấm (menu chỉ gọi đúng MỘT callback, không tách hai nút).
@@ -4473,6 +4522,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         if (uidVuaDangXuat != null) {
           unawaited(KhoDuLieuDamMay.xoaCacheOffline(uidVuaDangXuat));
           unawaited(CaiDatDamMay.xoaCacheOffline(uidVuaDangXuat));
+          unawaited(TuDienNhapLieuNhanhDamMay.xoaCacheOffline(uidVuaDangXuat));
+          unawaited(TuDienChinhTaDamMay.xoaCacheOffline(uidVuaDangXuat));
+          TuDienNhapLieuNhanhDamMay.dungChung = null;
+          TuDienChinhTaDamMay.dungChung = null;
         }
       }
     } catch (e) {
@@ -4579,9 +4632,21 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// ngay sau khi đóng modal "Từ điển..." (từ điển có thể vừa đổi).
   void _quetTuDienChinhTa() {
     final ketQua = <_LoiTuDien>[];
-    // Công tắc tổng — tắt thì bỏ hẳn việc quét, không gạch vàng chỗ nào cả
-    // (người dùng vẫn xem/sửa danh sách bình thường, chỉ phần quét này tắt).
-    if (!widget.caiDat.tuDienChinhTaBatHoatDong) {
+    // (YÊU CẦU MỚI — 2 bộ nhớ từ điển) Giờ có HAI công tắc riêng — Nội bộ
+    // (`widget.caiDat.tuDienChinhTaBatHoatDong`) và Đám mây
+    // (`TuDienChinhTaDamMay.dungChung?.bat`, chỉ có ý nghĩa lúc đã đăng
+    // nhập) — bật cả hai, chỉ một, hay tắt cả hai đều hợp lệ. Gộp CHUNG một
+    // bản đồ "từ lỗi (chữ thường) → các đề xuất thay thế" TRƯỚC khi quét, để
+    // một từ có mặt ở CẢ HAI từ điển chỉ sinh ra ĐÚNG MỘT `_LoiTuDien` với
+    // đề xuất Đám mây đứng TRƯỚC, đề xuất Nội bộ đứng SAU (đúng yêu cầu thứ
+    // tự hiện trong menu bấm vào) — không cần đụng gì tới nơi dựng menu, nó
+    // đã tự hiện đúng từng mục trong `dsThayThe` theo thứ tự có sẵn.
+    final tuDienDamMay = TuDienChinhTaDamMay.dungChung;
+    final capDamMay =
+        (tuDienDamMay != null && tuDienDamMay.bat) ? tuDienDamMay.ds : const <CapTuDien>[];
+    final capNoiBo =
+        widget.caiDat.tuDienChinhTaBatHoatDong ? widget.caiDat.tuDienChinhTa : const <CapTuDien>[];
+    if (capDamMay.isEmpty && capNoiBo.isEmpty) {
       _boDieuKhien.tuDien
         ..clear()
         ..addAll(ketQua);
@@ -4593,26 +4658,41 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // trong bài cũng được gạch vàng) — tìm trên bản chữ thường của cả bài và
     // cả từ lỗi, nhưng [tu]/vị trí vẫn lấy nguyên văn CHỮ THẬT trong bài.
     final vbThuong = vb.toLowerCase();
-    // Mục 5: hai cặp cùng "Từ bị lỗi chính tả hay gặp" (so không phân biệt
-    // hoa/thường) là trạng thái KHÔNG HỢP LỆ (modal đã cảnh báo tại chỗ) —
-    // chỉ cặp XUẤT HIỆN ĐẦU TIÊN trong danh sách được dùng để quét, các cặp
-    // trùng sau đó bị bỏ qua hẳn ở đây (không góp thêm một "nguồn sự thật"
-    // thứ hai cho cùng một từ).
-    final loiDaDung = <String>{};
-    for (final c in widget.caiDat.tuDienChinhTa) {
-      final loi = c.loi.trim();
-      if (loi.isEmpty) continue;
-      final loiThuong = loi.toLowerCase();
-      if (!loiDaDung.add(loiThuong)) continue;
-      // Mục 5: "Từ thay thế thứ nhất" giống hệt "Từ bị lỗi" (so không phân
-      // biệt hoa/thường) là trạng thái KHÔNG HỢP LỆ — modal đã cảnh báo tại
-      // chỗ, ở đây coi như chưa khai xong, không dùng để quét.
-      if (c.thayThe.trim().toLowerCase() == loiThuong) continue;
-      // Mục 5: từ đã bị "Huỷ đề xuất" thì không quét vàng lại nữa. Mục 6:
-      // gạch vàng/gạch đỏ không dẫm chân lên nhau — từ đang/đã từng gạch đỏ
-      // (AI) cũng bỏ qua luôn ở đây.
-      if (_tuTuDienDaHuy.contains(loi) || _tuChinhTaDaXuLy.contains(loi)) continue;
-      final dsThayThe = c.dsThayThe;
+    // Mục 5: hai cặp cùng "Từ bị lỗi chính tả hay gặp" trong CÙNG MỘT từ
+    // điển (so không phân biệt hoa/thường) là trạng thái KHÔNG HỢP LỆ (modal
+    // đã cảnh báo tại chỗ) — chỉ cặp XUẤT HIỆN ĐẦU TIÊN của từ điển đó được
+    // dùng. Hai từ điển KHÁC NHAU cùng khai một từ lỗi thì KHÔNG phải trùng
+    // lặp — đó chính là trường hợp cần gộp đề xuất (xem [deXuatGop]).
+    final deXuatGop = <String, List<String>>{};
+    void gopTu(List<CapTuDien> cap) {
+      final loiDaDung = <String>{};
+      for (final c in cap) {
+        final loi = c.loi.trim();
+        if (loi.isEmpty) continue;
+        final loiThuong = loi.toLowerCase();
+        if (!loiDaDung.add(loiThuong)) continue;
+        // Mục 5: "Từ thay thế thứ nhất" giống hệt "Từ bị lỗi" (so không phân
+        // biệt hoa/thường) là trạng thái KHÔNG HỢP LỆ — modal đã cảnh báo
+        // tại chỗ, ở đây coi như chưa khai xong, không dùng để quét.
+        if (c.thayThe.trim().toLowerCase() == loiThuong) continue;
+        deXuatGop[loiThuong] = [...(deXuatGop[loiThuong] ?? []), ...c.dsThayThe];
+      }
+    }
+
+    // Đám mây TRƯỚC, Nội bộ SAU — đúng thứ tự ưu tiên hiện trong menu.
+    gopTu(capDamMay);
+    gopTu(capNoiBo);
+
+    // So KHÔNG phân biệt hoa/thường với "đã Huỷ đề xuất"/"đã do AI xử lý" —
+    // giữ ĐÚNG hành vi cũ: huỷ một từ là huỷ CẢ TỪ đó (mọi lần xuất hiện,
+    // mọi cách viết hoa/thường), không chỉ riêng đúng một lần xuất hiện.
+    final daHuyThuong = _tuTuDienDaHuy.map((s) => s.toLowerCase()).toSet();
+    final daXuLyThuong = _tuChinhTaDaXuLy.map((s) => s.toLowerCase()).toSet();
+
+    for (final entry in deXuatGop.entries) {
+      final loiThuong = entry.key;
+      if (daHuyThuong.contains(loiThuong) || daXuLyThuong.contains(loiThuong)) continue;
+      final dsThayThe = entry.value;
       var tu = 0;
       while (true) {
         final i = vbThuong.indexOf(loiThuong, tu);
@@ -6553,6 +6633,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         doanNguon: doan,
         goiDinhDangNguon: goi,
         caiDat: widget.caiDat,
+        nguon: _NguonTuDienNhanh.hienHanh(widget.caiDat),
       ),
     );
   }
@@ -9086,7 +9167,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Alt + Shift) — ẩn/hiện bảng 26 dòng, y hệt `_khiPhimTatBoNhoTam`.
   bool _khiPhimTatTuDienNhapLieuNhanh(KeyEvent event) {
     if (!mounted || event is! KeyDownEvent) return false;
-    if (!widget.caiDat.tuDienNhapLieuNhanhBat) return false;
+    if (!_tuDienNhapLieuNhanhBatKyNguon) return false;
 
     // Xem giải thích ở `_khiPhimTatBoNhoTam` — cùng lý do, cùng cách sửa
     // (modal CHÍNH NÓ đang mở không bị tính là "route khác đè lên").
@@ -9114,15 +9195,24 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// `true` trong lúc bảng "Từ điển nhập liệu nhanh" đang hiện.
   bool _tuDienNhapLieuNhanhDangMo = false;
 
+  /// (YÊU CẦU MỚI — 2 bộ nhớ từ điển) Bật theo BẤT KỲ bộ nhớ nào (Nội bộ
+  /// HOẶC Đám mây) — nút toolbar/phím tắt chỉ cần BIẾT có hiện/dùng được
+  /// bảng 26 dòng hay không, không cần biết đang dùng đúng bộ nào (xem
+  /// `_NguonTuDienNhanh` cho phần đọc/ghi đúng bộ).
+  bool get _tuDienNhapLieuNhanhBatKyNguon =>
+      widget.caiDat.tuDienNhapLieuNhanhBat || (TuDienNhapLieuNhanhDamMay.dungChung?.bat ?? false);
+
   Future<void> _moHopThoaiTuDienNhapLieuNhanh() async {
-    if (!widget.caiDat.tuDienNhapLieuNhanhBat || _tuDienNhapLieuNhanhDangMo) return;
+    if (!_tuDienNhapLieuNhanhBatKyNguon || _tuDienNhapLieuNhanhDangMo) return;
     _tuDienNhapLieuNhanhDangMo = true;
+    final nguon = _NguonTuDienNhanh.hienHanh(widget.caiDat);
     await showDialog<void>(
       context: context,
       builder: (dialogCtx) => _HopThoaiTuDienNhapLieuNhanh(
         caiDat: widget.caiDat,
+        nguon: nguon,
         khiChonDong: (i) {
-          final doan = widget.caiDat.tuDienNhapLieuNhanh[i];
+          final doan = nguon.dong(i);
           Navigator.of(dialogCtx).pop();
           if (doan.trim().isEmpty) return;
           widget.caiDat.ghiNhanGanDayTuDienNhapLieuNhanh(i);
@@ -9130,7 +9220,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           // "Bộ nhớ tạm để dán văn bản" đang làm, đóng gói lại qua
           // `macGoiDinhDang` (CÙNG khuôn `_apDungGoiDinhDangTuClipboard` bên
           // dưới `_danTuBoNhoTam` đang đọc).
-          final vung = widget.caiDat.docDinhDangTuDienNhapLieuNhanh(i);
+          final vung = nguon.dinhDang(i);
           final goi = vung.isEmpty ? null : macGoiDinhDang(doan, vung);
           _danTuBoNhoTam(
             doan,
@@ -9179,7 +9269,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     if (widget.caiDat.boNhoTamDanVanBanBat && widget.caiDat.phimTatBoNhoTam.loai == loai) {
       _bamPhimTatBoNhoTam();
-    } else if (widget.caiDat.tuDienNhapLieuNhanhBat &&
+    } else if (_tuDienNhapLieuNhanhBatKyNguon &&
         widget.caiDat.phimTatTuDienNhapLieuNhanh.loai == loai) {
       _bamPhimTatTuDienNhapLieuNhanh();
     } else if (!_boNhoTamDangMo &&
@@ -13226,7 +13316,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     'Ẩn/hiện Bộ nhớ tạm để dán văn bản'
                         '${moTaThem(widget.caiDat.phimTatBoNhoTam)}',
                   ),
-                if (widget.caiDat.tuDienNhapLieuNhanhBat)
+                if (_tuDienNhapLieuNhanhBatKyNguon)
                   dong(
                     widget.caiDat.phimTatTuDienNhapLieuNhanh.nhan,
                     'Ẩn/hiện Từ điển nhập liệu nhanh'
@@ -15278,7 +15368,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         ),
         // (YÊU CẦU MỚI) Nút "Từ điển nhập liệu nhanh" — ngay bên phải "Tiến
         // tới", chỉ hiện khi công tắc tổng đang BẬT.
-        if (widget.caiDat.tuDienNhapLieuNhanhBat)
+        if (_tuDienNhapLieuNhanhBatKyNguon)
           IconButton(
             onPressed: _moHopThoaiTuDienNhapLieuNhanh,
             icon: const Text('📖', style: TextStyle(fontSize: 18)),
@@ -17846,6 +17936,7 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
         doanNguon: doan,
         goiDinhDangNguon: BoNhoTamDanVanBan.dinhDang[i],
         caiDat: widget.caiDat,
+        nguon: _NguonTuDienNhanh.hienHanh(widget.caiDat),
       ),
     );
   }
@@ -18078,11 +18169,75 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
 /// "Phím X" ở BÊN PHẢI mỗi dòng (không phải bên trái), phím tắt dán là CHỮ
 /// CÁI thay vì phím số, và có 3 TAB (Gần đây/theo hàng phím/A→Z — xem
 /// `_tabThuTu`) với lịch sử "gần đây" lưu LÂU DÀI (`CaiDat.ganDayTuDienNhapLieuNhanh`).
+/// (YÊU CẦU MỚI — 2 bộ nhớ từ điển) Trỏ tới ĐÚNG MỘT trong hai bộ nhớ của
+/// "Từ điển nhập liệu nhanh" — bộ nhớ nào đang BẬT (loại trừ nhau, xem
+/// `CaiDat.tuDienNhapLieuNhanhBat`/`TuDienNhapLieuNhanhDamMay.bat`) — để các
+/// hộp thoại dùng 26 dòng này (dán vào vị trí con trỏ, lưu nhanh vùng chọn
+/// vào dòng trống) luôn đọc/ghi đúng bộ đang bật, không viết chết bộ Nội bộ.
+/// Cả hai cùng tắt thì rơi về Nội bộ (các nơi mở những hộp thoại này đã tự
+/// kiểm `tuDienNhapLieuNhanhBat` trước, nên trường hợp đó không thực sự xảy
+/// ra ở đây — giữ Nội bộ chỉ để luôn có một giá trị an toàn, không `null`).
+class _NguonTuDienNhanh {
+  _NguonTuDienNhanh._(this._caiDat, this._damMay);
+
+  factory _NguonTuDienNhanh.hienHanh(CaiDat caiDat) {
+    final damMay = TuDienNhapLieuNhanhDamMay.dungChung;
+    if (!caiDat.tuDienNhapLieuNhanhBat && damMay != null && damMay.bat) {
+      return _NguonTuDienNhanh._(caiDat, damMay);
+    }
+    return _NguonTuDienNhanh._(caiDat, null);
+  }
+
+  final CaiDat _caiDat;
+  final TuDienNhapLieuNhanhDamMay? _damMay;
+
+  String dong(int i) => _damMay?.dong[i] ?? _caiDat.tuDienNhapLieuNhanh[i];
+
+  List<VungDinhDangDoanVan> dinhDang(int i) {
+    final raw = _damMay != null ? _damMay!.dinhDang[i] : _caiDat.dinhDangTuDienNhapLieuNhanh[i];
+    if (raw == null) return const [];
+    try {
+      final ds = jsonDecode(raw);
+      if (ds is! List) return const [];
+      final doDai = dong(i).length;
+      return ds
+          .map((j) => VungDinhDangDoanVan.tuJson(j, doDai))
+          .whereType<VungDinhDangDoanVan>()
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<void> ghiDong(int i, String gia) async {
+    if (_damMay != null) {
+      await _damMay!.ghiDong(i, gia);
+    } else {
+      _caiDat.tuDienNhapLieuNhanh[i] = gia;
+      await _caiDat.luuTuDienNhapLieuNhanh();
+    }
+  }
+
+  Future<void> ghiDinhDang(int i, List<VungDinhDangDoanVan> vung) async {
+    final goi = vung.isEmpty ? null : jsonEncode(vung.map((v) => v.toJson()).toList());
+    if (_damMay != null) {
+      await _damMay!.ghiDinhDang(i, goi);
+    } else {
+      await _caiDat.datDinhDangTuDienNhapLieuNhanh(i, goi);
+    }
+  }
+}
+
 class _HopThoaiTuDienNhapLieuNhanh extends StatefulWidget {
-  const _HopThoaiTuDienNhapLieuNhanh({required this.khiChonDong, required this.caiDat});
+  const _HopThoaiTuDienNhapLieuNhanh({
+    required this.khiChonDong,
+    required this.caiDat,
+    required this.nguon,
+  });
 
   final void Function(int chiSo) khiChonDong;
   final CaiDat caiDat;
+  final _NguonTuDienNhanh nguon;
 
   @override
   State<_HopThoaiTuDienNhapLieuNhanh> createState() => _HopThoaiTuDienNhapLieuNhanhState();
@@ -18357,7 +18512,7 @@ class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNha
 
   Widget _dong(int i) {
     final chuCai = chuCaiTuDienNhapLieuNhanh(i);
-    final doan = widget.caiDat.tuDienNhapLieuNhanh[i];
+    final doan = widget.nguon.dong(i);
     final rong = doan.trim().isEmpty;
     // (YÊU CẦU MỚI) Cùng lý do hiển thị với `_HopThoaiLichSuBoNhoTamState._dong`
     // — đổi dấu xuống dòng thật thành dấu cách CHỈ trên màn hình.
@@ -18534,11 +18689,13 @@ class _HopThoaiThemNhanhTuDien extends StatefulWidget {
     required this.doanNguon,
     required this.goiDinhDangNguon,
     required this.caiDat,
+    required this.nguon,
   });
 
   final String doanNguon;
   final String? goiDinhDangNguon;
   final CaiDat caiDat;
+  final _NguonTuDienNhanh nguon;
 
   @override
   State<_HopThoaiThemNhanhTuDien> createState() => _HopThoaiThemNhanhTuDienState();
@@ -18725,7 +18882,7 @@ class _HopThoaiThemNhanhTuDienState extends State<_HopThoaiThemNhanhTuDien>
   /// cụ thể) — `null` nếu không còn dòng trống nào trong thứ tự đó.
   int? _dongTrongDauTien(List<int> ds) {
     for (final i in ds) {
-      if (widget.caiDat.tuDienNhapLieuNhanh[i].trim().isEmpty) return i;
+      if (widget.nguon.dong(i).trim().isEmpty) return i;
     }
     return null;
   }
@@ -18766,7 +18923,7 @@ class _HopThoaiThemNhanhTuDienState extends State<_HopThoaiThemNhanhTuDien>
   }
 
   void _bamDong(int i) {
-    if (widget.caiDat.tuDienNhapLieuNhanh[i].trim().isEmpty) {
+    if (widget.nguon.dong(i).trim().isEmpty) {
       _ghiVaoDong(i);
     } else {
       _xacNhanThayThe(i);
@@ -18775,13 +18932,9 @@ class _HopThoaiThemNhanhTuDienState extends State<_HopThoaiThemNhanhTuDien>
 
   void _ghiVaoDong(int i) {
     final doan = _doanNguon;
-    widget.caiDat.tuDienNhapLieuNhanh[i] = doan;
-    widget.caiDat.luuTuDienNhapLieuNhanh();
+    unawaited(widget.nguon.ghiDong(i, doan));
     final vung = _vungDinhDangNguon;
-    widget.caiDat.datDinhDangTuDienNhapLieuNhanh(
-      i,
-      vung.isEmpty ? null : jsonEncode(vung.map((v) => v.toJson()).toList()),
-    );
+    unawaited(widget.nguon.ghiDinhDang(i, vung));
     final chuCai = chuCaiTuDienNhapLieuNhanh(i);
     Navigator.of(context).pop();
     hienThongBaoGiua(
@@ -18810,7 +18963,7 @@ class _HopThoaiThemNhanhTuDienState extends State<_HopThoaiThemNhanhTuDien>
 
   Widget _dong(int i, {required bool nhapNhayCam}) {
     final chuCai = chuCaiTuDienNhapLieuNhanh(i);
-    final doanDong = widget.caiDat.tuDienNhapLieuNhanh[i];
+    final doanDong = widget.nguon.dong(i);
     final rong = doanDong.trim().isEmpty;
     final doanHienThi = doanDong.replaceAll('\n', ' ');
     final manHinhHep = MediaQuery.sizeOf(context).width < _TrangSoanThaoState._nguongManHinhHep;

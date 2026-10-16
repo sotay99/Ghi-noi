@@ -14,6 +14,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'cai_dat.dart';
+import 'dang_nhap_google.dart';
+import 'thong_bao_giua.dart';
+import 'tu_dien_dam_may.dart';
 
 const _mauChinh = Color(0xFF1A73E8);
 
@@ -129,13 +132,19 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
   List<_KetQuaTimTuDien> _ketQuaTimTuDien = [];
   int _chiSoTimTuDienHienTai = -1;
 
-  @override
-  void initState() {
-    super.initState();
-    _ds = widget.caiDat.tuDienChinhTa;
-    // CHỈ sắp xếp lại đúng lúc MỞ modal (không sắp lại mỗi lần gõ — gõ dở
-    // một từ mà hàng tự nhảy chỗ thì rất khó chịu).
-    _ds.sort((a, b) => a.loi.trim().toLowerCase().compareTo(b.loi.trim().toLowerCase()));
+  // --------------------------------------------- (YÊU CẦU MỚI) 2 bộ nhớ
+
+  /// 'noiBo' hoặc 'damMay' — bộ nhớ ĐANG XEM/SỬA. Khởi tạo từ tab xem gần
+  /// nhất đã lưu lâu dài (`CaiDat.tabNguonTuDienChinhTa`) — KHÔNG có quy
+  /// tắc "tự suy ra từ công tắc đang bật" như từ điển nhập liệu nhanh, vì ở
+  /// đây công tắc hai bên không loại trừ nhau (có thể cùng bật/cùng tắt).
+  late String _tab;
+  bool get _dangODamMay => _tab == 'damMay';
+
+  /// Bản đám mây của tài khoản đang đăng nhập — `null` nếu chưa đăng nhập.
+  TuDienChinhTaDamMay? _khoDamMay;
+
+  void _dungControllerTheoDs() {
     for (final c in _ds) {
       _oLoi[c] = TextEditingController(text: c.loi);
       _oThayThe[c] = (c.dsThayThe.isEmpty ? [''] : c.dsThayThe)
@@ -145,20 +154,10 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
       _focusLoi[c] = FocusNode();
       _focusThayThe[c] = _oThayThe[c]!.map((_) => FocusNode()).toList();
     }
-    final noiDung = widget.noiDungCanDua;
-    if (noiDung != null && noiDung.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _dienNoiDungVaoCapRong(noiDung));
-    }
-    _oTimKiemTuDien.addListener(_capNhatKetQuaTimTuDien);
+    _kiemTraTrung();
   }
 
-  @override
-  void dispose() {
-    _henLuu?.cancel();
-    _henNhapNhayCapMoi?.cancel();
-    _cuon.dispose();
-    _oTimKiemTuDien.dispose();
-    _focusTimKiemTuDien.dispose();
+  void _huyCacControllerCu() {
     for (final o in _oLoi.values) {
       o.dispose();
     }
@@ -175,6 +174,73 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
         f.dispose();
       }
     }
+    _oLoi.clear();
+    _oThayThe.clear();
+    _khoaCap.clear();
+    _focusLoi.clear();
+    _focusThayThe.clear();
+    _loiTrungThayThe.clear();
+    _loiTrungTuLoi.clear();
+  }
+
+  /// Tab "Bộ nhớ Đám mây" chỉ bấm được khi đã đăng nhập.
+  Future<void> _doiTabNguon(String tab) async {
+    if (_tab == tab) return;
+    if (tab == 'damMay') {
+      final uid = DichVuDangNhapGoogle.instance.nguoiDungHienTai?.uid;
+      if (uid == null) {
+        if (mounted) {
+          hienThongBaoGiua(context, 'Vui lòng đăng nhập tài khoản Google trước.');
+        }
+        return;
+      }
+      var kho = _khoDamMay ?? TuDienChinhTaDamMay.dungChung;
+      if (kho == null || kho.uid != uid) {
+        kho = TuDienChinhTaDamMay(uid);
+        await kho.tai();
+        TuDienChinhTaDamMay.dungChung = kho;
+      }
+      _khoDamMay = kho;
+      if (!mounted) return;
+    }
+    _dongTimKiemTuDien();
+    setState(() {
+      _huyCacControllerCu();
+      _tab = tab;
+      _ds = tab == 'damMay' ? _khoDamMay!.ds : widget.caiDat.tuDienChinhTa;
+      _ds.sort((a, b) => a.loi.trim().toLowerCase().compareTo(b.loi.trim().toLowerCase()));
+      _dungControllerTheoDs();
+    });
+    widget.caiDat.datTabNguonTuDienChinhTa(tab);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _khoDamMay = TuDienChinhTaDamMay.dungChung;
+    _tab = widget.caiDat.tabNguonTuDienChinhTa == 'damMay' && _khoDamMay != null
+        ? 'damMay'
+        : 'noiBo';
+    _ds = _dangODamMay ? _khoDamMay!.ds : widget.caiDat.tuDienChinhTa;
+    // CHỈ sắp xếp lại đúng lúc MỞ modal (không sắp lại mỗi lần gõ — gõ dở
+    // một từ mà hàng tự nhảy chỗ thì rất khó chịu).
+    _ds.sort((a, b) => a.loi.trim().toLowerCase().compareTo(b.loi.trim().toLowerCase()));
+    _dungControllerTheoDs();
+    final noiDung = widget.noiDungCanDua;
+    if (noiDung != null && noiDung.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _dienNoiDungVaoCapRong(noiDung));
+    }
+    _oTimKiemTuDien.addListener(_capNhatKetQuaTimTuDien);
+  }
+
+  @override
+  void dispose() {
+    _henLuu?.cancel();
+    _henNhapNhayCapMoi?.cancel();
+    _cuon.dispose();
+    _oTimKiemTuDien.dispose();
+    _focusTimKiemTuDien.dispose();
+    _huyCacControllerCu();
     super.dispose();
   }
 
@@ -316,7 +382,11 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
   void _datLuu() {
     _henLuu?.cancel();
     _henLuu = Timer(const Duration(milliseconds: 500), () {
-      widget.caiDat.luuTuDienChinhTa();
+      if (_dangODamMay) {
+        unawaited(_khoDamMay?.ghiDs(_ds));
+      } else {
+        widget.caiDat.luuTuDienChinhTa();
+      }
     });
   }
 
@@ -385,7 +455,11 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
         f.dispose();
       }
     });
-    widget.caiDat.luuTuDienChinhTa();
+    if (_dangODamMay) {
+      unawaited(_khoDamMay?.ghiDs(_ds));
+    } else {
+      widget.caiDat.luuTuDienChinhTa();
+    }
   }
 
   /// Đồng bộ `c.dsThayThe` với nội dung đang gõ của mọi ô thay thế của [c].
@@ -554,11 +628,20 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
             ),
           ),
           Switch(
-            value: widget.caiDat.tuDienChinhTaBatHoatDong,
+            value: _dangODamMay
+                ? (_khoDamMay?.bat ?? true)
+                : widget.caiDat.tuDienChinhTaBatHoatDong,
             activeThumbColor: _mauChinh,
-            onChanged: (gia) {
-              setState(() => widget.caiDat.tuDienChinhTaBatHoatDong = gia);
-              widget.caiDat.luuTuDienChinhTaBatHoatDong();
+            // (YÊU CẦU MỚI — 2 bộ nhớ) KHÔNG loại trừ nhau ở từ điển sửa
+            // lỗi chính tả — cho phép tắt 1, tắt cả 2, hoặc bật cả 2.
+            onChanged: (gia) async {
+              if (_dangODamMay) {
+                await _khoDamMay?.ghiBat(gia);
+              } else {
+                widget.caiDat.tuDienChinhTaBatHoatDong = gia;
+                await widget.caiDat.luuTuDienChinhTaBatHoatDong();
+              }
+              if (mounted) setState(() {});
             },
           ),
         ],
@@ -566,9 +649,51 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
     );
   }
 
+  /// (YÊU CẦU MỚI — 2 bộ nhớ) Hai "tab" dính sát nhau, góc vuông — y hệt
+  /// khuôn của "Từ điển nhập liệu nhanh".
+  Widget _thanChonNguon() => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(child: _nutTabNguon('noiBo', 'Bộ nhớ Nội bộ')),
+              Expanded(child: _nutTabNguon('damMay', 'Bộ nhớ Đám mây')),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _dangODamMay
+                ? 'Từ điển này trong Bộ nhớ Đám mây lâu dài trên internet của tài khoản đang đăng nhập vào'
+                : 'Từ điển này trong Bộ nhớ nội bộ lâu dài của thiết bị (hoặc của trình duyệt)',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.red.shade700),
+          ),
+          const SizedBox(height: 16),
+        ],
+      );
+
+  Widget _nutTabNguon(String tab, String nhan) {
+    final dangChon = _tab == tab;
+    return InkWell(
+      onTap: () => _doiTabNguon(tab),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        color: dangChon ? _mauChinh : const Color(0xFFF1F3F4),
+        alignment: Alignment.center,
+        child: Text(
+          nhan,
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: dangChon ? Colors.white : const Color(0xFF5F6368),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: _dangODamMay ? const Color(0xFFE6F4EA) : null,
       appBar: AppBar(
         backgroundColor: _mauChinh,
         foregroundColor: Colors.white,
@@ -627,6 +752,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
           cacheExtent: 100000,
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
+            _thanChonNguon(),
             _congTacBatTat(),
             const SizedBox(height: 16),
             const Text(
