@@ -23,7 +23,15 @@
             android:textSize="15sp" />
     </LinearLayout>
 
-    <View
+    <!-- (SỬA LỖI "Không thể tải tiện ích") RemoteViews của widget màn hình
+         chính CHỈ hỗ trợ một tập view rất giới hạn (LinearLayout/FrameLayout/
+         RelativeLayout/GridLayout, TextView, ImageView, Button...) — một
+         <View> TRẦN không nằm trong danh sách đó, Android ném lỗi ngay khi
+         "áp" (apply) layout lên widget thật, launcher bắt lỗi và hiện đúng
+         dòng "Không thể tải tiện ích" thay vì nội dung thật. Đổi sang
+         ImageView (CÓ được hỗ trợ) với nền màu thay cho ảnh, vẫn ra đúng
+         hiệu ứng đường kẻ chia. -->
+    <ImageView
         android:layout_width="1dp"
         android:layout_height="match_parent"
         android:background="#5590D6F5" />

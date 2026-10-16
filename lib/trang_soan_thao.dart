@@ -36,6 +36,7 @@ import 'man_hinh_tro_chuyen.dart';
 import 'tin_nhan_tro_chuyen.dart';
 import 'canh_bao_roi_trang.dart';
 import 'kho_du_lieu.dart';
+import 'khoi_dong_lai_app.dart';
 import 'kiem_tra_cap_nhat.dart';
 import 'modal_bao_mat.dart';
 import 'modal_cai_dat_ung_dung.dart';
@@ -4629,6 +4630,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           TuDienNhapLieuNhanhDamMay.dungChung = null;
           TuDienChinhTaDamMay.dungChung = null;
         }
+        // (YÊU CẦU MỚI — SỬA LỖI vẫn còn thấy ghi chú/cây thư mục đám mây
+        // sau khi đăng xuất) Đã đăng xuất Firebase Auth xong ở trên — chủ
+        // động khởi động lại TOÀN BỘ app tại chỗ (`KhoiDongLaiApp`), huỷ
+        // sạch mọi màn hình đang mở (kể cả khi trang GỐC đang soạn thảo
+        // TRỰC TIẾP một ghi chú đám mây — trường hợp `_thoatKhoiDamMayNeuCanThiet`
+        // không tự xử lý được vì không có gì để `pop()` lùi về). Luồng
+        // khởi động bình thường (`giaiQuyetKhoiDong`) chạy lại từ đầu, tự
+        // rơi về đúng ghi chú NỘI BỘ gần nhất (hoặc tự tạo ghi chú mới nếu
+        // nội bộ trống) vì lúc này Auth đã đăng xuất — không cần viết
+        // thêm logic "tự chọn/tạo tệp" riêng ở đây.
+        if (mounted) KhoiDongLaiApp.goiLai(context);
       }
     } catch (e) {
       if (!mounted) return;

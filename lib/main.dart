@@ -11,6 +11,7 @@ import 'chan_esc_lui_trang.dart';
 import 'firebase_options.dart';
 import 'ghi_chu_nhanh_widget.dart';
 import 'kho_du_lieu.dart';
+import 'khoi_dong_lai_app.dart';
 import 'khoi_dong_tep.dart';
 import 'man_hinh_go_nhanh_widget.dart';
 import 'man_hinh_widget_cau_hinh.dart';
@@ -19,7 +20,9 @@ import 'trang_soan_thao.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(const UngDungFlowrite());
+  // (YÊU CẦU MỚI) Bọc trong `KhoiDongLaiApp` — cho phép khởi động lại toàn
+  // bộ app tại chỗ sau khi đăng xuất, xem `khoi_dong_lai_app.dart`.
+  runApp(const KhoiDongLaiApp(child: UngDungFlowrite()));
 }
 
 class UngDungFlowrite extends StatefulWidget {

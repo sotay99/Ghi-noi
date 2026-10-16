@@ -16,13 +16,16 @@ import 'cai_dat.dart';
 import 'chan_esc_lui_trang.dart';
 import 'firebase_options.dart';
 import 'kho_du_lieu.dart';
+import 'khoi_dong_lai_app.dart';
 import 'khoi_dong_tep.dart';
 import 'trang_soan_thao.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(const UngDungFlowriteWebDayDu());
+  // (YÊU CẦU MỚI) Bọc trong `KhoiDongLaiApp` — cho phép khởi động lại toàn
+  // bộ app tại chỗ sau khi đăng xuất, xem `khoi_dong_lai_app.dart`.
+  runApp(const KhoiDongLaiApp(child: UngDungFlowriteWebDayDu()));
 }
 
 class UngDungFlowriteWebDayDu extends StatefulWidget {
