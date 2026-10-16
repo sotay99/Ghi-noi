@@ -8,6 +8,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'mo_lien_ket_ngoai.dart';
 import 'thong_bao_giua.dart';
 
 void moModalDonate(BuildContext context) {
@@ -60,7 +61,14 @@ void moModalDonate(BuildContext context) {
                     '${Uri.encodeComponent('https://www.paypal.com/ncp/payment/JJDRYY4HXDHB6')}',
                 moTaQr: 'Quét mã hoặc bấm link dưới để mở trang nhận donate trên Paypal.',
                 dongThongTin: const [
-                  _DongThongTin(nhan: 'Link Paypal', gia: 'paypal.com/ncp/payment/JJDRYY4HXDHB6'),
+                  // (YÊU CẦU MỚI) Bấm TRỰC TIẾP vào link cũng mở được (ngoài
+                  // nút chép) — gạch chân + chữ xanh dương để người dùng
+                  // biết bấm được, xem `urlMo`/`_dongTinChepDuoc`.
+                  _DongThongTin(
+                    nhan: 'Link Paypal',
+                    gia: 'paypal.com/ncp/payment/JJDRYY4HXDHB6',
+                    urlMo: 'https://www.paypal.com/ncp/payment/JJDRYY4HXDHB6',
+                  ),
                   _DongThongTin(nhan: 'Email', gia: 'lookatmevanthanhpham@gmail.com'),
                   _DongThongTin(nhan: 'Tên', gia: 'PHAM VAN THANH'),
                 ],
@@ -128,9 +136,14 @@ Widget _nutDonate(
 }
 
 class _DongThongTin {
-  const _DongThongTin({required this.nhan, required this.gia});
+  const _DongThongTin({required this.nhan, required this.gia, this.urlMo});
   final String nhan;
   final String gia;
+
+  /// Khác `null` thì [gia] hiện thành link (xanh dương, gạch chân), bấm
+  /// trực tiếp vào mở [urlMo] qua `moLienKetNgoai` — tách riêng khỏi [gia]
+  /// vì [gia] có thể là bản RÚT GỌN để hiển thị (không có "https://").
+  final String? urlMo;
 }
 
 void _moModalQr(
@@ -221,18 +234,40 @@ Widget _dongTinChepDuoc(BuildContext context, _DongThongTin d) {
     child: Row(
       children: [
         Expanded(
-          child: RichText(
-            text: TextSpan(
-              style: const TextStyle(fontSize: 13.5, color: Colors.black),
-              children: [
-                TextSpan(
-                  text: '${d.nhan}: ',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+          child: d.urlMo == null
+              ? RichText(
+                  text: TextSpan(
+                    style: const TextStyle(fontSize: 13.5, color: Colors.black),
+                    children: [
+                      TextSpan(
+                        text: '${d.nhan}: ',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      TextSpan(text: d.gia),
+                    ],
+                  ),
+                )
+              : InkWell(
+                  onTap: () => moLienKetNgoai(d.urlMo!),
+                  child: RichText(
+                    text: TextSpan(
+                      style: const TextStyle(fontSize: 13.5, color: Colors.black),
+                      children: [
+                        TextSpan(
+                          text: '${d.nhan}: ',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        TextSpan(
+                          text: d.gia,
+                          style: const TextStyle(
+                            color: Color(0xFF1A73E8),
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                TextSpan(text: d.gia),
-              ],
-            ),
-          ),
         ),
         IconButton(
           icon: const Icon(Icons.copy, size: 17),

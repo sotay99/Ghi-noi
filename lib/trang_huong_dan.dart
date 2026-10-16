@@ -66,7 +66,15 @@ class ManHinhHuongDan extends StatelessWidget {
                       SizedBox(height: 14),
                       _Doan(_doan4),
                       SizedBox(height: 28),
-                      _MucLon(so: 'V', tieuDe: 'Bí quyết để nhanh hơn nữa'),
+                      _MucLon(so: 'V', tieuDe: 'Ghi nhanh ngay từ màn hình chính (Android)'),
+                      SizedBox(height: 6),
+                      _ChiChuNenTang('Chỉ dành cho Android — iPhone/iPad sẽ nâng cấp sau'),
+                      SizedBox(height: 14),
+                      _Doan(_doan5Widget),
+                      SizedBox(height: 14),
+                      _CacBuocDanhSo(cacBuoc: _cacBuocCaiWidget),
+                      SizedBox(height: 28),
+                      _MucLon(so: 'VI', tieuDe: 'Bí quyết để nhanh hơn nữa'),
                       SizedBox(height: 14),
                       _Doan(_doan8),
                       SizedBox(height: 14),
@@ -268,6 +276,65 @@ class _MucLon extends StatelessWidget {
             ),
           ),
         ),
+      ],
+    );
+  }
+}
+
+// --------------------------------------------- chú thích nền tảng / các bước
+
+/// Dòng chú thích nhỏ, nghiêng, ngay dưới tiêu đề mục — báo rõ mục này chỉ
+/// áp dụng cho MỘT nền tảng (ví dụ "Chỉ dành cho Android").
+class _ChiChuNenTang extends StatelessWidget {
+  const _ChiChuNenTang(this.chu);
+  final String chu;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      chu,
+      style: const TextStyle(
+        fontSize: 12.5,
+        fontStyle: FontStyle.italic,
+        color: Color(0xFF9AA0A6),
+      ),
+    );
+  }
+}
+
+/// Danh sách các bước đánh số tròn — dùng cho hướng dẫn thao tác từng bước
+/// (khác `_TheHanChe`/`_dacDiemDaTep` là liệt kê đặc điểm, không phải thứ tự).
+class _CacBuocDanhSo extends StatelessWidget {
+  const _CacBuocDanhSo({required this.cacBuoc});
+  final List<String> cacBuoc;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < cacBuoc.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 22,
+                  height: 22,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(color: _mauChinh, shape: BoxShape.circle),
+                  child: Text(
+                    '${i + 1}',
+                    style: const TextStyle(
+                        color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(child: _Doan(cacBuoc[i])),
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -521,6 +588,18 @@ const _doan4 =
     'Đăng nhập tài khoản Google (**hoàn toàn tuỳ chọn**) để mở đúng ghi chú '
     'đó ở một thiết bị khác — điện thoại, máy tính, trình duyệt nào cũng '
     'thấy cùng một dữ liệu.';
+
+const _doan5Widget =
+    'Đặt một **tiện ích (widget) Flowrite** ngay ngoài màn hình chính điện '
+    'thoại/máy tính bảng Android — ghi một ý nhanh mà ==không cần mở app==.';
+
+const _cacBuocCaiWidget = [
+  'Chạm giữ (long-press) một khoảng trống ở màn hình chính thiết bị.',
+  'Chọn mục "Widgets" (Tiện ích) trong menu hiện ra.',
+  'Tìm "Flowrite" trong danh sách, kéo thả ra màn hình chính.',
+  'Chọn MỘT ghi chú để tiện ích ghi vào — chỉ hỏi đúng một lần lúc vừa đặt.',
+  'Xong! Chạm nút "Ghi nhanh" trên tiện ích bất cứ lúc nào để gõ liền, không cần mở app. Nút "Mở app" bên cạnh mở Flowrite bình thường.',
+];
 
 const _doan8 =
     'Bản thân ứng dụng chỉ là một nửa câu chuyện — nửa còn lại nằm ở chính '

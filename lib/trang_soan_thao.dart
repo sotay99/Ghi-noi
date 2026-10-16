@@ -4336,6 +4336,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       final laLanDau = laLanDauNgheDangNhap;
       laLanDauNgheDangNhap = false;
       setState(() => _nguoiDungDangNhap = nguoiDung);
+      _thoatKhoiDamMayNeuCanThiet(nguoiDung);
       if (nguoiDung == null) return;
       unawaited(_dongBoCaiDatTuTaiKhoanKhiDangNhap(nguoiDung.uid));
       // (YÊU CẦU MỚI — 2 bộ nhớ từ điển) Tải hai bộ từ điển ĐÁM MÂY của tài
@@ -4539,6 +4540,51 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       await widget.caiDat.datTuDienNhapLieuNhanhBat(false);
     }
     if (mounted) setState(() {});
+  }
+
+  /// (SỬA LỖI NGHIÊM TRỌNG — đăng xuất/đổi tài khoản vẫn còn thấy ghi chú
+  /// và cây thư mục đám mây của tài khoản CŨ) Gọi mỗi lần trạng thái đăng
+  /// nhập đổi, trên TẤT CẢ các `TrangSoanThao` đang sống (kể cả cái đang
+  /// bị `ManHinhThuMuc`/`TrangSoanThao` khác mở CHỒNG lên che mất — xem
+  /// `ManHinhThuMuc._moGhiChuDuocChon`: đổi sang kho KHÁC thì mở hẳn một
+  /// `TrangSoanThao` MỚI thay vì thay thế cái cũ, nên Navigator có thể
+  /// xếp chồng nhiều lớp local/đám mây xen kẽ — mỗi lớp tự biết lúc nào
+  /// PHẢI tự rút khỏi ngăn xếp, không ai khác làm hộ được).
+  ///
+  /// Trang này vốn CHỈ biết đúng MỘT kho cố định (`widget.kho`) suốt
+  /// vòng đời — không tự "biết" phải ngừng hiển thị khi tài khoản chủ
+  /// của kho đó vừa đăng xuất hoặc đổi sang tài khoản khác.
+  void _thoatKhoiDamMayNeuCanThiet(User? nguoiDungMoi) {
+    // Dọn biến tĩnh TRƯỚC — object kho đám mây cũ không còn ai nên giữ
+    // sống nữa một khi chủ của nó đã đăng xuất/đổi tài khoản, bất kể
+    // trang NÀY có đang hiển thị kho đó hay không.
+    final dungChung = KhoDuLieuDamMay.dungChung;
+    if (dungChung != null &&
+        (nguoiDungMoi == null || nguoiDungMoi.uid != dungChung.uid)) {
+      KhoDuLieuDamMay.dungChung = null;
+    }
+
+    final kho = widget.kho;
+    if (kho is! KhoDuLieuDamMay) return; // Trang này vốn đã là nội bộ.
+    if (nguoiDungMoi != null && nguoiDungMoi.uid == kho.uid) return; // Vẫn đúng chủ.
+
+    if (!Navigator.of(context).canPop()) {
+      // (GIỚI HẠN ĐÃ BIẾT) Trang này là GỐC — ví dụ cài đặt "Khi khởi
+      // động App: Mở tệp..." đặt sẵn một ghi chú đám mây. Không pop được
+      // (không có gì bên dưới để lộ ra). Lần khởi động KẾ TIẾP sẽ tự rơi
+      // về nội bộ đúng (xem `giaiQuyetKhoiDong`), nhưng TRONG PHIÊN NÀY
+      // màn hình vẫn tạm hiện ghi chú đám mây cũ cho tới khi người dùng
+      // tự khởi động lại app — chấp nhận, trường hợp hiếm.
+      return;
+    }
+    // Rút khỏi ngăn xếp: đóng MỌI route xếp CHỒNG lên trang này (ví dụ
+    // một `ManHinhThuMuc` đang mở dở) rồi đóng luôn chính trang này —
+    // lộ ra đúng trang bên dưới (local, hoặc một lớp đám mây khác mà
+    // listener CỦA NÓ sẽ tự xử lý tiếp nếu cũng không còn hợp lệ).
+    final route = ModalRoute.of(context);
+    final nav = Navigator.of(context);
+    nav.popUntil((r) => r == route);
+    nav.pop();
   }
 
   /// Nút "Đăng nhập tài khoản"/"Đăng xuất" ở menu "Tài khoản và Cài đặt" —
@@ -8517,24 +8563,43 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       items: [
         const PopupMenuItem(
           value: 'tatCa',
-          child: Text('Chuyển hoá TẤT CẢ thẻ ghi âm'),
+          child: Row(children: [
+            Icon(Icons.transcribe, size: 18, color: Color(0xFF5F6368)),
+            SizedBox(width: 10),
+            Text('Chuyển hoá TẤT CẢ thẻ ghi âm'),
+          ]),
         ),
         const PopupMenuItem(
           value: 'moiThe',
-          child: Text('Chỉ chuyển hoá thẻ này'),
+          child: Row(children: [
+            Icon(Icons.graphic_eq, size: 18, color: Color(0xFF5F6368)),
+            SizedBox(width: 10),
+            Text('Chỉ chuyển hoá thẻ này'),
+          ]),
         ),
         const PopupMenuItem(
           value: 'nghe',
-          child: Text('Nghe bản ghi âm này'),
+          child: Row(children: [
+            Icon(Icons.play_circle_outline, size: 18, color: Color(0xFF5F6368)),
+            SizedBox(width: 10),
+            Text('Nghe bản ghi âm này'),
+          ]),
         ),
         PopupMenuItem(
           value: 'xoa',
-          child: Text('Xoá thẻ ghi âm này',
-              style: TextStyle(color: Colors.red.shade600)),
+          child: Row(children: [
+            Icon(Icons.delete_outline, size: 18, color: Colors.red.shade600),
+            const SizedBox(width: 10),
+            Text('Xoá thẻ ghi âm này', style: TextStyle(color: Colors.red.shade600)),
+          ]),
         ),
         const PopupMenuItem(
           value: 'doiViTri',
-          child: Text('Thay đổi vị trí của thẻ này'),
+          child: Row(children: [
+            Icon(Icons.swap_vert, size: 18, color: Color(0xFF5F6368)),
+            SizedBox(width: 10),
+            Text('Thay đổi vị trí của thẻ này'),
+          ]),
         ),
       ],
     );
@@ -8840,12 +8905,19 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       items: [
         const PopupMenuItem(
           value: 'nghe',
-          child: Text('Nghe bản ghi âm này'),
+          child: Row(children: [
+            Icon(Icons.play_circle_outline, size: 18, color: Color(0xFF5F6368)),
+            SizedBox(width: 10),
+            Text('Nghe bản ghi âm này'),
+          ]),
         ),
         PopupMenuItem(
           value: 'xoa',
-          child: Text('Xoá thẻ ghi âm này',
-              style: TextStyle(color: Colors.red.shade600)),
+          child: Row(children: [
+            Icon(Icons.delete_outline, size: 18, color: Colors.red.shade600),
+            const SizedBox(width: 10),
+            Text('Xoá thẻ ghi âm này', style: TextStyle(color: Colors.red.shade600)),
+          ]),
         ),
       ],
     );
@@ -11304,28 +11376,55 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       items: [
         if (coThayThe)
           for (var i = 0; i < loi.dsThayThe.length; i++)
-            PopupMenuItem(value: 'thay$i', child: Text(loi.dsThayThe[i]))
+            PopupMenuItem(
+              value: 'thay$i',
+              child: Row(children: [
+                const Icon(Icons.spellcheck, size: 18, color: Color(0xFF5F6368)),
+                const SizedBox(width: 10),
+                Text(loi.dsThayThe[i]),
+              ]),
+            )
         else
           PopupMenuItem(
             value: 'thay0',
-            child: Text('Đề xuất Xoá', style: TextStyle(color: Colors.red.shade600)),
+            child: Row(children: [
+              Icon(Icons.delete_outline, size: 18, color: Colors.red.shade600),
+              const SizedBox(width: 10),
+              Text('Đề xuất Xoá', style: TextStyle(color: Colors.red.shade600)),
+            ]),
           ),
         const PopupMenuDivider(),
         PopupMenuItem(
           value: 'xoa',
-          child: Text('Xoá', style: TextStyle(color: Colors.red.shade600)),
+          child: Row(children: [
+            Icon(Icons.delete_outline, size: 18, color: Colors.red.shade600),
+            const SizedBox(width: 10),
+            Text('Xoá', style: TextStyle(color: Colors.red.shade600)),
+          ]),
         ),
         PopupMenuItem(
           value: 'huy',
-          child: Text('Huỷ đề xuất', style: TextStyle(color: Colors.green.shade700)),
+          child: Row(children: [
+            Icon(Icons.undo, size: 18, color: Colors.green.shade700),
+            const SizedBox(width: 10),
+            Text('Huỷ đề xuất', style: TextStyle(color: Colors.green.shade700)),
+          ]),
         ),
         const PopupMenuItem(
           value: 'chapNhanTatCa',
-          child: Text('Chấp nhận tất cả đề xuất của từ điển'),
+          child: Row(children: [
+            Icon(Icons.done_all, size: 18, color: Color(0xFF5F6368)),
+            SizedBox(width: 10),
+            Text('Chấp nhận tất cả đề xuất của từ điển'),
+          ]),
         ),
         PopupMenuItem(
           value: 'chapNhanLienQuan',
-          child: Text('Chấp nhận các đề xuất liên quan đến "${loi.tu}"'),
+          child: Row(children: [
+            const Icon(Icons.done, size: 18, color: Color(0xFF5F6368)),
+            const SizedBox(width: 10),
+            Expanded(child: Text('Chấp nhận các đề xuất liên quan đến "${loi.tu}"')),
+          ]),
         ),
       ],
     );
@@ -11926,8 +12025,22 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         viTriManHinh.dy,
       ),
       items: const [
-        PopupMenuItem(value: 'xoa', child: Text('Chấp nhận xoá đoạn văn này')),
-        PopupMenuItem(value: 'khoiphuc', child: Text('Khôi phục đoạn văn này — không xoá')),
+        PopupMenuItem(
+          value: 'xoa',
+          child: Row(children: [
+            Icon(Icons.delete_outline, size: 18, color: Color(0xFF5F6368)),
+            SizedBox(width: 10),
+            Text('Chấp nhận xoá đoạn văn này'),
+          ]),
+        ),
+        PopupMenuItem(
+          value: 'khoiphuc',
+          child: Row(children: [
+            Icon(Icons.restore, size: 18, color: Color(0xFF5F6368)),
+            SizedBox(width: 10),
+            Text('Khôi phục đoạn văn này — không xoá'),
+          ]),
+        ),
       ],
     );
     if (chon == null || !mounted) return;
@@ -13519,47 +13632,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _moModalTam(String tieuDe, IconData bieuTuong, [String? moTaThem]) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        icon: Icon(bieuTuong, size: 28),
-        // (YÊU CẦU MỚI) Bỏ nút "Đóng" ở `actions` — thay bằng nút X đỏ gọn
-        // gàng ở góc trên bên phải.
-        title: Row(
-          children: [
-            Expanded(child: Text(tieuDe)),
-            IconButton(
-              icon: const Icon(Icons.close, color: Colors.red),
-              tooltip: 'Đóng',
-              onPressed: () => Navigator.of(ctx).pop(),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Tính năng đang nâng cấp.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              if (moTaThem != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  moTaThem,
-                  textAlign: TextAlign.left,
-                  style: const TextStyle(height: 1.5, color: Color(0xFF5F6368)),
-                ),
-              ],
-            ],
           ),
         ),
       ),
@@ -15225,10 +15297,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 enabled: false,
                 child: Text(s, style: TextStyle(color: Colors.purple.shade700, fontSize: 13)),
               );
+          Widget dong(IconData icon, String chu) => Row(children: [
+                Icon(icon, size: 18, color: const Color(0xFF5F6368)),
+                const SizedBox(width: 10),
+                Text(chu),
+              ]);
           return [
-            const PopupMenuItem(value: 'taoMoi', child: Text('Tạo Tệp văn bản mới')),
-            const PopupMenuItem(value: 'xoa', child: Text('Chuyển vào thùng rác')),
-            const PopupMenuItem(value: 'mau', child: Text('Chọn màu Tên Tệp')),
+            PopupMenuItem(value: 'taoMoi', child: dong(Icons.note_add_outlined, 'Tạo Tệp văn bản mới')),
+            PopupMenuItem(value: 'xoa', child: dong(Icons.delete_outline, 'Chuyển vào thùng rác')),
+            PopupMenuItem(value: 'mau', child: dong(Icons.palette_outlined, 'Chọn màu Tên Tệp')),
             const PopupMenuDivider(),
             dongThongTin('Số từ: $soTu'),
             dongThongTin('Ký tự (có dấu cách): $soKyTuCoDauCach'),
@@ -16954,16 +17031,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 epToanVanKhiCoVungChon: _epToanVanKhiCoVungChon,
                 khiBamDoiCheDoLamViec: _doiCheDoLamViecVoiVungChon,
                 khoaMenuAI: _khoaMenuAI,
-                khiBamBanPhim: () => _moModalTam(
-                  'Bàn phím',
-                  Icons.keyboard_outlined,
-                  'Bàn phím riêng của Flowrite sẽ cho bạn tự chọn ngôn ngữ và '
-                      'kiểu gõ, tích hợp sẵn nhiều ngôn ngữ và kiểu gõ khác '
-                      'nhau trong cùng một nơi.\n\n'
-                      'Hữu ích nhất cho máy chưa cài sẵn bàn phím ngôn ngữ '
-                      'mình cần, hoặc khi bạn muốn dùng hẳn bàn phím và bộ gõ '
-                      'riêng của Flowrite thay vì bàn phím mặc định của máy.',
-                ),
                 khiBamBoPhimNhanh: _bamNutBoPhimNhanhCamUng,
                 khiMoMenuCanReset: _resetManHinhTruocKhiMoMenu,
                 khiDongMenuAI: _giuFocusOChuSauKhiBam,

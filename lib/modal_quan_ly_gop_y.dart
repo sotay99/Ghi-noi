@@ -32,12 +32,31 @@ class _TrangQuanLyGopY extends StatefulWidget {
 class _TrangQuanLyGopYState extends State<_TrangQuanLyGopY> {
   int _tabHienTai = 0;
 
+  // (SỬA LỖI — "The query requires an index") Lọc theo `trangThai` CỘNG sắp
+  // theo `thoiGian` (hai field khác nhau) đòi Firestore phải có composite
+  // index — chưa tạo thì đỏ ngay. Bỏ hẳn `orderBy` ở Firestore, tự sắp lại
+  // phía Dart sau khi tải về (`_nguon` dưới) — màn này vốn đã tải HẾT một
+  // lần theo từng tab (không phân trang), sắp ở client không tốn thêm gì,
+  // và khỏi phải tạo index thủ công mỗi lần thêm lọc/tab mới sau này.
   Stream<QuerySnapshot<Map<String, dynamic>>> _nguon(String trangThai) {
     return FirebaseFirestore.instance
         .collection('gopY')
         .where('trangThai', isEqualTo: trangThai)
-        .orderBy('thoiGian', descending: true)
         .snapshots();
+  }
+
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _sapMoiNhatTruoc(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    final ds = [...docs];
+    ds.sort((a, b) {
+      final ta = a.data()['thoiGian'];
+      final tb = b.data()['thoiGian'];
+      if (ta is! Timestamp) return 1;
+      if (tb is! Timestamp) return -1;
+      return tb.compareTo(ta);
+    });
+    return ds;
   }
 
   Future<void> _doiTrangThai(String docId, String trangThaiMoi) {
@@ -91,7 +110,7 @@ class _TrangQuanLyGopYState extends State<_TrangQuanLyGopY> {
                   if (!snap.hasData) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  final docs = snap.data!.docs;
+                  final docs = _sapMoiNhatTruoc(snap.data!.docs);
                   if (docs.isEmpty) {
                     return Center(
                       child: Text(
@@ -149,9 +168,30 @@ class _TrangQuanLyGopYState extends State<_TrangQuanLyGopY> {
                 icon: const Icon(Icons.more_vert, size: 20),
                 onSelected: (gia) => _doiTrangThai(doc.id, gia),
                 itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'daXuLy', child: Text('Đánh dấu Đã xử lý')),
-                  PopupMenuItem(value: 'chuaXuLy', child: Text('Đánh dấu Chưa xử lý')),
-                  PopupMenuItem(value: 'thungRac', child: Text('Đưa vào Thùng rác')),
+                  PopupMenuItem(
+                    value: 'daXuLy',
+                    child: Row(children: [
+                      Icon(Icons.check_circle_outline, size: 18, color: Color(0xFF34A853)),
+                      SizedBox(width: 10),
+                      Text('Đánh dấu Đã xử lý'),
+                    ]),
+                  ),
+                  PopupMenuItem(
+                    value: 'chuaXuLy',
+                    child: Row(children: [
+                      Icon(Icons.radio_button_unchecked, size: 18, color: Color(0xFF5F6368)),
+                      SizedBox(width: 10),
+                      Text('Đánh dấu Chưa xử lý'),
+                    ]),
+                  ),
+                  PopupMenuItem(
+                    value: 'thungRac',
+                    child: Row(children: [
+                      Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                      SizedBox(width: 10),
+                      Text('Đưa vào Thùng rác'),
+                    ]),
+                  ),
                 ],
               ),
             ],

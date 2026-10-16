@@ -1671,23 +1671,39 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                     itemBuilder: (ctx) => [
                       const PopupMenuItem(
                         value: 1,
-                        child: Text('Toàn bộ văn bản mới nhất'),
+                        child: Row(children: [
+                          Icon(Icons.description_outlined, size: 18, color: Color(0xFF5F6368)),
+                          SizedBox(width: 10),
+                          Text('Toàn bộ văn bản mới nhất'),
+                        ]),
                       ),
                       PopupMenuItem(
                         value: 2,
                         enabled: widget.layDoanVanDangChon() != null,
-                        child: const Text('Đoạn văn đang chọn'),
+                        child: const Row(children: [
+                          Icon(Icons.text_snippet_outlined, size: 18, color: Color(0xFF5F6368)),
+                          SizedBox(width: 10),
+                          Text('Đoạn văn đang chọn'),
+                        ]),
                       ),
                       const PopupMenuDivider(),
                       PopupMenuItem(
                         value: 3,
                         enabled: !_micDangNghe && !_ghiDangMo,
-                        child: const Text('Ghi âm (nói xong mới ra chữ)'),
+                        child: const Row(children: [
+                          Icon(Icons.mic_none, size: 18, color: Color(0xFF5F6368)),
+                          SizedBox(width: 10),
+                          Text('Ghi âm (nói xong mới ra chữ)'),
+                        ]),
                       ),
                       PopupMenuItem(
                         value: 4,
                         enabled: !_micDangNghe && !_ghiDangMo,
-                        child: const Text('Micro (vừa nói vừa ra chữ)'),
+                        child: const Row(children: [
+                          Icon(Icons.graphic_eq, size: 18, color: Color(0xFF5F6368)),
+                          SizedBox(width: 10),
+                          Text('Micro (vừa nói vừa ra chữ)'),
+                        ]),
                       ),
                     ],
                     onSelected: (v) {

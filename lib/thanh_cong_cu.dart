@@ -5,6 +5,7 @@
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'quyen_admin.dart';
@@ -40,7 +41,6 @@ class ThanhCongCu extends StatelessWidget {
     required this.epToanVanKhiCoVungChon,
     required this.khiBamDoiCheDoLamViec,
     required this.khoaMenuAI,
-    required this.khiBamBanPhim,
     required this.khiBamBoPhimNhanh,
     required this.boPhimNhanhDangMo,
     this.noiBatBoPhimNhanh = false,
@@ -235,7 +235,6 @@ class ThanhCongCu extends StatelessWidget {
   /// Khoá để tự mở lại `PopupMenuButton` bên trong `_NutAIMenu` ngay sau
   /// khi [khiBamDoiCheDoLamViec] đảo trạng thái — xem giải thích ở đó.
   final GlobalKey<PopupMenuButtonState<int>> khoaMenuAI;
-  final VoidCallback khiBamBanPhim;
 
   /// "Bộ phím nhanh cho màn hình cảm ứng" (mục "Bật/Tắt..." trong "+ Thêm
   /// lựa chọn") — [boPhimNhanhDangMo] quyết định tên hiển thị (Bật/Tắt).
@@ -522,7 +521,6 @@ class ThanhCongCu extends StatelessWidget {
                             chu: 'Xem thêm lựa chọn',
                             child: _NutThemMenu(
                               rong: rong,
-                              khiBamBanPhim: khiBamBanPhim,
                               khiBamBoPhimNhanh: khiBamBoPhimNhanh,
                               boPhimNhanhDangMo: boPhimNhanhDangMo,
                               noiBatBoPhimNhanh: noiBatBoPhimNhanh,
@@ -1189,16 +1187,38 @@ Widget _mucMenuThemNoiBatXanh(int gia, String chu) {
 /// [noiBat]: chữ đậm + xanh dương — dùng đúng một chỗ, mục "Bật Bộ phím
 /// nhanh cho màn hình cảm ứng" khi thiết bị (tự đoán hoặc chọn tay) là
 /// Android/iPhone, xem `_NutThemMenu`.
-Widget _mucMenuThem(int gia, String chu, {bool noiBat = false, Color? mauChu}) {
+/// (YÊU CẦU MỚI) [icon] là Material Icon sát nghĩa với [chu]; [emoji] thay
+/// icon đó bằng một ký tự emoji khi không có icon Material nào đủ sát
+/// nghĩa (ví dụ 📖/📒 của hai từ điển — dùng ĐÚNG emoji đã quen mắt ở nút
+/// nhanh "Thêm vào từ điển..." khi có vùng chọn, xem `trang_soan_thao.dart`).
+/// Chỉ truyền MỘT trong hai, không truyền thì không có icon (hiếm dùng —
+/// hầu hết mục nay đều có icon).
+Widget _mucMenuThem(
+  int gia,
+  String chu, {
+  bool noiBat = false,
+  Color? mauChu,
+  IconData? icon,
+  String? emoji,
+}) {
+  final mau = mauChu ?? (noiBat ? Colors.blue.shade700 : const Color(0xFF5F6368));
   return _DongMenuCoTheBam(
     gia: gia,
-    child: Text(
-      chu,
-      style: TextStyle(
-        fontSize: 13,
-        fontWeight: noiBat ? FontWeight.bold : null,
-        color: mauChu ?? (noiBat ? Colors.blue.shade700 : null),
-      ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) Icon(icon, size: 17, color: mau),
+        if (emoji != null) Text(emoji, style: const TextStyle(fontSize: 15)),
+        if (icon != null || emoji != null) const SizedBox(width: 10),
+        Text(
+          chu,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: noiBat ? FontWeight.bold : null,
+            color: mauChu ?? (noiBat ? Colors.blue.shade700 : null),
+          ),
+        ),
+      ],
     ),
   );
 }
@@ -1442,7 +1462,6 @@ PopupMenuItem<int> _mucCuonDanhSach(
 class _NutThemMenu extends StatelessWidget {
   const _NutThemMenu({
     required this.rong,
-    required this.khiBamBanPhim,
     required this.khiBamBoPhimNhanh,
     required this.boPhimNhanhDangMo,
     this.noiBatBoPhimNhanh = false,
@@ -1460,9 +1479,6 @@ class _NutThemMenu extends StatelessWidget {
   });
 
   final bool rong;
-
-  /// Gắn với mục "Kiểu gõ bàn phím" trong danh sách.
-  final VoidCallback khiBamBanPhim;
 
   /// Gắn với mục "Bật/Tắt bộ phím nhanh cho màn hình cảm ứng".
   final VoidCallback khiBamBoPhimNhanh;
@@ -1544,9 +1560,6 @@ class _NutThemMenu extends StatelessWidget {
               case 3:
                 khiBamBoPhimNhanh();
                 break;
-              case 4:
-                khiBamBanPhim();
-                break;
               case 23:
                 khiBamDanhSachPhimTat();
                 break;
@@ -1595,16 +1608,16 @@ class _NutThemMenu extends StatelessWidget {
                 // Ba mục đầu — dời từ ba nút riêng trên thanh công cụ trên
                 // (Sao chép tất cả/Xoá tất cả) xuống đây, cộng thêm mục gộp
                 // mới "Sao chép rồi xoá tất cả".
-                _mucMenuThem(20, 'Sao chép tất cả'),
-                _mucMenuThem(21, 'Sao chép rồi xoá tất cả'),
-                _mucMenuThem(22, 'Xoá tất cả'),
-                _mucMenuThem(28, 'Chọn tất cả'),
+                _mucMenuThem(20, 'Sao chép tất cả', icon: Icons.copy_all_outlined),
+                _mucMenuThem(21, 'Sao chép rồi xoá tất cả', icon: Icons.content_cut),
+                _mucMenuThem(22, 'Xoá tất cả', icon: Icons.delete_outline),
+                _mucMenuThem(28, 'Chọn tất cả', icon: Icons.select_all),
                 _dividerMenu(),
                 // "Thêm ảnh"/"Chụp ảnh (camera)" đã dời sang menu "Làm việc
                 // với AI" (đổi tên "Chuyển hình ảnh thành văn bản") — "Cài
                 // đặt" và "Tìm kiếm và thay thế" (trước đây là hai nút riêng
                 // ngoài thanh công cụ) vào thay đúng vị trí này.
-                _mucMenuThem(25, 'Tìm kiếm và thay thế'),
+                _mucMenuThem(25, 'Tìm kiếm và thay thế', icon: Icons.find_replace),
                 _dividerMenu(),
                 _mucMenuThem(
                   3,
@@ -1612,17 +1625,21 @@ class _NutThemMenu extends StatelessWidget {
                       ? 'Tắt Bộ phím nhanh cho màn hình cảm ứng'
                       : 'Bật Bộ phím nhanh cho màn hình cảm ứng',
                   noiBat: !boPhimNhanhDangMo && noiBatBoPhimNhanh,
+                  icon: Icons.keyboard_alt_outlined,
                 ),
-                _mucMenuThem(4, 'Kiểu gõ bàn phím'),
-                _mucMenuThem(23, 'Danh sách phím tắt'),
-                _mucMenuThem(5, 'Luyện gõ phím bằng 10 ngón tay'),
+                // (YÊU CẦU MỚI) Bỏ "Kiểu gõ bàn phím" — đang nâng cấp, thừa
+                // thãi, bỏ hẳn (xoá luôn `khiBamBanPhim` không ai gọi nữa).
+                _mucMenuThem(23, 'Danh sách phím tắt', icon: Icons.list_alt),
+                _mucMenuThem(5, 'Luyện gõ phím bằng 10 ngón tay', icon: Icons.school_outlined),
                 _dividerMenu(),
                 // (YÊU CẦU MỚI) Nổi bật nền xanh dương đậm — thu hút ánh
-                // nhìn, ngay phía TRÊN "Chia sẻ ứng dụng...".
-                _mucMenuThemNoiBatXanh(29, 'Cài đặt Ứng dụng vào Thiết bị'),
-                _mucMenuThem(6, 'Chia sẻ ứng dụng này đến với mọi người'),
-                _mucMenuThem(7, 'Góp ý thêm, báo lỗi về ứng dụng'),
-                _mucMenuThem(8, 'Donate ủng hộ-cảm ơn tác giả'),
+                // nhìn, ngay phía TRÊN "Chia sẻ ứng dụng...". CHỈ web — bản
+                // APK đã CÀI RỒI, không cần nút "cài đặt" nữa.
+                if (kIsWeb)
+                  _mucMenuThemNoiBatXanh(29, 'Cài đặt Ứng dụng vào Thiết bị'),
+                _mucMenuThem(6, 'Chia sẻ ứng dụng này đến với mọi người', icon: Icons.share),
+                _mucMenuThem(7, 'Góp ý thêm, báo lỗi về ứng dụng', icon: Icons.feedback_outlined),
+                _mucMenuThem(8, 'Donate ủng hộ-cảm ơn tác giả', icon: Icons.favorite_outline),
               ]),
             ];
           },
@@ -1818,30 +1835,44 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                 // Hai mục mới — CHƯA gắn logic (chờ gắn sau), tạm đặt ở đầu
                 // menu, cùng kiểu dòng với "Cài đặt Micro"/"Cài đặt Hiển thị
                 // và tự động sửa" bên dưới.
-                _mucMenuThem(6, 'Language - Ngôn ngữ'),
-                _mucMenuThem(27, 'Khi khởi động App: Mở tệp...'),
+                _mucMenuThem(6, 'Language - Ngôn ngữ', icon: Icons.language),
+                _mucMenuThem(27, 'Khi khởi động App: Mở tệp...', icon: Icons.description_outlined),
                 _dividerMenu(),
-                _mucMenuThem(1, 'Cài đặt Micro'),
-                _mucMenuThem(2, 'Cài đặt Hiển thị và tự động sửa'),
-                _mucMenuThem(9, 'Cài đặt từ điển sửa lỗi chính tả'),
-                _mucMenuThem(26, 'Cài đặt Từ điển nhập liệu nhanh'),
-                _mucMenuThem(10, 'Cài đặt Bộ nhớ tạm để dán văn bản'),
+                // (YÊU CẦU MỚI) Năm mục "Cài đặt..." — chữ màu TÍM để phân
+                // biệt với các mục khác trong menu, icon SÁT NGHĨA với từng
+                // cài đặt (không dùng icon bánh răng chung chung). Hai mục
+                // từ điển/bộ nhớ tạm dùng ĐÚNG emoji đã quen mắt ở nút nhanh
+                // tương ứng khi có vùng chọn (xem `trang_soan_thao.dart`).
+                _mucMenuThem(1, 'Cài đặt Micro', icon: Icons.mic_none, mauChu: Colors.purple.shade700),
+                _mucMenuThem(2, 'Cài đặt Hiển thị và tự động sửa',
+                    icon: Icons.text_fields, mauChu: Colors.purple.shade700),
+                _mucMenuThem(9, 'Cài đặt từ điển sửa lỗi chính tả',
+                    emoji: '📒', mauChu: Colors.purple.shade700),
+                _mucMenuThem(26, 'Cài đặt Từ điển nhập liệu nhanh',
+                    emoji: '📖', mauChu: Colors.purple.shade700),
+                _mucMenuThem(10, 'Cài đặt Bộ nhớ tạm để dán văn bản',
+                    emoji: '📋', mauChu: Colors.purple.shade700),
                 _dividerMenu(),
-                _mucMenuThem(3, 'Điều khoản sử dụng'),
-                _mucMenuThem(4, 'Bảo mật và quyền riêng tư'),
+                _mucMenuThem(3, 'Điều khoản sử dụng', icon: Icons.gavel_outlined),
+                _mucMenuThem(4, 'Bảo mật và quyền riêng tư', icon: Icons.privacy_tip_outlined),
                 _dividerMenu(),
                 // "Trò chuyện" dời từ thanh công cụ ngoài vào đây, ngay
                 // phía TRÊN "Đăng nhập tài khoản" — cùng nhóm, không có
                 // đường kẻ chia giữa hai mục này.
-                _mucMenuThem(8, 'Trò chuyện'),
-                _mucMenuThem(5, daDangNhap ? 'Đăng xuất' : 'Đăng nhập bằng tài khoản Google'),
+                _mucMenuThem(8, 'Trò chuyện', icon: Icons.chat_bubble_outline),
+                _mucMenuThem(
+                  5,
+                  daDangNhap ? 'Đăng xuất' : 'Đăng nhập bằng tài khoản Google',
+                  icon: daDangNhap ? Icons.logout : Icons.login,
+                ),
                 // (YÊU CẦU MỚI — chỉ admin) Hai mục quản lý, CHỈ hiện khi
                 // đang đăng nhập ĐÚNG một trong hai email admin — đây chỉ
                 // là lớp ẨN/HIỆN giao diện, quyền THẬT nằm ở luật Firestore
                 // (xem `quyen_admin.dart`).
                 if (daDangNhap && laAdminEmail(emailDaDangNhap)) ...[
-                  _mucMenuThem(30, 'Các ý kiến góp ý, báo lỗi của user'),
-                  _mucMenuThem(31, 'Các User đã đăng nhập'),
+                  _mucMenuThem(30, 'Các ý kiến góp ý, báo lỗi của user',
+                      icon: Icons.rate_review_outlined),
+                  _mucMenuThem(31, 'Các User đã đăng nhập', icon: Icons.group_outlined),
                 ],
                 // (YÊU CẦU MỚI) Đang đăng nhập — hiện tên + avatar của tài
                 // khoản ở dòng CUỐI CÙNG của menu, không bấm được (chỉ để
@@ -2072,9 +2103,9 @@ class _NutAIMenu extends StatelessWidget {
                 // — xem `_moModalChonKieuTomTat` (mở modal chọn kiểu trước
                 // khi gọi Gemini, kết quả có nút "Thay thế toàn bộ văn
                 // bản").
-                _mucMenuThem(6, 'Chuyển hình ảnh thành văn bản'),
-                _mucMenuThem(7, 'Chụp ảnh (camera)'),
-                _mucMenuThem(8, 'Chuyển file âm thanh thành văn bản'),
+                _mucMenuThem(6, 'Chuyển hình ảnh thành văn bản', icon: Icons.image_outlined),
+                _mucMenuThem(7, 'Chụp ảnh (camera)', icon: Icons.camera_alt_outlined),
+                _mucMenuThem(8, 'Chuyển file âm thanh thành văn bản', icon: Icons.graphic_eq),
                 // Vị trí 4 — CHỈ hiện khi có vùng chọn THẬT SỰ (không bị ảnh
                 // hưởng bởi chính công tắc này — nếu không, bấm ép "toàn
                 // bộ văn bản" xong sẽ tự làm mục này biến mất, không bấm
@@ -2103,21 +2134,25 @@ class _NutAIMenu extends StatelessWidget {
                   1,
                   coDoanChon ? 'Trò chuyện về đoạn văn đã chọn' : 'Trò chuyện về văn bản này',
                   mauChu: coDoanChon ? _mauTimNguCanhDoanChon : null,
+                  icon: Icons.forum_outlined,
                 ),
                 _mucMenuThem(
                   2,
                   coDoanChon ? 'Tóm tắt đoạn văn này' : 'Tóm tắt toàn văn',
                   mauChu: coDoanChon ? _mauTimNguCanhDoanChon : null,
+                  icon: Icons.summarize_outlined,
                 ),
                 _mucMenuThem(
                   3,
                   coDoanChon ? 'Mở rộng đoạn văn này' : 'Mở rộng toàn văn',
                   mauChu: coDoanChon ? _mauTimNguCanhDoanChon : null,
+                  icon: Icons.unfold_more,
                 ),
                 _mucMenuThem(
                   4,
                   'Viết lại cho hay hơn',
                   mauChu: coDoanChon ? _mauTimNguCanhDoanChon : null,
+                  icon: Icons.auto_fix_high,
                 ),
                 _dividerMenu(),
                 // Hai mục CHỈ MỘT PHẦN của "Kiểm tra toàn văn" — ĐÚNG
@@ -2129,11 +2164,13 @@ class _NutAIMenu extends StatelessWidget {
                   10,
                   coDoanChon ? 'Kiểm tra lỗi chính tả đoạn văn này' : 'Kiểm tra lỗi chính tả toàn văn',
                   mauChu: coDoanChon ? _mauTimNguCanhDoanChon : null,
+                  icon: Icons.spellcheck,
                 ),
                 _mucMenuThem(
                   11,
                   coDoanChon ? 'Kiểm tra dấu câu đoạn văn này' : 'Kiểm tra dấu câu toàn văn',
                   mauChu: coDoanChon ? _mauTimNguCanhDoanChon : null,
+                  icon: Icons.rule,
                 ),
                 // "Kiểm tra toàn văn" dời từ một nút riêng ngoài thanh công
                 // cụ vào ngay TRÊN mục cài đặt của nó — giữ màu xanh lá +
@@ -2157,7 +2194,14 @@ class _NutAIMenu extends StatelessWidget {
                 _DongMenuCoTheBam(
                   gia: 5,
                   height: 34,
-                  child: const Text('Cài đặt nút "Kiểm tra toàn văn"'),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.tune, size: 17, color: Color(0xFF5F6368)),
+                      SizedBox(width: 10),
+                      Text('Cài đặt nút "Kiểm tra toàn văn"'),
+                    ],
+                  ),
                 ),
               ]),
             ];

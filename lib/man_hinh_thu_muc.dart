@@ -36,6 +36,20 @@ import 'zip_thu_muc.dart';
 /// này, build() rẽ nhánh riêng, KHÔNG bao giờ đưa vào `_kho.noiDungThuMuc`.
 const _ngoiNhaChung = '#ngoi-nha-chung#';
 
+/// (YÊU CẦU MỚI) Dòng menu có icon SÁT NGHĨA đứng trước chữ — dùng chung
+/// cho mọi `PopupMenuButton` trong màn hình này (menu trên cùng, menu
+/// "..." của từng thư mục/tệp).
+PopupMenuItem<T> _mucMenuIcon<T>(T value, IconData icon, String chu) {
+  return PopupMenuItem<T>(
+    value: value,
+    child: Row(children: [
+      Icon(icon, size: 18, color: const Color(0xFF5F6368)),
+      const SizedBox(width: 10),
+      Text(chu),
+    ]),
+  );
+}
+
 class ManHinhThuMuc extends StatefulWidget {
   const ManHinhThuMuc({
     super.key,
@@ -1498,29 +1512,39 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                     PopupMenuItem(
                       value: 8,
                       child: Row(children: [
-                        if (!dangNguoc) const Icon(Icons.check, size: 18),
-                        if (!dangNguoc) const SizedBox(width: 6),
+                        Icon(Icons.arrow_upward,
+                            size: 18, color: !dangNguoc ? null : const Color(0xFF9AA0A6)),
+                        const SizedBox(width: 10),
                         const Text('Sắp xếp A → Z'),
+                        if (!dangNguoc) ...[
+                          const SizedBox(width: 6),
+                          const Icon(Icons.check, size: 18),
+                        ],
                       ]),
                     ),
                     PopupMenuItem(
                       value: 9,
                       child: Row(children: [
-                        if (dangNguoc) const Icon(Icons.check, size: 18),
-                        if (dangNguoc) const SizedBox(width: 6),
+                        Icon(Icons.arrow_downward,
+                            size: 18, color: dangNguoc ? null : const Color(0xFF9AA0A6)),
+                        const SizedBox(width: 10),
                         const Text('Sắp xếp Z → A'),
+                        if (dangNguoc) ...[
+                          const SizedBox(width: 6),
+                          const Icon(Icons.check, size: 18),
+                        ],
                       ]),
                     ),
                     const PopupMenuDivider(),
-                    const PopupMenuItem(value: 1, child: Text('Tạo thư mục mới')),
-                    const PopupMenuItem(value: 6, child: Text('Nhập ZIP hoặc TXT vào đây')),
+                    _mucMenuIcon(1, Icons.create_new_folder_outlined, 'Tạo thư mục mới'),
+                    _mucMenuIcon(6, Icons.upload_file_outlined, 'Nhập ZIP hoặc TXT vào đây'),
                     const PopupMenuDivider(),
-                    const PopupMenuItem(value: 2, child: Text('Chọn nhiều')),
-                    const PopupMenuItem(value: 3, child: Text('Tải và chia sẻ thư mục này')),
-                    const PopupMenuItem(value: 4, child: Text('Thông tin thư mục này')),
+                    _mucMenuIcon(2, Icons.checklist_outlined, 'Chọn nhiều'),
+                    _mucMenuIcon(3, Icons.share_outlined, 'Tải và chia sẻ thư mục này'),
+                    _mucMenuIcon(4, Icons.info_outline, 'Thông tin thư mục này'),
                     const PopupMenuDivider(),
-                    const PopupMenuItem(value: 5, child: Text('Thùng rác Nội bộ')),
-                    const PopupMenuItem(value: 7, child: Text('Tìm kiếm trong này')),
+                    _mucMenuIcon(5, Icons.delete_outline, 'Thùng rác Nội bộ'),
+                    _mucMenuIcon(7, Icons.search, 'Tìm kiếm trong này'),
                   ];
                 },
               ),
@@ -1652,14 +1676,14 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
               break;
           }
         },
-        itemBuilder: (ctx) => const [
-          PopupMenuItem(value: 'doi_ten', child: Text('Đổi tên')),
-          PopupMenuItem(value: 'cat', child: Text('Cắt (di chuyển)')),
-          PopupMenuItem(value: 'chep', child: Text('Sao chép')),
-          PopupMenuItem(value: 'mau', child: Text('Chọn màu Tên Thư mục')),
-          PopupMenuItem(value: 'tai', child: Text('Tải và chia sẻ thư mục này')),
-          PopupMenuItem(value: 'thong_tin', child: Text('Thông tin thư mục này')),
-          PopupMenuItem(value: 'xoa', child: Text('Chuyển vào thùng rác')),
+        itemBuilder: (ctx) => [
+          _mucMenuIcon('doi_ten', Icons.edit_outlined, 'Đổi tên'),
+          _mucMenuIcon('cat', Icons.drive_file_move_outline, 'Cắt (di chuyển)'),
+          _mucMenuIcon('chep', Icons.copy_outlined, 'Sao chép'),
+          _mucMenuIcon('mau', Icons.palette_outlined, 'Chọn màu Tên Thư mục'),
+          _mucMenuIcon('tai', Icons.share_outlined, 'Tải và chia sẻ thư mục này'),
+          _mucMenuIcon('thong_tin', Icons.info_outline, 'Thông tin thư mục này'),
+          _mucMenuIcon('xoa', Icons.delete_outline, 'Chuyển vào thùng rác'),
         ],
       );
 
@@ -1691,14 +1715,14 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
               break;
           }
         },
-        itemBuilder: (ctx) => const [
-          PopupMenuItem(value: 'doi_ten', child: Text('Đổi tên')),
-          PopupMenuItem(value: 'cat', child: Text('Cắt (di chuyển)')),
-          PopupMenuItem(value: 'chep', child: Text('Sao chép')),
-          PopupMenuItem(value: 'tai_ve', child: Text('Tải về')),
-          PopupMenuItem(value: 'mau', child: Text('Chọn màu Tên Tệp')),
-          PopupMenuItem(value: 'thong_tin', child: Text('Thông tin tệp này')),
-          PopupMenuItem(value: 'xoa', child: Text('Chuyển vào thùng rác')),
+        itemBuilder: (ctx) => [
+          _mucMenuIcon('doi_ten', Icons.edit_outlined, 'Đổi tên'),
+          _mucMenuIcon('cat', Icons.drive_file_move_outline, 'Cắt (di chuyển)'),
+          _mucMenuIcon('chep', Icons.copy_outlined, 'Sao chép'),
+          _mucMenuIcon('tai_ve', Icons.download_outlined, 'Tải về'),
+          _mucMenuIcon('mau', Icons.palette_outlined, 'Chọn màu Tên Tệp'),
+          _mucMenuIcon('thong_tin', Icons.info_outline, 'Thông tin tệp này'),
+          _mucMenuIcon('xoa', Icons.delete_outline, 'Chuyển vào thùng rác'),
         ],
       );
 
@@ -1980,35 +2004,18 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                     break;
                                 }
                               },
-                              itemBuilder: (ctx) => const [
-                                PopupMenuItem(
-                                  value: 'doi_ten',
-                                  child: Text('Đổi tên'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'cat',
-                                  child: Text('Cắt (di chuyển)'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'chep',
-                                  child: Text('Sao chép'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'mau',
-                                  child: Text('Chọn màu Tên Thư mục'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'tai',
-                                  child: Text('Tải và chia sẻ thư mục này'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'thong_tin',
-                                  child: Text('Thông tin thư mục này'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'xoa',
-                                  child: Text('Chuyển vào thùng rác'),
-                                ),
+                              itemBuilder: (ctx) => [
+                                _mucMenuIcon('doi_ten', Icons.edit_outlined, 'Đổi tên'),
+                                _mucMenuIcon(
+                                    'cat', Icons.drive_file_move_outline, 'Cắt (di chuyển)'),
+                                _mucMenuIcon('chep', Icons.copy_outlined, 'Sao chép'),
+                                _mucMenuIcon(
+                                    'mau', Icons.palette_outlined, 'Chọn màu Tên Thư mục'),
+                                _mucMenuIcon(
+                                    'tai', Icons.share_outlined, 'Tải và chia sẻ thư mục này'),
+                                _mucMenuIcon(
+                                    'thong_tin', Icons.info_outline, 'Thông tin thư mục này'),
+                                _mucMenuIcon('xoa', Icons.delete_outline, 'Chuyển vào thùng rác'),
                               ],
                             ),
                           ),
@@ -2091,35 +2098,16 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                     break;
                                 }
                               },
-                              itemBuilder: (ctx) => const [
-                                PopupMenuItem(
-                                  value: 'doi_ten',
-                                  child: Text('Đổi tên'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'cat',
-                                  child: Text('Cắt (di chuyển)'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'chep',
-                                  child: Text('Sao chép'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'tai_ve',
-                                  child: Text('Tải về'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'mau',
-                                  child: Text('Chọn màu Tên Tệp'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'thong_tin',
-                                  child: Text('Thông tin tệp này'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'xoa',
-                                  child: Text('Chuyển vào thùng rác'),
-                                ),
+                              itemBuilder: (ctx) => [
+                                _mucMenuIcon('doi_ten', Icons.edit_outlined, 'Đổi tên'),
+                                _mucMenuIcon(
+                                    'cat', Icons.drive_file_move_outline, 'Cắt (di chuyển)'),
+                                _mucMenuIcon('chep', Icons.copy_outlined, 'Sao chép'),
+                                _mucMenuIcon('tai_ve', Icons.download_outlined, 'Tải về'),
+                                _mucMenuIcon('mau', Icons.palette_outlined, 'Chọn màu Tên Tệp'),
+                                _mucMenuIcon(
+                                    'thong_tin', Icons.info_outline, 'Thông tin tệp này'),
+                                _mucMenuIcon('xoa', Icons.delete_outline, 'Chuyển vào thùng rác'),
                               ],
                             ),
                           ),
