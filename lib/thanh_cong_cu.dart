@@ -66,6 +66,8 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiDongMenuAI,
     required this.khiBamDangNhapGoogle,
     required this.khiBamKhoiDongTep,
+    required this.khiBamDieuKhoan,
+    required this.khiBamBaoMat,
     this.tenHienThiDaDangNhap,
     this.emailDaDangNhap,
     this.urlAnhDaiDienDaDangNhap,
@@ -82,6 +84,12 @@ class ThanhCongCu extends StatelessWidget {
   /// (YÊU CẦU MỚI) Mục "Khi khởi động App: Mở tệp..." — truyền thẳng xuống
   /// `_NutTaiKhoanMenu`.
   final VoidCallback khiBamKhoiDongTep;
+
+  /// (YÊU CẦU MỚI) Mục "Điều khoản sử dụng" — truyền thẳng xuống `_NutTaiKhoanMenu`.
+  final VoidCallback khiBamDieuKhoan;
+
+  /// (YÊU CẦU MỚI) Mục "Bảo mật và quyền riêng tư" — truyền thẳng xuống `_NutTaiKhoanMenu`.
+  final VoidCallback khiBamBaoMat;
   final String? tenHienThiDaDangNhap;
   final String? emailDaDangNhap;
   final String? urlAnhDaiDienDaDangNhap;
@@ -513,6 +521,8 @@ class ThanhCongCu extends StatelessWidget {
                               khiMoMenu: khiMoMenuCanReset,
                               khiBamDangNhapGoogle: khiBamDangNhapGoogle,
                               khiBamKhoiDongTep: khiBamKhoiDongTep,
+                              khiBamDieuKhoan: khiBamDieuKhoan,
+                              khiBamBaoMat: khiBamBaoMat,
                               tenHienThiDaDangNhap: tenHienThiDaDangNhap,
                               emailDaDangNhap: emailDaDangNhap,
                               urlAnhDaiDienDaDangNhap: urlAnhDaiDienDaDangNhap,
