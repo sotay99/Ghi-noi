@@ -1525,14 +1525,9 @@ class _NutThemMenu extends StatelessWidget {
 }
 
 /// Menu thả xuống của nút "Tài khoản của bạn" — cùng cơ chế với
-/// `_NutThemMenu`/`_NutAIMenu`. Bảy mục: hai mục MỚI đầu tiên ("Language -
-/// Ngôn ngữ", "Mỗi khi khởi động Ứng dụng: Hiển thị Tệp...") và ba mục cuối
-/// ("Điều khoản sử dụng", "Bảo mật và quyền riêng tư" — dời từ menu "+ Thêm
-/// lựa chọn" sang đây, và "Đăng nhập tài khoản") CHƯA gắn logic, giữ nguyên
-/// hiện trạng (bấm vào chưa có tác dụng gì) — chờ gắn sau. Chỉ hai mục ở
-/// giữa (Cài đặt Micro / Cài đặt Hiển thị và tự động sửa) gọi callback
-/// thật — mở đúng nhóm cài đặt tương ứng trong `ManHinhCaiDat` (xem
-/// `NhomCaiDat`).
+/// `_NutThemMenu`/`_NutAIMenu`. "Điều khoản sử dụng"/"Bảo mật và quyền
+/// riêng tư" mở `TrangDieuKhoan`/`TrangBaoMat` (toàn màn hình, nội dung
+/// chọn/copy được). "Language - Ngôn ngữ" vẫn CHƯA gắn logic, chờ gắn sau.
 class _NutTaiKhoanMenu extends StatelessWidget {
   const _NutTaiKhoanMenu({
     required this.rong,
@@ -1545,6 +1540,8 @@ class _NutTaiKhoanMenu extends StatelessWidget {
     required this.khiMoMenu,
     required this.khiBamDangNhapGoogle,
     required this.khiBamKhoiDongTep,
+    required this.khiBamDieuKhoan,
+    required this.khiBamBaoMat,
     this.tenHienThiDaDangNhap,
     this.emailDaDangNhap,
     this.urlAnhDaiDienDaDangNhap,
@@ -1558,6 +1555,12 @@ class _NutTaiKhoanMenu extends StatelessWidget {
 
   /// (YÊU CẦU MỚI) Mục "Khi khởi động App: Mở tệp..." — mở `moModalKhoiDong`.
   final VoidCallback khiBamKhoiDongTep;
+
+  /// (YÊU CẦU MỚI) Mục "Điều khoản sử dụng" — mở `TrangDieuKhoan`.
+  final VoidCallback khiBamDieuKhoan;
+
+  /// (YÊU CẦU MỚI) Mục "Bảo mật và quyền riêng tư" — mở `TrangBaoMat`.
+  final VoidCallback khiBamBaoMat;
 
   /// Khác `null` nghĩa là ĐANG đăng nhập — tên/avatar hiện thêm ở dòng CUỐI
   /// CÙNG của menu. Cả ba đều `null` cùng lúc khi chưa đăng nhập.
@@ -1670,6 +1673,12 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                 break;
               case 27:
                 khiBamKhoiDongTep();
+                break;
+              case 3:
+                khiBamDieuKhoan();
+                break;
+              case 4:
+                khiBamBaoMat();
                 break;
             }
           },

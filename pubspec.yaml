@@ -41,6 +41,10 @@ dependencies:
   # Bộ nhớ đám mây (cây thư mục/ghi chú đồng bộ theo tài khoản Google) —
   # xem `lib/dong_bo_dam_may.dart`.
   cloud_firestore: ^5.4.4
+  # (YÊU CẦU MỚI) Mở link ở trình duyệt ngoài trên APK — nút "Mở link" của
+  # gạch chân xanh dương (xem `lib/mo_lien_ket_ngoai_io.dart`). Web vẫn dùng
+  # thẳng `dart:html` (không cần gói này).
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_lints: ^4.0.0

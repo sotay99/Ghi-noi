@@ -36,6 +36,8 @@ import 'man_hinh_tro_chuyen.dart';
 import 'tin_nhan_tro_chuyen.dart';
 import 'canh_bao_roi_trang.dart';
 import 'kho_du_lieu.dart';
+import 'modal_bao_mat.dart';
+import 'modal_dieu_khoan.dart';
 import 'tu_dien_dam_may.dart';
 import 'theo_doi_tap_doi_phim.dart';
 import 'vong_song_am.dart';
@@ -85,6 +87,15 @@ class _LoiTuDien {
   /// Đề xuất THỨ NHẤT — dùng cho "Chấp nhận tất cả đề xuất của từ điển"
   /// (luôn chỉ áp dụng đề xuất đầu tiên) và mọi chỗ cũ chỉ cần MỘT đề xuất.
   String get thayThe => dsThayThe.isEmpty ? '' : dsThayThe.first;
+}
+
+/// (YÊU CẦU MỚI) Một đoạn TRÔNG NHƯ LINK tìm được trong bài — [tu] là chữ
+/// THẬT tại vị trí này lúc quét (để so khi áp dụng, giống `_LoiTuDien.tu`).
+class _VungLienKet {
+  _VungLienKet({required this.batDau, required this.ketThuc, required this.tu});
+  final int batDau;
+  final int ketThuc;
+  final String tu;
 }
 
 /// Một vùng chữ AI cho là "không phù hợp" (câu từ lủng củng, lạc đề, thừa ý,
@@ -735,6 +746,9 @@ const _mauGachChanCanXoa = Colors.green; // Lượn sóng, dưới đoạn AI đ
 const _damGachChanCanXoa = 2.0;
 const _mauGachGiuaThan = Color(0xFFFF8F00); // Thẳng, giữa thân — vàng đậm (Colors.amber.shade800).
 const _mauGachChanTuDien = Colors.amber;
+// (YÊU CẦU MỚI) Lượn sóng, dưới đoạn TRÔNG NHƯ LINK — xanh dương đậm, cùng
+// độ đậm với gạch đỏ (dễ thấy, không mảnh như đề xuất xanh lá).
+const _mauGachChanLienKet = Color(0xFF0D47A1); // Colors.blue.shade900.
 
 /// Số "phút:giây" của một thẻ đang ghi — đổi màu TÍM từ giây thứ 45 (việc
 /// NHẤP NHÁY của cả dòng do `_NhapNhayGioiHanGhiAm` bên ngoài lo, xem đó).
@@ -1363,6 +1377,11 @@ class _BoDieuKhienChinhTa extends TextEditingController {
   /// lần văn bản đổi (xem `_quetTuDienChinhTa` ở `_TrangSoanThaoState`).
   final List<_LoiTuDien> tuDien = [];
 
+  /// (YÊU CẦU MỚI) Các đoạn TRÔNG NHƯ LINK tìm được trong bài — CŨNG là
+  /// nguồn duy nhất của sự thật, quét lại mỗi lần văn bản đổi (xem
+  /// `_quetLienKet` ở `_TrangSoanThaoState`).
+  final List<_VungLienKet> lienKet = [];
+
   /// Dấu câu AI vừa tự chèn (mục 3) — chỉ tồn tại trong 4 giây hiệu ứng nhấp
   /// nháy, không phải "nguồn duy nhất của sự thật" như ba danh sách trên,
   /// vì hết hiệu ứng thì chữ đã ở trong [text] rồi, không cần theo dõi nữa.
@@ -1399,6 +1418,7 @@ class _BoDieuKhienChinhTa extends TextEditingController {
 
   void Function(LoiChinhTa loi, Offset viTriManHinh)? khiBamTuSai;
   void Function(_LoiTuDien loi, Offset viTriManHinh)? khiBamTuDien;
+  void Function(_VungLienKet vung, Offset viTriManHinh)? khiBamLienKet;
   void Function(_VungKhongPhuHop vung, Offset viTriManHinh)? khiBamDoanKhongPhuHop;
   void Function(_VungCanXoa vung, Offset viTriManHinh)? khiBamDoanCanXoa;
   void Function(int soThe, Offset viTriManHinh)? khiBamTheGhiAmHoanChinh;
@@ -1544,6 +1564,18 @@ class _BoDieuKhienChinhTa extends TextEditingController {
         ketThuc: t.ketThuc,
         recognizer: TapGestureRecognizer()
           ..onTapDown = (ct) => khiBamTuDien?.call(t, ct.globalPosition),
+      ));
+    }
+
+    for (final k in lienKet) {
+      if (k.batDau < 0 || k.ketThuc > vb.length || k.batDau >= k.ketThuc) continue;
+      // Gạch xanh dương lượn sóng vẽ ở lớp riêng (`_veDanhDauAi`) — ở đây
+      // chỉ giữ vùng bắt chạm để mở menu, giống `tuDien` ở trên.
+      vung.add(_VungVe(
+        batDau: k.batDau,
+        ketThuc: k.ketThuc,
+        recognizer: TapGestureRecognizer()
+          ..onTapDown = (ct) => khiBamLienKet?.call(k, ct.globalPosition),
       ));
     }
 
@@ -3390,7 +3422,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (_boDieuKhien.loi.isEmpty &&
         _boDieuKhien.khongPhuHop.isEmpty &&
         _boDieuKhien.canXoa.isEmpty &&
-        _boDieuKhien.tuDien.isEmpty) {
+        _boDieuKhien.tuDien.isEmpty &&
+        _boDieuKhien.lienKet.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -3429,6 +3462,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     for (final t in _boDieuKhien.tuDien) {
       themVung(t.batDau, t.ketThuc, _mauGachChanTuDien, _damGachChanLoi);
+    }
+    for (final k in _boDieuKhien.lienKet) {
+      themVung(k.batDau, k.ketThuc, _mauGachChanLienKet, _damGachChanLoi);
     }
     for (final k in _boDieuKhien.khongPhuHop) {
       if (k.nhapNhayMau != null) continue; // Đang nhấp nháy — không vẽ gạch.
@@ -4314,6 +4350,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _boDieuKhien.addListener(_tinhTrangThaiDinhDangHienTai);
     _boDieuKhien.khiBamTuSai = _khiBamTuSai;
     _boDieuKhien.khiBamTuDien = _khiBamTuDien;
+    _boDieuKhien.khiBamLienKet = _khiBamLienKet;
     _boDieuKhien.khiBamDoanKhongPhuHop = _khiBamDoanKhongPhuHop;
     _boDieuKhien.khiBamDoanCanXoa = _khiBamDoanCanXoa;
     _boDieuKhien.khiBamTheGhiAmHoanChinh = _khiBamTheGhiAmHoanChinh;
@@ -4624,6 +4661,74 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// giản, không cần bọc `kIsWeb` quanh một biến bool vô hại.
   bool _coThayDoiChuaLuu = false;
 
+  /// (YÊU CẦU MỚI) Chuỗi đã bị bấm "Đây không phải là link" — nhớ CHỈ trong
+  /// RAM của phiên soạn thảo tệp này, KHÔNG lưu xuống đĩa (mất khi đóng/mở
+  /// lại tệp) — cùng mức ghi nhớ với `_tuTuDienDaHuy`/`_tuChinhTaDaXuLy`, so
+  /// khớp theo ĐÚNG chuỗi (phân biệt hoa/thường, khác `_tuTuDienDaHuy`: một
+  /// link là một địa chỉ cụ thể, không có khái niệm "viết hoa/thường khác
+  /// nhau vẫn là một link giống nhau" như một từ tiếng Việt).
+  final Set<String> _linkDaHuy = {};
+
+  /// (YÊU CẦU MỚI) Bắt HẸP — chỉ `http://`, `https://`, `www.` theo sau bởi
+  /// ký tự không phải khoảng trắng. Không bắt domain trơn (ví dụ gõ thẳng
+  /// "abc.com") để tránh nhận nhầm tên tệp/số thập phân/viết tắt.
+  static final _reLienKet = RegExp(r'(?:https?://|www\.)\S+', caseSensitive: false);
+
+  /// Dấu câu cuối câu thường đi dính liền sau link khi gõ trong một câu
+  /// (ví dụ "...xem ở https://abc.com/xyz."). Cắt bỏ các dấu này ở cuối
+  /// chuỗi khớp — không thuộc về link.
+  static const _dauCauCuoiLink = '.,;:!?)]}\'"”’';
+
+  String _catDauCauCuoiLink(String tu) {
+    var ketThuc = tu.length;
+    while (ketThuc > 0 && _dauCauCuoiLink.contains(tu[ketThuc - 1])) {
+      ketThuc--;
+    }
+    return tu.substring(0, ketThuc);
+  }
+
+  /// Quét lại TOÀN BỘ bài tìm đoạn TRÔNG NHƯ LINK — gọi TRƯỚC
+  /// `_quetTuDienChinhTa` (xem nơi gọi) để từ điển biết đường bỏ qua đúng
+  /// những vùng đã là link. Bỏ qua vùng ĐANG gạch đỏ (AI)/gạch vàng (từ
+  /// điển) đã chiếm trước — một chữ chỉ thuộc đúng một loại gạch chân.
+  void _quetLienKet() {
+    final ketQua = <_VungLienKet>[];
+    final vb = _boDieuKhien.text;
+    for (final m in _reLienKet.allMatches(vb)) {
+      final khopGoc = m.group(0)!;
+      final khop = _catDauCauCuoiLink(khopGoc);
+      if (khop.isEmpty) continue;
+      final batDau = m.start;
+      final ketThuc = batDau + khop.length;
+      final tuThat = vb.substring(batDau, ketThuc);
+      if (_linkDaHuy.contains(tuThat)) continue;
+      final dungCho = _boDieuKhien.loi.any((l) => l.batDau < ketThuc && l.ketThuc > batDau) ||
+          _boDieuKhien.tuDien.any((t) => t.batDau < ketThuc && t.ketThuc > batDau) ||
+          _boDieuKhien.khongPhuHop.any((k) =>
+              (k.batDauGoc < ketThuc && k.ketThucGoc > batDau) ||
+              (k.batDauDeXuat < ketThuc && k.ketThucDeXuat > batDau)) ||
+          _boDieuKhien.canXoa.any((x) => x.batDau < ketThuc && x.ketThuc > batDau);
+      if (dungCho) continue;
+      ketQua.add(_VungLienKet(batDau: batDau, ketThuc: ketThuc, tu: tuThat));
+    }
+    _boDieuKhien.lienKet
+      ..clear()
+      ..addAll(ketQua);
+    // (YÊU CẦU MỚI) Một đoạn đã là link thì KHÔNG được AI đề xuất xoá/thay
+    // thế — các đề xuất AI (`loi`/`khongPhuHop`/`canXoa`) được thêm vào từ
+    // nhiều nơi khác nhau (kiểm tra chính tả/toàn văn, chat sửa bài...),
+    // không chặn được ngay lúc thêm mà không sửa từng nơi — dọn lại ở đây,
+    // ngay sau mỗi lần quét link, để đề xuất nào lỡ dẫm vào vùng link cũng
+    // biến mất khỏi màn hình.
+    _boDieuKhien.loi.removeWhere(
+        (l) => _boDieuKhien.lienKet.any((k) => l.batDau < k.ketThuc && l.ketThuc > k.batDau));
+    _boDieuKhien.khongPhuHop.removeWhere((kp) => _boDieuKhien.lienKet.any((k) =>
+        (kp.batDauGoc < k.ketThuc && kp.ketThucGoc > k.batDau) ||
+        (kp.batDauDeXuat < k.ketThuc && kp.ketThucDeXuat > k.batDau)));
+    _boDieuKhien.canXoa.removeWhere(
+        (x) => _boDieuKhien.lienKet.any((k) => x.batDau < k.ketThuc && x.ketThuc > k.batDau));
+  }
+
   /// Quét lại TOÀN BỘ bài theo "Từ điển sửa lỗi chính tả của bạn"
   /// (`widget.caiDat.tuDienChinhTa`) — dựng lại hẳn `_boDieuKhien.tuDien` từ
   /// đầu mỗi lần gọi (đơn giản, rẻ với từ điển/bài cỡ thường, không cần cơ
@@ -4631,6 +4736,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// `_henLuu`/`_luuVanBan`) và mỗi khi mở một ghi chú (`_moGhiChu`), hoặc
   /// ngay sau khi đóng modal "Từ điển..." (từ điển có thể vừa đổi).
   void _quetTuDienChinhTa() {
+    // (YÊU CẦU MỚI — gạch chân link xanh dương) Quét link TRƯỚC — từ điển
+    // phải biết vùng nào đã là link (xem `dungDoAi` dưới đây, đã gộp thêm
+    // kiểm tra `_boDieuKhien.lienKet`) để không gạch vàng đè lên.
+    _quetLienKet();
     final ketQua = <_LoiTuDien>[];
     // (YÊU CẦU MỚI — 2 bộ nhớ từ điển) Giờ có HAI công tắc riêng — Nội bộ
     // (`widget.caiDat.tuDienChinhTaBatHoatDong`) và Đám mây
@@ -4698,8 +4807,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         final i = vbThuong.indexOf(loiThuong, tu);
         if (i < 0) break;
         final ketThuc = i + loiThuong.length;
-        // Không gạch vàng đè lên vùng ĐANG gạch đỏ của AI.
-        final dungDoAi = _boDieuKhien.loi.any((l) => l.batDau < ketThuc && l.ketThuc > i);
+        // Không gạch vàng đè lên vùng ĐANG gạch đỏ của AI, hay vùng ĐANG
+        // gạch xanh dương của link.
+        final dungDoAi = _boDieuKhien.loi.any((l) => l.batDau < ketThuc && l.ketThuc > i) ||
+            _boDieuKhien.lienKet.any((k) => k.batDau < ketThuc && k.ketThuc > i);
         if (!dungDoAi) {
           ketQua.add(_LoiTuDien(
             batDau: i,
@@ -11124,6 +11235,40 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// của bạn") — ĐÚNG KHUÔN `_khiBamTuSai` ở trên, chỉ khác mục đầu tiên:
   /// nếu [loi.thayThe] có chữ thì hiện đúng chữ đó, RỖNG thì hiện "Đề xuất
   /// Xoá" màu đỏ — cả hai trường hợp menu LUÔN có đúng 4 mục.
+  /// (YÊU CẦU MỚI) Menu của một đoạn gạch chân xanh dương (trông như link)
+  /// — hai mục: "Mở link" (tab mới trên web, trình duyệt ngoài trên APK —
+  /// tự thêm `https://` phía trước nếu đoạn chỉ bắt đầu bằng `www.`) và
+  /// "Đây không phải là link" (xoá gạch chân, nhớ KHÔNG gạch lại đoạn này
+  /// nữa trong phiên soạn thảo tệp này — xem `_linkDaHuy`).
+  Future<void> _khiBamLienKet(_VungLienKet vung, Offset viTriManHinh) async {
+    final chon = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        viTriManHinh.dx,
+        viTriManHinh.dy,
+        viTriManHinh.dx,
+        viTriManHinh.dy,
+      ),
+      items: const [
+        PopupMenuItem(value: 'mo', child: Text('Mở link')),
+        PopupMenuItem(
+          value: 'khongPhaiLink',
+          child: Text('Đây không phải là link'),
+        ),
+      ],
+    );
+    if (chon == null || !mounted) return;
+    switch (chon) {
+      case 'mo':
+        final url = vung.tu.toLowerCase().startsWith('http') ? vung.tu : 'https://${vung.tu}';
+        moLienKetNgoai(url);
+      default: // 'khongPhaiLink'
+        _linkDaHuy.add(vung.tu);
+        _boDieuKhien.lienKet.remove(vung);
+        _boDieuKhien.veLai();
+    }
+  }
+
   Future<void> _khiBamTuDien(_LoiTuDien loi, Offset viTriManHinh) async {
     final coThayThe = loi.dsThayThe.isNotEmpty;
     // Mỗi đề xuất ("thứ nhất/hai/ba") thành MỘT mục riêng, LUÔN đứng ĐẦU
@@ -16773,6 +16918,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   khoNoiBo: widget.khoNoiBo,
                   khoHienTai: widget.kho,
                   ghiChuHienTai: _ghiChuHienTai,
+                ),
+                khiBamDieuKhoan: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TrangDieuKhoan()),
+                ),
+                khiBamBaoMat: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TrangBaoMat()),
                 ),
                 // `tenHienThiDaDangNhap` khác `null` LÀ tín hiệu "đang đăng
                 // nhập" cho `ThanhCongCu` — không được để `null` chỉ vì tài
