@@ -864,3 +864,72 @@ class KhoDuLieuDamMay extends KhoDuLieu {
   @override
   Future<void> datGhiChuDangMo(String id) async {}
 }
+
+/// (ĐỒNG BỘ TÀI KHOẢN GOOGLE — YÊU CẦU MỚI) Lưu một phần cài đặt app
+/// (`CaiDat.toJsonDongBoTaiKhoan()`/`apDungCaiDatDongBo()`) lên Firestore,
+/// riêng theo từng tài khoản — KHÔNG đụng gì tới `KhoDuLieuDamMay` (ghi
+/// chú/thư mục), dù dùng CÙNG kiểu kiến trúc (một document JSON + cache
+/// đĩa cho lúc mất mạng, lặng lẽ rơi về cache/im lặng bỏ qua khi không gọi
+/// được Firestore — không có hàng đợi riêng để dọn: lần ghi KẾ TIẾP khi có
+/// mạng trở lại sẽ tự mang đúng giá trị mới nhất lên, không cần đồng bộ lại
+/// giá trị cũ đã lỡ mất giữa đường).
+class CaiDatDamMay {
+  CaiDatDamMay(this.uid);
+
+  final String uid;
+  final _db = FirebaseFirestore.instance;
+
+  DocumentReference<Map<String, dynamic>> get _vanBan =>
+      _db.collection('users').doc(uid).collection('caiDatDamMay').doc('chinh');
+
+  static const _tienToKhoaCache = 'ghi_noi_cache_cai_dat_dam_may_';
+  String get _khoaCache => '$_tienToKhoaCache$uid';
+
+  /// Đọc toàn bộ cài đặt tài khoản này đang nhớ. Mất mạng thì trả lại bản
+  /// đã lưu xuống đĩa từ lần có mạng gần nhất (có thể là `{}` nếu MÁY NÀY
+  /// chưa từng đọc được lúc có mạng) — không bao giờ ném lỗi, nơi gọi coi
+  /// `{}` là "tài khoản chưa nhớ gì" (giống hệt tài khoản mới, hành vi vẫn
+  /// đúng dù hơi quá dè dặt lúc offline).
+  Future<Map<String, dynamic>> tai() async {
+    try {
+      final snap = await _vanBan.get();
+      final j = snap.data() ?? <String, dynamic>{};
+      unawaited(_ghiCacheDia(j));
+      return j;
+    } catch (_) {
+      final kho = await SharedPreferences.getInstance();
+      final tho = kho.getString(_khoaCache);
+      if (tho == null) return {};
+      return jsonDecode(tho) as Map<String, dynamic>;
+    }
+  }
+
+  /// Ghi GỘP (merge — không đụng các trường khác đã có trên tài khoản)
+  /// [thayDoi] lên tài khoản. Mất mạng thì BỎ QUA LẶNG LẼ (xem giải thích ở
+  /// đầu lớp) — vẫn cập nhật cache đĩa bằng giá trị mới để lần đăng nhập
+  /// offline kế tiếp trên CHÍNH MÁY NÀY thấy đúng giá trị vừa đổi.
+  Future<void> luu(Map<String, dynamic> thayDoi) async {
+    try {
+      await _vanBan.set(thayDoi, SetOptions(merge: true));
+    } catch (_) {
+      // Không giữ hàng đợi riêng — xem giải thích ở đầu lớp.
+    }
+    final kho = await SharedPreferences.getInstance();
+    final tho = kho.getString(_khoaCache);
+    final hienTai = tho == null ? <String, dynamic>{} : jsonDecode(tho) as Map<String, dynamic>;
+    await _ghiCacheDia({...hienTai, ...thayDoi});
+  }
+
+  Future<void> _ghiCacheDia(Map<String, dynamic> j) async {
+    final kho = await SharedPreferences.getInstance();
+    await kho.setString(_khoaCache, jsonEncode(j));
+  }
+
+  /// Gọi lúc đăng xuất — máy dùng chung không lộ cache cài đặt của người
+  /// vừa đăng xuất cho người đăng nhập kế tiếp (y hệt
+  /// `KhoDuLieuDamMay.xoaCacheOffline`).
+  static Future<void> xoaCacheOffline(String uid) async {
+    final kho = await SharedPreferences.getInstance();
+    await kho.remove('$_tienToKhoaCache$uid');
+  }
+}

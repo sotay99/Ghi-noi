@@ -3824,6 +3824,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             onPressed: () async {
               final ghimMoi = !widget.caiDat.ghimThanhDinhDang;
               await widget.caiDat.datGhimThanhDinhDang(ghimMoi);
+              unawaited(_dayCaiDatDongBoTaiKhoan({'ghimThanhDinhDang': ghimMoi}));
               if (!mounted) return;
               setState(() {});
               if (ghimMoi) {
@@ -4224,6 +4225,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _ganDauDaMoTepChoLichSu(widget.ghiChuId);
     _ghiNhoGanDayNhatChoKhoiDong();
     _thietBiHienTai = widget.caiDat.thietBiChonTay ?? doanThietBi();
+    _thuGonThanhCongCu = widget.caiDat.thuGonThanhCongCu;
     // Chỉ có tác dụng trên web (no-op ở Android/iOS gốc) — hiện đúng cảnh
     // báo CỦA CHÍNH TRÌNH DUYỆT (không tự đặt chữ được) khi bấm F5/đóng
     // tab/đóng trình duyệt lúc còn thay đổi CHƯA kịp tự động lưu.
@@ -4279,6 +4281,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       laLanDauNgheDangNhap = false;
       setState(() => _nguoiDungDangNhap = nguoiDung);
       if (nguoiDung == null) return;
+      unawaited(_dongBoCaiDatTuTaiKhoanKhiDangNhap(nguoiDung.uid));
       if (laLanDau && !kIsWeb) return;
       final ten = nguoiDung.displayName ?? nguoiDung.email ?? 'Google';
       hienThongBaoGiua(
@@ -4386,6 +4389,53 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   User? _nguoiDungDangNhap;
   StreamSubscription<User?>? _dangKyDoiTrangThaiDangNhap;
 
+  /// (ĐỒNG BỘ TÀI KHOẢN GOOGLE — YÊU CẦU MỚI) Ghim/bỏ ghim thanh định dạng
+  /// và mở rộng/thu gọn thanh công cụ phía trên: lưu vào bộ nhớ lâu dài của
+  /// tài khoản NGAY mỗi lần đổi, nếu đang đăng nhập — không làm gì nếu
+  /// chưa đăng nhập (lúc đó `datGhimThanhDinhDang`/`datThuGonThanhCongCu` ở
+  /// nơi gọi đã lo xong phần lưu ở máy rồi). Mất mạng thì `CaiDatDamMay.luu`
+  /// tự bỏ qua lặng lẽ (xem giải thích ở lớp đó) — không chặn UI, không báo
+  /// lỗi gì ở đây.
+  Future<void> _dayCaiDatDongBoTaiKhoan(Map<String, dynamic> thayDoi) async {
+    final uid = _nguoiDungDangNhap?.uid;
+    if (uid == null) return;
+    await CaiDatDamMay(uid).luu(thayDoi);
+  }
+
+  /// (ĐỒNG BỘ TÀI KHOẢN GOOGLE — YÊU CẦU MỚI) Gọi mỗi lần phát hiện tài
+  /// khoản [uid] đang đăng nhập (đăng nhập thành công MỚI, hoặc app vừa mở
+  /// lại mà phiên đăng nhập cũ còn hiệu lực) — đúng lúc trong
+  /// `_dangKyDoiTrangThaiDangNhap` ở `initState`.
+  ///
+  /// Thứ tự hai bước CỐ Ý tách biệt, không gộp:
+  /// 1. Chụp ảnh giá trị HIỆN TẠI của app (trước khi áp bất cứ gì từ tài
+  ///    khoản) — dùng để nạp đầy đúng những ô tài khoản ĐANG TRỐNG. Mục đã
+  ///    có trên tài khoản thì không đụng tới (giữ nguyên yêu cầu "mục nào
+  ///    đã nhớ thì không tiếp nhận gì cả").
+  /// 2. Áp mọi giá trị tài khoản ĐÃ có vào app + lưu lại ở máy — tài khoản
+  ///    luôn thắng máy, đúng yêu cầu ưu tiên.
+  /// Hai bước không đụng cùng field nào (tập khoá rời nhau: "trống" vs "đã
+  /// có"), nên làm theo thứ tự nào cũng ra cùng kết quả — nhưng chụp ảnh
+  /// TRƯỚC vẫn an toàn hơn, tránh mọi khả năng lấy nhầm giá trị vừa áp từ
+  /// tài khoản để rồi "nạp đầy" ngược lại chính tài khoản đó.
+  Future<void> _dongBoCaiDatTuTaiKhoanKhiDangNhap(String uid) async {
+    final kho = CaiDatDamMay(uid);
+    final daCo = await kho.tai();
+    final hienTaiCuaMay = widget.caiDat.toJsonDongBoTaiKhoan();
+
+    final canNapDay = <String, dynamic>{};
+    for (final e in hienTaiCuaMay.entries) {
+      if (!daCo.containsKey(e.key)) canNapDay[e.key] = e.value;
+    }
+
+    if (daCo.isNotEmpty) {
+      await widget.caiDat.apDungCaiDatDongBo(daCo);
+      if (mounted) setState(() {});
+    }
+
+    if (canNapDay.isNotEmpty) await kho.luu(canNapDay);
+  }
+
   /// Nút "Đăng nhập tài khoản"/"Đăng xuất" ở menu "Tài khoản và Cài đặt" —
   /// tự quyết đăng nhập hay đăng xuất dựa theo [_nguoiDungDangNhap] HIỆN
   /// TẠI lúc bấm (menu chỉ gọi đúng MỘT callback, không tách hai nút).
@@ -4422,6 +4472,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         await DichVuDangNhapGoogle.instance.dangXuat();
         if (uidVuaDangXuat != null) {
           unawaited(KhoDuLieuDamMay.xoaCacheOffline(uidVuaDangXuat));
+          unawaited(CaiDatDamMay.xoaCacheOffline(uidVuaDangXuat));
         }
       }
     } catch (e) {
@@ -6718,6 +6769,22 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     } else if (mounted) {
       hienThongBaoGiua(context, 'Bấm "All" 2-4 lần để chọn vùng rộng hơn', ganTren: true);
     }
+  }
+
+  /// Mục "Chọn tất cả" trong menu "+ Thêm lựa chọn" — KHÁC nút "All" gần nút
+  /// ghi âm: nút All phải bấm liên tục (chọn từ → đoạn văn → cụm đoạn văn →
+  /// toàn bộ) vì nó còn dùng để chọn các vùng hẹp hơn. Mục trong menu này chỉ
+  /// có đúng một việc là chọn toàn bộ văn bản, nên chọn thẳng một lần, không
+  /// đi qua bộ đếm/trạng thái của `_phimAoChonTatCa`.
+  void _chonTatCaTrucTiepTuMenu() {
+    final vb = _boDieuKhien.text;
+    _giuFocusOChuSauKhiBam();
+    _boDieuKhien.selection = TextSelection(baseOffset: 0, extentOffset: vb.length);
+    _cuonToiConTroNeuCan();
+    _demBamAll = 0;
+    _lanBamAllTruoc = null;
+    if (mounted) hienThongBaoGiua(context, 'Đã chọn tất cả', ganTren: true);
+    _batCheDoNhanhChonTatCa();
   }
 
   /// Vùng ĐOẠN VĂN chứa vị trí [vt] — ranh giới là dấu xuống dòng gần nhất
@@ -15275,7 +15342,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         // `_NutAnHienDieuHuongConTro` (icon Material mới thêm có thể bị
         // "tree-shake" mất trên bản dựng thật dù code không lỗi).
         IconButton(
-          onPressed: () => setState(() => _thuGonThanhCongCu = true),
+          onPressed: () {
+            setState(() => _thuGonThanhCongCu = true);
+            unawaited(widget.caiDat.datThuGonThanhCongCu(true));
+            unawaited(_dayCaiDatDongBoTaiKhoan({'thuGonThanhCongCu': true}));
+          },
           icon: const Text('🔼', style: TextStyle(fontSize: 18)),
           tooltip: 'Thu gọn — ẩn hết thanh công cụ phía trên',
           visualDensity: VisualDensity.compact,
@@ -16639,7 +16710,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 khiBamChepTatCa: () => _chepTatCa(),
                 khiBamChepRoiXoaTatCa: _chepRoiXoaTatCa,
                 khiBamXoaTatCa: () => _xoaTatCa(),
-                khiBamChonTatCaTrongMenuThem: _phimAoChonTatCa,
+                khiBamChonTatCaTrongMenuThem: _chonTatCaTrucTiepTuMenu,
                 khiBamDanhSachPhimTat: _moDanhSachPhimTat,
                 khiBamTimKiem: () => _hienThanhTimKiem ? _dongTimKiem() : _moTimKiem(),
                 khiBamTroChuyen: _moThongBaoTroChuyenDangNangCap,
@@ -16680,7 +16751,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 chu: '🔽',
                 mau: const Color(0xFF5F6368),
                 moTa: 'Mở rộng — hiện lại thanh công cụ',
-                onTap: () => setState(() => _thuGonThanhCongCu = false),
+                onTap: () {
+                  setState(() => _thuGonThanhCongCu = false);
+                  unawaited(widget.caiDat.datThuGonThanhCongCu(false));
+                  unawaited(_dayCaiDatDongBoTaiKhoan({'thuGonThanhCongCu': false}));
+                },
               ),
             ),
           // (YÊU CẦU MỚI v123) Thu gọn thanh công cụ làm mất luôn nút "Dán"

@@ -1700,7 +1700,7 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                 // phía TRÊN "Đăng nhập tài khoản" — cùng nhóm, không có
                 // đường kẻ chia giữa hai mục này.
                 _mucMenuThem(8, 'Trò chuyện'),
-                _mucMenuThem(5, daDangNhap ? 'Đăng xuất' : 'Đăng nhập tài khoản'),
+                _mucMenuThem(5, daDangNhap ? 'Đăng xuất' : 'Đăng nhập bằng tài khoản Google'),
                 // (YÊU CẦU MỚI) Đang đăng nhập — hiện tên + avatar của tài
                 // khoản ở dòng CUỐI CÙNG của menu, không bấm được (chỉ để
                 // xem, đăng xuất đã có mục riêng ngay phía trên).

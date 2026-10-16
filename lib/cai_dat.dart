@@ -73,6 +73,7 @@ class CaiDat {
   static const _khoaTuDongMoBangDieuKhienGhiAm =
       'ghi_noi_tu_dong_mo_bang_dieu_khien_ghi_am';
   static const _khoaGhimThanhDinhDang = 'ghi_noi_ghim_thanh_dinh_dang';
+  static const _khoaThuGonThanhCongCu = 'ghi_noi_thu_gon_thanh_cong_cu';
 
   /// Số giây chờ, kể từ lúc người dùng ngừng gõ phím, tới khi micro tự bật
   /// lại. Mặc định 1 giây.
@@ -112,6 +113,12 @@ class CaiDat {
   /// nữa. Mặc định TẮT (chưa ghim — thanh tự ẩn sau mỗi lần bấm, đúng hành
   /// vi mới).
   bool ghimThanhDinhDang = false;
+
+  /// Thanh công cụ phía trên (tên tệp/Lùi-Tiến-Lưu/nút abc) có đang được THU
+  /// GỌN hay không — thu gọn thì nhường thêm chỗ cho vùng soạn thảo, có nút
+  /// "Mở rộng" nổi để lấy lại. Mặc định TẮT (đang mở rộng — hành vi cũ, trước
+  /// khi tính năng thu gọn tồn tại).
+  bool thuGonThanhCongCu = false;
 
   /// Có tự gọi AI kiểm tra chính tả mỗi khi có đoạn văn mới hay không.
   /// (YÊU CẦU MỚI) Mặc định TẮT — người dùng mới cài app lần đầu không bị
@@ -518,6 +525,157 @@ class CaiDat {
     await luuChuoi(_khoaKhoiDongTepUid, khoiDongTepUid);
   }
 
+  /// (ĐỒNG BỘ TÀI KHOẢN GOOGLE) Ảnh chụp các cài đặt đồng bộ theo tài khoản:
+  /// ghim/thu gọn thanh công cụ (đồng bộ SỐNG, ghi lên tài khoản mỗi lần
+  /// đổi — xem `CaiDatDamMay`/`_khiDoiThuGonThanhCongCu` ở `trang_soan_thao.dart`)
+  /// cộng bốn nhóm "Cài đặt Micro", "Cài đặt Hiển thị và tự động sửa", "Cài
+  /// đặt Bộ nhớ tạm để dán văn bản", "Cài đặt Khi khởi động App: Mở tệp..."
+  /// (chỉ NẠP ĐẦY một lần lúc tài khoản còn trống mục đó, không đẩy lại mỗi
+  /// lần đổi sau). CHỦ Ý không gồm hai bộ từ điển (sửa lỗi chính tả, nhập
+  /// liệu nhanh) — người dùng tự nói để riêng làm sau.
+  Map<String, dynamic> toJsonDongBoTaiKhoan() => {
+        'ghimThanhDinhDang': ghimThanhDinhDang,
+        'thuGonThanhCongCu': thuGonThanhCongCu,
+        'thoiGianBatLaiGiay': thoiGianBatLaiGiay,
+        'thoiGianTuTatMicroGiay': thoiGianTuTatMicroGiay,
+        'phimTatMicroLoai': phimTatMicro.loai,
+        'phimTatMicroPhim': phimTatMicro.phim,
+        'phimTatGhiAmLoai': phimTatGhiAm.loai,
+        'phimTatGhiAmPhim': phimTatGhiAm.phim,
+        'phimTatBoNhoTamLoai': phimTatBoNhoTam.loai,
+        'phimTatBoNhoTamPhim': phimTatBoNhoTam.phim,
+        'boNhoTamDanVanBanBat': boNhoTamDanVanBanBat,
+        'tuDongChenKhoangCach': tuDongChenKhoangCach,
+        'tuDongThemDauCham': tuDongThemDauCham,
+        'tuDongThutDauDong': tuDongThutDauDong,
+        'tuDongThemDuongKeChia': tuDongThemDuongKeChia,
+        'soDauCachThutDauDong': soDauCachThutDauDong,
+        'mauDuongKeChia': mauDuongKeChia,
+        'phanTramMoDuongKeChia': phanTramMoDuongKeChia,
+        'chamCuoiVanBanBat': chamCuoiVanBanBat,
+        'mauChamCuoiVanBan': mauChamCuoiVanBan,
+        'tuDongVietHoaDauCau': tuDongVietHoaDauCau,
+        'tuDongChuanHoaNgoac': tuDongChuanHoaNgoac,
+        'kieuMoKhiKhoiDong': kieuMoKhiKhoiDong,
+        'khoiDongThuMucLoai': khoiDongThuMucLoai,
+        'khoiDongThuMucId': khoiDongThuMucId,
+        'khoiDongThuMucUid': khoiDongThuMucUid,
+        'khoiDongTepLoai': khoiDongTepLoai,
+        'khoiDongTepId': khoiDongTepId,
+        'khoiDongTepUid': khoiDongTepUid,
+      };
+
+  /// Áp từng giá trị có mặt trong [j] (đọc từ tài khoản) vào field tương
+  /// ứng rồi lưu lại Ở MÁY — qua ĐÚNG các khoá mà các hàm `datXxx()`/
+  /// `luuCaiDatKhoiDong()` ở trên dùng, để lần mở app kế tiếp (kể cả lúc
+  /// offline hoặc đã đăng xuất) vẫn còn giữ đúng giá trị vừa áp. Field nào
+  /// [j] không có (tài khoản chưa từng lưu) thì bỏ qua, giữ nguyên giá trị
+  /// hiện tại — đúng quy tắc "chỉ áp cái tài khoản đã nhớ".
+  Future<void> apDungCaiDatDongBo(Map<String, dynamic> j) async {
+    final kho = await SharedPreferences.getInstance();
+
+    if (j['ghimThanhDinhDang'] is bool) {
+      ghimThanhDinhDang = j['ghimThanhDinhDang'] as bool;
+      await kho.setBool(_khoaGhimThanhDinhDang, ghimThanhDinhDang);
+    }
+    if (j['thuGonThanhCongCu'] is bool) {
+      thuGonThanhCongCu = j['thuGonThanhCongCu'] as bool;
+      await kho.setBool(_khoaThuGonThanhCongCu, thuGonThanhCongCu);
+    }
+    if (j['thoiGianBatLaiGiay'] is num) {
+      thoiGianBatLaiGiay = (j['thoiGianBatLaiGiay'] as num).toDouble();
+      await kho.setDouble(_khoaThoiGianBatLai, thoiGianBatLaiGiay);
+    }
+    if (j['thoiGianTuTatMicroGiay'] is num) {
+      thoiGianTuTatMicroGiay = (j['thoiGianTuTatMicroGiay'] as num)
+          .toInt()
+          .clamp(gioiHanDuoiTuTatMicro, gioiHanTrenTuTatMicro);
+      await kho.setInt(_khoaThoiGianTuTatMicro, thoiGianTuTatMicroGiay);
+    }
+    if (j['phimTatMicroLoai'] is String) {
+      phimTatMicro =
+          LuaChonPhimTat.tuLuu(j['phimTatMicroLoai'] as String, j['phimTatMicroPhim'] as String?);
+      await kho.setString(_khoaPhimTatMicroLoai, phimTatMicro.loai);
+      if (phimTatMicro.phim != null) {
+        await kho.setString(_khoaPhimTatMicroPhimCtrl, phimTatMicro.phim!);
+      }
+    }
+    if (j['phimTatGhiAmLoai'] is String) {
+      phimTatGhiAm =
+          LuaChonPhimTat.tuLuu(j['phimTatGhiAmLoai'] as String, j['phimTatGhiAmPhim'] as String?);
+      await kho.setString(_khoaPhimTatGhiAmLoai, phimTatGhiAm.loai);
+      if (phimTatGhiAm.phim != null) {
+        await kho.setString(_khoaPhimTatGhiAmPhimCtrl, phimTatGhiAm.phim!);
+      }
+    }
+    if (j['phimTatBoNhoTamLoai'] is String) {
+      phimTatBoNhoTam = LuaChonPhimTat.tuLuu(
+          j['phimTatBoNhoTamLoai'] as String, j['phimTatBoNhoTamPhim'] as String?);
+      await kho.setString(_khoaPhimTatBoNhoTamLoai, phimTatBoNhoTam.loai);
+      if (phimTatBoNhoTam.phim != null) {
+        await kho.setString(_khoaPhimTatBoNhoTamPhimCtrl, phimTatBoNhoTam.phim!);
+      }
+    }
+    if (j['boNhoTamDanVanBanBat'] is bool) {
+      boNhoTamDanVanBanBat = j['boNhoTamDanVanBanBat'] as bool;
+      await kho.setBool(_khoaBoNhoTamDanVanBanBat, boNhoTamDanVanBanBat);
+    }
+    if (j['tuDongChenKhoangCach'] is bool) {
+      tuDongChenKhoangCach = j['tuDongChenKhoangCach'] as bool;
+      await kho.setBool(_khoaTuDongChenCach, tuDongChenKhoangCach);
+    }
+    if (j['tuDongThemDauCham'] is bool) {
+      tuDongThemDauCham = j['tuDongThemDauCham'] as bool;
+      await kho.setBool(_khoaTuDongThemDauCham, tuDongThemDauCham);
+    }
+    if (j['tuDongThutDauDong'] is bool) {
+      tuDongThutDauDong = j['tuDongThutDauDong'] as bool;
+      await kho.setBool(_khoaTuDongThutDauDong, tuDongThutDauDong);
+    }
+    if (j['tuDongThemDuongKeChia'] is bool) {
+      tuDongThemDuongKeChia = j['tuDongThemDuongKeChia'] as bool;
+      await kho.setBool(_khoaTuDongThemDuongKeChia, tuDongThemDuongKeChia);
+    }
+    if (j['soDauCachThutDauDong'] is num) {
+      soDauCachThutDauDong = (j['soDauCachThutDauDong'] as num).toInt();
+      await kho.setInt(_khoaSoDauCachThutDauDong, soDauCachThutDauDong);
+    }
+    if (j['mauDuongKeChia'] is num) {
+      mauDuongKeChia = (j['mauDuongKeChia'] as num).toInt();
+      await kho.setInt(_khoaMauDuongKeChia, mauDuongKeChia);
+    }
+    if (j['phanTramMoDuongKeChia'] is num) {
+      phanTramMoDuongKeChia = (j['phanTramMoDuongKeChia'] as num).toInt();
+      await kho.setInt(_khoaPhanTramMoDuongKeChia, phanTramMoDuongKeChia);
+    }
+    if (j['chamCuoiVanBanBat'] is bool) {
+      chamCuoiVanBanBat = j['chamCuoiVanBanBat'] as bool;
+      await kho.setBool(_khoaChamCuoiVanBanBat, chamCuoiVanBanBat);
+    }
+    if (j['mauChamCuoiVanBan'] is num) {
+      mauChamCuoiVanBan = (j['mauChamCuoiVanBan'] as num).toInt();
+      await kho.setInt(_khoaMauChamCuoiVanBan, mauChamCuoiVanBan);
+    }
+    if (j['tuDongVietHoaDauCau'] is bool) {
+      tuDongVietHoaDauCau = j['tuDongVietHoaDauCau'] as bool;
+      await kho.setBool(_khoaTuDongVietHoaDauCau, tuDongVietHoaDauCau);
+    }
+    if (j['tuDongChuanHoaNgoac'] is bool) {
+      tuDongChuanHoaNgoac = j['tuDongChuanHoaNgoac'] as bool;
+      await kho.setBool(_khoaTuDongChuanHoaNgoac, tuDongChuanHoaNgoac);
+    }
+    if (j['kieuMoKhiKhoiDong'] is String) {
+      kieuMoKhiKhoiDong = j['kieuMoKhiKhoiDong'] as String;
+      khoiDongThuMucLoai = j['khoiDongThuMucLoai'] as String?;
+      khoiDongThuMucId = j['khoiDongThuMucId'] as String?;
+      khoiDongThuMucUid = j['khoiDongThuMucUid'] as String?;
+      khoiDongTepLoai = j['khoiDongTepLoai'] as String?;
+      khoiDongTepId = j['khoiDongTepId'] as String?;
+      khoiDongTepUid = j['khoiDongTepUid'] as String?;
+      await luuCaiDatKhoiDong();
+    }
+  }
+
   /// (YÊU CẦU MỚI) Theo dõi tệp đang soạn thảo GẦN NHẤT thuộc BỘ NHỚ ĐÁM
   /// MÂY — chỉ có ý nghĩa khi tệp gần nhất THỰC SỰ là đám mây; khi là nội
   /// bộ thì để trống cả hai (lúc đó lựa chọn "gần đây nhất" đọc THẲNG cơ
@@ -593,6 +751,7 @@ class CaiDat {
         .clamp(gioiHanDuoiNguongTuDongGuiTheGhiAm, gioiHanTrenNguongTuDongGuiTheGhiAm);
     tuDongMoBangDieuKhienGhiAm = kho.getBool(_khoaTuDongMoBangDieuKhienGhiAm);
     ghimThanhDinhDang = kho.getBool(_khoaGhimThanhDinhDang) ?? false;
+    thuGonThanhCongCu = kho.getBool(_khoaThuGonThanhCongCu) ?? false;
     tuDongChenDauCauBangAI = kho.getBool(_khoaTuDongChenDauCau) ?? false;
     mucDoDaiDeXuat = (kho.getInt(_khoaMucDoDaiDeXuat) ?? 2).clamp(0, 4);
     cauLenhTuyChinhKiemTraToanVan = kho.getString(_khoaCauLenhTuyChinhKiemTraToanVan) ?? '';
@@ -961,6 +1120,12 @@ class CaiDat {
     ghimThanhDinhDang = bat;
     final kho = await SharedPreferences.getInstance();
     await kho.setBool(_khoaGhimThanhDinhDang, bat);
+  }
+
+  Future<void> datThuGonThanhCongCu(bool bat) async {
+    thuGonThanhCongCu = bat;
+    final kho = await SharedPreferences.getInstance();
+    await kho.setBool(_khoaThuGonThanhCongCu, bat);
   }
 
   Future<void> datTuDongMoBangDieuKhienGhiAm(bool bat) async {
