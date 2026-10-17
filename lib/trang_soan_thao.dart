@@ -38,6 +38,7 @@ import 'canh_bao_roi_trang.dart';
 import 'kho_du_lieu.dart';
 import 'khoi_dong_lai_app.dart';
 import 'kiem_tra_cap_nhat.dart';
+import 'canh_bao_han_muc_ai.dart';
 import 'modal_bao_mat.dart';
 import 'modal_cai_dat_ung_dung.dart';
 import 'modal_canh_bao_api.dart';
@@ -8505,6 +8506,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
 
+    // (YÊU CẦU MỚI) Đã biết trước hôm nay chạm trần hạn mức âm thanh — chặn
+    // ngay từ đây, không đổi nhãn "Đang chuyển" rồi phải lùi lại ngay sau đó.
+    final daChamHanMucAmThanh = await doanDaChamHanMucAiHomNay(LoaiHanMucAi.amThanh);
+    if (daChamHanMucAmThanh != null) {
+      if (baoLoi && mounted) await hienHopThoaiHanMucAi(context, daChamHanMucAmThanh);
+      return;
+    }
+
     final viTriGoc = _boDieuKhien.text.indexOf(nhanGoc);
     if (viTriGoc < 0) return; // đã bị xoá/đổi — không có gì để gửi.
 
@@ -8532,6 +8541,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         _thoiLuongTheoTheGhiAm.remove(soThe);
       }
     } catch (e) {
+      if (e is LoiHanMucAi) await ghiNhoDaChamHanMucAi(e.loai, e.thongDiep);
       if (mounted) {
         final viTri = _boDieuKhien.text.indexOf(nhanDangChuyen);
         if (viTri >= 0) {
@@ -8540,7 +8550,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           _boDieuKhien.veLai();
         }
       }
-      if (baoLoi) _bao('Thẻ ghi âm #$soThe: lỗi gửi — $e');
+      if (e is LoiHanMucAi) {
+        if (baoLoi && mounted) await hienHopThoaiHanMucAi(context, e.thongDiep);
+      } else if (baoLoi) {
+        _bao('Thẻ ghi âm #$soThe: lỗi gửi — $e');
+      }
     } finally {
       _theGhiAmDangGui.remove(soThe);
     }
@@ -11194,6 +11208,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final dauNguCanh = (tuViTri - _doDaiNguCanhChinhTa).clamp(0, tuViTri);
     final nguCanh = vanBan.substring(dauNguCanh, tuViTri);
 
+    // (YÊU CẦU MỚI) Đã biết trước hôm nay chạm trần văn bản — im lặng bỏ
+    // qua, KHÔNG gọi mạng (hộp thoại đã hiện đúng một lần lúc vừa chạm, xem
+    // nhánh `LoiHanMucAi` dưới) — chạy ngầm lúc gõ nên không hiện lại mỗi câu.
+    if (await doanDaChamHanMucAiHomNay(LoaiHanMucAi.vanBan) != null) return;
+
     KetQuaKiemTraChinhTaMoi ketQua;
     try {
       ketQua = await _dichVuChinhTa.kiemTra(
@@ -11202,7 +11221,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         layLoiChinhTa: layLoiChinhTa,
         chenDauCau: chenDauCau,
       );
-    } catch (_) {
+    } catch (e) {
+      if (e is LoiHanMucAi) {
+        await ghiNhoDaChamHanMucAi(e.loai, e.thongDiep);
+        final daBaoRoi = await danhDauDaBaoTuDongHomNay(e.loai);
+        if (!daBaoRoi && mounted) await hienHopThoaiHanMucAi(context, e.thongDiep);
+      }
       return; // Mất mạng hay máy chủ lỗi — im lặng bỏ qua, lần sau thử lại.
     }
     if (!mounted) return;
@@ -11611,6 +11635,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
     if (!_coTheDungAIVoiVanBan(vanBan, coVungChon: vungChon != null)) return;
+    if (await chanNeuDaChamHanMucAi(context, LoaiHanMucAi.vanBan)) return;
 
     final daHuy = ValueNotifier<bool>(false);
     setState(() => _dangKiemTraToanVan = true);
@@ -11694,6 +11719,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     Navigator.of(context, rootNavigator: true).pop();
     setState(() => _dangKiemTraToanVan = false);
 
+    if (loiXayRa is LoiHanMucAi) {
+      await ghiNhoDaChamHanMucAi(loiXayRa.loai, loiXayRa.thongDiep);
+      if (mounted) await hienHopThoaiHanMucAi(context, loiXayRa.thongDiep);
+      return;
+    }
     if (loiXayRa != null || ketQua == null) {
       _bao('Không kiểm tra được: $loiXayRa');
       return;
@@ -13728,6 +13758,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     final mimeType = _doanMimeTuDuoiTep(tep.extension ?? '');
 
+    if (await chanNeuDaChamHanMucAi(context, LoaiHanMucAi.amThanh)) return;
+
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -13748,6 +13780,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     String? vanBanKetQua;
     String? loi;
+    Object? loiObj;
     try {
       // locHallucination CỐ Ý để mặc định (false) — tệp người dùng tự tải
       // lên có thể là nhạc/podcast/nhiều giọng, không phải một lượt ghi âm
@@ -13755,10 +13788,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       vanBanKetQua = await guiGhiAmChoGemini(bytes, mimeType);
     } catch (e) {
       loi = e.toString();
+      loiObj = e;
     }
     if (!mounted) return;
     Navigator.of(context, rootNavigator: true).pop(); // đóng hộp "đang xử lý".
 
+    if (loiObj is LoiHanMucAi) {
+      await ghiNhoDaChamHanMucAi(loiObj.loai, loiObj.thongDiep);
+      if (mounted) await hienHopThoaiHanMucAi(context, loiObj.thongDiep);
+      return;
+    }
     if (loi != null || vanBanKetQua == null || vanBanKetQua.trim().isEmpty) {
       _bao('Chuyển tệp thất bại: ${loi ?? "không có nội dung trả về."}');
       return;
@@ -13829,6 +13868,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     final mimeType = _doanMimeAnhTuDuoiTep(tep.extension ?? '');
 
+    if (await chanNeuDaChamHanMucAi(context, LoaiHanMucAi.hinhAnh)) return;
+
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -13849,14 +13890,21 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     String? vanBanKetQua;
     String? loi;
+    Object? loiObj;
     try {
       vanBanKetQua = await guiAnhChoGemini(bytes, mimeType);
     } catch (e) {
       loi = e.toString();
+      loiObj = e;
     }
     if (!mounted) return;
     Navigator.of(context, rootNavigator: true).pop(); // đóng hộp "đang xử lý".
 
+    if (loiObj is LoiHanMucAi) {
+      await ghiNhoDaChamHanMucAi(loiObj.loai, loiObj.thongDiep);
+      if (mounted) await hienHopThoaiHanMucAi(context, loiObj.thongDiep);
+      return;
+    }
     if (loi != null || vanBanKetQua == null || vanBanKetQua.trim().isEmpty) {
       _bao('Chuyển ảnh thất bại: ${loi ?? "không có nội dung trả về."}');
       return;
@@ -14041,6 +14089,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     int? phanTram,
     String? huongDanNguoiDung,
   }) async {
+    if (await chanNeuDaChamHanMucAi(context, LoaiHanMucAi.vanBan)) return;
+
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -14061,6 +14111,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     String? vanBanKetQua;
     String? loi;
+    Object? loiObj;
     try {
       vanBanKetQua = await guiTomTatChoGemini(
         vanBanGoc,
@@ -14069,10 +14120,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       );
     } catch (e) {
       loi = e.toString();
+      loiObj = e;
     }
     if (!mounted) return;
     Navigator.of(context, rootNavigator: true).pop(); // đóng hộp "đang xử lý".
 
+    if (loiObj is LoiHanMucAi) {
+      await ghiNhoDaChamHanMucAi(loiObj.loai, loiObj.thongDiep);
+      if (mounted) await hienHopThoaiHanMucAi(context, loiObj.thongDiep);
+      return;
+    }
     if (loi != null || vanBanKetQua == null || vanBanKetQua.trim().isEmpty) {
       _bao('Tóm tắt thất bại: ${loi ?? "không có nội dung trả về."}');
       return;
@@ -14215,6 +14272,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     int? phanTram,
     String? huongDanNguoiDung,
   }) async {
+    if (await chanNeuDaChamHanMucAi(context, LoaiHanMucAi.vanBan)) return;
+
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -14235,6 +14294,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     String? vanBanKetQua;
     String? loi;
+    Object? loiObj;
     try {
       vanBanKetQua = await guiMoRongChoGemini(
         vanBanGoc,
@@ -14243,10 +14303,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       );
     } catch (e) {
       loi = e.toString();
+      loiObj = e;
     }
     if (!mounted) return;
     Navigator.of(context, rootNavigator: true).pop(); // đóng hộp "đang xử lý".
 
+    if (loiObj is LoiHanMucAi) {
+      await ghiNhoDaChamHanMucAi(loiObj.loai, loiObj.thongDiep);
+      if (mounted) await hienHopThoaiHanMucAi(context, loiObj.thongDiep);
+      return;
+    }
     if (loi != null || vanBanKetQua == null || vanBanKetQua.trim().isEmpty) {
       _bao('Mở rộng thất bại: ${loi ?? "không có nội dung trả về."}');
       return;
@@ -14342,6 +14408,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     required TextSelection? vungChon,
     String? huongDanNguoiDung,
   }) async {
+    if (await chanNeuDaChamHanMucAi(context, LoaiHanMucAi.vanBan)) return;
+
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -14362,6 +14430,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     String? vanBanKetQua;
     String? loi;
+    Object? loiObj;
     try {
       vanBanKetQua = await guiVietLaiChoGemini(
         vanBanGoc,
@@ -14369,10 +14438,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       );
     } catch (e) {
       loi = e.toString();
+      loiObj = e;
     }
     if (!mounted) return;
     Navigator.of(context, rootNavigator: true).pop(); // đóng hộp "đang xử lý".
 
+    if (loiObj is LoiHanMucAi) {
+      await ghiNhoDaChamHanMucAi(loiObj.loai, loiObj.thongDiep);
+      if (mounted) await hienHopThoaiHanMucAi(context, loiObj.thongDiep);
+      return;
+    }
     if (loi != null || vanBanKetQua == null || vanBanKetQua.trim().isEmpty) {
       _bao('Viết lại thất bại: ${loi ?? "không có nội dung trả về."}');
       return;
@@ -14755,6 +14830,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final mimeType = anh.mimeType ?? _doanMimeAnhTuDuoiTep(phanDuoi);
 
     if (!mounted) return;
+    if (await chanNeuDaChamHanMucAi(context, LoaiHanMucAi.hinhAnh)) return;
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -14775,14 +14851,21 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     String? vanBanKetQua;
     String? loi;
+    Object? loiObj;
     try {
       vanBanKetQua = await guiAnhChoGemini(bytes, mimeType);
     } catch (e) {
       loi = e.toString();
+      loiObj = e;
     }
     if (!mounted) return;
     Navigator.of(context, rootNavigator: true).pop(); // đóng hộp "đang xử lý".
 
+    if (loiObj is LoiHanMucAi) {
+      await ghiNhoDaChamHanMucAi(loiObj.loai, loiObj.thongDiep);
+      if (mounted) await hienHopThoaiHanMucAi(context, loiObj.thongDiep);
+      return;
+    }
     if (loi != null || vanBanKetQua == null || vanBanKetQua.trim().isEmpty) {
       _bao('Chuyển ảnh thất bại: ${loi ?? "không có nội dung trả về."}');
       return;

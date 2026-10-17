@@ -25,6 +25,7 @@ import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import 'cai_dat.dart';
+import 'canh_bao_han_muc_ai.dart';
 import 'doan_thiet_bi.dart';
 import 'ghi_am_the.dart';
 import 'gui_ghi_am_gemini.dart';
@@ -1324,6 +1325,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
       );
       return;
     }
+    if (await chanNeuDaChamHanMucAi(context, LoaiHanMucAi.vanBan)) return;
     _oNhap.clear();
 
     final laLuotDau = widget.lichSu.isEmpty;
@@ -1391,6 +1393,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     _cuonXuongDuoi();
 
     String? loi;
+    Object? loiObj;
     var coChu = false;
     try {
       final luong = guiTroChuyenChoGeminiStream([
@@ -1413,8 +1416,18 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
       }
     } catch (e) {
       loi = e.toString();
+      loiObj = e;
     }
     if (!mounted) return;
+    if (loiObj is LoiHanMucAi && !coChu) {
+      setState(() => _dangGui = false);
+      await ghiNhoDaChamHanMucAi(loiObj.loai, loiObj.thongDiep);
+      if (mounted) await hienHopThoaiHanMucAi(context, loiObj.thongDiep);
+      // Tin nhắn AI rỗng vừa thêm để chuẩn bị chảy chữ (STREAMING) không
+      // còn ý nghĩa gì — xoá hẳn, khác lỗi mạng (còn giữ lại để biết đã gửi).
+      setState(() => widget.lichSu.removeAt(chiSoAi));
+      return;
+    }
     setState(() {
       _dangGui = false;
       if (loi != null && !coChu) {
@@ -2472,6 +2485,12 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
   }
 
   Future<void> _chuyenHoa(KetQuaGhiAmThe kq, int soThe) async {
+    final daCham = await doanDaChamHanMucAiHomNay(LoaiHanMucAi.amThanh);
+    if (daCham != null) {
+      widget.khiLoiChuyenHoa(soThe);
+      if (mounted) await hienHopThoaiHanMucAi(context, daCham);
+      return;
+    }
     try {
       final chu = await guiGhiAmChoGemini(kq.bytes, kq.mime, locHallucination: true);
       if (chu.trim().isNotEmpty) {
@@ -2481,6 +2500,11 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
       }
     } catch (e) {
       widget.khiLoiChuyenHoa(soThe);
+      if (e is LoiHanMucAi) {
+        await ghiNhoDaChamHanMucAi(e.loai, e.thongDiep);
+        if (mounted) await hienHopThoaiHanMucAi(context, e.thongDiep);
+        return;
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Thẻ ghi âm #$soThe chuyển hoá thất bại: $e'),

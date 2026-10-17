@@ -13,6 +13,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 
 import 'ai_cau_hinh.dart';
+import 'canh_bao_han_muc_ai.dart';
 
 /// [locHallucination]: CHỈ truyền `true` cho luồng THẺ GHI ÂM trong app —
 /// bật cơ chế lọc "hallucination" phía máy chủ (kèm prompt ngữ cảnh +
@@ -78,7 +79,7 @@ Future<String> guiGhiAmChoGemini(
       throw Exception('Hạn mức miễn phí Groq (âm thanh) đã hết hôm nay — thử lại sau, hoặc báo admin nâng cấp gói.');
     }
     if (goc['hanMucAi'] == true) {
-      throw Exception(goc['loi']?.toString() ?? 'Bạn đã dùng hết hạn mức AI hôm nay.');
+      throw LoiHanMucAi(LoaiHanMucAi.amThanh, goc['loi']?.toString() ?? 'Bạn đã dùng hết hạn mức AI hôm nay.');
     }
     throw Exception('Máy chủ AI trả về lỗi ${phanHoi.statusCode}: ${phanHoi.body}');
   }

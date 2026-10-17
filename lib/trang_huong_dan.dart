@@ -110,6 +110,16 @@ class ManHinhHuongDan extends StatelessWidget {
                         noiDung: _oGoiYMicroRoi,
                       ),
                       SizedBox(height: 28),
+                      _MucLon(so: 'VII', tieuDe: 'Liên hệ'),
+                      SizedBox(height: 14),
+                      _Doan(
+                        'Có thắc mắc, góp ý, báo lỗi, vui lòng liên hệ qua '
+                        'một trong các cách sau:\n\n'
+                        '**Email:** lookatmevanthanhpham@gmail.com\n'
+                        '**Email khác:** 219thanhdeptrai@gmail.com\n'
+                        '**Điện thoại:** +84 91 711 4941',
+                      ),
+                      SizedBox(height: 28),
                       _TrichDan(),
                       SizedBox(height: 8),
                     ],

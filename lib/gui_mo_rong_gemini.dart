@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'ai_cau_hinh.dart';
+import 'canh_bao_han_muc_ai.dart';
 
 /// [phanTram] (120-400) và/hoặc [huongDanNguoiDung] — ít nhất một trong hai
 /// phải có, nơi gọi (modal chọn kiểu mở rộng) đã chặn gửi lên khi cả hai
@@ -39,6 +40,9 @@ Future<String> guiMoRongChoGemini(
       .timeout(const Duration(minutes: 3));
   final goc = jsonDecode(utf8.decode(phanHoi.bodyBytes)) as Map<String, dynamic>;
   if (phanHoi.statusCode != 200) {
+    if (goc['hanMucAi'] == true) {
+      throw LoiHanMucAi(LoaiHanMucAi.vanBan, goc['loi']?.toString() ?? 'Bạn đã dùng hết hạn mức AI hôm nay.');
+    }
     throw Exception(goc['loi']?.toString() ?? 'Máy chủ AI trả về lỗi ${phanHoi.statusCode}.');
   }
   final chu = (goc['text'] as String?)?.trim();

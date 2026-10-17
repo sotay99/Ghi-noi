@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'ai_cau_hinh.dart';
+import 'canh_bao_han_muc_ai.dart';
 
 /// Một từ/cụm từ sai chính tả tìm được trong lần kiểm tra toàn văn — vị trí
 /// tính trên TOÀN BỘ văn bản đã gửi, khác với [LoiChinhTa] của bản kiểm tra
@@ -113,6 +114,9 @@ class DichVuKiemTraToanVan {
 
     final goc = jsonDecode(utf8.decode(phanHoi.bodyBytes)) as Map<String, dynamic>;
     if (phanHoi.statusCode != 200) {
+      if (goc['hanMucAi'] == true) {
+        throw LoiHanMucAi(LoaiHanMucAi.vanBan, goc['loi']?.toString() ?? 'Bạn đã dùng hết hạn mức AI hôm nay.');
+      }
       throw Exception(goc['loi']?.toString() ?? 'Máy chủ AI trả về lỗi ${phanHoi.statusCode}.');
     }
     final vanBanKetQua = goc['text'] as String?;

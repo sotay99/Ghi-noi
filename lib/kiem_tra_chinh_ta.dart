@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'ai_cau_hinh.dart';
+import 'canh_bao_han_muc_ai.dart';
 
 /// Một lỗi chính tả AI tìm được: vùng [batDau, ketThuc) trong văn bản, cùng
 /// từ đề xuất thay thế. [tu] là từ SAI, giữ lại để lúc người dùng chọn thay
@@ -87,6 +88,9 @@ class DichVuKiemTraChinhTa {
 
     final goc = jsonDecode(utf8.decode(phanHoi.bodyBytes)) as Map<String, dynamic>;
     if (phanHoi.statusCode != 200) {
+      if (goc['hanMucAi'] == true) {
+        throw LoiHanMucAi(LoaiHanMucAi.vanBan, goc['loi']?.toString() ?? 'Bạn đã dùng hết hạn mức AI hôm nay.');
+      }
       throw Exception(goc['loi']?.toString() ?? 'Máy chủ AI trả về lỗi ${phanHoi.statusCode}.');
     }
     final vanBanKetQua = goc['text'] as String?;

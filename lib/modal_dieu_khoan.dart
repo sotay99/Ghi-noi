@@ -124,6 +124,29 @@ class TrangDieuKhoan extends StatelessWidget {
                   'dụng hoặc không thể sử dụng app, bao gồm cả thiệt hại do '
                   'dựa vào kết quả của tính năng AI.',
                 ),
+                const SizedBox(height: 22),
+
+                const MucLonPhapLy(so: '9', tieuDe: 'Liên hệ'),
+                const SizedBox(height: 12),
+                const DoanPhapLy(
+                  'Có thắc mắc, góp ý, báo lỗi, vui lòng liên hệ qua một '
+                  'trong các cách sau:',
+                ),
+                const SizedBox(height: 12),
+                HopNoiBatPhapLy(
+                  mauNen: const Color(0xFFF1F8F3),
+                  mauVien: const Color(0xFFB7E1C1),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      DoanPhapLy('**Email:** lookatmevanthanhpham@gmail.com'),
+                      SizedBox(height: 6),
+                      DoanPhapLy('**Email khác:** 219thanhdeptrai@gmail.com'),
+                      SizedBox(height: 6),
+                      DoanPhapLy('**Điện thoại:** +84 91 711 4941'),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),

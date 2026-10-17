@@ -15,6 +15,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'ai_cau_hinh.dart';
+import 'canh_bao_han_muc_ai.dart';
 
 /// Một lượt trong cuộc hội thoại — [vaiTro] là `'nguoiDung'` hoặc `'ai'`.
 class LuotTroChuyen {
@@ -43,10 +44,13 @@ Stream<String> guiTroChuyenChoGeminiStream(List<LuotTroChuyen> lichSu) async* {
     if (phanHoi.statusCode != 200) {
       final noiDungLoi = await phanHoi.stream.bytesToString();
       String thongDiep = 'Máy chủ AI trả về lỗi ${phanHoi.statusCode}: $noiDungLoi';
+      bool hanMucAi = false;
       try {
         final goc = jsonDecode(noiDungLoi) as Map<String, dynamic>;
         if (goc['loi'] is String) thongDiep = goc['loi'] as String;
+        hanMucAi = goc['hanMucAi'] == true;
       } catch (_) {}
+      if (hanMucAi) throw LoiHanMucAi(LoaiHanMucAi.vanBan, thongDiep);
       throw Exception(thongDiep);
     }
     var coChu = false;
