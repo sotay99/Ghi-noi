@@ -8,6 +8,13 @@ tự thao tác tay (dán lại, copy...), PHẢI dán TOÀN BỘ nội dung tệ
 dạng text ngay trong tin nhắn trả lời ở cuộc trò chuyện này — không chỉ gửi
 qua đính kèm.
 
+**Nguyên vẹn, MỘT khối duy nhất — không chia nhiều tin nhắn/nhiều khối mã.**
+Người dùng cần dán đè nguyên file cho nhanh — chia file ra "phần 1/phần 2"
+bắt người dùng tự ghép lại là KHÔNG chấp nhận được, dù file dài (kể cả
+file cả nghìn dòng). Luôn dán trọn trong đúng MỘT khối ```...``` liền
+mạch, kể cả khi phải đọc file theo nhiều lượt `Read` (offset/limit khác
+nhau) để gom đủ nội dung trước khi dán.
+
 # Lỗi tồn đọng — hoãn sửa
 
 ## [v163, 2026-10-05 — CHƯA XÁC NHẬN, đừng ghi "đã xong" cho tới khi người dùng dùng thử nhiều ngày] Thỉnh thoảng không gõ được bằng bàn phím vật lý sau mất/được tiêu điểm (bản Web)
