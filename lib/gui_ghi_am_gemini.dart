@@ -56,12 +56,12 @@ Future<String> guiGhiAmChoGemini(
           'content-type': 'application/json',
           'x-flowrite-secret': matKhauMayChuAI,
         },
-        body: jsonEncode({
+        body: jsonEncode(await ganDinhDanhAi({
           'action': 'ghi_am',
           'audioBase64': base64,
           'mimeType': mimeType.isNotEmpty ? mimeType : 'audio/mp4',
           if (locHallucination) 'locHallucination': true,
-        }),
+        })),
       )
       .timeout(const Duration(minutes: 3));
   final goc = jsonDecode(utf8.decode(phanHoi.bodyBytes)) as Map<String, dynamic>;
@@ -76,6 +76,9 @@ Future<String> guiGhiAmChoGemini(
       final thongDiep = goc['loi']?.toString() ?? 'Đã chạm hạn mức Groq.';
       unawaited(_ghiCanhBaoHanMucApi('[ĐÃ CHẠM HẠN MỨC] $thongDiep'));
       throw Exception('Hạn mức miễn phí Groq (âm thanh) đã hết hôm nay — thử lại sau, hoặc báo admin nâng cấp gói.');
+    }
+    if (goc['hanMucAi'] == true) {
+      throw Exception(goc['loi']?.toString() ?? 'Bạn đã dùng hết hạn mức AI hôm nay.');
     }
     throw Exception('Máy chủ AI trả về lỗi ${phanHoi.statusCode}: ${phanHoi.body}');
   }

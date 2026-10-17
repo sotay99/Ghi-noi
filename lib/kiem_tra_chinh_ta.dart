@@ -75,21 +75,20 @@ class DichVuKiemTraChinhTa {
             'content-type': 'application/json',
             'x-flowrite-secret': matKhauMayChuAI,
           },
-          body: jsonEncode({
+          body: jsonEncode(await ganDinhDanhAi({
             'action': 'chinh_ta',
             'text': ghep,
             'boQuaTruocViTri': nguCanh.length,
             'layLoiChinhTa': layLoiChinhTa,
             'chenDauCau': chenDauCau,
-          }),
+          })),
         )
         .timeout(const Duration(seconds: 25));
 
-    if (phanHoi.statusCode != 200) {
-      throw Exception('Máy chủ AI trả về lỗi ${phanHoi.statusCode}');
-    }
-
     final goc = jsonDecode(utf8.decode(phanHoi.bodyBytes)) as Map<String, dynamic>;
+    if (phanHoi.statusCode != 200) {
+      throw Exception(goc['loi']?.toString() ?? 'Máy chủ AI trả về lỗi ${phanHoi.statusCode}.');
+    }
     final vanBanKetQua = goc['text'] as String?;
     if (vanBanKetQua == null) {
       throw Exception(goc['loi']?.toString() ?? 'Máy chủ AI không trả về nội dung.');

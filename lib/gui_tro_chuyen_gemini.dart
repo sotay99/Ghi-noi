@@ -35,14 +35,19 @@ Stream<String> guiTroChuyenChoGeminiStream(List<LuotTroChuyen> lichSu) async* {
     final yeuCau = http.Request('POST', Uri.parse(diaChiMayChuAI))
       ..headers['content-type'] = 'application/json'
       ..headers['x-flowrite-secret'] = matKhauMayChuAI
-      ..body = jsonEncode({
+      ..body = jsonEncode(await ganDinhDanhAi({
         'action': 'tro_chuyen',
         'lichSu': lichSu.map((l) => l.toJson()).toList(),
-      });
+      }));
     final phanHoi = await client.send(yeuCau).timeout(const Duration(minutes: 3));
     if (phanHoi.statusCode != 200) {
       final noiDungLoi = await phanHoi.stream.bytesToString();
-      throw Exception('Máy chủ AI trả về lỗi ${phanHoi.statusCode}: $noiDungLoi');
+      String thongDiep = 'Máy chủ AI trả về lỗi ${phanHoi.statusCode}: $noiDungLoi';
+      try {
+        final goc = jsonDecode(noiDungLoi) as Map<String, dynamic>;
+        if (goc['loi'] is String) thongDiep = goc['loi'] as String;
+      } catch (_) {}
+      throw Exception(thongDiep);
     }
     var coChu = false;
     await for (final doan in phanHoi.stream.transform(utf8.decoder)) {

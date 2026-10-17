@@ -98,7 +98,7 @@ class DichVuKiemTraToanVan {
             'content-type': 'application/json',
             'x-flowrite-secret': matKhauMayChuAI,
           },
-          body: jsonEncode({
+          body: jsonEncode(await ganDinhDanhAi({
             'action': 'toan_van',
             'text': vanBan,
             'vungDaXuLy': vungDaXuLy.map((v) => v.toJson()).toList(),
@@ -107,15 +107,14 @@ class DichVuKiemTraToanVan {
             if (khoangKyTu != null) 'doDaiMax': khoangKyTu.$2,
             'cauLenhTuyChinh': cauLenhTuyChinh,
             if (loaiKiemTra != null) 'loaiKiemTra': loaiKiemTra,
-          }),
+          })),
         )
         .timeout(const Duration(seconds: 60));
 
-    if (phanHoi.statusCode != 200) {
-      throw Exception('Máy chủ AI trả về lỗi ${phanHoi.statusCode}');
-    }
-
     final goc = jsonDecode(utf8.decode(phanHoi.bodyBytes)) as Map<String, dynamic>;
+    if (phanHoi.statusCode != 200) {
+      throw Exception(goc['loi']?.toString() ?? 'Máy chủ AI trả về lỗi ${phanHoi.statusCode}.');
+    }
     final vanBanKetQua = goc['text'] as String?;
     if (vanBanKetQua == null) {
       throw Exception(goc['loi']?.toString() ?? 'Máy chủ AI không trả về nội dung.');

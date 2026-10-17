@@ -21,17 +21,17 @@ Future<String> guiAnhChoGemini(Uint8List bytes, String mimeType) async {
           'content-type': 'application/json',
           'x-flowrite-secret': matKhauMayChuAI,
         },
-        body: jsonEncode({
+        body: jsonEncode(await ganDinhDanhAi({
           'action': 'chuyen_anh',
           'imageBase64': base64,
           'mimeType': mimeType.isNotEmpty ? mimeType : 'image/jpeg',
-        }),
+        })),
       )
       .timeout(const Duration(minutes: 3));
-  if (phanHoi.statusCode != 200) {
-    throw Exception('Máy chủ AI trả về lỗi ${phanHoi.statusCode}: ${phanHoi.body}');
-  }
   final goc = jsonDecode(utf8.decode(phanHoi.bodyBytes)) as Map<String, dynamic>;
+  if (phanHoi.statusCode != 200) {
+    throw Exception(goc['loi']?.toString() ?? 'Máy chủ AI trả về lỗi ${phanHoi.statusCode}.');
+  }
   final chu = (goc['text'] as String?)?.trim();
   if (chu == null || chu.isEmpty) {
     throw Exception(goc['loi']?.toString() ?? 'Không có nội dung trả về.');

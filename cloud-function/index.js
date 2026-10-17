@@ -10,6 +10,142 @@
 
 const MODEL_MAC_DINH = 'gemini-flash-lite-latest';
 
+// (YÊU CẦU MỚI) Giới hạn hạn mức AI THEO TỪNG NGƯỜI mỗi ngày — chặn một
+// người dùng/script đốt hết ngân sách AI chung của shop. Ba loại đo riêng,
+// đúng bản chất chi phí của từng loại (xem thêm `thuHanMucAi` bên dưới):
+// - kyTu: số ký tự văn bản GỬI LÊN (proxy cho token, không cần bộ đếm token
+//   thật) — áp cho mọi action văn bản/trò chuyện.
+// - anhByte: tổng dung lượng ảnh (byte, tệp gốc chứ không phải base64) đã
+//   xử lý OCR.
+// - amThanhGiay: tổng số GIÂY âm thanh (ghi âm + tệp tải lên) đã phiên âm —
+//   ƯỚC LƯỢNG từ dung lượng tệp (không có cách rẻ để biết thời lượng thật
+//   TRƯỚC khi gửi cho Groq), đủ chính xác cho mục đích chặn lạm dụng.
+const GIOI_HAN_AI = {
+  chuaDangNhap: { kyTu: 10000, anhByte: 5 * 1024 * 1024, amThanhGiay: 15 * 60 },
+  daDangNhap: { kyTu: 500000, anhByte: 100 * 1024 * 1024, amThanhGiay: 300 * 60 },
+};
+
+const PROJECT_ID_FIRESTORE = 'flowrite219';
+
+function ngayHomNay() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/// Đọc claim `sub` (UID) từ một Firebase ID token — CHƯA xác minh chữ ký
+/// thật (cần tải JWKS + RS256, tốn thêm việc cho một tính năng chỉ nhằm
+/// GIỚI HẠN CHI PHÍ, không phải bảo vệ dữ liệu riêng tư). Mức an toàn này đã
+/// đủ: ai muốn khai man UID để hưởng hạn mức "đã đăng nhập" cao hơn vẫn
+/// phải biết trước `APP_SHARED_SECRET` mới gọi được máy chủ này — đúng cùng
+/// mức an toàn đang áp dụng cho trang `/admin` (xem `quyen_admin.dart` bên
+/// app: "quyền THẬT nằm ở rules, không ở đây"). Trả `null` nếu token không
+/// hợp lệ/hết hạn/sai dự án.
+function laySubKhongXacThucChuKy(idToken) {
+  try {
+    const phan = String(idToken).split('.');
+    if (phan.length !== 3) return null;
+    const payload = JSON.parse(Buffer.from(phan[1], 'base64url').toString('utf8'));
+    if (payload.aud !== PROJECT_ID_FIRESTORE) return null;
+    if (payload.iss !== `https://securetoken.google.com/${PROJECT_ID_FIRESTORE}`) return null;
+    if (typeof payload.exp !== 'number' || payload.exp * 1000 < Date.now()) return null;
+    if (typeof payload.sub !== 'string' || !payload.sub) return null;
+    return payload.sub;
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Định danh người gọi — ưu tiên UID thật (đã đăng nhập) nếu có `idToken`
+/// hợp lệ, không thì dùng mã thiết bị ẩn danh client tự gửi lên (xem
+/// `ganDinhDanhAi` ở `lib/ai_cau_hinh.dart`). `id: null` khi không có gì cả
+/// (client cũ chưa cập nhật) — khi đó KHÔNG áp hạn mức, tránh chặn nhầm
+/// phiên bản app cũ.
+function layDinhDanhNguoiGoi(than) {
+  const sub = than.idToken ? laySubKhongXacThucChuKy(than.idToken) : null;
+  if (sub) return { id: `uid_${sub}`, dangNhap: true };
+  const ma = typeof than.maThietBi === 'string' ? than.maThietBi.trim().slice(0, 64) : '';
+  if (ma) return { id: `dev_${ma}`, dangNhap: false };
+  return { id: null, dangNhap: false };
+}
+
+async function docHanMucAi(id) {
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID_FIRESTORE}/databases/(default)/documents/gioiHanAi/${encodeURIComponent(id)}`;
+  const res = await fetch(url);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Firestore GET lỗi ${res.status}`);
+  const data = await res.json();
+  const f = data.fields || {};
+  return {
+    ngay: f.ngay?.stringValue || '',
+    kyTu: Number(f.kyTu?.integerValue || 0),
+    anhByte: Number(f.anhByte?.integerValue || 0),
+    amThanhGiay: Number(f.amThanhGiay?.integerValue || 0),
+  };
+}
+
+async function ghiHanMucAi(id, ban) {
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID_FIRESTORE}/databases/(default)/documents/gioiHanAi/${encodeURIComponent(id)}`;
+  await fetch(url, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      fields: {
+        ngay: { stringValue: ban.ngay },
+        kyTu: { integerValue: String(ban.kyTu) },
+        anhByte: { integerValue: String(ban.anhByte) },
+        amThanhGiay: { integerValue: String(ban.amThanhGiay) },
+      },
+    }),
+  });
+}
+
+/// Kiểm tra + "trừ" luôn hạn mức [loai] của người gọi [id] — tính phí NGAY
+/// LÚC GỌI (giống cách `thanhdeptrai.vn` tính hạn link tải "chỉ lúc bắt
+/// đầu"), không hoàn lại nếu bản thân lượt gọi AI sau đó lỗi — đơn giản hơn
+/// nhiều so với đọc-gọi AI-rồi-mới-ghi, và đủ dùng cho mục đích chặn lạm
+/// dụng. Đọc/ghi Firestore qua REST công khai (rules project đang mở toàn
+/// bộ — xem CLAUDE.md) nên KHÔNG cần khoá service account riêng.
+/// Lỗi Firestore (mạng, hạn mức Firestore...) KHÔNG được chặn người dùng —
+/// coi như cho qua, vì đó là lỗi hạ tầng của mình, không phải lỗi của họ.
+async function thuHanMucAi(id, dangNhap, loai, soLuong) {
+  if (!id) return { choPhep: true };
+  const ngay = ngayHomNay();
+  let ban;
+  try {
+    ban = await docHanMucAi(id);
+  } catch (_) {
+    return { choPhep: true };
+  }
+  if (!ban || ban.ngay !== ngay) {
+    ban = { ngay, kyTu: 0, anhByte: 0, amThanhGiay: 0 };
+  }
+  const gioiHan = dangNhap ? GIOI_HAN_AI.daDangNhap : GIOI_HAN_AI.chuaDangNhap;
+  if (ban[loai] >= gioiHan[loai]) {
+    return { choPhep: false };
+  }
+  ban[loai] += soLuong;
+  try {
+    await ghiHanMucAi(id, ban);
+  } catch (_) {
+    // Ghi thất bại thì vẫn cho qua lượt NÀY — không chặn vì lỗi hạ tầng.
+  }
+  return { choPhep: true };
+}
+
+function thongDiepHetHanMucAi(dangNhap, loai) {
+  const tenLoai = loai === 'kyTu' ? 'văn bản' : loai === 'anhByte' ? 'hình ảnh' : 'âm thanh';
+  const goiY = dangNhap ? '' : ' Đăng nhập bằng Google (nút "Đăng nhập") để có hạn mức cao hơn.';
+  return `Bạn đã dùng hết hạn mức AI (${tenLoai}) hôm nay — hạn mức tự reset vào ngày mai.${goiY}`;
+}
+
+/// Ước lượng số GIÂY âm thanh từ dung lượng base64 — không có cách rẻ để
+/// biết thời lượng thật trước khi gửi cho Groq. Giả định ~16KB/giây (bitrate
+/// thoại nén điển hình m4a/webm/ogg của ghi âm giọng nói) — chỉ cần đủ gần
+/// đúng để chặn lạm dụng, không cần chính xác tuyệt đối.
+function uocLuongGiayAmThanh(audioBase64) {
+  const soByte = Math.floor((audioBase64.length * 3) / 4);
+  return Math.max(1, Math.round(soByte / 16000));
+}
+
 /// Đoạn hướng dẫn DÙNG CHUNG cho mọi nơi AI sửa chính tả — cả kiểm tra tự
 /// động theo từng câu (action 'chinh_ta') lẫn "Kiểm tra toàn văn" (action
 /// 'toan_van'). Ưu tiên sửa CỤM TỪ, giải thích hai nguồn chữ (gõ tay/giọng
@@ -568,6 +704,7 @@ exports.flowriteAi = async (req, res) => {
 
   const than = req.body || {};
   const { action, text, boQuaTruocViTri, layLoiChinhTa, chenDauCau } = than;
+  const { id: idNguoiGoi, dangNhap } = layDinhDanhNguoiGoi(than);
 
   // Nhánh riêng cho ghi âm: gửi lên là DỮ LIỆU ÂM THANH, không phải `text`,
   // nên không đi qua các kiểm tra dành cho văn bản ở dưới. Đi qua Whisper
@@ -590,6 +727,11 @@ exports.flowriteAi = async (req, res) => {
     const gioiHanBase64ChoTepAmThanh = Math.ceil((25 * 1024 * 1024 * 4) / 3);
     if (audioBase64.length > gioiHanBase64ChoTepAmThanh) {
       res.status(400).json({ loi: 'Tệp âm thanh quá lớn — Groq chỉ nhận tối đa 25MB/tệp. Hãy nén hoặc cắt ngắn tệp rồi thử lại.' });
+      return;
+    }
+    const thuAmThanh = await thuHanMucAi(idNguoiGoi, dangNhap, 'amThanhGiay', uocLuongGiayAmThanh(audioBase64));
+    if (!thuAmThanh.choPhep) {
+      res.status(429).json({ loi: thongDiepHetHanMucAi(dangNhap, 'amThanhGiay'), hanMucAi: true });
       return;
     }
     try {
@@ -630,6 +772,12 @@ exports.flowriteAi = async (req, res) => {
     const gioiHanBase64ChoAnh = Math.ceil((15 * 1024 * 1024 * 4) / 3);
     if (imageBase64.length > gioiHanBase64ChoAnh) {
       res.status(400).json({ loi: 'Ảnh quá lớn — chỉ nhận tối đa 15MB/tệp. Hãy nén ảnh rồi thử lại.' });
+      return;
+    }
+    const soByteAnh = Math.floor((imageBase64.length * 3) / 4);
+    const thuAnh = await thuHanMucAi(idNguoiGoi, dangNhap, 'anhByte', soByteAnh);
+    if (!thuAnh.choPhep) {
+      res.status(429).json({ loi: thongDiepHetHanMucAi(dangNhap, 'anhByte'), hanMucAi: true });
       return;
     }
     try {
@@ -674,6 +822,17 @@ exports.flowriteAi = async (req, res) => {
       }
       contents.push({ role: vaiTro, parts: [{ text: noiDung }] });
     }
+    // Tính phí theo TOÀN BỘ lichSu (không chỉ lượt mới) — đúng với chi phí
+    // thật: Gemini phải xử lý lại toàn bộ lịch sử làm ngữ cảnh ở MỖI lượt.
+    const tongKyTuLichSu = lichSu.reduce(
+      (tong, l) => tong + (l && typeof l.noiDung === 'string' ? l.noiDung.length : 0),
+      0,
+    );
+    const thuTroChuyen = await thuHanMucAi(idNguoiGoi, dangNhap, 'kyTu', tongKyTuLichSu);
+    if (!thuTroChuyen.choPhep) {
+      res.status(429).json({ loi: thongDiepHetHanMucAi(dangNhap, 'kyTu'), hanMucAi: true });
+      return;
+    }
     try {
       await goiGeminiChatStream(contents, res);
     } catch (err) {
@@ -693,6 +852,12 @@ exports.flowriteAi = async (req, res) => {
   }
   if (text.length > 20000) {
     res.status(400).json({ loi: 'Văn bản quá dài (tối đa 20.000 ký tự).' });
+    return;
+  }
+
+  const thuVanBan = await thuHanMucAi(idNguoiGoi, dangNhap, 'kyTu', text.length);
+  if (!thuVanBan.choPhep) {
+    res.status(429).json({ loi: thongDiepHetHanMucAi(dangNhap, 'kyTu'), hanMucAi: true });
     return;
   }
 
