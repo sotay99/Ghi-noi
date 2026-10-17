@@ -1,3 +1,13 @@
+# Quy ước giao tiếp — QUAN TRỌNG
+
+Người dùng dùng máy tính bảng Android — KHÔNG thấy được file gửi qua cơ chế
+đính kèm/thẻ file (ví dụ công cụ gửi file) trong cuộc trò chuyện. Mỗi khi có
+một tệp MỚI cần đưa cho người dùng (ví dụ `cloud-function/index.js` để dán
+vào Google Cloud Console) hoặc một tệp ĐÃ CÓ vừa cập nhật mà người dùng cần
+tự thao tác tay (dán lại, copy...), PHẢI dán TOÀN BỘ nội dung tệp đó dưới
+dạng text ngay trong tin nhắn trả lời ở cuộc trò chuyện này — không chỉ gửi
+qua đính kèm.
+
 # Lỗi tồn đọng — hoãn sửa
 
 ## [v163, 2026-10-05 — CHƯA XÁC NHẬN, đừng ghi "đã xong" cho tới khi người dùng dùng thử nhiều ngày] Thỉnh thoảng không gõ được bằng bàn phím vật lý sau mất/được tiêu điểm (bản Web)
