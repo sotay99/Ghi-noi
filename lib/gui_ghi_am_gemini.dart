@@ -53,10 +53,7 @@ Future<String> guiGhiAmChoGemini(
   final phanHoi = await http
       .post(
         Uri.parse(diaChiMayChuAI),
-        headers: {
-          'content-type': 'application/json',
-          'x-flowrite-secret': matKhauMayChuAI,
-        },
+        headers: await taoHeaderGoiAi(),
         body: jsonEncode(await ganDinhDanhAi({
           'action': 'ghi_am',
           'audioBase64': base64,

@@ -34,8 +34,7 @@ Stream<String> guiTroChuyenChoGeminiStream(List<LuotTroChuyen> lichSu) async* {
   final client = http.Client();
   try {
     final yeuCau = http.Request('POST', Uri.parse(diaChiMayChuAI))
-      ..headers['content-type'] = 'application/json'
-      ..headers['x-flowrite-secret'] = matKhauMayChuAI
+      ..headers.addAll(await taoHeaderGoiAi())
       ..body = jsonEncode(await ganDinhDanhAi({
         'action': 'tro_chuyen',
         'lichSu': lichSu.map((l) => l.toJson()).toList(),

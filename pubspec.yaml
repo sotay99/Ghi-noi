@@ -38,6 +38,13 @@ dependencies:
   firebase_core: ^3.8.0
   firebase_auth: ^5.3.1
   google_sign_in: ^6.2.1
+  # (YÊU CẦU MỚI — vá lỗ hổng "xót tiền") App Check — xác thực yêu cầu AI
+  # đến từ ĐÚNG app Flowrite thật (Play Integrity trên Android, reCAPTCHA
+  # Enterprise trên Web), không chỉ dựa vào chuỗi mật khẩu tĩnh
+  # `matKhauMayChuAI` (lộ ra được nếu ai giải nén APK/xem mã nguồn web).
+  # Xem `lib/ai_cau_hinh.dart` (khởi tạo + lấy token) và
+  # `cloud-function/index.js` (xác minh chữ ký token, hàm `xacMinhAppCheckToken`).
+  firebase_app_check: ^0.3.1
   # Bộ nhớ đám mây (cây thư mục/ghi chú đồng bộ theo tài khoản Google) —
   # xem `lib/dong_bo_dam_may.dart`.
   cloud_firestore: ^5.4.4

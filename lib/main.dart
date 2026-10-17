@@ -6,6 +6,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
+import 'ai_cau_hinh.dart';
 import 'cai_dat.dart';
 import 'chan_esc_lui_trang.dart';
 import 'firebase_options.dart';
@@ -20,6 +21,7 @@ import 'trang_soan_thao.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await khoiTaoAppCheck();
   // (YÊU CẦU MỚI) Bọc trong `KhoiDongLaiApp` — cho phép khởi động lại toàn
   // bộ app tại chỗ sau khi đăng xuất, xem `khoi_dong_lai_app.dart`.
   runApp(const KhoiDongLaiApp(child: UngDungFlowrite()));

@@ -25,10 +25,7 @@ Future<String> guiMoRongChoGemini(
   final phanHoi = await http
       .post(
         Uri.parse(diaChiMayChuAI),
-        headers: {
-          'content-type': 'application/json',
-          'x-flowrite-secret': matKhauMayChuAI,
-        },
+        headers: await taoHeaderGoiAi(),
         body: jsonEncode(await ganDinhDanhAi({
           'action': 'mo_rong',
           'text': vanBan,

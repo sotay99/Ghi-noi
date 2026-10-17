@@ -18,10 +18,7 @@ Future<String> guiAnhChoGemini(Uint8List bytes, String mimeType) async {
   final phanHoi = await http
       .post(
         Uri.parse(diaChiMayChuAI),
-        headers: {
-          'content-type': 'application/json',
-          'x-flowrite-secret': matKhauMayChuAI,
-        },
+        headers: await taoHeaderGoiAi(),
         body: jsonEncode(await ganDinhDanhAi({
           'action': 'chuyen_anh',
           'imageBase64': base64,

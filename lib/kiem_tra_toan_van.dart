@@ -95,10 +95,7 @@ class DichVuKiemTraToanVan {
     final phanHoi = await http
         .post(
           Uri.parse(diaChiMayChuAI),
-          headers: {
-            'content-type': 'application/json',
-            'x-flowrite-secret': matKhauMayChuAI,
-          },
+          headers: await taoHeaderGoiAi(),
           body: jsonEncode(await ganDinhDanhAi({
             'action': 'toan_van',
             'text': vanBan,

@@ -8,7 +8,97 @@
 // Logic giống hệt bản Cloudflare: một điểm cuối (POST /) dùng chung cho MỌI
 // tính năng AI của app, chỉ khác nhau ở tham số `action`.
 
+const crypto = require('crypto');
+
 const MODEL_MAC_DINH = 'gemini-flash-lite-latest';
+
+// (YÊU CẦU MỚI — vá lỗ hổng "xót tiền") `matKhauMayChuAI` (header
+// x-flowrite-secret) là một chuỗi VIẾT CHẾT trong code app — ai giải nén
+// APK hoặc xem mã nguồn web đều thấy được, rồi gọi thẳng vào máy chủ này mà
+// không qua app thật, tốn tiền Gemini/Groq mà không hay biết. App Check vá
+// đúng chỗ này: xác thực "yêu cầu này đến từ app Flowrite THẬT do chính
+// mình build" (Play Integrity trên Android, reCAPTCHA Enterprise trên
+// Web) — Google tự ký một token, máy chủ CHỈ CẦN xác minh chữ ký, không
+// phải đoán một bí mật nào cả.
+//
+// Xác minh THẬT (chữ ký RS256 qua JWKS công khai của Google) — khác hẳn
+// cách đọc payload không xác minh chữ ký đang dùng cho `idToken` (hạn mức
+// theo người) ở trên: đây mới là lớp chặn CHI PHÍ thật, cần chắc chắn hơn.
+const APP_CHECK_PROJECT_NUMBER = '1081343450729';
+const APP_CHECK_APP_ID_HOP_LE = new Set([
+  '1:1081343450729:web:5833f9c895d22212338cf8', // Flowrite Web
+  '1:1081343450729:android:0ddbecc02fa7384c338cf8', // Flowrite Android
+]);
+
+let _jwksAppCheckCache = { khoa: {}, hetHan: 0 };
+
+async function layKhoaCongKhaiAppCheck(kid) {
+  if (Date.now() > _jwksAppCheckCache.hetHan) {
+    const res = await fetch('https://firebaseappcheck.googleapis.com/v1/jwks');
+    if (!res.ok) throw new Error(`Không tải được JWKS App Check (${res.status}).`);
+    const data = await res.json();
+    const moi = {};
+    for (const k of data.keys || []) moi[k.kid] = k;
+    // JWKS của Google hiếm khi đổi — cache 6 giờ, đủ tránh gọi lại mỗi request
+    // mà vẫn sớm nhận khoá mới nếu Google xoay vòng.
+    _jwksAppCheckCache = { khoa: moi, hetHan: Date.now() + 6 * 60 * 60 * 1000 };
+  }
+  return _jwksAppCheckCache.khoa[kid] || null;
+}
+
+/// Trả `{ hopLe: true }` hoặc `{ hopLe: false, lyDo: '...' }` — KHÔNG bao
+/// giờ ném lỗi ra ngoài, để nơi gọi luôn xử lý được bằng nhánh if đơn giản.
+async function xacMinhAppCheckToken(token) {
+  if (typeof token !== 'string' || !token) return { hopLe: false, lyDo: 'thieu-token' };
+  const phan = token.split('.');
+  if (phan.length !== 3) return { hopLe: false, lyDo: 'sai-dinh-dang' };
+  let header, payload;
+  try {
+    header = JSON.parse(Buffer.from(phan[0], 'base64url').toString('utf8'));
+    payload = JSON.parse(Buffer.from(phan[1], 'base64url').toString('utf8'));
+  } catch (_) {
+    return { hopLe: false, lyDo: 'khong-doc-duoc' };
+  }
+  if (header.alg !== 'RS256') return { hopLe: false, lyDo: 'sai-thuat-toan' };
+
+  let jwk;
+  try {
+    jwk = await layKhoaCongKhaiAppCheck(header.kid);
+  } catch (err) {
+    return { hopLe: false, lyDo: `loi-tai-jwks: ${err.message}` };
+  }
+  if (!jwk) return { hopLe: false, lyDo: 'khong-tim-thay-khoa' };
+
+  let khoaCongKhai;
+  try {
+    khoaCongKhai = crypto.createPublicKey({ key: jwk, format: 'jwk' });
+  } catch (_) {
+    return { hopLe: false, lyDo: 'khoa-hong' };
+  }
+
+  let khopChuKy = false;
+  try {
+    khopChuKy = crypto
+      .createVerify('RSA-SHA256')
+      .update(`${phan[0]}.${phan[1]}`)
+      .verify(khoaCongKhai, Buffer.from(phan[2], 'base64url'));
+  } catch (_) {
+    khopChuKy = false;
+  }
+  if (!khopChuKy) return { hopLe: false, lyDo: 'chu-ky-sai' };
+
+  if (typeof payload.exp !== 'number' || payload.exp * 1000 < Date.now()) {
+    return { hopLe: false, lyDo: 'het-han' };
+  }
+  const aud = Array.isArray(payload.aud) ? payload.aud : [];
+  if (!aud.includes(`projects/${APP_CHECK_PROJECT_NUMBER}`)) return { hopLe: false, lyDo: 'sai-aud' };
+  if (payload.iss !== `https://firebaseappcheck.googleapis.com/${APP_CHECK_PROJECT_NUMBER}`) {
+    return { hopLe: false, lyDo: 'sai-iss' };
+  }
+  if (!APP_CHECK_APP_ID_HOP_LE.has(payload.sub)) return { hopLe: false, lyDo: 'sai-app' };
+
+  return { hopLe: true };
+}
 
 // (YÊU CẦU MỚI) Giới hạn hạn mức AI THEO TỪNG NGƯỜI mỗi ngày — chặn một
 // người dùng/script đốt hết ngân sách AI chung của shop. Ba loại đo riêng,
@@ -683,7 +773,7 @@ async function goiGeminiChatStream(contents, res) {
 exports.flowriteAi = async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'content-type, x-flowrite-secret');
+  res.set('Access-Control-Allow-Headers', 'content-type, x-flowrite-secret, x-firebase-appcheck');
 
   if (req.method === 'OPTIONS') {
     res.status(204).send('');
@@ -700,6 +790,21 @@ exports.flowriteAi = async (req, res) => {
   if (!process.env.APP_SHARED_SECRET || macXacThuc !== process.env.APP_SHARED_SECRET) {
     res.status(401).json({ loi: 'Không có quyền gọi.' });
     return;
+  }
+
+  // (YÊU CẦU MỚI — vá lỗ hổng "xót tiền") App Check — xem chú thích đầy đủ ở
+  // `xacMinhAppCheckToken`. CHẠY Ở CHẾ ĐỘ "CHỈ GHI LOG" cho tới khi admin tự
+  // đặt biến môi trường `APP_CHECK_ENFORCE=true` trên Cloud Console (không
+  // cần sửa code/deploy lại lần nữa) — đủ thời gian xác nhận app thật (cả
+  // bản cũ CHƯA cập nhật App Check lẫn bản mới) vẫn gọi được bình thường,
+  // trước khi thật sự chặn request thiếu/sai token.
+  const ketQuaAppCheck = await xacMinhAppCheckToken(req.get('x-firebase-appcheck'));
+  if (!ketQuaAppCheck.hopLe) {
+    console.warn(`[AppCheck] Token không hợp lệ (${ketQuaAppCheck.lyDo}) — enforce=${process.env.APP_CHECK_ENFORCE === 'true'}`);
+    if (process.env.APP_CHECK_ENFORCE === 'true') {
+      res.status(401).json({ loi: 'Yêu cầu không đến từ app Flowrite hợp lệ (App Check).' });
+      return;
+    }
   }
 
   const than = req.body || {};
