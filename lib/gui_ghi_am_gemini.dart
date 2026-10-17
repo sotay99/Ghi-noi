@@ -5,9 +5,11 @@
 // (web-test). Không đụng dart:io/dart:html — thuần http + dart:convert nên
 // dùng được ở cả hai nền tảng.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 
 import 'ai_cau_hinh.dart';
@@ -19,6 +21,26 @@ import 'ai_cau_hinh.dart';
 /// tệp người dùng tự tải lên có thể là nhạc/podcast, ranh giới "im lặng =
 /// hallucination" không đáng tin như với một lượt ghi âm giọng nói ngắn.
 ///
+/// (YÊU CẦU MỚI) Groq miễn phí — dùng CHUNG một tài khoản thật (KHÔNG lập
+/// nhiều tài khoản để né hạn mức, vi phạm điều khoản sử dụng của Groq).
+/// `cloud-function/index.js` đọc header "còn lại bao nhiêu" trên MỌI phản
+/// hồi Groq và gắn cảnh báo vào JSON trả về khi gần/đã chạm hạn mức — ghi
+/// lại đây thành một bản ghi Firestore công khai (ai cũng ghi được, chỉ
+/// admin đọc được danh sách — xem `quyen_admin.dart`) để admin chủ động
+/// nâng cấp gói TRƯỚC KHI app bị chặn hẳn, thay vì biết lúc người dùng báo
+/// lỗi. Không chặn luồng chính — ghi "bắn rồi quên" (fire-and-forget).
+Future<void> _ghiCanhBaoHanMucApi(String thongDiep) async {
+  try {
+    await FirebaseFirestore.instance.collection('canhBaoApi').add({
+      'thongDiep': thongDiep,
+      'nguon': 'groq_am_thanh',
+      'thoiGian': FieldValue.serverTimestamp(),
+    });
+  } catch (_) {
+    // Ghi cảnh báo thất bại không được làm hỏng luồng ghi âm chính.
+  }
+}
+
 /// Trả về chữ phiên âm được, hoặc ném lỗi ra ngoài (nơi gọi tự quyết định
 /// báo lỗi hay âm thầm thử lại sau).
 Future<String> guiGhiAmChoGemini(
@@ -42,10 +64,21 @@ Future<String> guiGhiAmChoGemini(
         }),
       )
       .timeout(const Duration(minutes: 3));
+  final goc = jsonDecode(utf8.decode(phanHoi.bodyBytes)) as Map<String, dynamic>;
+
+  final canhBao = goc['canhBao'] as String?;
+  if (canhBao != null && canhBao.isNotEmpty) {
+    unawaited(_ghiCanhBaoHanMucApi(canhBao));
+  }
+
   if (phanHoi.statusCode != 200) {
+    if (goc['hanMucHet'] == true) {
+      final thongDiep = goc['loi']?.toString() ?? 'Đã chạm hạn mức Groq.';
+      unawaited(_ghiCanhBaoHanMucApi('[ĐÃ CHẠM HẠN MỨC] $thongDiep'));
+      throw Exception('Hạn mức miễn phí Groq (âm thanh) đã hết hôm nay — thử lại sau, hoặc báo admin nâng cấp gói.');
+    }
     throw Exception('Máy chủ AI trả về lỗi ${phanHoi.statusCode}: ${phanHoi.body}');
   }
-  final goc = jsonDecode(utf8.decode(phanHoi.bodyBytes)) as Map<String, dynamic>;
   final chu = (goc['text'] as String?)?.trim();
   if (chu == null || chu.isEmpty) {
     throw Exception(goc['loi']?.toString() ?? 'Không có nội dung trả về.');

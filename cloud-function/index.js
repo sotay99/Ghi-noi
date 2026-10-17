@@ -276,6 +276,34 @@ function huongDanChinhTa(boQuaTruocViTri, layLoiChinhTa, chenDauCau) {
 ///    model tự đánh giá là im lặng/không chắc trước khi ghép chữ trả về —
 ///    đúng cơ chế OpenAI Whisper dùng nội bộ để tự chặn hallucination, chỉ
 ///    khác là ở đây ta tự làm vì Groq không tự lọc sẵn.
+/// (YÊU CẦU MỚI) Groq trả kèm 4 header "còn lại bao nhiêu" trên MỌI phản
+/// hồi (kể cả lúc thành công) — đọc chúng để báo sớm lúc gần chạm hạn mức,
+/// KHÔNG đợi tới lúc bị chặn hẳn (429) mới biết. Trả về chuỗi cảnh báo nếu
+/// còn dưới 15% (số lượt HOẶC số token, cái nào cạn trước), `null` nếu còn
+/// dư dả hoặc Groq không trả header (ví dụ tài khoản trả phí không áp hạn
+/// mức theo kiểu này).
+function canhBaoHanMucGroq(headers) {
+  const doc = (ten) => {
+    const v = headers.get(ten);
+    const n = v == null ? NaN : Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const conLuot = doc('x-ratelimit-remaining-requests');
+  const tongLuot = doc('x-ratelimit-limit-requests');
+  const conToken = doc('x-ratelimit-remaining-tokens');
+  const tongToken = doc('x-ratelimit-limit-tokens');
+
+  const ganHet = (con, tong) => con != null && tong != null && tong > 0 && con / tong < 0.15;
+
+  if (ganHet(conLuot, tongLuot)) {
+    return `Tài khoản Groq sắp hết hạn mức SỐ LƯỢT gọi trong ngày (còn ${conLuot}/${tongLuot}).`;
+  }
+  if (ganHet(conToken, tongToken)) {
+    return `Tài khoản Groq sắp hết hạn mức SỐ TOKEN trong ngày (còn ${conToken}/${tongToken}).`;
+  }
+  return null;
+}
+
 async function goiGroqAmThanh(audioBase64, mimeType, maNgonNgu, locHallucination) {
   if (!process.env.GROQ_API_KEY) {
     throw new Error('Chưa cấu hình GROQ_API_KEY.');
@@ -311,32 +339,43 @@ async function goiGroqAmThanh(audioBase64, mimeType, maNgonNgu, locHallucination
     body: bieuMau,
   });
 
+  // (YÊU CẦU MỚI) Đọc header cảnh báo hạn mức TRÊN MỌI PHẢN HỒI — kể cả lúc
+  // lỗi — vì lúc 429 (đã chạm hạn mức) chính là lúc cần biết NHẤT.
+  const canhBao = canhBaoHanMucGroq(phanHoi.headers);
+
+  if (phanHoi.status === 429) {
+    // (YÊU CẦU MỚI) Phân biệt RÕ "đã chạm hạn mức" khỏi các lỗi 5xx/lỗi dữ
+    // liệu khác — tiền tố cố định để nơi gọi (exports.flowriteAi) nhận ra
+    // và trả về đúng tín hiệu cho app, không lẫn vào lỗi chung chung.
+    throw new Error(`HAN_MUC_HET: Tài khoản Groq đã chạm hạn mức (429) — cần nâng cấp gói hoặc chờ reset.`);
+  }
   if (!phanHoi.ok) {
     const chuLoi = await phanHoi.text();
-    throw new Error(`Groq trả về lỗi ${phanHoi.status}: ${chuLoi.slice(0, 300)}`);
+    const loi = new Error(`Groq trả về lỗi ${phanHoi.status}: ${chuLoi.slice(0, 300)}`);
+    loi.canhBao = canhBao;
+    throw loi;
   }
 
   const duLieu = await phanHoi.json();
 
+  let chu;
   if (locHallucination && Array.isArray(duLieu?.segments)) {
     // Ngưỡng tham khảo từ chính cách openai-whisper (bản chạy máy) tự lọc
     // segment hallucination: no_speech_prob cao (gần chắc chắn là im lặng)
     // NHƯNG model vẫn "cố" trả chữ, kèm avg_logprob thấp (không tự tin về
     // chữ đó) — hai điều kiện phải CÙNG đúng mới loại, để không lỡ tay xoá
     // câu nói thật chỉ vì thu nhỏ tiếng.
-    const chu = duLieu.segments
+    chu = duLieu.segments
       .filter((s) => !(Number(s?.no_speech_prob) > 0.6 && Number(s?.avg_logprob) < -1))
       .map((s) => (s?.text || '').trim())
       .filter(Boolean)
       .join(' ')
       .trim();
-    if (!chu) throw new Error('Groq không trả về nội dung (có thể ghi âm quá nhỏ hoặc im lặng hoàn toàn).');
-    return chu;
+  } else {
+    chu = (duLieu?.text || '').trim();
   }
-
-  const chu = (duLieu?.text || '').trim();
   if (!chu) throw new Error('Groq không trả về nội dung (có thể ghi âm quá nhỏ hoặc im lặng hoàn toàn).');
-  return chu;
+  return { text: chu, canhBao };
 }
 
 /// Gửi một tệp ảnh cho Gemini để trích chữ ra (OCR) — dùng cho action
@@ -555,9 +594,18 @@ exports.flowriteAi = async (req, res) => {
     }
     try {
       const ketQua = await goiGroqAmThanh(audioBase64, mimeType || 'audio/mp4', ngonNgu, locHallucination === true);
-      res.status(200).json({ text: ketQua });
+      res.status(200).json({ text: ketQua.text, canhBao: ketQua.canhBao || undefined });
     } catch (err) {
-      res.status(502).json({ loi: String(err && err.message ? err.message : err) });
+      const thongDiep = String(err && err.message ? err.message : err);
+      // (YÊU CẦU MỚI) "HAN_MUC_HET:" là tiền tố riêng từ `goiGroqAmThanh` —
+      // tách thành trường `hanMucHet: true` RIÊNG để app nhận diện chắc
+      // chắn (không phải so khớp chuỗi tiếng Việt dễ vỡ khi đổi câu chữ).
+      const hanMucHet = thongDiep.startsWith('HAN_MUC_HET:');
+      res.status(502).json({
+        loi: hanMucHet ? thongDiep.slice('HAN_MUC_HET:'.length).trim() : thongDiep,
+        hanMucHet: hanMucHet || undefined,
+        canhBao: err && err.canhBao ? err.canhBao : undefined,
+      });
     }
     return;
   }

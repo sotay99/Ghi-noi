@@ -75,6 +75,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamDonate,
     required this.khiBamQuanLyGopY,
     required this.khiBamDanhSachUser,
+    required this.khiBamCanhBaoApi,
     this.tenHienThiDaDangNhap,
     this.emailDaDangNhap,
     this.urlAnhDaiDienDaDangNhap,
@@ -117,6 +118,10 @@ class ThanhCongCu extends StatelessWidget {
   /// (YÊU CẦU MỚI — chỉ admin) Mục "Các User đã đăng nhập" — truyền thẳng
   /// xuống `_NutTaiKhoanMenu`.
   final VoidCallback khiBamDanhSachUser;
+
+  /// (YÊU CẦU MỚI — chỉ admin) Mục "Cảnh báo hạn mức API" — truyền thẳng
+  /// xuống `_NutTaiKhoanMenu`.
+  final VoidCallback khiBamCanhBaoApi;
 
   final String? tenHienThiDaDangNhap;
   final String? emailDaDangNhap;
@@ -555,6 +560,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamBaoMat: khiBamBaoMat,
                               khiBamQuanLyGopY: khiBamQuanLyGopY,
                               khiBamDanhSachUser: khiBamDanhSachUser,
+                              khiBamCanhBaoApi: khiBamCanhBaoApi,
                               tenHienThiDaDangNhap: tenHienThiDaDangNhap,
                               emailDaDangNhap: emailDaDangNhap,
                               urlAnhDaiDienDaDangNhap: urlAnhDaiDienDaDangNhap,
@@ -1669,6 +1675,7 @@ class _NutTaiKhoanMenu extends StatelessWidget {
     required this.khiBamBaoMat,
     required this.khiBamQuanLyGopY,
     required this.khiBamDanhSachUser,
+    required this.khiBamCanhBaoApi,
     this.tenHienThiDaDangNhap,
     this.emailDaDangNhap,
     this.urlAnhDaiDienDaDangNhap,
@@ -1697,6 +1704,10 @@ class _NutTaiKhoanMenu extends StatelessWidget {
   /// (YÊU CẦU MỚI — chỉ admin) Mục "Các User đã đăng nhập" — mở
   /// `moModalDanhSachUser`. Cùng điều kiện hiện với [khiBamQuanLyGopY].
   final VoidCallback khiBamDanhSachUser;
+
+  /// (YÊU CẦU MỚI — chỉ admin) Mục "Cảnh báo hạn mức API" — mở
+  /// `moModalCanhBaoApi`. Cùng điều kiện hiện với [khiBamQuanLyGopY].
+  final VoidCallback khiBamCanhBaoApi;
 
   /// Khác `null` nghĩa là ĐANG đăng nhập — tên/avatar hiện thêm ở dòng CUỐI
   /// CÙNG của menu. Cả ba đều `null` cùng lúc khi chưa đăng nhập.
@@ -1822,6 +1833,9 @@ class _NutTaiKhoanMenu extends StatelessWidget {
               case 31:
                 khiBamDanhSachUser();
                 break;
+              case 32:
+                khiBamCanhBaoApi();
+                break;
             }
           },
           itemBuilder: (ctx) {
@@ -1865,7 +1879,7 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                   daDangNhap ? 'Đăng xuất' : 'Đăng nhập bằng tài khoản Google',
                   icon: daDangNhap ? Icons.logout : Icons.login,
                 ),
-                // (YÊU CẦU MỚI — chỉ admin) Hai mục quản lý, CHỈ hiện khi
+                // (YÊU CẦU MỚI — chỉ admin) Ba mục quản lý, CHỈ hiện khi
                 // đang đăng nhập ĐÚNG một trong hai email admin — đây chỉ
                 // là lớp ẨN/HIỆN giao diện, quyền THẬT nằm ở luật Firestore
                 // (xem `quyen_admin.dart`).
@@ -1873,6 +1887,8 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                   _mucMenuThem(30, 'Các ý kiến góp ý, báo lỗi của user',
                       icon: Icons.rate_review_outlined),
                   _mucMenuThem(31, 'Các User đã đăng nhập', icon: Icons.group_outlined),
+                  _mucMenuThem(32, 'Cảnh báo hạn mức API',
+                      icon: Icons.warning_amber_outlined, mauChu: Colors.orange.shade800),
                 ],
                 // (YÊU CẦU MỚI) Đang đăng nhập — hiện tên + avatar của tài
                 // khoản ở dòng CUỐI CÙNG của menu, không bấm được (chỉ để
