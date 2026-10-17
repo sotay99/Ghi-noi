@@ -1,19 +1,11 @@
 # Quy ước giao tiếp — QUAN TRỌNG
 
-Người dùng dùng máy tính bảng Android — KHÔNG thấy được file gửi qua cơ chế
-đính kèm/thẻ file (ví dụ công cụ gửi file) trong cuộc trò chuyện. Mỗi khi có
-một tệp MỚI cần đưa cho người dùng (ví dụ `cloud-function/index.js` để dán
-vào Google Cloud Console) hoặc một tệp ĐÃ CÓ vừa cập nhật mà người dùng cần
-tự thao tác tay (dán lại, copy...), PHẢI dán TOÀN BỘ nội dung tệp đó dưới
-dạng text ngay trong tin nhắn trả lời ở cuộc trò chuyện này — không chỉ gửi
-qua đính kèm.
-
-**Nguyên vẹn, MỘT khối duy nhất — không chia nhiều tin nhắn/nhiều khối mã.**
-Người dùng cần dán đè nguyên file cho nhanh — chia file ra "phần 1/phần 2"
-bắt người dùng tự ghép lại là KHÔNG chấp nhận được, dù file dài (kể cả
-file cả nghìn dòng). Luôn dán trọn trong đúng MỘT khối ```...``` liền
-mạch, kể cả khi phải đọc file theo nhiều lượt `Read` (offset/limit khác
-nhau) để gom đủ nội dung trước khi dán.
+Người dùng dùng máy tính bảng Android. Khi có một tệp MỚI hoặc tệp ĐÃ CÓ vừa
+cập nhật mà người dùng cần (ví dụ `cloud-function/index.js` để dán vào
+Google Cloud Console): gửi qua công cụ đính kèm file là ĐỦ, người dùng tải
+file đó về máy rồi tự mở ra copy — KHÔNG dán nội dung tràn lan ra khung chat
+(không cần thiết, chỉ gây rối). Chỉ dán nội dung file thẳng vào tin nhắn khi
+người dùng YÊU CẦU RÕ RÀNG việc đó.
 
 # Lỗi tồn đọng — hoãn sửa
 
