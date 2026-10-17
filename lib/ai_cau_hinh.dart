@@ -18,7 +18,7 @@ const matKhauMayChuAI = 'hGzPGCntDDGc0cfAkzePuypITzrJHA55ltIvl9zq';
 /// theo đúng cách reCAPTCHA hoạt động, khác hẳn `matKhauMayChuAI`), dùng để
 /// App Check sinh token chứng minh "yêu cầu này đến từ app Flowrite thật"
 /// trên web. Android dùng Play Integrity, không cần khoá nào ở đây.
-const _siteKeyReCaptchaEnterprise = '6LelK_MtAAAAALyj5zKPexmETI4GwyoXiB_uYMl2';
+const _siteKeyReCaptchaEnterprise = '6LeLjvMtAAAAADrqHR0Ze-oiDtp0jnEKArtCTv4u';
 
 /// Gọi ĐÚNG MỘT LẦN lúc khởi động app (`main.dart`/`main_web_full.dart`,
 /// ngay sau `Firebase.initializeApp`). `cloud-function/index.js` xác minh
