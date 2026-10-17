@@ -3,6 +3,8 @@
 // cho phần soạn thảo, lib/man_hinh_thu_muc.dart cho phần quản lý thư mục, và
 // lib/kho_du_lieu.dart cho phần lưu trữ.
 
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
@@ -21,7 +23,10 @@ import 'trang_soan_thao.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await khoiTaoAppCheck();
+  // (SỬA LỖI NGHIÊM TRỌNG) KHÔNG `await` — App Check (Play Integrity) có
+  // thể chậm/treo trên APK sideload, xem chú thích ở `khoiTaoAppCheck`.
+  // Chạy nền, không chặn màn hình đầu tiên vẽ ra.
+  unawaited(khoiTaoAppCheck());
   // (YÊU CẦU MỚI) Bọc trong `KhoiDongLaiApp` — cho phép khởi động lại toàn
   // bộ app tại chỗ sau khi đăng xuất, xem `khoi_dong_lai_app.dart`.
   runApp(const KhoiDongLaiApp(child: UngDungFlowrite()));

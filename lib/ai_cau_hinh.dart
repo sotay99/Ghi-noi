@@ -24,11 +24,28 @@ const _siteKeyReCaptchaEnterprise = '6LelK_MtAAAAALyj5zKPexmETI4GwyoXiB_uYMl2';
 /// ngay sau `Firebase.initializeApp`). `cloud-function/index.js` xác minh
 /// token này (chữ ký RS256 thật, không phải chỉ đọc payload như `idToken`
 /// ở trên) trước khi xử lý — hàm `xacMinhAppCheckToken`.
+///
+/// (SỬA LỖI NGHIÊM TRỌNG — v216 làm app KẸT HẲN ở màn hình khởi động) BẮT
+/// BUỘC có `try/catch` + giới hạn thời gian chờ: `activate()` gọi Play
+/// Integrity, một dịch vụ THIẾT KẾ CHO APK CÀI TỪ GOOGLE PLAY — APK cài
+/// trực tiếp từ tệp (sideload, như qua GitHub Releases) khiến Play
+/// Integrity xác thực thất bại HOẶC TREO VÔ THỜI HẠN (không ném lỗi ngay).
+/// Hàm này gọi TRƯỚC `runApp()` nên một khi nó treo, app không bao giờ vẽ
+/// được màn hình đầu tiên — đúng triệu chứng "kẹt ở logo/màn trắng". App
+/// Check hiện vẫn đang ở chế độ "chỉ ghi log" (chưa chặn gì ở máy chủ), nên
+/// lỗi/treo ở đây KHÔNG được phép cản trở app khởi động bình thường.
 Future<void> khoiTaoAppCheck() async {
-  await FirebaseAppCheck.instance.activate(
-    androidProvider: AndroidProvider.playIntegrity,
-    webProvider: ReCaptchaEnterpriseProvider(_siteKeyReCaptchaEnterprise),
-  );
+  try {
+    await FirebaseAppCheck.instance
+        .activate(
+          androidProvider: AndroidProvider.playIntegrity,
+          webProvider: ReCaptchaEnterpriseProvider(_siteKeyReCaptchaEnterprise),
+        )
+        .timeout(const Duration(seconds: 8));
+  } catch (_) {
+    // Im lặng bỏ qua — xem chú thích ở trên. Token App Check chỉ đơn thuần
+    // không gửi được, máy chủ vẫn hoạt động bình thường (chế độ chưa chặn).
+  }
 }
 
 /// Trả `null` nếu lấy token thất bại (mất mạng, App Check chưa kịp khởi
