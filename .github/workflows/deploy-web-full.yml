@@ -57,6 +57,12 @@ on:
       - 'lib/ai_cau_hinh.dart'
       - 'lib/firebase_options.dart'
       - 'lib/dang_nhap_google.dart'
+      - 'lib/mo_hinh.dart'
+      - 'lib/modal_chia_se_tep.dart'
+      - 'lib/mo_lien_ket_ngoai.dart'
+      - 'lib/mo_lien_ket_ngoai_web.dart'
+      - 'lib/mo_lien_ket_ngoai_io.dart'
+      - 'web_static/chia-se-tep.html'
       - '.github/workflows/deploy-web-full.yml'
   workflow_dispatch:
 
@@ -121,6 +127,13 @@ jobs:
             --pwa-strategy=none \
             --source-maps
 
+      # (YÊU CẦU MỚI — "Chia sẻ tệp bằng đường link") Trang HTML tĩnh xem
+      # tệp công khai, KHÔNG phải Flutter — chép thẳng vào build/web, rewrite
+      # ở bước "Tạo cấu hình Firebase Hosting" bên dưới sẽ trỏ mọi đường dẫn
+      # một đoạn (/<mã chia sẻ>) về đây TRƯỚC rule "**" của Flutter.
+      - name: Chép trang tĩnh "Chia sẻ tệp bằng đường link"
+        run: cp web_static/chia-se-tep.html build/web/chia-se-tep.html
+
       # Đưa thẳng lên channel "live" — địa chỉ chính flowrite219.web.app,
       # vĩnh viễn, không hết hạn (khác channel xem trước "day-du"/tên nhánh,
       # gia hạn 7-30 ngày mỗi lần đẩy nhưng vẫn có ngày hết nếu ngừng đẩy).
@@ -134,6 +147,7 @@ jobs:
               "public": "build/web",
               "ignore": ["firebase.json", "**/.*"],
               "rewrites": [
+                { "source": "/:ma", "destination": "/chia-se-tep.html" },
                 { "source": "**", "destination": "/index.html" }
               ],
               "headers": [

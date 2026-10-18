@@ -90,6 +90,7 @@ class GhiChuFile {
     required this.capNhat,
     this.mau,
     this.thoiGianXoa,
+    this.maChiaSe,
   });
 
   final String id;
@@ -104,6 +105,14 @@ class GhiChuFile {
   /// Cùng vai trò với `ThuMuc.thoiGianXoa` — xem chú thích ở đó.
   DateTime? thoiGianXoa;
 
+  /// (YÊU CẦU MỚI — "Chia sẻ tệp bằng đường link") Mã ngẫu nhiên duy nhất
+  /// của tệp này, CHỈ có ở tệp trên Bộ nhớ đám mây — `null` nghĩa là chưa
+  /// từng bấm "Chia sẻ tệp bằng đường link". Sinh một lần, giữ mãi (không
+  /// sinh lại) để link cũ đã gửi đi không bao giờ hỏng. Xem
+  /// `lib/modal_chia_se_tep.dart` và `KhoDuLieuDamMay._dayLenFirestore`
+  /// (đồng bộ nội dung sang collection công khai `chiaSeTep/<mã>`).
+  String? maChiaSe;
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'ten': ten,
@@ -113,6 +122,7 @@ class GhiChuFile {
         if (mau != null) 'mau': mau,
         if (thoiGianXoa != null)
           'xoa': thoiGianXoa!.millisecondsSinceEpoch,
+        if (maChiaSe != null) 'maChiaSe': maChiaSe,
       };
 
   factory GhiChuFile.fromJson(Map<String, dynamic> j) => GhiChuFile(
@@ -127,5 +137,6 @@ class GhiChuFile {
         thoiGianXoa: j['xoa'] == null
             ? null
             : DateTime.fromMillisecondsSinceEpoch(j['xoa'] as int),
+        maChiaSe: j['maChiaSe'] as String?,
       );
 }

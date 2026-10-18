@@ -50,7 +50,19 @@ class ManHinhHuongDan extends StatelessWidget {
                         gachDau: _dacDiemDaTep,
                       ),
                       SizedBox(height: 28),
-                      _MucLon(so: 'III', tieuDe: 'Trợ lý AI đi kèm'),
+                      _MucLon(so: 'III', tieuDe: 'Gõ nhanh hơn với bộ nhớ tạm, từ điển gõ nhanh, sửa lỗi chính tả'),
+                      SizedBox(height: 14),
+                      _Doan(_doan3b),
+                      SizedBox(height: 14),
+                      _TheHanChe(
+                        mau: Color(0xFF188038),
+                        mauNen: Color(0xFFE6F4EA),
+                        icon: Icons.content_paste_outlined,
+                        tieuDe: 'Ba trợ thủ nhỏ, hiệu quả lớn',
+                        gachDau: _dacDiemGoNhanh,
+                      ),
+                      SizedBox(height: 28),
+                      _MucLon(so: 'IV', tieuDe: 'Trợ lý AI đi kèm'),
                       SizedBox(height: 14),
                       _Doan(_doan3),
                       SizedBox(height: 14),
@@ -62,11 +74,11 @@ class ManHinhHuongDan extends StatelessWidget {
                         gachDau: _dacDiemAi,
                       ),
                       SizedBox(height: 28),
-                      _MucLon(so: 'IV', tieuDe: 'Đồng bộ nhiều thiết bị'),
+                      _MucLon(so: 'V', tieuDe: 'Đồng bộ nhiều thiết bị'),
                       SizedBox(height: 14),
                       _Doan(_doan4),
                       SizedBox(height: 28),
-                      _MucLon(so: 'V', tieuDe: 'Ghi nhanh ngay từ màn hình chính (Android)'),
+                      _MucLon(so: 'VI', tieuDe: 'Ghi nhanh ngay từ màn hình chính (Android)'),
                       SizedBox(height: 6),
                       _ChiChuNenTang('Chỉ dành cho Android — iPhone/iPad sẽ nâng cấp sau'),
                       SizedBox(height: 14),
@@ -74,7 +86,7 @@ class ManHinhHuongDan extends StatelessWidget {
                       SizedBox(height: 14),
                       _CacBuocDanhSo(cacBuoc: _cacBuocCaiWidget),
                       SizedBox(height: 28),
-                      _MucLon(so: 'VI', tieuDe: 'Bí quyết để nhanh hơn nữa'),
+                      _MucLon(so: 'VII', tieuDe: 'Bí quyết để nhanh hơn nữa'),
                       SizedBox(height: 14),
                       _Doan(_doan8),
                       SizedBox(height: 14),
@@ -110,7 +122,7 @@ class ManHinhHuongDan extends StatelessWidget {
                         noiDung: _oGoiYMicroRoi,
                       ),
                       SizedBox(height: 28),
-                      _MucLon(so: 'VII', tieuDe: 'Liên hệ'),
+                      _MucLon(so: 'VIII', tieuDe: 'Liên hệ'),
                       SizedBox(height: 14),
                       _Doan(
                         'Có thắc mắc, góp ý, báo lỗi, vui lòng liên hệ qua '
@@ -582,6 +594,17 @@ const _dacDiemDaTep = [
   'Chuyển qua ghi chú khác KHÔNG phải quay lại màn hình thư mục rồi bấm mở lại từng cái — chỉ một nút, ngay tại chỗ đang soạn.',
   'Hết tệp cuối tự vòng về tệp đầu (và ngược lại) — không bao giờ "kẹt ở biên".',
   'Tìm nhanh trong thư mục, và tuỳ chọn mở sẵn đúng ghi chú mỗi khi khởi động app.',
+];
+
+const _doan3b =
+    'Những đoạn gõ lặp lại — chữ ký, lời chào, cụm từ hay dùng — không cần '
+    'gõ lại từ đầu mỗi lần. Và những lỗi chính tả nhỏ không cần tự soi từng '
+    'chữ để sửa.';
+
+const _dacDiemGoNhanh = [
+  '**Bộ nhớ tạm để dán văn bản**: lưu lại 10 lần cắt/dán/copy gần nhất, ghim lại dòng nào muốn giữ lâu — dán lại y nguyên bất cứ lúc nào, khỏi gõ lại.',
+  '**Từ điển nhập liệu nhanh**: một bảng 26 dòng chứa sẵn các đoạn hay dùng, chạm một lần là dán thẳng vào bài — nhanh hơn hẳn gõ tay cho những câu lặp đi lặp lại.',
+  '**Từ điển sửa lỗi chính tả**: tự động dò và gợi ý sửa lỗi gõ sai quen tay, giữ văn bản sạch mà không phải dừng lại đọc rà soát.',
 ];
 
 const _doan3 =

@@ -17,6 +17,7 @@ import 'kho_du_lieu.dart';
 import 'luu_va_chia_se_tep.dart';
 import 'mau_co_ban.dart';
 import 'mo_hinh.dart';
+import 'modal_chia_se_tep.dart';
 import 'modal_nhap_zip.dart';
 import 'modal_thong_tin_muc.dart';
 import 'modal_thung_rac.dart';
@@ -727,7 +728,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     _danhDauMucMoi([ketQua.id]);
   }
 
-  /// "Tải và chia sẻ thư mục này" — nén nguyên thư mục [id] (và mọi thứ bên
+  /// "Tải Thư mục này về thiết bị" — nén nguyên thư mục [id] (và mọi thứ bên
   /// trong) thành .zip rồi tải/chia sẻ, xem `lib/zip_thu_muc.dart`. Dùng
   /// chung cho cả dòng tên thư mục ĐANG ĐỨNG (dòng 3) và từng thư mục con
   /// trong danh sách (menu ba chấm riêng của nó).
@@ -1540,7 +1541,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                     _mucMenuIcon(6, Icons.upload_file_outlined, 'Nhập ZIP hoặc TXT vào đây'),
                     const PopupMenuDivider(),
                     _mucMenuIcon(2, Icons.checklist_outlined, 'Chọn nhiều'),
-                    _mucMenuIcon(3, Icons.share_outlined, 'Tải và chia sẻ thư mục này'),
+                    _mucMenuIcon(3, Icons.download_outlined, 'Tải Thư mục này về thiết bị'),
                     _mucMenuIcon(4, Icons.info_outline, 'Thông tin thư mục này'),
                     const PopupMenuDivider(),
                     _mucMenuIcon(5, Icons.delete_outline, 'Thùng rác Nội bộ'),
@@ -1681,7 +1682,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
           _mucMenuIcon('cat', Icons.drive_file_move_outline, 'Cắt (di chuyển)'),
           _mucMenuIcon('chep', Icons.copy_outlined, 'Sao chép'),
           _mucMenuIcon('mau', Icons.palette_outlined, 'Chọn màu Tên Thư mục'),
-          _mucMenuIcon('tai', Icons.share_outlined, 'Tải và chia sẻ thư mục này'),
+          _mucMenuIcon('tai', Icons.download_outlined, 'Tải Thư mục này về thiết bị'),
           _mucMenuIcon('thong_tin', Icons.info_outline, 'Thông tin thư mục này'),
           _mucMenuIcon('xoa', Icons.delete_outline, 'Chuyển vào thùng rác'),
         ],
@@ -1704,6 +1705,9 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
             case 'tai_ve':
               _taiVeGhiChu(g);
               break;
+            case 'chia_se_link':
+              hienModalChiaSeTep(context, ghiChu: g, kho: _kho as KhoDuLieuDamMay);
+              break;
             case 'mau':
               _chonMau(laThuMuc: false, id: g.id);
               break;
@@ -1720,6 +1724,10 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
           _mucMenuIcon('cat', Icons.drive_file_move_outline, 'Cắt (di chuyển)'),
           _mucMenuIcon('chep', Icons.copy_outlined, 'Sao chép'),
           _mucMenuIcon('tai_ve', Icons.download_outlined, 'Tải về'),
+          // (YÊU CẦU MỚI) CHỈ dành cho tệp trên Bộ nhớ đám mây — tệp nội bộ
+          // không có nơi công khai để trỏ link tới.
+          if (_laKhoDamMay)
+            _mucMenuIcon('chia_se_link', Icons.link, 'Chia sẻ tệp bằng đường link'),
           _mucMenuIcon('mau', Icons.palette_outlined, 'Chọn màu Tên Tệp'),
           _mucMenuIcon('thong_tin', Icons.info_outline, 'Thông tin tệp này'),
           _mucMenuIcon('xoa', Icons.delete_outline, 'Chuyển vào thùng rác'),
@@ -2012,7 +2020,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                 _mucMenuIcon(
                                     'mau', Icons.palette_outlined, 'Chọn màu Tên Thư mục'),
                                 _mucMenuIcon(
-                                    'tai', Icons.share_outlined, 'Tải và chia sẻ thư mục này'),
+                                    'tai', Icons.download_outlined, 'Tải Thư mục này về thiết bị'),
                                 _mucMenuIcon(
                                     'thong_tin', Icons.info_outline, 'Thông tin thư mục này'),
                                 _mucMenuIcon('xoa', Icons.delete_outline, 'Chuyển vào thùng rác'),
@@ -2083,6 +2091,10 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                   case 'tai_ve':
                                     _taiVeGhiChu(g);
                                     break;
+                                  case 'chia_se_link':
+                                    hienModalChiaSeTep(context,
+                                        ghiChu: g, kho: _kho as KhoDuLieuDamMay);
+                                    break;
                                   case 'mau':
                                     _chonMau(laThuMuc: false, id: g.id);
                                     break;
@@ -2104,6 +2116,9 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                     'cat', Icons.drive_file_move_outline, 'Cắt (di chuyển)'),
                                 _mucMenuIcon('chep', Icons.copy_outlined, 'Sao chép'),
                                 _mucMenuIcon('tai_ve', Icons.download_outlined, 'Tải về'),
+                                if (_laKhoDamMay)
+                                  _mucMenuIcon('chia_se_link', Icons.link,
+                                      'Chia sẻ tệp bằng đường link'),
                                 _mucMenuIcon('mau', Icons.palette_outlined, 'Chọn màu Tên Tệp'),
                                 _mucMenuIcon(
                                     'thong_tin', Icons.info_outline, 'Thông tin tệp này'),

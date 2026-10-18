@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'mo_hinh.dart';
@@ -786,6 +787,20 @@ class KhoDuLieuDamMay extends KhoDuLieu {
       if (_anhGhiChu[g.id] != j) {
         batch.set(_colGhiChu.doc(g.id), g.toJson());
         coGhi = true;
+        // (YÊU CẦU MỚI — "Chia sẻ tệp bằng đường link") Tệp đã có mã chia
+        // sẻ thì MỖI LẦN lưu đều ghi lại bản mới nhất sang collection công
+        // khai riêng `chiaSeTep/<mã>` — KHÔNG đọc thẳng document gốc ở
+        // `_colGhiChu` (tránh lộ các trường khác của người dùng), trang
+        // tĩnh `flowrite.pro/<mã>` chỉ đọc đúng collection này.
+        if (g.maChiaSe != null) {
+          batch.set(_db.collection('chiaSeTep').doc(g.maChiaSe), {
+            'ten': g.ten,
+            'noiDung': g.noiDung,
+            'chuSoHuu': FirebaseAuth.instance.currentUser?.email ?? '',
+            'idTepGoc': g.id,
+          });
+          coGhi = true;
+        }
       }
     }
     for (final idCu in _anhGhiChu.keys) {
