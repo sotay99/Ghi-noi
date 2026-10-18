@@ -8636,7 +8636,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         viTriManHinh.dy,
       ),
       items: [
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'tatCa',
           child: Row(children: [
             Icon(Icons.transcribe, size: 18, color: Color(0xFF5F6368)),
@@ -8644,7 +8644,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             Text(Ch.chuyenHoaTatCaTheGhiAm(ngonNguHienTai.value)),
           ]),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'moiThe',
           child: Row(children: [
             Icon(Icons.graphic_eq, size: 18, color: Color(0xFF5F6368)),
@@ -8652,7 +8652,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             Text(Ch.chiChuyenHoaTheNay(ngonNguHienTai.value)),
           ]),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'nghe',
           child: Row(children: [
             Icon(Icons.play_circle_outline, size: 18, color: Color(0xFF5F6368)),
@@ -8668,7 +8668,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             Text(Ch.xoaTheGhiAmNay(ngonNguHienTai.value), style: TextStyle(color: Colors.red.shade600)),
           ]),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'doiViTri',
           child: Row(children: [
             Icon(Icons.swap_vert, size: 18, color: Color(0xFF5F6368)),
@@ -8978,7 +8978,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         viTriManHinh.dy,
       ),
       items: [
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'nghe',
           child: Row(children: [
             Icon(Icons.play_circle_outline, size: 18, color: Color(0xFF5F6368)),
@@ -11488,7 +11488,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             Text(Ch.huyDeXuat(ngonNguHienTai.value), style: TextStyle(color: Colors.green.shade700)),
           ]),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'chapNhanTatCa',
           child: Row(children: [
             Icon(Icons.done_all, size: 18, color: Color(0xFF5F6368)),
