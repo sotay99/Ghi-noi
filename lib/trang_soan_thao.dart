@@ -5963,7 +5963,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 children: [
                   Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Text(Ch.kyTuDacBiet(ngonNguHienTai.value), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       ),
                       IconButton(
@@ -11785,12 +11785,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         Future.delayed(const Duration(milliseconds: 1500), () {
           if (ctx.mounted) Navigator.of(ctx).pop();
         });
-        return const AlertDialog(
+        return AlertDialog(
           content: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.check_circle, color: Colors.green),
-              SizedBox(width: 12),
+              const Icon(Icons.check_circle, color: Colors.green),
+              const SizedBox(width: 12),
               Text(Ch.aiDaTraVeKetQua(ngonNguHienTai.value)),
             ],
           ),
@@ -13810,7 +13810,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => const AlertDialog(
+      builder: (ctx) => AlertDialog(
         content: Row(
           children: [
             SizedBox(
@@ -13920,7 +13920,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => const AlertDialog(
+      builder: (ctx) => AlertDialog(
         content: Row(
           children: [
             SizedBox(
@@ -14141,7 +14141,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => const AlertDialog(
+      builder: (ctx) => AlertDialog(
         content: Row(
           children: [
             SizedBox(
@@ -14324,7 +14324,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => const AlertDialog(
+      builder: (ctx) => AlertDialog(
         content: Row(
           children: [
             SizedBox(
@@ -14460,7 +14460,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => const AlertDialog(
+      builder: (ctx) => AlertDialog(
         content: Row(
           children: [
             SizedBox(
@@ -14876,7 +14876,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => const AlertDialog(
+      builder: (ctx) => AlertDialog(
         content: Row(
           children: [
             SizedBox(
