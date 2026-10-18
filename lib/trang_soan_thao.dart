@@ -11666,8 +11666,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final vanBan = vungChon != null ? vungChon.textInside(_boDieuKhien.text) : _boDieuKhien.text;
     if (vanBan.trim().isEmpty) {
       _bao(vungChon != null
-          ? 'Đoạn đang chọn trống, không có gì để kiểm tra.'
-          : 'Chưa có văn bản nào để kiểm tra.');
+          ? Ch.doanDangChonTrongKhongCoGiDeKiemTra(ngonNguHienTai.value)
+          : Ch.chuaCoVanBanNaoDeKiemTra(ngonNguHienTai.value));
       return;
     }
     if (!_coTheDungAIVoiVanBan(vanBan, coVungChon: vungChon != null)) return;
@@ -14010,8 +14010,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final vanBanGoc = vungChon != null ? vungChon.textInside(_boDieuKhien.text) : _boDieuKhien.text;
     if (vanBanGoc.trim().isEmpty) {
       _bao(vungChon != null
-          ? 'Đoạn đang chọn trống, không có gì để tóm tắt.'
-          : 'Trang đang trống, không có gì để tóm tắt.');
+          ? Ch.doanDangChonTrongKhongCoGiDeTomTat(ngonNguHienTai.value)
+          : Ch.trangDangTrongKhongCoGiDeTomTat(ngonNguHienTai.value));
       return;
     }
     if (!_coTheDungAIVoiVanBan(vanBanGoc, coVungChon: vungChon != null)) return;
@@ -14026,7 +14026,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         builder: (ctx, capNhat) {
           final coTheGui = chonPhanTram || chonCauLenh;
           return AlertDialog(
-            title: Text(vungChon != null ? 'Chọn kiểu tóm tắt (đoạn đang chọn)' : 'Chọn kiểu tóm tắt'),
+            title: Text(Ch.chonKieuTomTat(ngonNguHienTai.value, vungChon != null)),
             content: SizedBox(
               width: 420,
               child: SingleChildScrollView(
@@ -14043,7 +14043,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     ),
                     if (chonPhanTram) ...[
                       Text(
-                        'Rút gọn còn ${phanTram.round()}% văn bản gốc',
+                        Ch.rutGonConPhanTramVanBanGoc(ngonNguHienTai.value, phanTram.round()),
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: Color(0xFF1A73E8),
@@ -14179,7 +14179,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     _moModalKetQuaToanVan(
       vanBanKetQua,
-      tieuDe: vungChon != null ? 'Kết quả tóm tắt (đoạn đã chọn)' : 'Kết quả tóm tắt',
+      tieuDe: Ch.ketQuaTomTat(ngonNguHienTai.value, vungChon != null),
       vungChon: vungChon,
     );
   }
@@ -14193,8 +14193,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final vanBanGoc = vungChon != null ? vungChon.textInside(_boDieuKhien.text) : _boDieuKhien.text;
     if (vanBanGoc.trim().isEmpty) {
       _bao(vungChon != null
-          ? 'Đoạn đang chọn trống, không có gì để mở rộng.'
-          : 'Trang đang trống, không có gì để mở rộng.');
+          ? Ch.doanDangChonTrongKhongCoGiDeMoRong(ngonNguHienTai.value)
+          : Ch.trangDangTrongKhongCoGiDeMoRong(ngonNguHienTai.value));
       return;
     }
     if (!_coTheDungAIVoiVanBan(vanBanGoc, coVungChon: vungChon != null)) return;
@@ -14209,7 +14209,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         builder: (ctx, capNhat) {
           final coTheGui = chonPhanTram || chonCauLenh;
           return AlertDialog(
-            title: Text(vungChon != null ? 'Chọn kiểu mở rộng (đoạn đang chọn)' : 'Chọn kiểu mở rộng'),
+            title: Text(Ch.chonKieuMoRong(ngonNguHienTai.value, vungChon != null)),
             content: SizedBox(
               width: 420,
               child: SingleChildScrollView(
@@ -14226,7 +14226,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     ),
                     if (chonPhanTram) ...[
                       Text(
-                        'Mở rộng thành ${phanTram.round()}% văn bản gốc',
+                        Ch.moRongThanhPhanTramVanBanGoc(ngonNguHienTai.value, phanTram.round()),
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: Color(0xFF1A73E8),
@@ -14362,7 +14362,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     _moModalKetQuaToanVan(
       vanBanKetQua,
-      tieuDe: vungChon != null ? 'Kết quả mở rộng (đoạn đã chọn)' : 'Kết quả mở rộng',
+      tieuDe: Ch.ketQuaMoRong(ngonNguHienTai.value, vungChon != null),
       vungChon: vungChon,
     );
   }
@@ -14376,8 +14376,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final vanBanGoc = vungChon != null ? vungChon.textInside(_boDieuKhien.text) : _boDieuKhien.text;
     if (vanBanGoc.trim().isEmpty) {
       _bao(vungChon != null
-          ? 'Đoạn đang chọn trống, không có gì để viết lại.'
-          : 'Trang đang trống, không có gì để viết lại.');
+          ? Ch.doanDangChonTrongKhongCoGiDeVietLai(ngonNguHienTai.value)
+          : Ch.trangDangTrongKhongCoGiDeVietLai(ngonNguHienTai.value));
       return;
     }
     if (!_coTheDungAIVoiVanBan(vanBanGoc, coVungChon: vungChon != null)) return;
@@ -14387,7 +14387,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, capNhat) => AlertDialog(
-          title: Text(vungChon != null ? 'Viết lại cho hay hơn (đoạn đang chọn)' : 'Viết lại cho hay hơn'),
+          title: Text(Ch.vietLaiChoHayHonTieuDe(ngonNguHienTai.value, vungChon != null)),
           content: SizedBox(
             width: 420,
             child: Column(
@@ -14497,7 +14497,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     _moModalKetQuaToanVan(
       vanBanKetQua,
-      tieuDe: vungChon != null ? 'Kết quả viết lại (đoạn đã chọn)' : 'Kết quả viết lại',
+      tieuDe: Ch.ketQuaVietLai(ngonNguHienTai.value, vungChon != null),
       vungChon: vungChon,
     );
   }
@@ -14549,10 +14549,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(Ch.troChuyenDangNangCapTieuDe(ngonNguHienTai.value)),
-        content: const Text(
-          'Tính năng này giúp bạn trò chuyện với mọi người... Tính năng '
-          'này hiện đang nâng cấp.',
-        ),
+        content: Text(Ch.troChuyenDangNangCapNoiDung(ngonNguHienTai.value)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
@@ -14589,9 +14586,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Bạn có thể bấm vào ô bên dưới để sửa lại chữ tuỳ ý trước khi thay thế.',
-                style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+              Text(
+                Ch.banCoTheBamOBenDuoiDeSuaTruocKhiThayThe(ngonNguHienTai.value),
+                style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
               ),
               const SizedBox(height: 8),
               ConstrainedBox(
@@ -14635,7 +14632,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 _thayTheToanBoVanBan(vb);
               }
             },
-            child: Text(vungChon != null ? 'Thay thế đoạn đã chọn' : 'Thay thế toàn bộ văn bản'),
+            child: Text(Ch.thayTheDoanDaChon(ngonNguHienTai.value, vungChon != null)),
           ),
         ],
       ),
@@ -14647,10 +14644,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       context: context,
       builder: (ctx2) => AlertDialog(
         title: Text(Ch.huyKetQuaNay(ngonNguHienTai.value)),
-        content: const Text(
-          'Văn bản AI vừa trả về (kể cả phần bạn đã sửa, nếu có) sẽ mất hẳn, '
-          'không thể lấy lại. Bạn có chắc chắn muốn huỷ không?',
-        ),
+        content: Text(Ch.vanBanAiSapMatKhiHuy(ngonNguHienTai.value)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx2).pop(false),
@@ -14945,9 +14939,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Bạn có thể bấm vào ô bên dưới để sửa lại chữ tuỳ ý trước khi chèn.',
-                style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+              Text(
+                Ch.banCoTheBamOBenDuoiDeSuaTruocKhiChen(ngonNguHienTai.value),
+                style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
               ),
               const SizedBox(height: 8),
               ConstrainedBox(

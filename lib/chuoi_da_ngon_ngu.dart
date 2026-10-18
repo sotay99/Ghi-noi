@@ -926,6 +926,69 @@ class Ch {
       : 'Matches the exact tone marks typed — typing "thang" only matches "thang", not accented variants.';
   static String huongDanThayThe(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Hướng dẫn thay thế' : 'Replace guide';
+  static String chonKieuTomTat(NgonNgu nn, bool coDoanChon) => nn == NgonNgu.vi
+      ? (coDoanChon ? 'Chọn kiểu tóm tắt (đoạn đang chọn)' : 'Chọn kiểu tóm tắt')
+      : (coDoanChon ? 'Choose summary style (selected paragraph)' : 'Choose summary style');
+  static String chonKieuMoRong(NgonNgu nn, bool coDoanChon) => nn == NgonNgu.vi
+      ? (coDoanChon ? 'Chọn kiểu mở rộng (đoạn đang chọn)' : 'Chọn kiểu mở rộng')
+      : (coDoanChon ? 'Choose expansion style (selected paragraph)' : 'Choose expansion style');
+  static String doanDangChonTrongKhongCoGiDeKiemTra(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đoạn đang chọn trống, không có gì để kiểm tra.'
+      : 'The selected paragraph is empty — nothing to check.';
+  static String chuaCoVanBanNaoDeKiemTra(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Chưa có văn bản nào để kiểm tra.'
+      : 'There is no text to check yet.';
+  static String doanDangChonTrongKhongCoGiDeTomTat(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đoạn đang chọn trống, không có gì để tóm tắt.'
+      : 'The selected paragraph is empty — nothing to summarize.';
+  static String trangDangTrongKhongCoGiDeTomTat(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Trang đang trống, không có gì để tóm tắt.'
+      : 'The page is empty — nothing to summarize.';
+  static String rutGonConPhanTramVanBanGoc(NgonNgu nn, int phanTram) => nn == NgonNgu.vi
+      ? 'Rút gọn còn $phanTram% văn bản gốc'
+      : 'Shorten to $phanTram% of the original text';
+  static String ketQuaTomTat(NgonNgu nn, bool coDoanChon) => nn == NgonNgu.vi
+      ? (coDoanChon ? 'Kết quả tóm tắt (đoạn đã chọn)' : 'Kết quả tóm tắt')
+      : (coDoanChon ? 'Summary result (selected paragraph)' : 'Summary result');
+  static String doanDangChonTrongKhongCoGiDeMoRong(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đoạn đang chọn trống, không có gì để mở rộng.'
+      : 'The selected paragraph is empty — nothing to expand.';
+  static String trangDangTrongKhongCoGiDeMoRong(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Trang đang trống, không có gì để mở rộng.'
+      : 'The page is empty — nothing to expand.';
+  static String moRongThanhPhanTramVanBanGoc(NgonNgu nn, int phanTram) => nn == NgonNgu.vi
+      ? 'Mở rộng thành $phanTram% văn bản gốc'
+      : 'Expand to $phanTram% of the original text';
+  static String ketQuaMoRong(NgonNgu nn, bool coDoanChon) => nn == NgonNgu.vi
+      ? (coDoanChon ? 'Kết quả mở rộng (đoạn đã chọn)' : 'Kết quả mở rộng')
+      : (coDoanChon ? 'Expansion result (selected paragraph)' : 'Expansion result');
+  static String doanDangChonTrongKhongCoGiDeVietLai(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đoạn đang chọn trống, không có gì để viết lại.'
+      : 'The selected paragraph is empty — nothing to rewrite.';
+  static String trangDangTrongKhongCoGiDeVietLai(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Trang đang trống, không có gì để viết lại.'
+      : 'The page is empty — nothing to rewrite.';
+  static String ketQuaVietLai(NgonNgu nn, bool coDoanChon) => nn == NgonNgu.vi
+      ? (coDoanChon ? 'Kết quả viết lại (đoạn đã chọn)' : 'Kết quả viết lại')
+      : (coDoanChon ? 'Rewrite result (selected paragraph)' : 'Rewrite result');
+  static String troChuyenDangNangCapNoiDung(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Tính năng này giúp bạn trò chuyện với mọi người... Tính năng này hiện đang nâng cấp.'
+      : 'This feature lets you chat with everyone... It is currently being upgraded.';
+  static String banCoTheBamOBenDuoiDeSuaTruocKhiThayThe(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bạn có thể bấm vào ô bên dưới để sửa lại chữ tuỳ ý trước khi thay thế.'
+      : 'You can tap the box below to edit the text before replacing it.';
+  static String thayTheDoanDaChon(NgonNgu nn, bool coDoanChon) => nn == NgonNgu.vi
+      ? (coDoanChon ? 'Thay thế đoạn đã chọn' : 'Thay thế toàn bộ văn bản')
+      : (coDoanChon ? 'Replace selected paragraph' : 'Replace whole text');
+  static String vanBanAiSapMatKhiHuy(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Văn bản AI vừa trả về (kể cả phần bạn đã sửa, nếu có) sẽ mất hẳn, không thể lấy lại. Bạn có chắc chắn muốn huỷ không?'
+      : 'The text the AI just returned (including any edits you made) will be lost for good. Are you sure you want to cancel?';
+  static String banCoTheBamOBenDuoiDeSuaTruocKhiChen(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bạn có thể bấm vào ô bên dưới để sửa lại chữ tuỳ ý trước khi chèn.'
+      : 'You can tap the box below to edit the text before inserting it.';
+  static String vietLaiChoHayHonTieuDe(NgonNgu nn, bool coDoanChon) => nn == NgonNgu.vi
+      ? (coDoanChon ? 'Viết lại cho hay hơn (đoạn đang chọn)' : 'Viết lại cho hay hơn')
+      : (coDoanChon ? 'Rewrite more fluently (selected paragraph)' : 'Rewrite more fluently');
   static String noiDungHuongDanThayThe(NgonNgu nn) => nn == NgonNgu.vi
       ? '• "Thay chỗ này": chỉ thay đúng kết quả đang chọn (số thứ tự đang hiện, ví dụ 3/5).\n\n'
           '• "Tất cả": thay hết mọi kết quả cùng lúc, có hỏi xác nhận trước khi làm.\n\n'
