@@ -1122,6 +1122,40 @@ class Ch {
 
   static String daChepTen(NgonNgu nn, String ten) =>
       nn == NgonNgu.vi ? 'Đã chép "$ten"' : 'Copied "$ten"';
+
+  // ------------------------------------------- Trang "Góp ý thêm, báo lỗi"
+  static String guiKhongThanhCongKiemTraLaiMang(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Gửi không thành công — kiểm tra lại mạng rồi thử lại.'
+      : 'Failed to send — check your connection and try again.';
+
+  static String camOnBanDaGopYBaoLoi(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Cảm ơn bạn đã góp ý, báo lỗi về ứng dụng!' : 'Thanks for your feedback and bug report!';
+
+  static String adminSeTiepThuSomNhatCoThe(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Admin sẽ tiếp thu và triển khai sớm nhất có thể.'
+      : 'The admin will review it and roll out changes as soon as possible.';
+
+  static String moiBanGopYThemHoacBaoLoi(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Mời bạn góp ý thêm hoặc báo lỗi về ứng dụng — mọi ý kiến đều được '
+          'ghi nhận và sẽ giúp Flowrite tốt hơn.'
+      : 'Feel free to share more feedback or report a bug — every comment '
+          'is noted and helps make Flowrite better.';
+
+  static String nhapGopYHoacMoTaLoi(NgonNgu nn, int gioiHanDuoi) => nn == NgonNgu.vi
+      ? 'Nhập góp ý hoặc mô tả lỗi bạn gặp phải (tối thiểu $gioiHanDuoi ký tự)...'
+      : 'Enter your feedback or describe the bug you encountered (at least $gioiHanDuoi characters)...';
+
+  static String emailCuaBanKhongBatBuoc(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Email của bạn (không bắt buộc)' : 'Your email (optional)';
+
+  static String deAdminPhanHoiLaiNeuCan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Để admin phản hồi lại nếu cần' : 'So the admin can reply if needed';
+
+  static String nutGui(NgonNgu nn) => nn == NgonNgu.vi ? 'Gửi' : 'Send';
+
+  static String coThacMacGopYBaoLoiLienHe(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Có thắc mắc, góp ý, báo lỗi, vui lòng liên hệ qua một trong các cách sau:'
+      : 'For questions, feedback, or bug reports, please contact us via one of the following:';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt

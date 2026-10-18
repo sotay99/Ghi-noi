@@ -6,6 +6,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import 'chuoi_da_ngon_ngu.dart';
+import 'ngon_ngu.dart';
 import 'trang_phap_ly_dung_chung.dart';
 
 const _gioiHanDuoiNoiDung = 20;
@@ -38,6 +40,16 @@ class _TrangGopYState extends State<_TrangGopY> {
       _oNoiDung.text.trim().length >= _gioiHanDuoiNoiDung &&
       _oNoiDung.text.trim().length <= _gioiHanTrenNoiDung;
 
+  @override
+  void initState() {
+    super.initState();
+    ngonNguHienTai.addListener(_veLaiKhiDoiNgonNgu);
+  }
+
+  void _veLaiKhiDoiNgonNgu() {
+    if (mounted) setState(() {});
+  }
+
   Future<void> _gui() async {
     if (!_hopLe || _dangGui) return;
     setState(() {
@@ -60,13 +72,14 @@ class _TrangGopYState extends State<_TrangGopY> {
       if (!mounted) return;
       setState(() {
         _dangGui = false;
-        _loi = 'Gửi không thành công — kiểm tra lại mạng rồi thử lại.';
+        _loi = Ch.guiKhongThanhCongKiemTraLaiMang(ngonNguHienTai.value);
       });
     }
   }
 
   @override
   void dispose() {
+    ngonNguHienTai.removeListener(_veLaiKhiDoiNgonNgu);
     _oNoiDung.dispose();
     _oEmail.dispose();
     super.dispose();
@@ -79,7 +92,7 @@ class _TrangGopYState extends State<_TrangGopY> {
       appBar: AppBar(
         backgroundColor: mauChinhPhapLy,
         foregroundColor: Colors.white,
-        title: const Text('Góp ý thêm, báo lỗi về ứng dụng'),
+        title: Text(Ch.gopYThemBaoLoi(ngonNguHienTai.value)),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -96,21 +109,21 @@ class _TrangGopYState extends State<_TrangGopY> {
       children: [
         const Icon(Icons.check_circle, color: Color(0xFF34A853), size: 48),
         const SizedBox(height: 16),
-        const Text(
-          'Cảm ơn bạn đã góp ý, báo lỗi về ứng dụng!',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        Text(
+          Ch.camOnBanDaGopYBaoLoi(ngonNguHienTai.value),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 10),
-        const Text(
-          'Admin sẽ tiếp thu và triển khai sớm nhất có thể.',
-          style: TextStyle(fontSize: 14, height: 1.4),
+        Text(
+          Ch.adminSeTiepThuSomNhatCoThe(ngonNguHienTai.value),
+          style: const TextStyle(fontSize: 14, height: 1.4),
         ),
         const SizedBox(height: 24),
         Align(
           alignment: Alignment.centerLeft,
           child: FilledButton(
             onPressed: () => Navigator.of(context).maybePop(),
-            child: const Text('Đóng'),
+            child: Text(Ch.dong(ngonNguHienTai.value)),
           ),
         ),
       ],
@@ -122,10 +135,9 @@ class _TrangGopYState extends State<_TrangGopY> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Mời bạn góp ý thêm hoặc báo lỗi về ứng dụng — mọi ý kiến đều được '
-          'ghi nhận và sẽ giúp Flowrite tốt hơn.',
-          style: TextStyle(fontSize: 14.5, height: 1.4),
+        Text(
+          Ch.moiBanGopYThemHoacBaoLoi(ngonNguHienTai.value),
+          style: const TextStyle(fontSize: 14.5, height: 1.4),
         ),
         const SizedBox(height: 18),
         TextField(
@@ -136,7 +148,7 @@ class _TrangGopYState extends State<_TrangGopY> {
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
             border: const OutlineInputBorder(),
-            hintText: 'Nhập góp ý hoặc mô tả lỗi bạn gặp phải (tối thiểu $_gioiHanDuoiNoiDung ký tự)...',
+            hintText: Ch.nhapGopYHoacMoTaLoi(ngonNguHienTai.value, _gioiHanDuoiNoiDung),
             counterText: '$soKyTu/$_gioiHanTrenNoiDung',
           ),
         ),
@@ -144,10 +156,10 @@ class _TrangGopYState extends State<_TrangGopY> {
         TextField(
           controller: _oEmail,
           keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            labelText: 'Email của bạn (không bắt buộc)',
-            hintText: 'Để admin phản hồi lại nếu cần',
+          decoration: InputDecoration(
+            border: const OutlineInputBorder(),
+            labelText: Ch.emailCuaBanKhongBatBuoc(ngonNguHienTai.value),
+            hintText: Ch.deAdminPhanHoiLaiNeuCan(ngonNguHienTai.value),
           ),
         ),
         const SizedBox(height: 18),
@@ -165,15 +177,15 @@ class _TrangGopYState extends State<_TrangGopY> {
                     height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                   )
-                : const Text('Gửi'),
+                : Text(Ch.nutGui(ngonNguHienTai.value)),
           ),
         ),
         const SizedBox(height: 32),
         const Divider(),
         const SizedBox(height: 16),
-        const Text(
-          'Có thắc mắc, góp ý, báo lỗi, vui lòng liên hệ qua một trong các cách sau:',
-          style: TextStyle(fontSize: 13.5),
+        Text(
+          Ch.coThacMacGopYBaoLoiLienHe(ngonNguHienTai.value),
+          style: const TextStyle(fontSize: 13.5),
         ),
         const SizedBox(height: 12),
         HopNoiBatPhapLy(
