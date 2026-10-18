@@ -9,7 +9,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'cai_dat.dart';
+import 'chuoi_da_ngon_ngu.dart';
 import 'lua_chon_phim_tat.dart';
+import 'ngon_ngu.dart';
 import 'thong_bao_giua.dart';
 
 const _mauChinh = Color(0xFF1A73E8);
@@ -77,7 +79,7 @@ class _ModalBoNhoTamState extends State<_ModalBoNhoTam> {
             final chon = await showDialog<String>(
               context: ctx,
               builder: (ctx2) => AlertDialog(
-                title: const Text('Nhấn một phím'),
+                title: Text(Ch.nhanMotPhim(ngonNguHienTai.value)),
                 content: KeyboardListener(
                   focusNode: tieuDiem,
                   autofocus: true,
@@ -97,13 +99,13 @@ class _ModalBoNhoTamState extends State<_ModalBoNhoTam> {
                     if (nhan.isEmpty) return;
                     Navigator.of(ctx2).pop(nhan.toUpperCase());
                   },
-                  child: const SizedBox(
+                  child: SizedBox(
                     height: 60,
-                    child: Center(child: Text('Hãy nhấn một phím bất kỳ trên bàn phím...')),
+                    child: Center(child: Text(Ch.hayNhanMotPhimBatKyTrenBanPhim(ngonNguHienTai.value))),
                   ),
                 ),
                 actions: [
-                  TextButton(onPressed: () => Navigator.of(ctx2).pop(), child: const Text('Huỷ')),
+                  TextButton(onPressed: () => Navigator.of(ctx2).pop(), child: Text(Ch.huy(ngonNguHienTai.value))),
                 ],
               ),
             );
@@ -117,7 +119,7 @@ class _ModalBoNhoTamState extends State<_ModalBoNhoTam> {
           }
 
           return AlertDialog(
-            title: const Text('Phím tắt cho Bộ nhớ tạm để dán văn bản'),
+            title: Text(Ch.phimTatChoBoNhoTamDanVanBan(ngonNguHienTai.value)),
             content: SizedBox(
               width: 360,
               child: SingleChildScrollView(
@@ -127,30 +129,23 @@ class _ModalBoNhoTamState extends State<_ModalBoNhoTam> {
                   children: [
                     oLuaChon(
                       loai: 'tab',
-                      nhan: 'Tab',
-                      giaiThich: 'Phím Tab — hình mũi tên hai chiều (⇥). Nằm '
-                          'ở góc trên bên trái bàn phím, ngay phía trên phím '
-                          'Caps Lock, bên trái chữ Q.',
+                      nhan: Ch.tenTab(ngonNguHienTai.value),
+                      giaiThich: Ch.giaiThichTab(ngonNguHienTai.value),
                     ),
                     oLuaChon(
                       loai: 'ctrl',
-                      nhan: 'Ctrl + ...',
-                      giaiThich: 'Giữ phím Ctrl (góc dưới cùng bên trái bàn '
-                          'phím) rồi bấm thêm một phím khác — ví dụ Ctrl + G.',
+                      nhan: Ch.tenCtrlCongThem(ngonNguHienTai.value),
+                      giaiThich: Ch.giaiThichCtrlCongThem(ngonNguHienTai.value),
                     ),
                     oLuaChon(
                       loai: 'ctrlDup',
-                      nhan: 'Bấm Ctrl 2 lần liên tiếp',
-                      giaiThich: 'Bấm phím Ctrl rồi BUÔNG RA NGAY (không giữ), '
-                          'sau đó bấm Ctrl thêm một lần nữa trong vòng 1 giây '
-                          '— giống bấm đúp chuột nhưng bằng phím Ctrl.',
+                      nhan: Ch.tenBamCtrl2Lan(ngonNguHienTai.value),
+                      giaiThich: Ch.giaiThichBamCtrl2Lan(ngonNguHienTai.value),
                     ),
                     oLuaChon(
                       loai: 'shiftDup',
-                      nhan: 'Bấm Shift 2 lần liên tiếp',
-                      giaiThich: 'Bấm phím Shift rồi buông ra ngay, bấm Shift '
-                          'thêm một lần nữa trong vòng 1 giây. Lưu ý: nếu gõ '
-                          'chữ hoa rất nhanh, đôi khi có thể vô tình kích hoạt.',
+                      nhan: Ch.tenBamShift2Lan(ngonNguHienTai.value),
+                      giaiThich: Ch.giaiThichBamShift2Lan(ngonNguHienTai.value),
                     ),
                     if (loaiTam == 'ctrl') ...[
                       const SizedBox(height: 4),
@@ -169,7 +164,7 @@ class _ModalBoNhoTamState extends State<_ModalBoNhoTam> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  phimCtrlTam == null ? 'Bấm để chọn phím' : 'Ctrl + $phimCtrlTam',
+                                  phimCtrlTam == null ? Ch.bamDeChonPhim(ngonNguHienTai.value) : 'Ctrl + $phimCtrlTam',
                                   style: TextStyle(
                                     fontWeight: FontWeight.w600,
                                     color: phimCtrlTam == null
@@ -194,11 +189,11 @@ class _ModalBoNhoTamState extends State<_ModalBoNhoTam> {
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Huỷ')),
+              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(Ch.huy(ngonNguHienTai.value))),
               FilledButton(
                 onPressed: () async {
                   if (loaiTam == 'ctrl' && phimCtrlTam == null) {
-                    capNhatModal(() => loiXungDot = 'Hãy bấm chọn một phím trước khi lưu.');
+                    capNhatModal(() => loiXungDot = Ch.hayBamChonMotPhimTruocKhiLuu(ngonNguHienTai.value));
                     return;
                   }
                   final moi = loaiTam == 'ctrl'
@@ -212,24 +207,21 @@ class _ModalBoNhoTamState extends State<_ModalBoNhoTam> {
                   if (moi.loai == 'ctrl') {
                     final xungDotCoDinh = CaiDat.tenXungDot(moi);
                     if (xungDotCoDinh != null) {
-                      capNhatModal(() => loiXungDot =
-                          'Phím tắt này đang trùng với chức năng "$xungDotCoDinh" '
-                          '(${moi.nhan}) — chọn phím khác nhé.');
+                      capNhatModal(() => loiXungDot = Ch.phimTatDangTrungVoiChucNang(
+                          ngonNguHienTai.value, xungDotCoDinh, moi.nhan));
                       return;
                     }
                     // Lựa chọn 4 (tổ hợp tự chọn) không có cơ chế tự đổi hộ
                     // — chặn lưu nếu trùng BẤT KỲ phím tắt nào của Micro/
                     // Ghi âm.
                     if (widget.caiDat.phimTatMicro.coBangVoi(moi)) {
-                      capNhatModal(() => loiXungDot =
-                          'Phím tắt này đang trùng với chức năng "Micro (vừa nói vừa ra chữ)" '
-                          '(${moi.nhan}) — chọn phím khác nhé.');
+                      capNhatModal(() => loiXungDot = Ch.phimTatDangTrungVoiChucNang(
+                          ngonNguHienTai.value, Ch.micoVuaNoiVuaRaChuTen(ngonNguHienTai.value), moi.nhan));
                       return;
                     }
                     if (widget.caiDat.phimTatGhiAm.coBangVoi(moi)) {
-                      capNhatModal(() => loiXungDot =
-                          'Phím tắt này đang trùng với chức năng "Ghi âm (Ghi âm xong mới ra chữ)" '
-                          '(${moi.nhan}) — chọn phím khác nhé.');
+                      capNhatModal(() => loiXungDot = Ch.phimTatDangTrungVoiChucNang(
+                          ngonNguHienTai.value, Ch.ghiAmXongMoiRaChuTen(ngonNguHienTai.value), moi.nhan));
                       return;
                     }
                   }
@@ -243,18 +235,17 @@ class _ModalBoNhoTamState extends State<_ModalBoNhoTam> {
                   if (ctx.mounted) Navigator.of(ctx).pop();
                   if (doiHo.isNotEmpty && mounted) {
                     final doan = doiHo.entries
-                        .map((e) => 'chọn phím tắt ${e.value.nhan} cho '
-                            '${e.key == TinhNangPhimTat.micro ? 'nút micro vừa nói vừa ra chữ' : 'nút ghi âm'}')
+                        .map((e) => Ch.chonPhimTatChoNut(
+                            ngonNguHienTai.value, e.value.nhan, e.key == TinhNangPhimTat.micro))
                         .join(', ');
                     hienThongBaoGiua(
                       context,
-                      'Đã chọn phím tắt ${moi.nhan} cho Bộ nhớ tạm để dán văn bản, '
-                      'tự động $doan',
+                      Ch.daChonPhimTatChoBoNhoTam(ngonNguHienTai.value, moi.nhan, doan),
                       thoiGian: const Duration(seconds: 4),
                     );
                   }
                 },
-                child: const Text('Lưu'),
+                child: Text(Ch.luu(ngonNguHienTai.value)),
               ),
             ],
           );
@@ -270,10 +261,10 @@ class _ModalBoNhoTamState extends State<_ModalBoNhoTam> {
       // gàng ở góc trên bên phải.
       title: Row(
         children: [
-          const Expanded(child: Text('Bộ nhớ tạm để dán văn bản')),
+          Expanded(child: Text(Ch.boNhoTamDanVanBanTen(ngonNguHienTai.value))),
           IconButton(
             icon: const Icon(Icons.close, color: Colors.red),
-            tooltip: 'Đóng',
+            tooltip: Ch.dong(ngonNguHienTai.value),
             onPressed: () => Navigator.of(context).pop(),
           ),
         ],
@@ -287,13 +278,13 @@ class _ModalBoNhoTamState extends State<_ModalBoNhoTam> {
             children: [
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Bật Bộ nhớ tạm để dán văn bản'),
+                title: Text(Ch.batBoNhoTamDanVanBan(ngonNguHienTai.value)),
                 value: _bat,
                 onChanged: _doiCongTac,
               ),
               const SizedBox(height: 8),
-              const Text('Phím tắt ẩn hiện bộ nhớ tạm này',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(Ch.phimTatAnHienBoNhoTamNay(ngonNguHienTai.value),
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 6),
               InkWell(
                 onTap: _moDoiPhimTat,
@@ -316,18 +307,9 @@ class _ModalBoNhoTamState extends State<_ModalBoNhoTam> {
                 ),
               ),
               const SizedBox(height: 14),
-              const Text(
-                'Bộ nhớ tạm để dán văn bản là một bảng NHỚ RIÊNG của app, giữ '
-                'lại tối đa 10 đoạn văn bản gần nhất bạn đã Cắt hoặc Copy — '
-                'khác với bộ nhớ đệm thường của máy (chỉ nhớ được ĐÚNG MỘT '
-                'đoạn gần nhất). Khi BẬT: mỗi lần Cắt/Copy, đoạn văn bản tự '
-                'được thêm vào bảng; bấm nút hoặc dùng phím tắt ở trên để mở '
-                'bảng, rồi bấm vào một dòng (hoặc gõ đúng phím số của dòng '
-                'đó) để dán ngay vào vị trí con trỏ. Khi TẮT: Cắt/Copy vẫn '
-                'hoạt động bình thường với bộ nhớ đệm của máy như trước, chỉ '
-                'không ghi thêm vào bảng 10 dòng này nữa, và nút/phím tắt mở '
-                'bảng cũng ẩn đi.',
-                style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+              Text(
+                Ch.gioiThieuBoNhoTamDanVanBan(ngonNguHienTai.value),
+                style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
               ),
             ],
           ),

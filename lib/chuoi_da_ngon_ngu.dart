@@ -1156,6 +1156,124 @@ class Ch {
   static String coThacMacGopYBaoLoiLienHe(NgonNgu nn) => nn == NgonNgu.vi
       ? 'Có thắc mắc, góp ý, báo lỗi, vui lòng liên hệ qua một trong các cách sau:'
       : 'For questions, feedback, or bug reports, please contact us via one of the following:';
+
+  // --------------------------------- Modal "Bộ nhớ tạm để dán văn bản"
+  static String hayBamChonMotPhimTruocKhiLuu(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Hãy bấm chọn một phím trước khi lưu.'
+      : 'Please press a key before saving.';
+
+  static String phimTatDangTrungVoiChucNang(NgonNgu nn, String tenChucNang, String nhanPhim) =>
+      nn == NgonNgu.vi
+          ? 'Phím tắt này đang trùng với chức năng "$tenChucNang" '
+              '($nhanPhim) — chọn phím khác nhé.'
+          : 'This shortcut conflicts with "$tenChucNang" '
+              '($nhanPhim) — please choose another key.';
+
+  static String micoVuaNoiVuaRaChuTen(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Micro (vừa nói vừa ra chữ)' : 'Mic (speak and type at once)';
+
+  static String ghiAmXongMoiRaChuTen(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Ghi âm (Ghi âm xong mới ra chữ)' : 'Record (record first, then transcribe)';
+
+  static String daChonPhimTatChoBoNhoTam(NgonNgu nn, String nhanPhim, String doanTuDong) =>
+      nn == NgonNgu.vi
+          ? 'Đã chọn phím tắt $nhanPhim cho Bộ nhớ tạm để dán văn bản, '
+              'tự động $doanTuDong'
+          : 'Shortcut $nhanPhim set for the clipboard-paste history, '
+              'automatically $doanTuDong';
+
+  static String chonPhimTatChoNut(NgonNgu nn, String nhanPhim, bool laMicro) {
+    final tenNut = laMicro
+        ? (nn == NgonNgu.vi ? 'nút micro vừa nói vừa ra chữ' : 'the mic (speak-and-type) button')
+        : (nn == NgonNgu.vi ? 'nút ghi âm' : 'the record button');
+    return nn == NgonNgu.vi
+        ? 'chọn phím tắt $nhanPhim cho $tenNut'
+        : 'set shortcut $nhanPhim for $tenNut';
+  }
+
+  static String boNhoTamDanVanBanTen(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Bộ nhớ tạm để dán văn bản' : 'Clipboard paste history';
+
+  static String batBoNhoTamDanVanBan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Bật Bộ nhớ tạm để dán văn bản' : 'Enable clipboard paste history';
+
+  static String phimTatAnHienBoNhoTamNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Phím tắt ẩn hiện bộ nhớ tạm này' : 'Shortcut to show/hide this history';
+
+  static String gioiThieuBoNhoTamDanVanBan(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bộ nhớ tạm để dán văn bản là một bảng NHỚ RIÊNG của app, giữ '
+          'lại tối đa 10 đoạn văn bản gần nhất bạn đã Cắt hoặc Copy — '
+          'khác với bộ nhớ đệm thường của máy (chỉ nhớ được ĐÚNG MỘT '
+          'đoạn gần nhất). Khi BẬT: mỗi lần Cắt/Copy, đoạn văn bản tự '
+          'được thêm vào bảng; bấm nút hoặc dùng phím tắt ở trên để mở '
+          'bảng, rồi bấm vào một dòng (hoặc gõ đúng phím số của dòng '
+          'đó) để dán ngay vào vị trí con trỏ. Khi TẮT: Cắt/Copy vẫn '
+          'hoạt động bình thường với bộ nhớ đệm của máy như trước, chỉ '
+          'không ghi thêm vào bảng 10 dòng này nữa, và nút/phím tắt mở '
+          'bảng cũng ẩn đi.'
+      : 'The clipboard paste history is the app\'s OWN memory, keeping '
+          'up to the last 10 pieces of text you Cut or Copied — unlike '
+          'the device\'s regular clipboard (which only remembers the '
+          'ONE most recent piece). When ON: every Cut/Copy is '
+          'automatically added to the list; use the button or the '
+          'shortcut above to open it, then tap a row (or type its '
+          'number key) to paste it right at the cursor. When OFF: '
+          'Cut/Copy still work normally with the device\'s regular '
+          'clipboard as before, it just stops adding to this 10-row '
+          'list, and the button/shortcut to open it is hidden too.';
+
+  static String nhanMotPhim(NgonNgu nn) => nn == NgonNgu.vi ? 'Nhấn một phím' : 'Press a key';
+
+  static String hayNhanMotPhimBatKyTrenBanPhim(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Hãy nhấn một phím bất kỳ trên bàn phím...'
+      : 'Press any key on your keyboard...';
+
+  static String phimTatChoBoNhoTamDanVanBan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Phím tắt cho Bộ nhớ tạm để dán văn bản' : 'Shortcut for the clipboard paste history';
+
+  static String tenTab(NgonNgu nn) => nn == NgonNgu.vi ? 'Tab' : 'Tab';
+
+  static String giaiThichTab(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Phím Tab — hình mũi tên hai chiều (⇥). Nằm '
+          'ở góc trên bên trái bàn phím, ngay phía trên phím '
+          'Caps Lock, bên trái chữ Q.'
+      : 'The Tab key — the two-way arrow icon (⇥). Located '
+          'at the top-left of the keyboard, right above '
+          'Caps Lock, to the left of the Q key.';
+
+  static String tenCtrlCongThem(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Ctrl + ...' : 'Ctrl + ...';
+
+  static String giaiThichCtrlCongThem(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Giữ phím Ctrl (góc dưới cùng bên trái bàn '
+          'phím) rồi bấm thêm một phím khác — ví dụ Ctrl + G.'
+      : 'Hold the Ctrl key (bottom-left corner of the '
+          'keyboard) and press another key — e.g. Ctrl + G.';
+
+  static String tenBamCtrl2Lan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Bấm Ctrl 2 lần liên tiếp' : 'Press Ctrl twice in a row';
+
+  static String giaiThichBamCtrl2Lan(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bấm phím Ctrl rồi BUÔNG RA NGAY (không giữ), '
+          'sau đó bấm Ctrl thêm một lần nữa trong vòng 1 giây '
+          '— giống bấm đúp chuột nhưng bằng phím Ctrl.'
+      : 'Press Ctrl and RELEASE it right away (don\'t hold), '
+          'then press Ctrl again within 1 second '
+          '— like a double-click, but with the Ctrl key.';
+
+  static String tenBamShift2Lan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Bấm Shift 2 lần liên tiếp' : 'Press Shift twice in a row';
+
+  static String giaiThichBamShift2Lan(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bấm phím Shift rồi buông ra ngay, bấm Shift '
+          'thêm một lần nữa trong vòng 1 giây. Lưu ý: nếu gõ '
+          'chữ hoa rất nhanh, đôi khi có thể vô tình kích hoạt.'
+      : 'Press Shift and release it right away, then press '
+          'Shift again within 1 second. Note: typing capital '
+          'letters very fast may sometimes trigger this by accident.';
+
+  static String bamDeChonPhim(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Bấm để chọn phím' : 'Tap to choose a key';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt
