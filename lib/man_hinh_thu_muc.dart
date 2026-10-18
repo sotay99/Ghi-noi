@@ -337,7 +337,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   /// (YÊU CẦU MỚI) "Bộ nhớ được chia sẻ với bạn" — để dành cho sau này,
   /// chưa làm gì cả ngoài báo biết.
   void _baoDangNangCap() {
-    hienThongBaoGiua(context, 'Tính năng đang nâng cấp');
+    hienThongBaoGiua(context, Ch.tinhNangDangNangCap(ngonNguHienTai.value));
   }
 
   /// (YÊU CẦU MỚI) Đổi [_kho] đang dùng NGAY TRONG màn hình này — không đẩy
@@ -683,7 +683,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   /// ~85% màn hình (`ganTren: true`), ĐÚNG hệt thông báo Copy/Cắt/Dán/All ở
   /// thanh công cụ soạn thảo.
   void _baoDaChuyenVaoThungRac() {
-    hienThongBaoGiua(context, 'Đã di chuyển vào Thùng rác', ganTren: true);
+    hienThongBaoGiua(context, Ch.daDiChuyenVaoThungRac(ngonNguHienTai.value), ganTren: true);
   }
 
   /// Xuất ghi chú thành một tệp .txt rồi mở màn hình chia sẻ của máy — dạng
@@ -692,7 +692,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   /// (phải xin quyền lưu trữ nặng nề), nên đi qua màn hình chia sẻ sẵn có của
   /// máy — người dùng chọn "Lưu vào máy"/"Tệp" hoặc gửi thẳng đi nơi khác.
   Future<void> _taiVeGhiChu(GhiChuFile g) async {
-    hienThongBaoGiua(context, 'Đang tải file TXT về thiết bị');
+    hienThongBaoGiua(context, Ch.dangTaiFileTxtVeThietBi(ngonNguHienTai.value));
     try {
       final tenTep = '${g.ten.trim().isEmpty ? 'Ghi chú' : g.ten.trim()}.txt';
       await luuVaChiaSeGhiChu(tenTep, g.noiDung, g.ten);
@@ -745,8 +745,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   Future<void> _taiThuMuc(String id, String ten) async {
     hienThongBaoGiua(
       context,
-      'Đang tải file nén Zip về thiết bị, hãy giải nén file Zip để có thể '
-      'sử dụng ở các thiết bị',
+      Ch.dangTaiFileNenZipVeThietBi(ngonNguHienTai.value),
     );
     try {
       final bytes = nenThuMucThanhZip(_kho, id, ten);
@@ -787,7 +786,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       }
       if (bytes.length > gioiHanTxtByte) {
         if (mounted) {
-          hienThongBaoGiua(context, 'Không cho nhập tệp TXT quá 2 MB');
+          hienThongBaoGiua(context, Ch.khongChoNhapTepTxtQua2Mb(ngonNguHienTai.value));
         }
         return;
       }
@@ -801,7 +800,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       _danhDauMucMoi(ids);
       await _kho.luu();
       if (mounted) {
-        hienThongBaoGiua(context, 'Đã nhập tệp vào thư mục', ganTren: true);
+        hienThongBaoGiua(context, Ch.daNhapTepVaoThuMuc(ngonNguHienTai.value), ganTren: true);
       }
       return;
     }
@@ -843,7 +842,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       if (coTepQuaNang && mounted) {
         hienThongBaoGiua(
           context,
-          'Không có tệp hợp lệ để nhập — tệp TXT quá 2 MB đã bị bỏ qua',
+          Ch.khongCoTepHopLeDeNhapTxtQua2Mb(ngonNguHienTai.value),
         );
       }
       return;
@@ -866,7 +865,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       _danhDauMucMoi(ids);
       await _kho.luu();
       if (mounted) {
-        hienThongBaoGiua(context, 'Đã nhập vào thư mục', ganTren: true);
+        hienThongBaoGiua(context, Ch.daNhapVaoThuMuc(ngonNguHienTai.value), ganTren: true);
       }
     } else {
       // chonViTriKhac — chờ người dùng tự đi tìm chỗ, xem thanh ghim đáy
@@ -886,7 +885,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     _danhDauMucMoi(ids);
     await _kho.luu();
     if (mounted) {
-      hienThongBaoGiua(context, 'Đã nhập tệp nén vào thư mục', ganTren: true);
+      hienThongBaoGiua(context, Ch.daNhapTepNenVaoThuMuc(ngonNguHienTai.value), ganTren: true);
     }
   }
 

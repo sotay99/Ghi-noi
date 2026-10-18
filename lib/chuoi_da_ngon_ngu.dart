@@ -369,6 +369,133 @@ class Ch {
   static String linkChiaSeDaBiXoa(NgonNgu nn) => nn == NgonNgu.vi
       ? 'Link chia sẻ đã bị xoá, không ai có thể sử dụng lại link đó được nữa'
       : 'The share link has been deleted — no one can use it again.';
+
+  // --------------------------------------------- Snackbar/toast ngắn còn sót
+  static String bamAllDeChonVungRongHon(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bấm "All" 2-4 lần để chọn vùng rộng hơn'
+      : 'Tap "All" 2-4 times to select a wider range';
+
+  static String bamEndDeXuongDuoiCungVanBan(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bấm End 2 lần để xuống dưới cùng văn bản'
+      : 'Tap End twice to jump to the bottom of the text';
+
+  static String bamHomeDeLenTrenCungVanBan(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bấm Home 2 lần để lên trên cùng văn bản'
+      : 'Tap Home twice to jump to the top of the text';
+
+  static String khongXuatDuocTepThuLaiSau(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Không xuất được tệp. Thử lại sau.' : 'Couldn\'t export the file. Try again later.';
+
+  static String dangTaiFileTxtVeThietBi(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đang tải file TXT về thiết bị'
+      : 'Downloading TXT file to device';
+
+  static String daGhimThanhCongCuDinhDang(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đã Ghim thanh công cụ định dạng' : 'Formatting toolbar pinned';
+
+  static String daChuyenTheGhiAmToiViTriMoi(NgonNgu nn, int soThe) => nn == NgonNgu.vi
+      ? 'Đã chuyển thẻ ghi âm #$soThe tới vị trí mới'
+      : 'Moved recording card #$soThe to a new position';
+
+  static String daChonTatCa(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đã chọn tất cả' : 'Selected all';
+
+  static String daCopyVaoBoNhoDem(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đã copy vào bộ nhớ đệm' : 'Copied to clipboard';
+
+  static String daCatVaLuuVaoBoNhoDem(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đã cắt và lưu vào bộ nhớ đệm' : 'Cut and saved to clipboard';
+
+  static String daDiChuyenVaoThungRac(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đã di chuyển vào Thùng rác' : 'Moved to Trash';
+
+  static String daDanVanBanVaoTuBoNhoDem(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đã dán văn bản vào từ bộ nhớ đệm' : 'Pasted text from clipboard';
+
+  static String daLuuVaoBoNhoMay(NgonNgu nn, String tenTep) => nn == NgonNgu.vi
+      ? 'Đã lưu "$tenTep" vào bộ nhớ máy.'
+      : 'Saved "$tenTep" to device storage.';
+
+  static String daMoKhoaBanPhim(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đã mở khoá bàn phím' : 'Keyboard unlocked';
+
+  static String dangNhapGoogleThatBai(NgonNgu nn, String loi) => nn == NgonNgu.vi
+      ? 'Đăng nhập Google thất bại: $loi'
+      : 'Google sign-in failed: $loi';
+
+  static String khongChoNhapTepTxtQua2Mb(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Không cho nhập tệp TXT quá 2 MB'
+      : 'TXT files over 2 MB aren\'t allowed';
+
+  static String tinhNangDangNangCap(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tính năng đang nâng cấp' : 'This feature is being upgraded';
+
+  static String daNhapTepNenVaoThuMuc(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đã nhập tệp nén vào thư mục' : 'Imported the archive into the folder';
+
+  static String daNhapTepVaoThuMuc(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đã nhập tệp vào thư mục' : 'Imported the file into the folder';
+
+  static String daNhapVaoThuMuc(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đã nhập vào thư mục' : 'Imported into the folder';
+
+  static String chonVungVanBanTruocKhiHoanDoiHoaThuong(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Chọn vùng văn bản trước khi hoán đổi chữ Hoa chữ thường'
+      : 'Select a text range before toggling upper/lowercase';
+
+  static String tepDaVuotQuaKyTuKhongTheNhapThem(NgonNgu nn, int nghinKyTu) =>
+      nn == NgonNgu.vi
+          ? 'Tệp đã vượt quá $nghinKyTu.000 ký tự - không thể nhập thêm'
+          : 'The file already exceeds $nghinKyTu,000 characters - cannot add more';
+
+  static String daDangNhapVaoTaiKhoan(NgonNgu nn, String ten) => nn == NgonNgu.vi
+      ? 'Đã đăng nhập vào tài khoản $ten'
+      : 'Signed in as $ten';
+
+  static String banPhimBiKhoaDangBatBoPhimNhanh(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bàn phím bị khoá - Đang bật bộ phím nhanh cho màn hình cảm ứng'
+      : 'Keyboard locked - turning on the quick touch keyboard';
+
+  static String khongTheThemVaoTuDienNhapLieuNhanhVuotQua1000(NgonNgu nn) =>
+      nn == NgonNgu.vi
+          ? 'Không thể thêm vào Từ điển nhập liệu nhanh, vì vượt quá 1000 ký tự'
+          : 'Can\'t add to the quick-entry dictionary - it exceeds 1000 characters';
+
+  static String khongTheThemVaoTuDienChinhTaVuotQua(NgonNgu nn, int gioiHan) =>
+      nn == NgonNgu.vi
+          ? 'Không thể thêm vào Từ điển sửa lỗi chính tả, vì vượt quá $gioiHan ký tự'
+          : 'Can\'t add to the spelling dictionary - it exceeds $gioiHan characters';
+
+  static String daTamDungGhiAmXinMoiChonViTri(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đã Tạm dừng ghi âm - Xin mời chọn vị trí cho thẻ này'
+      : 'Recording paused - please choose a position for this card';
+
+  static String khongTheDatTheGhiAmVaoGiuaMotTheKhac(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Không thể đặt thẻ ghi âm vào giữa một thẻ khác'
+      : 'Can\'t place a recording card in the middle of another card';
+
+  static String vungChonVuotQua10000KyTu(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Vùng chọn vượt quá 10.000 ký tự - không thể sử dụng AI'
+      : 'The selection exceeds 10,000 characters - cannot use AI';
+
+  static String toanBoVanBanVuotQua20000KyTu(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Toàn bộ văn bản vượt quá 20.000 ký tự - không thể sử dụng AI'
+      : 'The whole text exceeds 20,000 characters - cannot use AI';
+
+  static String daDanNoiDungVaoDongNhapLieuNhanhThuocPhim(NgonNgu nn, String chuCai) =>
+      nn == NgonNgu.vi
+          ? 'Đã Dán nội dung vào dòng nhập liệu nhanh thuộc Phím $chuCai'
+          : 'Pasted content into the quick-entry row for key $chuCai';
+
+  static String dangTaiFileNenZipVeThietBi(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đang tải file nén Zip về thiết bị, hãy giải nén file Zip để có thể '
+          'sử dụng ở các thiết bị'
+      : 'Downloading the Zip archive to your device - please unzip it to '
+          'use it on any device';
+
+  static String khongCoTepHopLeDeNhapTxtQua2Mb(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Không có tệp hợp lệ để nhập — tệp TXT quá 2 MB đã bị bỏ qua'
+      : 'No valid files to import — TXT files over 2 MB were skipped';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt

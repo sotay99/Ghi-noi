@@ -3829,7 +3829,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   if (mounted) {
                     hienThongBaoGiua(
                       context,
-                      'Chọn vùng văn bản trước khi hoán đổi chữ Hoa chữ thường',
+                      Ch.chonVungVanBanTruocKhiHoanDoiHoaThuong(ngonNguHienTai.value),
                     );
                   }
                 });
@@ -3872,7 +3872,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               if (!mounted) return;
               setState(() {});
               if (ghimMoi) {
-                hienThongBaoGiua(context, 'Đã Ghim thanh công cụ định dạng');
+                hienThongBaoGiua(context, Ch.daGhimThanhCongCuDinhDang(ngonNguHienTai.value));
               }
             },
           ),
@@ -3981,7 +3981,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (_henCanhBaoGioiHanKyTuMotTep != null) return;
     hienThongBaoGiua(
       context,
-      'Tệp đã vượt quá ${gioiHanKyTuMotTep ~/ 1000}.000 ký tự - không thể nhập thêm',
+      Ch.tepDaVuotQuaKyTuKhongTheNhapThem(ngonNguHienTai.value, gioiHanKyTuMotTep ~/ 1000),
     );
     _henCanhBaoGioiHanKyTuMotTep = Timer(const Duration(seconds: 2), () {
       _henCanhBaoGioiHanKyTuMotTep = null;
@@ -4362,7 +4362,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       final ten = nguoiDung.displayName ?? nguoiDung.email ?? 'Google';
       hienThongBaoGiua(
         context,
-        'Đã đăng nhập vào tài khoản $ten',
+        Ch.daDangNhapVaoTaiKhoan(ngonNguHienTai.value, ten),
         thoiGian: const Duration(seconds: 5),
       );
     });
@@ -4672,7 +4672,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       }
     } catch (e) {
       if (!mounted) return;
-      hienThongBaoGiua(context, 'Đăng nhập Google thất bại: $e');
+      hienThongBaoGiua(context, Ch.dangNhapGoogleThatBai(ngonNguHienTai.value, '$e'));
     }
   }
 
@@ -5146,7 +5146,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Future<void> _bamNutLuu() async {
     await _luuVanBan();
     if (mounted) {
-      hienThongBaoGiua(context, 'Đã lưu "${_ghiChuHienTai.ten}" vào bộ nhớ máy.');
+      hienThongBaoGiua(context, Ch.daLuuVaoBoNhoMay(ngonNguHienTai.value, _ghiChuHienTai.ten));
     }
   }
 
@@ -5404,7 +5404,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     await widget.kho.luu();
     if (!mounted) return;
-    hienThongBaoGiua(context, 'Đã di chuyển vào Thùng rác', ganTren: true);
+    hienThongBaoGiua(context, Ch.daDiChuyenVaoThungRac(ngonNguHienTai.value), ganTren: true);
     _moGhiChu(ke.id);
     _kichHoatLuonSongTen();
     if (laTuDongTao) {
@@ -5808,7 +5808,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       if (mounted) {
         hienThongBaoGiua(
           context,
-          'Bàn phím bị khoá - Đang bật bộ phím nhanh cho màn hình cảm ứng',
+          Ch.banPhimBiKhoaDangBatBoPhimNhanh(ngonNguHienTai.value),
         );
       }
     }
@@ -5905,7 +5905,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _epHienBanPhimAoTrongBoPhimNhanh = true;
       _thuGonThanhCongCu = true;
     });
-    hienThongBaoGiua(context, 'Đã mở khoá bàn phím', ganTren: true);
+    hienThongBaoGiua(context, Ch.daMoKhoaBanPhim(ngonNguHienTai.value), ganTren: true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _oChu.requestFocus();
@@ -6795,7 +6795,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (widget.caiDat.boNhoTamDanVanBanBat) {
       BoNhoTamDanVanBan.themMoi(doan, dinhDangGoi: _tachGoiDinhDangTuHtml(htmlClip));
     }
-    if (mounted) hienThongBaoGiua(context, 'Đã copy vào bộ nhớ đệm', ganTren: true);
+    if (mounted) hienThongBaoGiua(context, Ch.daCopyVaoBoNhoDem(ngonNguHienTai.value), ganTren: true);
   }
 
   /// "Cut" — y hệt Copy rồi xoá vùng vừa chép, ĐI QUA đúng con đường gõ tay
@@ -6839,7 +6839,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _boDieuKhien.value =
         TextEditingValue(text: moi, selection: TextSelection.collapsed(offset: batDau));
     _cuonToiConTroNeuCan();
-    if (mounted) hienThongBaoGiua(context, 'Đã cắt và lưu vào bộ nhớ đệm', ganTren: true);
+    if (mounted) hienThongBaoGiua(context, Ch.daCatVaLuuVaoBoNhoDem(ngonNguHienTai.value), ganTren: true);
   }
 
   /// (YÊU CẦU MỚI) Nút 📖 "Thêm vào Từ điển nhập liệu nhanh" ở hàng Copy/Cắt
@@ -6855,7 +6855,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (doan.length > CaiDat.gioiHanTuDienNhapLieuNhanh) {
       hienThongBaoGiua(
         context,
-        'Không thể thêm vào Từ điển nhập liệu nhanh, vì vượt quá 1000 ký tự',
+        Ch.khongTheThemVaoTuDienNhapLieuNhanhVuotQua1000(ngonNguHienTai.value),
       );
       return;
     }
@@ -6883,7 +6883,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (doan.length > gioiHanTuDienChinhTa) {
       hienThongBaoGiua(
         context,
-        'Không thể thêm vào Từ điển sửa lỗi chính tả, vì vượt quá $gioiHanTuDienChinhTa ký tự',
+        Ch.khongTheThemVaoTuDienChinhTaVuotQua(ngonNguHienTai.value, gioiHanTuDienChinhTa),
       );
       return;
     }
@@ -6993,7 +6993,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       if (ds != null) setState(() => _themVungDinhDangTuDs(ds, batDau, boQuaDau: soCachBiXoa));
     }
     _cuonToiConTroNeuCan();
-    if (mounted) hienThongBaoGiua(context, 'Đã dán văn bản vào từ bộ nhớ đệm', ganTren: true);
+    if (mounted) hienThongBaoGiua(context, Ch.daDanVanBanVaoTuBoNhoDem(ngonNguHienTai.value), ganTren: true);
   }
 
   /// "All" — 4 mức, đếm số lần bấm liên tiếp trong 2 giây (riêng nút này,
@@ -7042,7 +7042,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (_phimAllVuaChonTatCa) {
       _boDieuKhien.selection = TextSelection(baseOffset: 0, extentOffset: vb.length);
       _cuonToiConTroNeuCan();
-      if (mounted) hienThongBaoGiua(context, 'Đã chọn tất cả', ganTren: true);
+      if (mounted) hienThongBaoGiua(context, Ch.daChonTatCa(ngonNguHienTai.value), ganTren: true);
       _batCheDoNhanhChonTatCa(); // gia hạn thêm 1 giây nữa, tính từ lần bấm này.
       return;
     }
@@ -7059,7 +7059,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _lanBamAllTruoc = null;
       _boDieuKhien.selection = TextSelection(baseOffset: 0, extentOffset: vb.length);
       _cuonToiConTroNeuCan();
-      if (mounted) hienThongBaoGiua(context, 'Đã chọn tất cả', ganTren: true);
+      if (mounted) hienThongBaoGiua(context, Ch.daChonTatCa(ngonNguHienTai.value), ganTren: true);
       _batCheDoNhanhChonTatCa();
       return;
     }
@@ -7078,10 +7078,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     if (_demBamAll >= 2 && vung.$1 == 0 && vung.$2 == vb.length) {
       _demBamAll = 0;
       _lanBamAllTruoc = null;
-      if (mounted) hienThongBaoGiua(context, 'Đã chọn tất cả', ganTren: true);
+      if (mounted) hienThongBaoGiua(context, Ch.daChonTatCa(ngonNguHienTai.value), ganTren: true);
       _batCheDoNhanhChonTatCa();
     } else if (mounted) {
-      hienThongBaoGiua(context, 'Bấm "All" 2-4 lần để chọn vùng rộng hơn', ganTren: true);
+      hienThongBaoGiua(context, Ch.bamAllDeChonVungRongHon(ngonNguHienTai.value), ganTren: true);
     }
   }
 
@@ -7097,7 +7097,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _cuonToiConTroNeuCan();
     _demBamAll = 0;
     _lanBamAllTruoc = null;
-    if (mounted) hienThongBaoGiua(context, 'Đã chọn tất cả', ganTren: true);
+    if (mounted) hienThongBaoGiua(context, Ch.daChonTatCa(ngonNguHienTai.value), ganTren: true);
     _batCheDoNhanhChonTatCa();
   }
 
@@ -7262,7 +7262,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _boDieuKhien.selection = TextSelection.collapsed(offset: batDauDong);
     _cuonToiConTroNeuCan();
     if (mounted) {
-      hienThongBaoGiua(context, 'Bấm Home 2 lần để lên trên cùng văn bản');
+      hienThongBaoGiua(context, Ch.bamHomeDeLenTrenCungVanBan(ngonNguHienTai.value));
     }
   }
 
@@ -7288,7 +7288,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _boDieuKhien.selection = TextSelection.collapsed(offset: vtMoi);
     _cuonToiConTroNeuCan();
     if (mounted) {
-      hienThongBaoGiua(context, 'Bấm End 2 lần để xuống dưới cùng văn bản');
+      hienThongBaoGiua(context, Ch.bamEndDeXuongDuoiCungVanBan(ngonNguHienTai.value));
     }
   }
 
@@ -8739,7 +8739,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       await _tamDungTheGhiAmHienTai();
       if (!mounted) return;
       hienThongBaoGiua(
-          context, 'Đã Tạm dừng ghi âm - Xin mời chọn vị trí cho thẻ này');
+          context, Ch.daTamDungGhiAmXinMoiChonViTri(ngonNguHienTai.value));
     }
     setState(() {
       _soTheDangDoiViTri = soThe;
@@ -8825,7 +8825,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     if (viTriNamGiuaThe(vt, timCacVungTheGhiAm(vb))) {
       hienThongBaoGiua(
-          context, 'Không thể đặt thẻ ghi âm vào giữa một thẻ khác');
+          context, Ch.khongTheDatTheGhiAmVaoGiuaMotTheKhac(ngonNguHienTai.value));
       return;
     }
 
@@ -8852,7 +8852,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     await _ketThucCheDoDoiViTriThe();
     if (mounted) {
-      hienThongBaoGiua(context, 'Đã chuyển thẻ ghi âm #$soThe tới vị trí mới');
+      hienThongBaoGiua(context, Ch.daChuyenTheGhiAmToiViTriMoi(ngonNguHienTai.value, soThe));
     }
   }
 
@@ -14788,8 +14788,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     hienThongBaoGiua(
       context,
       coVungChon
-          ? 'Vùng chọn vượt quá 10.000 ký tự - không thể sử dụng AI'
-          : 'Toàn bộ văn bản vượt quá 20.000 ký tự - không thể sử dụng AI',
+          ? Ch.vungChonVuotQua10000KyTu(ngonNguHienTai.value)
+          : Ch.toanBoVanBanVuotQua20000KyTu(ngonNguHienTai.value),
     );
     return false;
   }
@@ -15428,7 +15428,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               _chonMauTenTepHienTai();
             case 'tai_ve':
               () async {
-                hienThongBaoGiua(context, 'Đang tải file TXT về thiết bị');
+                hienThongBaoGiua(context, Ch.dangTaiFileTxtVeThietBi(ngonNguHienTai.value));
                 try {
                   final tenTep =
                       '${_ghiChuHienTai.ten.trim().isEmpty ? 'Ghi chú' : _ghiChuHienTai.ten.trim()}.txt';
@@ -15436,7 +15436,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       tenTep, _ghiChuHienTai.noiDung, _ghiChuHienTai.ten);
                 } catch (_) {
                   if (mounted) {
-                    hienThongBaoGiua(context, 'Không xuất được tệp. Thử lại sau.');
+                    hienThongBaoGiua(context, Ch.khongXuatDuocTepThuLaiSau(ngonNguHienTai.value));
                   }
                 }
               }();
@@ -18413,7 +18413,7 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
     if (doan.length > CaiDat.gioiHanTuDienNhapLieuNhanh) {
       hienThongBaoGiua(
         context,
-        'Không thể thêm vào Từ điển nhập liệu nhanh, vì vượt quá 1000 ký tự',
+        Ch.khongTheThemVaoTuDienNhapLieuNhanhVuotQua1000(ngonNguHienTai.value),
       );
       return;
     }
@@ -19433,7 +19433,7 @@ class _HopThoaiThemNhanhTuDienState extends State<_HopThoaiThemNhanhTuDien>
     Navigator.of(context).pop();
     hienThongBaoGiua(
       context,
-      'Đã Dán nội dung vào dòng nhập liệu nhanh thuộc Phím $chuCai',
+      Ch.daDanNoiDungVaoDongNhapLieuNhanhThuocPhim(ngonNguHienTai.value, chuCai),
       ganTren: true,
     );
   }
