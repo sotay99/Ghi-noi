@@ -54,7 +54,9 @@ Future<void> khoiTaoAppCheck() async {
 /// thiếu chỉ bị log lại chứ chưa bị từ chối.
 Future<String?> _layAppCheckToken() async {
   try {
-    return await FirebaseAppCheck.instance.getToken();
+    return await FirebaseAppCheck.instance
+        .getToken()
+        .timeout(const Duration(seconds: 5));
   } catch (_) {
     return null;
   }
