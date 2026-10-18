@@ -15267,11 +15267,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
-            children: const [
-              Icon(Icons.folder, size: 18, color: Color(0xFF5F6368)),
-              SizedBox(width: 6),
+            children: [
+              const Icon(Icons.folder, size: 18, color: Color(0xFF5F6368)),
+              const SizedBox(width: 6),
               Text(Ch.nutThuMuc(ngonNguHienTai.value),
-                  style: TextStyle(fontSize: 13, color: Color(0xFF5F6368))),
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF5F6368))),
             ],
           ),
         ),

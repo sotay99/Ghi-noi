@@ -1203,12 +1203,12 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
               TextButton.icon(
                 onPressed: coChon ? () => _datNhieu(laCat: false) : null,
                 icon: const Icon(Icons.copy_outlined, size: 18),
-                label: const Text(Ch.saoChep(ngonNguHienTai.value)),
+                label: Text(Ch.saoChep(ngonNguHienTai.value)),
               ),
               TextButton.icon(
                 onPressed: coChon ? () => _datNhieu(laCat: true) : null,
                 icon: const Icon(Icons.cut_outlined, size: 18),
-                label: const Text(Ch.catDiChuyen(ngonNguHienTai.value)),
+                label: Text(Ch.catDiChuyen(ngonNguHienTai.value)),
               ),
               TextButton.icon(
                 onPressed: coChon ? _chonMauNhieu : null,

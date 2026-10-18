@@ -613,7 +613,7 @@ class ThanhCongCu extends StatelessWidget {
                   if (!gopMicVaGhiAmThanhMotNut)
                     _NutCoChuThich(
                       hien: hienChuThich,
-                      chu: 'Ghi âm (Nói xong mới ra chữ)',
+                      chu: Ch.ghiAmChuThich(ngonNguHienTai.value),
                       child: _NutGhiAmTron(
                         dangGhiAm: dangGhiAmThe,
                         khiBam: khiBamGhiAmThe,
@@ -631,7 +631,7 @@ class ThanhCongCu extends StatelessWidget {
                   if (gopMicVaGhiAmThanhMotNut) ...[
                     _NutCoChuThich(
                       hien: hienChuThich,
-                      chu: 'Ghi âm (Nói xong mới ra chữ)',
+                      chu: Ch.ghiAmChuThich(ngonNguHienTai.value),
                       child: _NutGhiAmTron(
                         dangGhiAm: dangGhiAmThe,
                         khiBam: khiBamGhiAmThe,
@@ -641,7 +641,7 @@ class ThanhCongCu extends StatelessWidget {
                     const SizedBox(width: 6),
                     _NutCoChuThich(
                       hien: hienChuThich && !bat,
-                      chu: 'Hiện chú thích',
+                      chu: Ch.hienChuThich(ngonNguHienTai.value),
                       vang: true,
                       child: SongAm(
                         muc: songAm,
@@ -653,7 +653,7 @@ class ThanhCongCu extends StatelessWidget {
                   ] else ...[
                     _NutCoChuThich(
                       hien: hienChuThich && !bat,
-                      chu: 'Hiện chú thích',
+                      chu: Ch.hienChuThich(ngonNguHienTai.value),
                       vang: true,
                       child: SongAm(
                         muc: songAm,
@@ -665,7 +665,7 @@ class ThanhCongCu extends StatelessWidget {
                     const SizedBox(width: 6),
                     _NutCoChuThich(
                       hien: hienChuThich,
-                      chu: 'Micro Vừa nói vừa ra chữ',
+                      chu: Ch.microVuaNoiVuaRaChu(ngonNguHienTai.value),
                       child: _NutMicroTron(
                         bat: bat,
                         sanSang: sanSang,
@@ -749,8 +749,10 @@ class _NutGhiAmTron extends StatelessWidget {
       label: dangGhiAm ? Ch.dungGhiAm(ngonNguHienTai.value) : Ch.ghiAm(ngonNguHienTai.value),
       child: Tooltip(
         message: biKhoa
-            ? 'Đang dùng Micro — tắt Micro trước khi ghi âm'
-            : (dangGhiAm ? 'Dừng ghi âm' : 'Ghi âm (tạo thẻ ghi âm)'),
+            ? Ch.dangDungMicroTatTruocKhiGhiAm(ngonNguHienTai.value)
+            : (dangGhiAm
+                ? Ch.dungGhiAm(ngonNguHienTai.value)
+                : Ch.ghiAmTaoTheGhiAm(ngonNguHienTai.value)),
         child: Material(
           color: biKhoa
               ? Colors.grey.shade300
@@ -1583,7 +1585,7 @@ class _NutThemMenu extends StatelessWidget {
           // với hai menu khác (AI: xanh lá nhạt, Tài khoản: vàng nhạt).
           color: Colors.red.shade50,
           child: rong
-              ? const _KhungNutRong(
+              ? _KhungNutRong(
                   bieuTuong: Icons.add_circle_outline,
                   nhan: Ch.nutThemLuaChon(ngonNguHienTai.value),
                 )
@@ -1652,38 +1654,38 @@ class _NutThemMenu extends StatelessWidget {
                 // Ba mục đầu — dời từ ba nút riêng trên thanh công cụ trên
                 // (Sao chép tất cả/Xoá tất cả) xuống đây, cộng thêm mục gộp
                 // mới "Sao chép rồi xoá tất cả".
-                _mucMenuThem(20, 'Sao chép tất cả', icon: Icons.copy_all_outlined),
-                _mucMenuThem(21, 'Sao chép rồi xoá tất cả', icon: Icons.content_cut),
-                _mucMenuThem(22, 'Xoá tất cả', icon: Icons.delete_outline),
-                _mucMenuThem(28, 'Chọn tất cả', icon: Icons.select_all),
+                _mucMenuThem(20, Ch.saoChepTatCa(ngonNguHienTai.value), icon: Icons.copy_all_outlined),
+                _mucMenuThem(21, Ch.saoChepRoiXoaTatCa(ngonNguHienTai.value), icon: Icons.content_cut),
+                _mucMenuThem(22, Ch.xoaTatCa(ngonNguHienTai.value), icon: Icons.delete_outline),
+                _mucMenuThem(28, Ch.chonTatCa(ngonNguHienTai.value), icon: Icons.select_all),
                 _dividerMenu(),
                 // "Thêm ảnh"/"Chụp ảnh (camera)" đã dời sang menu "Làm việc
                 // với AI" (đổi tên "Chuyển hình ảnh thành văn bản") — "Cài
                 // đặt" và "Tìm kiếm và thay thế" (trước đây là hai nút riêng
                 // ngoài thanh công cụ) vào thay đúng vị trí này.
-                _mucMenuThem(25, 'Tìm kiếm và thay thế', icon: Icons.find_replace),
+                _mucMenuThem(25, Ch.timKiemVaThayThe(ngonNguHienTai.value), icon: Icons.find_replace),
                 _dividerMenu(),
                 _mucMenuThem(
                   3,
                   boPhimNhanhDangMo
-                      ? 'Tắt Bộ phím nhanh cho màn hình cảm ứng'
-                      : 'Bật Bộ phím nhanh cho màn hình cảm ứng',
+                      ? Ch.tatBoPhimNhanh(ngonNguHienTai.value)
+                      : Ch.batBoPhimNhanh(ngonNguHienTai.value),
                   noiBat: !boPhimNhanhDangMo && noiBatBoPhimNhanh,
                   icon: Icons.keyboard_alt_outlined,
                 ),
                 // (YÊU CẦU MỚI) Bỏ "Kiểu gõ bàn phím" — đang nâng cấp, thừa
                 // thãi, bỏ hẳn (xoá luôn `khiBamBanPhim` không ai gọi nữa).
-                _mucMenuThem(23, 'Danh sách phím tắt', icon: Icons.list_alt),
-                _mucMenuThem(5, 'Luyện gõ phím bằng 10 ngón tay', icon: Icons.school_outlined),
+                _mucMenuThem(23, Ch.danhSachPhimTat(ngonNguHienTai.value), icon: Icons.list_alt),
+                _mucMenuThem(5, Ch.luyenGoPhim10Ngon(ngonNguHienTai.value), icon: Icons.school_outlined),
                 _dividerMenu(),
                 // (YÊU CẦU MỚI) Nổi bật nền xanh dương đậm — thu hút ánh
                 // nhìn, ngay phía TRÊN "Chia sẻ ứng dụng...". CHỈ web — bản
                 // APK đã CÀI RỒI, không cần nút "cài đặt" nữa.
                 if (kIsWeb)
-                  _mucMenuThemNoiBatXanh(29, 'Cài đặt Ứng dụng vào Thiết bị'),
-                _mucMenuThem(6, 'Chia sẻ ứng dụng này đến với mọi người', icon: Icons.share),
-                _mucMenuThem(7, 'Góp ý thêm, báo lỗi về ứng dụng', icon: Icons.feedback_outlined),
-                _mucMenuThem(8, 'Donate ủng hộ-cảm ơn tác giả', icon: Icons.favorite_outline),
+                  _mucMenuThemNoiBatXanh(29, Ch.caiDatUngDungVaoThietBiNoiBat(ngonNguHienTai.value)),
+                _mucMenuThem(6, Ch.chiaSeUngDung(ngonNguHienTai.value), icon: Icons.share),
+                _mucMenuThem(7, Ch.gopYThemBaoLoi(ngonNguHienTai.value), icon: Icons.feedback_outlined),
+                _mucMenuThem(8, Ch.donateUngHo(ngonNguHienTai.value), icon: Icons.favorite_outline),
               ]),
             ];
           },
@@ -1817,13 +1819,13 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                     border: Border.all(color: const Color(0xFFDADCE0)),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       haiIcon,
-                      SizedBox(width: 6),
+                      const SizedBox(width: 6),
                       Text(Ch.nutTaiKhoanCaiDat(ngonNguHienTai.value),
-                          style: TextStyle(fontSize: 12, color: Color(0xFF5F6368))),
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368))),
                     ],
                   ),
                 )
@@ -1914,16 +1916,18 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                 _mucMenuThem(10, 'Cài đặt Bộ nhớ tạm để dán văn bản',
                     emoji: '📋', mauChu: Colors.purple.shade700),
                 _dividerMenu(),
-                _mucMenuThem(3, 'Điều khoản sử dụng', icon: Icons.gavel_outlined),
-                _mucMenuThem(4, 'Bảo mật và quyền riêng tư', icon: Icons.privacy_tip_outlined),
+                _mucMenuThem(3, Ch.dieuKhoanSuDung(ngonNguHienTai.value), icon: Icons.gavel_outlined),
+                _mucMenuThem(4, Ch.baoMatVaQuyenRiengTu(ngonNguHienTai.value), icon: Icons.privacy_tip_outlined),
                 _dividerMenu(),
                 // "Trò chuyện" dời từ thanh công cụ ngoài vào đây, ngay
                 // phía TRÊN "Đăng nhập tài khoản" — cùng nhóm, không có
                 // đường kẻ chia giữa hai mục này.
-                _mucMenuThem(8, 'Trò chuyện', icon: Icons.chat_bubble_outline),
+                _mucMenuThem(8, Ch.troChuyen(ngonNguHienTai.value), icon: Icons.chat_bubble_outline),
                 _mucMenuThem(
                   5,
-                  daDangNhap ? 'Đăng xuất' : 'Đăng nhập bằng tài khoản Google',
+                  daDangNhap
+                      ? Ch.dangXuat(ngonNguHienTai.value)
+                      : Ch.dangNhapBangTaiKhoanGoogle(ngonNguHienTai.value),
                   icon: daDangNhap ? Icons.logout : Icons.login,
                 ),
                 // (YÊU CẦU MỚI) "Cảnh báo hạn mức API" nằm GIỮA "Đăng xuất"
@@ -1931,7 +1935,7 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                 // có cảnh báo cần báo cáo ([coCanhBaoApi]), khác hai mục
                 // quản lý khác (chỉ cần admin, không cần dữ liệu).
                 if (daDangNhap && laAdminEmail(emailDaDangNhap) && coCanhBaoApi)
-                  _mucMenuThem(32, 'Cảnh báo hạn mức API',
+                  _mucMenuThem(32, Ch.canhBaoHanMucApi(ngonNguHienTai.value),
                       icon: Icons.warning_amber_outlined, mauChu: Colors.orange.shade800),
                 // (YÊU CẦU MỚI — chỉ admin) Hai mục quản lý, CHỈ hiện khi
                 // đang đăng nhập ĐÚNG một trong hai email admin — đây chỉ
@@ -2200,25 +2204,31 @@ class _NutAIMenu extends StatelessWidget {
                 _dividerMenu(),
                 _mucMenuThem(
                   1,
-                  coDoanChon ? 'Trò chuyện về đoạn văn đã chọn' : 'Trò chuyện về văn bản này',
+                  coDoanChon
+                      ? Ch.troChuyenVeDoanVanDaChon(ngonNguHienTai.value)
+                      : Ch.troChuyenVeVanBanNay(ngonNguHienTai.value),
                   mauChu: coDoanChon ? _mauTimNguCanhDoanChon : null,
                   icon: Icons.forum_outlined,
                 ),
                 _mucMenuThem(
                   2,
-                  coDoanChon ? 'Tóm tắt đoạn văn này' : 'Tóm tắt toàn văn',
+                  coDoanChon
+                      ? Ch.tomTatDoanVanNay(ngonNguHienTai.value)
+                      : Ch.tomTatToanVan(ngonNguHienTai.value),
                   mauChu: coDoanChon ? _mauTimNguCanhDoanChon : null,
                   icon: Icons.summarize_outlined,
                 ),
                 _mucMenuThem(
                   3,
-                  coDoanChon ? 'Mở rộng đoạn văn này' : 'Mở rộng toàn văn',
+                  coDoanChon
+                      ? Ch.moRongDoanVanNay(ngonNguHienTai.value)
+                      : Ch.moRongToanVan(ngonNguHienTai.value),
                   mauChu: coDoanChon ? _mauTimNguCanhDoanChon : null,
                   icon: Icons.unfold_more,
                 ),
                 _mucMenuThem(
                   4,
-                  'Viết lại cho hay hơn',
+                  Ch.vietLaiChoHayHon(ngonNguHienTai.value),
                   mauChu: coDoanChon ? _mauTimNguCanhDoanChon : null,
                   icon: Icons.auto_fix_high,
                 ),
@@ -2230,13 +2240,17 @@ class _NutAIMenu extends StatelessWidget {
                 // yêu cầu.
                 _mucMenuThem(
                   10,
-                  coDoanChon ? 'Kiểm tra lỗi chính tả đoạn văn này' : 'Kiểm tra lỗi chính tả toàn văn',
+                  coDoanChon
+                      ? Ch.kiemTraLoiChinhTaDoanVanNay(ngonNguHienTai.value)
+                      : Ch.kiemTraLoiChinhTaToanVan(ngonNguHienTai.value),
                   mauChu: coDoanChon ? _mauTimNguCanhDoanChon : null,
                   icon: Icons.spellcheck,
                 ),
                 _mucMenuThem(
                   11,
-                  coDoanChon ? 'Kiểm tra dấu câu đoạn văn này' : 'Kiểm tra dấu câu toàn văn',
+                  coDoanChon
+                      ? Ch.kiemTraDauCauDoanVanNay(ngonNguHienTai.value)
+                      : Ch.kiemTraDauCauToanVan(ngonNguHienTai.value),
                   mauChu: coDoanChon ? _mauTimNguCanhDoanChon : null,
                   icon: Icons.rule,
                 ),

@@ -181,6 +181,162 @@ class Ch {
   static String daCopy(NgonNgu nn) => nn == NgonNgu.vi ? 'Đã copy' : 'Copied';
 
   static String moLink(NgonNgu nn) => nn == NgonNgu.vi ? 'Mở Link' : 'Open Link';
+
+  // ------------------------------------------------- Thanh công cụ (lượt 4)
+  static String ghiAmChuThich(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Ghi âm (Nói xong mới ra chữ)' : 'Record audio (speak first, transcribe after)';
+
+  static String ghiAmTaoTheGhiAm(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Ghi âm (tạo thẻ ghi âm)' : 'Record audio (creates an audio card)';
+
+  static String dangDungMicroTatTruocKhiGhiAm(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đang dùng Micro — tắt Micro trước khi ghi âm'
+      : 'Microphone in use — turn it off before recording audio';
+
+  static String hienChuThich(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Hiện chú thích' : 'Show tooltips';
+
+  static String microVuaNoiVuaRaChu(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Micro Vừa nói vừa ra chữ' : 'Microphone — live speech-to-text';
+
+  // --------------------------------------------- Menu "Tài khoản - Cài đặt"
+  static String dieuKhoanSuDung(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Điều khoản sử dụng' : 'Terms of use';
+
+  static String baoMatVaQuyenRiengTu(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Bảo mật và quyền riêng tư' : 'Privacy policy';
+
+  static String dangNhapBangTaiKhoanGoogle(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đăng nhập bằng tài khoản Google' : 'Sign in with Google';
+
+  // ------------------------------------------------------ Menu "Làm việc với AI"
+  static String troChuyenVeDoanVanDaChon(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Trò chuyện về đoạn văn đã chọn' : 'Chat about the selected paragraph';
+
+  static String troChuyenVeVanBanNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Trò chuyện về văn bản này' : 'Chat about this text';
+
+  static String tomTatDoanVanNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tóm tắt đoạn văn này' : 'Summarize this paragraph';
+
+  static String tomTatToanVan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tóm tắt toàn văn' : 'Summarize whole text';
+
+  static String moRongDoanVanNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Mở rộng đoạn văn này' : 'Expand this paragraph';
+
+  static String moRongToanVan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Mở rộng toàn văn' : 'Expand whole text';
+
+  static String vietLaiChoHayHon(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Viết lại cho hay hơn' : 'Rewrite more fluently';
+
+  static String kiemTraLoiChinhTaDoanVanNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Kiểm tra lỗi chính tả đoạn văn này' : 'Check spelling in this paragraph';
+
+  static String kiemTraLoiChinhTaToanVan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Kiểm tra lỗi chính tả toàn văn' : 'Check spelling in whole text';
+
+  static String kiemTraDauCauDoanVanNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Kiểm tra dấu câu đoạn văn này' : 'Check punctuation in this paragraph';
+
+  static String kiemTraDauCauToanVan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Kiểm tra dấu câu toàn văn' : 'Check punctuation in whole text';
+
+  // ------------------------------------------------------- Menu "Thêm lựa chọn"
+  static String saoChepTatCa(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Sao chép tất cả' : 'Copy all';
+
+  static String saoChepRoiXoaTatCa(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Sao chép rồi xoá tất cả' : 'Copy then delete all';
+
+  static String xoaTatCa(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Xoá tất cả' : 'Delete all';
+
+  static String chonTatCa(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chọn tất cả' : 'Select all';
+
+  static String timKiemVaThayThe(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tìm kiếm và thay thế' : 'Find and replace';
+
+  static String tatBoPhimNhanh(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tắt Bộ phím nhanh cho màn hình cảm ứng' : 'Turn off quick touch keyboard';
+
+  static String batBoPhimNhanh(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Bật Bộ phím nhanh cho màn hình cảm ứng' : 'Turn on quick touch keyboard';
+
+  static String danhSachPhimTat(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Danh sách phím tắt' : 'Keyboard shortcuts';
+
+  static String luyenGoPhim10Ngon(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Luyện gõ phím bằng 10 ngón tay' : 'Practice 10-finger typing';
+
+  static String caiDatUngDungVaoThietBiNoiBat(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Cài đặt Ứng dụng vào Thiết bị' : 'Install App on this Device';
+
+  static String gopYThemBaoLoi(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Góp ý thêm, báo lỗi về ứng dụng' : 'Send feedback, report a bug';
+
+  static String donateUngHo(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Donate ủng hộ-cảm ơn tác giả' : 'Donate to support the author';
+
+  // ------------------------------------------------------------ Thùng rác
+  static String dong(NgonNgu nn) => nn == NgonNgu.vi ? 'Đóng' : 'Close';
+
+  static String timKiemTrongThungRac(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tìm kiếm trong thùng rác' : 'Search in trash';
+
+  static String thungRacTrong(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Thùng rác trống' : 'Trash is empty';
+
+  static String khoiPhucVeViTriCu(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Khôi phục về vị trí cũ' : 'Restore to original location';
+
+  static String xoaVinhVien(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Xoá vĩnh viễn' : 'Delete permanently';
+
+  static String thongTinChiTiet(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Thông tin chi tiết' : 'Details';
+
+  static String khoiPhucHoi(NgonNgu nn) => nn == NgonNgu.vi ? 'Khôi phục?' : 'Restore?';
+
+  static String khoiPhucVeViTriCuHoi(NgonNgu nn, String ten) => nn == NgonNgu.vi
+      ? 'Khôi phục "$ten" về vị trí cũ?'
+      : 'Restore "$ten" to its original location?';
+
+  static String khong(NgonNgu nn) => nn == NgonNgu.vi ? 'Không' : 'No';
+
+  static String khoiPhuc(NgonNgu nn) => nn == NgonNgu.vi ? 'Khôi phục' : 'Restore';
+
+  static String daKhoiPhucThanhCong(NgonNgu nn, bool laThuMuc, String ten) {
+    if (nn == NgonNgu.vi) {
+      return '${laThuMuc ? "Thư mục" : "Tệp"} "$ten" đã được khôi phục thành công';
+    }
+    return '${laThuMuc ? "Folder" : "File"} "$ten" was restored successfully';
+  }
+
+  static String oTaiViTri(NgonNgu nn, String diaChi) =>
+      nn == NgonNgu.vi ? 'Ở tại vị trí: $diaChi' : 'Located at: $diaChi';
+
+  static String daHieu(NgonNgu nn) => nn == NgonNgu.vi ? 'Đã hiểu' : 'Got it';
+
+  static String denViTriVuaDuocKhoiPhuc(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đến vị trí vừa được khôi phục' : 'Go to restored location';
+
+  static String xoaVinhVienHoi(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Xoá vĩnh viễn?' : 'Delete permanently?';
+
+  static String xoaVinhVienXacNhan(NgonNgu nn, bool laThuMuc, String ten) {
+    if (nn == NgonNgu.vi) {
+      return 'Xoá vĩnh viễn "$ten"${laThuMuc ? " và toàn bộ nội dung bên trong nó" : ""}. '
+          'Không thể khôi phục lại được nữa. Bạn có chắc chắn không?';
+    }
+    return 'Permanently delete "$ten"${laThuMuc ? " and everything inside it" : ""}. '
+        'This cannot be undone. Are you sure?';
+  }
+
+  static String daXoaLuc(NgonNgu nn, String thoiGian) =>
+      nn == NgonNgu.vi ? 'Đã xoá lúc $thoiGian' : 'Deleted at $thoiGian';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt
