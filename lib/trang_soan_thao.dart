@@ -3832,11 +3832,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     );
                   }
                 });
-                return const [
+                return [
                   PopupMenuItem<int>(enabled: false, child: Text(Ch.chuaCoVungChon(ngonNguHienTai.value))),
                 ];
               }
-              return const [
+              return [
                 PopupMenuItem(value: 0, child: Text(Ch.vietHoaChuDauMoiTu(ngonNguHienTai.value))),
                 PopupMenuItem(value: 1, child: Text(Ch.vietHoaTatCaKyTu(ngonNguHienTai.value))),
                 PopupMenuItem(value: 2, child: Text(Ch.vietThuongTatCaKyTu(ngonNguHienTai.value))),
