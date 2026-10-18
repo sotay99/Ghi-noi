@@ -37,8 +37,6 @@ class ManHinhCaiDat extends StatefulWidget {
     required this.khiTatKiemTraChinhTa,
     required this.khiKiemTraLaiMicro,
     this.khiDoiTuDongThemDuongKeChia,
-    this.layNhatKyMicro,
-    this.xoaNhatKyMicro,
   });
 
   final CaiDat caiDat;
@@ -46,12 +44,6 @@ class ManHinhCaiDat extends StatefulWidget {
   /// Nhóm cài đặt nào đang mở — quyết định tiêu đề AppBar và danh sách dòng
   /// hiển thị trong `build()`.
   final NhomCaiDat nhom;
-
-  /// Chỉ có trên web (xem `_dong0ThietBi`) — đọc/xoá nhật ký gỡ lỗi micro
-  /// (`_nhatKyMicro` bên trang soạn thảo). `null` trên Android/iOS gốc vì
-  /// trang đó không ghi log này.
-  final List<String> Function()? layNhatKyMicro;
-  final VoidCallback? xoaNhatKyMicro;
 
   /// Gọi ngay khi người dùng tắt "kiểm tra chính tả bằng AI" — trang soạn
   /// thảo dùng đây để xoá hết gạch đỏ chân đang hiển thị.
@@ -358,114 +350,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
             ),
           ),
         ),
-        if (widget.layNhatKyMicro != null) ...[
-          const SizedBox(height: 6),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-              style: TextButton.styleFrom(padding: EdgeInsets.zero),
-              onPressed: _moNhatKyMicro,
-              child: const Text('Xem nhật ký micro (gỡ lỗi)'),
-            ),
-          ),
-        ],
       ],
-    );
-  }
-
-  /// Bảng nhật ký micro — chỉ để GỬI CHO NGƯỜI PHÁT TRIỂN đọc khi micro ra
-  /// chữ sai, không phải màn hình dùng hàng ngày. Có nút Sao chép (copy
-  /// toàn bộ vào clipboard) và Xoá (dọn sạch, bắt đầu ghi lại từ đầu).
-  Future<void> _moNhatKyMicro() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, capNhat) {
-            final dong = widget.layNhatKyMicro!();
-            final noiDung = dong.isEmpty
-                ? '(chưa có gì — bật micro và nói thử, rồi mở lại bảng này)'
-                : dong.join('\n');
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Nhật ký micro (gỡ lỗi)',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Bấm Sao chép rồi gửi lại toàn bộ đoạn này khi micro ra '
-                      'chữ sai.',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      constraints: const BoxConstraints(maxHeight: 360),
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: SingleChildScrollView(
-                        child: SelectableText(
-                          noiDung,
-                          style: const TextStyle(
-                              fontSize: 12, fontFamily: 'monospace'),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            icon: const Icon(Icons.copy, size: 18),
-                            label: const Text('Sao chép'),
-                            onPressed: dong.isEmpty
-                                ? null
-                                : () {
-                                    Clipboard.setData(
-                                        ClipboardData(text: noiDung));
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                          content:
-                                              Text('Đã sao chép nhật ký.')),
-                                    );
-                                  },
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            icon: const Icon(Icons.delete_outline, size: 18),
-                            label: const Text('Xoá'),
-                            style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.red.shade700),
-                            onPressed: dong.isEmpty
-                                ? null
-                                : () {
-                                    widget.xoaNhatKyMicro?.call();
-                                    capNhat(() {});
-                                  },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
     );
   }
 

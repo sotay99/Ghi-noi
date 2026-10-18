@@ -104,4 +104,19 @@ class BoNhoTamDanVanBan {
     final ds = thuTuCuNhatKhongGhim;
     return ds.length > 1 ? ds[1] : null;
   }
+
+  /// (YÊU CẦU MỚI) Ô vừa được ghi gần đây nhất — theo [_tuoi] LỚN NHẤT
+  /// trong TẤT CẢ ô có dữ liệu, KỂ CẢ ô đã ghim (ghim chỉ chặn bị ĐÈ lên
+  /// sau này, không đổi lúc nó được ghi lần cuối). `null` nếu chưa có ô nào
+  /// từng được ghi. Không xung đột với [oCuNhat]/[oGanCuNhat] — những ô đó
+  /// luôn là ô CŨ nhất trong các ô chưa ghim, còn ô này luôn MỚI nhất trong
+  /// mọi ô.
+  static int? get oVuaThem {
+    int? ketQua;
+    for (var i = 0; i < lichSu.length; i++) {
+      if (lichSu[i] == null) continue;
+      if (ketQua == null || _tuoi[i] > _tuoi[ketQua]) ketQua = i;
+    }
+    return ketQua;
+  }
 }

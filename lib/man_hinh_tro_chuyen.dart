@@ -48,7 +48,6 @@ class ManHinhTroChuyen extends StatefulWidget {
     required this.layVanBanHienTai,
     required this.layDoanVanDangChon,
     required this.caiDat,
-    this.ghiNhatKyMicro,
     this.draftBanDau,
     this.khiDoiDraft,
   });
@@ -69,13 +68,6 @@ class ManHinhTroChuyen extends StatefulWidget {
   /// — CÙNG phím tắt với trang soạn thảo chính, hoạt động y hệt trong kênh
   /// chat này (xem `_khiPhimCucBoTroChuyen`).
   final CaiDat caiDat;
-
-  /// Ghi vào CHUNG một nhật ký với micro trang soạn thảo chính
-  /// (`_ghiNhatKyMicro`, xem "Xem nhật ký micro" trong Cài đặt) — người
-  /// dùng bấm xem/sao chép ngay trong app, không cần console trình duyệt.
-  /// `null` thì coi như không ghi (phòng trường hợp màn hình này được mở
-  /// từ chỗ khác không có sẵn nhật ký để nối vào).
-  final void Function(String dong)? ghiNhatKyMicro;
 
   /// Tham chiếu sống — mọi thêm/xoá ở đây đều "lưu" thẳng vào bộ nhớ đệm của
   /// tệp ghi chú đang mở (do nơi gọi cầm List này).
@@ -596,8 +588,6 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   /// cứ dời lại mãi, chỉ thật sự đếm khi tay đã ngừng hẳn.
   void _nguoiDungVuaGoChat() {
     if (_micDangNghe) {
-      widget.ghiNhatKyMicro
-          ?.call('[chat] Người dùng gõ tay — huỷ phiên #$_phienNgheMicChat, tắt mic');
       // Tăng số phiên NGAY — mọi `onResult` của phiên vừa huỷ (kể cả tới
       // trễ) bị vứt thẳng, không ghi đè gì vào bài nữa.
       _phienNgheMicChat++;
@@ -614,8 +604,6 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
       // cùng bay về rồi đổ nhầm vào chỗ mới, y hệt lý do trang soạn thảo
       // chính dùng cancel() ở đây.
       _micro.cancel();
-    } else {
-      widget.ghiNhatKyMicro?.call('[chat] Người dùng gõ tiếp — dời lại đồng hồ chờ bật mic lại');
     }
 
     _henGoXongMicChat?.cancel();
@@ -635,7 +623,6 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   Future<void> _batLaiMicChatSauKhiGoXong() async {
     if (!_dangTamTatMicChatDeGo || !mounted) return;
     _dangTamTatMicChatDeGo = false;
-    widget.ghiNhatKyMicro?.call('[chat] Hết giờ chờ sau khi gõ tay — tự bật lại micro');
     setState(() => _micDangNghe = true);
     _datLaiHenTuTatMicChatImLang();
     await _batPhienNgheMicChat();
@@ -726,7 +713,6 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
         // trong `onError`, không phân biệt — vô hại nếu phiên NÀY vẫn đang
         // chạy tốt vì `_khiMicDoiTrangThai` cũng gọi lại y hệt).
         onError: (loi) {
-          widget.ghiNhatKyMicro?.call('[chat] onError: "${loi.errorMsg}"');
           if (mounted) setState(() => _micDangNgheThat = false);
           _lenLichBatLaiMicChat();
         },
@@ -771,7 +757,6 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     // `_phienNgheMicChat`. Mỗi lần gọi hàm này (kể cả tự bật lại) là một
     // phiên MỚI; `onResult` chỉ nhận đúng phiên vừa đăng ký.
     final idPhien = ++_phienNgheMicChat;
-    widget.ghiNhatKyMicro?.call('[chat] Bắt đầu phiên #$idPhien');
     // (SỬA LỖI v121 — "nút vuông đỏ không còn xuất hiện") Hàm này LUÔN được
     // gọi với ý định (`_micDangNghe`) đã là `true` từ trước — nhưng trước
     // đây UI (`_micDangNgheThat`) CHỈ bật lên khi `onStatus` thật sự báo
@@ -785,9 +770,6 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
       await _micro.listen(
         onResult: (ketQua) {
           if (idPhien != _phienNgheMicChat) {
-            widget.ghiNhatKyMicro?.call(
-                '[chat] onResult phiên CŨ #$idPhien (hiện tại #$_phienNgheMicChat) — vứt: '
-                '"${ketQua.recognizedWords}"');
             return;
           }
           if (!_micDangNghe) return;
@@ -805,15 +787,10 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
           // hiện ra) bằng chuỗi rỗng — XOÁ MẤT câu đó. Không có gì mới để
           // chèn thì dừng ngay, đừng đụng gì vào văn bản đang có.
           if (ketQua.recognizedWords.isEmpty) {
-            widget.ghiNhatKyMicro?.call(
-                '[chat] onResult phiên #$idPhien, xong=${ketQua.finalResult}: rỗng — bỏ qua, '
-                'không xoá chữ đã hiện ra');
             return;
           }
           _datLaiHenTuTatMicChatImLang();
           var chen = ketQua.recognizedWords;
-          widget.ghiNhatKyMicro?.call(
-              '[chat] onResult phiên #$idPhien, xong=${ketQua.finalResult}: "$chen"');
           // Android bản web: `recognizedWords` không phải "toàn bộ utterance
           // tính từ đầu, sạch sẽ" — nó CỘNG DỒN VÔ HẠN, mỗi lần gọi lại ghép
           // THÊM đuôi mới vào SAU TOÀN BỘ raw đã gửi ở MỌI lần gọi trước đó
@@ -837,7 +814,6 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
             // âm thầm khởi động lại bộ đệm) — coi nguyên `raw` là cụm chữ
             // thật, an toàn hơn là trừ nhầm.
             _rawTichLuyChromeAndroidChat = raw;
-            widget.ghiNhatKyMicro?.call('[chat]   → sau khi trừ raw cộng dồn: "$chen"');
             // Trừ xong ra rỗng (raw mới khớp NGUYÊN VĂN tiền tố đã thấy, tức
             // chẳng có gì mới) — y hệt lý do ở trên: KHÔNG được dùng chuỗi
             // rỗng này để thay thế/xoá mất `_micChuGanNhat` hiện có.
@@ -945,13 +921,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   void _lenLichBatLaiMicChat() {
     if (!_micDangNghe) return;
     _soLanBatLaiLienTucKhongKetQua++;
-    widget.ghiNhatKyMicro?.call(
-        '[chat] Lên lịch bật lại lần $_soLanBatLaiLienTucKhongKetQua liên tiếp '
-        'chưa có onResult nào');
     if (_soLanBatLaiLienTucKhongKetQua > _soLanBatLaiLienTucToiDa) {
-      widget.ghiNhatKyMicro?.call(
-          '[chat] Bật lại $_soLanBatLaiLienTucToiDa lần liên tiếp vẫn không '
-          'nghe được gì — chịu, tắt hẳn mic');
       _soLanBatLaiLienTucKhongKetQua = 0;
       _henBatLaiMicChat?.cancel();
       if (mounted) {
@@ -985,7 +955,6 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   /// không còn đứng yên hiển thị sai suốt khoảng hở đó.
   void _khiMicDoiTrangThai(String trangThai) {
     final dangNghe = trangThai == SpeechToText.listeningStatus;
-    widget.ghiNhatKyMicro?.call('[chat] onStatus: "$trangThai" (micDangNghe=$_micDangNghe)');
     if (mounted && _micDangNgheThat != dangNghe) {
       setState(() => _micDangNgheThat = dangNghe);
     }

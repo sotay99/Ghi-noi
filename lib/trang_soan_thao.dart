@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' show User;
 import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -46,6 +47,7 @@ import 'modal_danh_sach_user.dart';
 import 'modal_donate.dart';
 import 'modal_gop_y.dart';
 import 'modal_quan_ly_gop_y.dart';
+import 'quyen_admin.dart';
 import 'modal_dieu_khoan.dart';
 import 'modal_luyen_go_phim.dart';
 import 'tu_dien_dam_may.dart';
@@ -2750,26 +2752,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// đọc ở những chỗ đã tự bọc `kIsWeb`).
   late ThietBi _thietBiHienTai;
 
-  /// Nhật ký gỡ lỗi micro — CHỈ ghi trên web (xem `_ghiNhatKyMicro`), để
-  /// người dùng bấm "Xem nhật ký micro" trong Cài đặt, sao chép rồi gửi lại
-  /// khi micro ra chữ sai — không cần USB debug hay console trình duyệt.
-  /// Giới hạn 300 dòng, dòng cũ nhất bị bỏ khi đầy (y hệt bản thử nghiệm
-  /// `main_web_test.dart`).
-  final List<String> _nhatKyMicro = [];
-
   /// CHỈ dùng cho web + Android — xem chú thích chi tiết tại nơi dùng trong
   /// `_khiCoChu`. Reset về rỗng mỗi khi một PHIÊN nghe mới thật sự bắt đầu
   /// (`_batMicro()`) — bộ nhận dạng của trình duyệt tạo lại từ đầu lúc đó.
   String _rawTichLuyChromeAndroid = '';
-
-  void _ghiNhatKyMicro(String dong) {
-    if (!kIsWeb) return;
-    final gio = DateTime.now();
-    String hai(int n) => n.toString().padLeft(2, '0');
-    final gioChuoi = '${hai(gio.hour)}:${hai(gio.minute)}:${hai(gio.second)}';
-    _nhatKyMicro.add('[$gioChuoi] $dong');
-    if (_nhatKyMicro.length > 300) _nhatKyMicro.removeAt(0);
-  }
 
   /// Đang hiện dòng chữ chú thích dọc bên trên từng nút của thanh công cụ
   /// hay không — bật bằng nút "i" (chỉ xuất hiện khi micro tắt), hoặc tự bật
@@ -4322,6 +4308,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // (YÊU CẦU MỚI) Đăng nhập Google — nghe thay đổi trạng thái để vẽ lại
     // menu "Tài khoản và Cài đặt" (tên/avatar + đổi nhãn nút).
     _nguoiDungDangNhap = DichVuDangNhapGoogle.instance.nguoiDungHienTai;
+    _capNhatDangKyCanhBaoApi();
     // (YÊU CẦU MỚI) Báo "Đã đăng nhập vào tài khoản..." mỗi lần CHUYỂN từ
     // chưa đăng nhập sang đã đăng nhập — bắt đúng cả hai trường hợp bằng
     // MỘT nơi duy nhất (không cần tự báo riêng ở `_bamDangNhapGoogle`):
@@ -4339,6 +4326,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       final laLanDau = laLanDauNgheDangNhap;
       laLanDauNgheDangNhap = false;
       setState(() => _nguoiDungDangNhap = nguoiDung);
+      _capNhatDangKyCanhBaoApi();
       _thoatKhoiDamMayNeuCanThiet(nguoiDung);
       if (nguoiDung == null) return;
       unawaited(_dongBoCaiDatTuTaiKhoanKhiDangNhap(nguoiDung.uid));
@@ -4463,6 +4451,30 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// nhập. Xem `_bamDangNhapGoogle`/`DichVuDangNhapGoogle`.
   User? _nguoiDungDangNhap;
   StreamSubscription<User?>? _dangKyDoiTrangThaiDangNhap;
+
+  /// (YÊU CẦU MỚI) Mục "Cảnh báo hạn mức API" trong menu "Tài khoản-Cài
+  /// đặt" — CHỈ hiện khi collection `canhBaoApi` (xem `modal_canh_bao_api.dart`)
+  /// THẬT SỰ có ít nhất một dòng cần báo cáo, không hiện suông cho admin
+  /// xem "chưa có gì". Nghe trực tiếp Firestore (không phải chỉ đọc một
+  /// lần) để tự ẩn/hiện ngay khi có cảnh báo mới, không cần mở/đóng app lại.
+  bool _coCanhBaoApiCanBaoCao = false;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _dangKyCanhBaoApi;
+
+  void _capNhatDangKyCanhBaoApi() {
+    _dangKyCanhBaoApi?.cancel();
+    _dangKyCanhBaoApi = null;
+    if (!laAdminEmail(_nguoiDungDangNhap?.email)) {
+      if (mounted) setState(() => _coCanhBaoApiCanBaoCao = false);
+      return;
+    }
+    _dangKyCanhBaoApi = FirebaseFirestore.instance
+        .collection('canhBaoApi')
+        .limit(1)
+        .snapshots()
+        .listen((snap) {
+      if (mounted) setState(() => _coCanhBaoApiCanBaoCao = snap.docs.isNotEmpty);
+    });
+  }
 
   /// (ĐỒNG BỘ TÀI KHOẢN GOOGLE — YÊU CẦU MỚI) Ghim/bỏ ghim thanh định dạng
   /// và mở rộng/thu gọn thanh công cụ phía trên: lưu vào bộ nhớ lâu dài của
@@ -4661,6 +4673,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     HardwareKeyboard.instance.removeHandler(_khiGoPhimBatKyTatChuThich);
     WidgetsBinding.instance.removeObserver(this);
     _dangKyDoiTrangThaiDangNhap?.cancel();
+    _dangKyCanhBaoApi?.cancel();
     huyNgheResizeTrinhDuyet(_dangKyNgheResizeTrinhDuyet);
     huyThamDoChieuCaoVienPort(_dangKyThamDoChieuCaoVienPort);
     _hen?.cancel();
@@ -5153,8 +5166,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         builder: (_) => ManHinhCaiDat(
           caiDat: widget.caiDat,
           nhom: nhom,
-          layNhatKyMicro: () => List<String>.from(_nhatKyMicro),
-          xoaNhatKyMicro: _nhatKyMicro.clear,
           // Người dùng vừa tắt "kiểm tra chính tả bằng AI": xoá hết gạch đỏ
           // đang hiển thị ngay, vì đó là dữ liệu riêng của trang soạn thảo,
           // màn Cài đặt không cầm được.
@@ -5191,7 +5202,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   // --------------------------------------------------------------- thư mục
 
   Future<void> _moManHinhThuMuc() async {
-    if (_muonNghe) await _tatMicro();
+    await _ngungMicroVaGhiAmTheNeuDangBat();
     if (!mounted) return;
     final idChon = await Navigator.of(context).push<String>(
       MaterialPageRoute(
@@ -5252,7 +5263,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     // Lưu ghi chú đang mở TRƯỚC KHI chuyển — đúng luồng `_moManHinhThuMuc`
     // đã dùng khi rời trang (tắt micro nếu đang nghe, rồi lưu).
-    if (_muonNghe) await _tatMicro();
+    await _ngungMicroVaGhiAmTheNeuDangBat();
     if (!mounted) return;
     await _luuVanBan();
     if (!mounted) return;
@@ -5594,9 +5605,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   Future<void> _batMicro() async {
     if (!_sanSang) return;
-    _ghiNhatKyMicro(
-        'Bật micro — bản $phienBanWebDayDu, thiết bị đang dùng: '
-        '${_thietBiHienTai.ten}${widget.caiDat.thietBiChonTay != null ? ' (đã CHỌN TAY)' : ' (tự đoán)'}');
     _rawTichLuyChromeAndroid = '';
     // (RACE CONDITION KHI CHUYỂN PHIÊN — LỚP 2) Chụp lại đệm chống nhân đôi
     // TRƯỚC khi `_chotCauDangDoc()` xoá rỗng `_tuDaChotTrongPhien` ngay dưới
@@ -5663,6 +5671,20 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
   }
 
+  /// (YÊU CẦU MỚI — loại trừ lẫn nhau Ghi âm/Micro) Gọi ở ĐẦU mọi nút/menu
+  /// NGOÀI vùng soạn thảo chính (thư mục, hướng dẫn, từ điển nhập liệu
+  /// nhanh, bộ nhớ tạm, ba menu thả xuống Làm việc với AI/Thêm lựa chọn/
+  /// Tài khoản-Cài đặt, menu ba chấm cạnh nút thư mục, Tệp trước/sau, sửa
+  /// tên tệp, Lùi lại/Tiến tới) — NGƯNG HẲN Ghi âm/Micro đang hoạt động,
+  /// KHÔNG để tự bật lại. Ghi âm dùng ĐÚNG lối thoát "Hoàn thành-Đóng trình
+  /// ghi âm" (`_dongTrinhGhiAmThe`, chốt thẻ đang ghi trước khi đóng) —
+  /// KHÔNG phải huỷ bỏ dở dang.
+  Future<void> _ngungMicroVaGhiAmTheNeuDangBat() async {
+    if (_trinhGhiAmMo) await _dongTrinhGhiAmThe();
+    if (!mounted) return;
+    if (_muonNghe) await _tatMicro();
+  }
+
   // ---------------------------------- bộ phím nhanh cho màn hình cảm ứng
 
   /// Chặn bàn phím ảo bật lên + hiện hàng phím thay thế (chấm/phẩy/cách/
@@ -5725,6 +5747,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// việc.
   void _resetManHinhTruocKhiMoMenu() {
     if (!mounted) return;
+    // (YÊU CẦU MỚI — loại trừ lẫn nhau Ghi âm/Micro) Mở một trong ba menu
+    // thả xuống (Làm việc với AI/Thêm lựa chọn/Tài khoản-Cài đặt) coi như
+    // "bấm nút ngoài vùng soạn thảo" — ngưng hẳn Ghi âm/Micro, không tự bật
+    // lại. Mọi mục BÊN TRONG các menu này đều phải mở menu trước, nên chặn
+    // đúng một chỗ này là đủ cho toàn bộ ba menu.
+    unawaited(_ngungMicroVaGhiAmTheNeuDangBat());
     if (MediaQuery.of(context).viewInsets.bottom > 0) {
       SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
       setState(() => _epAnBanPhimAoKhiGiuFocus = true);
@@ -7682,8 +7710,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _bao('Đang mở tìm kiếm — hãy đóng tìm kiếm trước khi ghi âm.');
       return;
     }
-    if (_muonNghe) await _tatMicro();
-    if (!mounted) return;
+    // (YÊU CẦU MỚI — loại trừ lẫn nhau Ghi âm/Micro) Nút bấm tay đã bị khoá
+    // xám lúc Micro đang bật (`khoaNutGhiAmThe`) nên không lọt vào đây được
+    // qua chạm thường — chốt an toàn này chỉ còn cần cho đường vào khác
+    // (phím tắt Ghi âm bấm trong lúc Micro đang nghe).
+    if (_muonNghe) {
+      _bao('Đang dùng Micro — tắt Micro trước khi ghi âm.');
+      return;
+    }
     final ok = await ghiAmTheKhoiTao();
     if (!mounted) return;
     if (!ok) {
@@ -9754,9 +9788,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     if (noi.isEmpty) return;
 
-    _ghiNhatKyMicro(
-        'onResult(xong=$xong): "${noi.length > 120 ? '${noi.substring(0, 120)}…' : noi}"');
-
     // Chrome trên Android (web) không gửi `recognizedWords` là "toàn bộ
     // utterance tính từ đầu, sạch sẽ" như speech_to_text NATIVE vẫn làm —
     // nó CỘNG DỒN vô hạn, ghép thêm nội dung mới vào đuôi của TOÀN BỘ raw
@@ -9781,7 +9812,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // dung mới, an toàn hơn là cố trừ nhầm.
       _rawTichLuyChromeAndroid = raw;
       if (noi.isEmpty) return;
-      _ghiNhatKyMicro('  → phần đuôi mới sau khi trừ raw lần trước: "$noi"');
     }
 
     final cu = _boDieuKhien.text;
@@ -13355,6 +13385,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   void _lui() {
     if (_lichSuLui.isEmpty) return;
+    // (YÊU CẦU MỚI — loại trừ lẫn nhau Ghi âm/Micro) Xem
+    // `_ngungMicroVaGhiAmTheNeuDangBat`.
+    unawaited(_ngungMicroVaGhiAmTheNeuDangBat());
     // Hướng B đã bàn: KHÔNG tự chèn thẻ vào giữa chừng (sẽ làm thẻ trôi vị
     // trí mỗi lần bấm) — chỉ NHẢY QUA những mốc lịch sử nào thiếu bất kỳ thẻ
     // nào đang cần giữ, tới khi gặp mốc còn giữ nguyên văn TẤT CẢ các thẻ đó.
@@ -13392,6 +13425,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   void _toi() {
     if (_lichSuToi.isEmpty) return;
+    // (YÊU CẦU MỚI — loại trừ lẫn nhau Ghi âm/Micro) Xem
+    // `_ngungMicroVaGhiAmTheNeuDangBat`.
+    unawaited(_ngungMicroVaGhiAmTheNeuDangBat());
     final nhanPhaiGiu = _nhanTheChuaCoTrongBoNhoDem();
     final biNhayQua = <_TrangThaiVanBan>[];
     _TrangThaiVanBan? sau;
@@ -14492,11 +14528,6 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           layVanBanHienTai: () => _boDieuKhien.text,
           layDoanVanDangChon: _layDoanVanDangChon,
           caiDat: widget.caiDat,
-          // Ghi CHUNG một nhật ký với micro trang soạn thảo chính (xem
-          // "Xem nhật ký micro" trong Cài đặt) — để còn CÓ BẰNG CHỨNG THẬT
-          // mà soát tiếp nếu Micro kênh chat còn lặp/lộn chữ sau các lần
-          // sửa trước, thay vì tiếp tục đoán mò.
-          ghiNhatKyMicro: _ghiNhatKyMicro,
           draftBanDau: _draftTroChuyenTheoTep[idTep],
           khiDoiDraft: (chu) => _draftTroChuyenTheoTep[idTep] = chu,
         ),
@@ -15370,6 +15401,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       child: PopupMenuButton<String>(
         tooltip: '',
         onSelected: (v) {
+          // (YÊU CẦU MỚI — loại trừ lẫn nhau Ghi âm/Micro) Xem
+          // `_ngungMicroVaGhiAmTheNeuDangBat`.
+          unawaited(_ngungMicroVaGhiAmTheNeuDangBat());
           switch (v) {
             case 'taoMoi':
               _taoTepMoiTuThanhCongCu();
@@ -15497,6 +15531,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   }
 
   Future<void> _moModalDoiTenTep() async {
+    // (YÊU CẦU MỚI — loại trừ lẫn nhau Ghi âm/Micro) Xem
+    // `_ngungMicroVaGhiAmTheNeuDangBat`.
+    await _ngungMicroVaGhiAmTheNeuDangBat();
+    if (!mounted) return;
     final tenGoc = _ghiChuHienTai.ten;
     final bo = TextEditingController(text: tenGoc)
       ..selection = TextSelection(baseOffset: 0, extentOffset: tenGoc.length);
@@ -17100,20 +17138,34 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   if (mounted) _quetTuDienChinhTa();
                 },
                 khiBamTuDienNhapLieuNhanh: () async {
+                  // (YÊU CẦU MỚI — loại trừ lẫn nhau Ghi âm/Micro) Xem
+                  // `_ngungMicroVaGhiAmTheNeuDangBat`.
+                  await _ngungMicroVaGhiAmTheNeuDangBat();
+                  if (!mounted) return;
                   await moModalTuDienNhapLieuNhanh(context, widget.caiDat);
                   // Có thể vừa bật/tắt hoặc đổi phím tắt — vẽ lại nút
                   // toolbar (ẩn/hiện theo công tắc) ngay, không đợi gì cả.
                   if (mounted) setState(() {});
                 },
                 khiBamBoNhoTam: () async {
+                  // (YÊU CẦU MỚI — loại trừ lẫn nhau Ghi âm/Micro) Xem
+                  // `_ngungMicroVaGhiAmTheNeuDangBat`.
+                  await _ngungMicroVaGhiAmTheNeuDangBat();
+                  if (!mounted) return;
                   await moModalBoNhoTam(context, widget.caiDat);
                   // Có thể vừa bật/tắt hoặc đổi phím tắt — vẽ lại nút
                   // toolbar (ẩn/hiện theo công tắc) ngay, không đợi gì cả.
                   if (mounted) setState(() {});
                 },
-                khiBamHuongDan: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ManHinhHuongDan()),
-                ),
+                khiBamHuongDan: () async {
+                  // (YÊU CẦU MỚI — loại trừ lẫn nhau Ghi âm/Micro) Xem
+                  // `_ngungMicroVaGhiAmTheNeuDangBat`.
+                  await _ngungMicroVaGhiAmTheNeuDangBat();
+                  if (!mounted) return;
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ManHinhHuongDan()),
+                  );
+                },
                 khiBamCaiDatKiemTraToanVan: _moModalCaiDatKiemTraToanVan,
                 khiBamChuyenFileAmThanh: _chonVaChuyenFileAmThanh,
                 khiBamChuyenAnhThanhVanBan: _chonVaChuyenAnhThanhVanBan,
@@ -17153,6 +17205,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 khiBamQuanLyGopY: () => moModalQuanLyGopY(context),
                 khiBamDanhSachUser: () => moModalDanhSachUser(context),
                 khiBamCanhBaoApi: () => moModalCanhBaoApi(context),
+                coCanhBaoApi: _coCanhBaoApiCanBaoCao,
                 khiBamDonate: () => moModalDonate(context),
                 // `tenHienThiDaDangNhap` khác `null` LÀ tín hiệu "đang đăng
                 // nhập" cho `ThanhCongCu` — không được để `null` chỉ vì tài
@@ -17174,6 +17227,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     _khiBamKiemTraToanVan(loaiKiemTra: 'dau_cau'),
                 dangGhiAmThe: _trinhGhiAmMo,
                 khiBamGhiAmThe: _bamNutGhiAmThe,
+                khoaNutGhiAmThe: _muonNghe && !_trinhGhiAmMo,
                 khiBamChonTatCa: _phimAoChonTatCa,
                 dangChonTatCa: _phimAllVuaChonTatCa,
                 gopMicVaGhiAmThanhMotNut: false,
@@ -18337,6 +18391,11 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
     final day = BoNhoTamDanVanBan.day;
     final laCuNhat = day && i == BoNhoTamDanVanBan.oCuNhat;
     final laGanCuNhat = day && i == BoNhoTamDanVanBan.oGanCuNhat;
+    // (YÊU CẦU MỚI) Dòng VỪA được thêm vào bộ nhớ tạm gần đây nhất — nền
+    // xanh dương nhạt. Tính lại ngay trong `_dong()` (gọi mỗi lần build
+    // danh sách) nên tự cập nhật đồng bộ mỗi khi ghim/bỏ ghim một dòng,
+    // giống `laCuNhat`/`laGanCuNhat`, không phải trạng thái "đóng băng".
+    final laVuaThem = !rong && i == BoNhoTamDanVanBan.oVuaThem;
 
     // (YÊU CẦU MỚI) Dòng đang ghim: nền xanh lá, chuyển sắc TỪ TRÁI (đậm
     // vừa, không đậm quá) SANG PHẢI — nửa đầu dòng giữ nguyên màu đậm,
@@ -18355,7 +18414,9 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
       trangTri = BoxDecoration(
         color: laCuNhat
             ? const Color(0xFFFCE8E6)
-            : (laGanCuNhat ? const Color(0xFFFEF7E0) : null),
+            : (laGanCuNhat
+                ? const Color(0xFFFEF7E0)
+                : (laVuaThem ? const Color(0xFFE8F0FE) : null)),
       );
     }
 

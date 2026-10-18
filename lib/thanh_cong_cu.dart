@@ -49,6 +49,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamKiemTraDauCauToanVan,
     required this.dangGhiAmThe,
     required this.khiBamGhiAmThe,
+    this.khoaNutGhiAmThe = false,
     required this.khiBamChonTatCa,
     this.dangChonTatCa = false,
     this.gopMicVaGhiAmThanhMotNut = false,
@@ -76,6 +77,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamQuanLyGopY,
     required this.khiBamDanhSachUser,
     required this.khiBamCanhBaoApi,
+    this.coCanhBaoApi = false,
     this.tenHienThiDaDangNhap,
     this.emailDaDangNhap,
     this.urlAnhDaiDienDaDangNhap,
@@ -122,6 +124,11 @@ class ThanhCongCu extends StatelessWidget {
   /// (YÊU CẦU MỚI — chỉ admin) Mục "Cảnh báo hạn mức API" — truyền thẳng
   /// xuống `_NutTaiKhoanMenu`.
   final VoidCallback khiBamCanhBaoApi;
+
+  /// (YÊU CẦU MỚI) `true` khi collection `canhBaoApi` THẬT SỰ có cảnh báo
+  /// cần báo cáo — mục "Cảnh báo hạn mức API" CHỈ hiện trong menu lúc này,
+  /// xem `_NutTaiKhoanMenu.build`.
+  final bool coCanhBaoApi;
 
   final String? tenHienThiDaDangNhap;
   final String? emailDaDangNhap;
@@ -262,6 +269,13 @@ class ThanhCongCu extends StatelessWidget {
   /// cả nút micro/ghi âm chung.
   final bool dangGhiAmThe;
   final VoidCallback khiBamGhiAmThe;
+
+  /// (YÊU CẦU MỚI — loại trừ lẫn nhau Ghi âm/Micro) Micro (vừa nói vừa ra
+  /// chữ) đang bật — khoá hẳn nút Ghi âm thẻ lại (không bấm được), đối xứng
+  /// với việc nút Micro đã bị khoá bởi `_ghiAmTheDangKhoaMicro` lúc trình
+  /// ghi âm thẻ đang mở. KHÔNG áp dụng lúc [dangGhiAmThe] đã `true` — vẫn
+  /// phải bấm được để DỪNG bản ghi đang chạy.
+  final bool khoaNutGhiAmThe;
 
   /// Nút "All" — ĐÚNG logic/hiệu ứng với nút cùng tên ở Bộ phím nhanh
   /// (`_phimAoChonTatCa`/`_phimAllVuaChonTatCa` trong `trang_soan_thao.dart`):
@@ -561,6 +575,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiBamQuanLyGopY: khiBamQuanLyGopY,
                               khiBamDanhSachUser: khiBamDanhSachUser,
                               khiBamCanhBaoApi: khiBamCanhBaoApi,
+                              coCanhBaoApi: coCanhBaoApi,
                               tenHienThiDaDangNhap: tenHienThiDaDangNhap,
                               emailDaDangNhap: emailDaDangNhap,
                               urlAnhDaiDienDaDangNhap: urlAnhDaiDienDaDangNhap,
@@ -599,6 +614,7 @@ class ThanhCongCu extends StatelessWidget {
                       child: _NutGhiAmTron(
                         dangGhiAm: dangGhiAmThe,
                         khiBam: khiBamGhiAmThe,
+                        biKhoa: khoaNutGhiAmThe,
                       ),
                     ),
 
@@ -616,6 +632,7 @@ class ThanhCongCu extends StatelessWidget {
                       child: _NutGhiAmTron(
                         dangGhiAm: dangGhiAmThe,
                         khiBam: khiBamGhiAmThe,
+                        biKhoa: khoaNutGhiAmThe,
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -707,20 +724,34 @@ class ThanhCongCu extends StatelessWidget {
 /// giác) + viền xanh LÁ đậm lúc chưa ghi (khác màu viền xanh DƯƠNG của nút
 /// micro, để phân biệt hai chức năng) — đỏ đặc (không viền) lúc đang ghi.
 class _NutGhiAmTron extends StatelessWidget {
-  const _NutGhiAmTron({required this.dangGhiAm, required this.khiBam});
+  const _NutGhiAmTron({
+    required this.dangGhiAm,
+    required this.khiBam,
+    this.biKhoa = false,
+  });
 
   final bool dangGhiAm;
   final VoidCallback khiBam;
+
+  /// (YÊU CẦU MỚI — loại trừ lẫn nhau Ghi âm/Micro) Micro đang bật — nút
+  /// này không bấm được, hiện xám hẳn. KHÔNG áp dụng khi [dangGhiAm] đã
+  /// `true` (nơi gọi tự đảm bảo điều đó — xem `khoaNutGhiAmThe`).
+  final bool biKhoa;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
+      enabled: !biKhoa,
       label: dangGhiAm ? 'Dừng ghi âm' : 'Ghi âm',
       child: Tooltip(
-        message: dangGhiAm ? 'Dừng ghi âm' : 'Ghi âm (tạo thẻ ghi âm)',
+        message: biKhoa
+            ? 'Đang dùng Micro — tắt Micro trước khi ghi âm'
+            : (dangGhiAm ? 'Dừng ghi âm' : 'Ghi âm (tạo thẻ ghi âm)'),
         child: Material(
-          color: dangGhiAm ? Colors.red.shade600 : Colors.blue.shade50,
+          color: biKhoa
+              ? Colors.grey.shade300
+              : (dangGhiAm ? Colors.red.shade600 : Colors.blue.shade50),
           shape: const CircleBorder(),
           child: InkWell(
             customBorder: const CircleBorder(),
@@ -730,13 +761,14 @@ class _NutGhiAmTron extends StatelessWidget {
             // điểm DOM ra khỏi khung nhập (khi focus rời khỏi input ẩn phía
             // sau) có thể "ăn" mất đúng sự kiện nhấc tay của lượt chạm đầu.
             // `onTap` rỗng chỉ để giữ InkWell ở trạng thái "có thể chạm"
-            // (còn hiệu ứng loang màu).
-            onTap: () {},
-            onTapDown: (_) => khiBam(),
+            // (còn hiệu ứng loang màu) — bỏ cả hai khi [biKhoa] để nút thật
+            // sự không phản ứng gì với chạm.
+            onTap: biKhoa ? null : () {},
+            onTapDown: biKhoa ? null : (_) => khiBam(),
             child: Container(
               width: 40,
               height: 40,
-              decoration: dangGhiAm
+              decoration: (dangGhiAm || biKhoa)
                   ? null
                   : BoxDecoration(
                       shape: BoxShape.circle,
@@ -745,7 +777,9 @@ class _NutGhiAmTron extends StatelessWidget {
               alignment: Alignment.center,
               child: Icon(
                 dangGhiAm ? Icons.stop : Icons.mic_rounded,
-                color: dangGhiAm ? Colors.white : Colors.green.shade800,
+                color: biKhoa
+                    ? Colors.grey.shade600
+                    : (dangGhiAm ? Colors.white : Colors.green.shade800),
                 size: 20,
               ),
             ),
@@ -1169,20 +1203,21 @@ class _DongMenuCoTheBam extends StatelessWidget {
   }
 }
 
-/// (YÊU CẦU MỚI) Mục "Cài đặt Ứng dụng vào Thiết bị" — nền xanh dương đậm,
-/// chữ trắng đậm kèm icon, để nổi bật hẳn so với các dòng text thường
-/// khác trong menu "+ Thêm lựa chọn", thu hút ánh nhìn người dùng.
+/// (YÊU CẦU MỚI — bỏ nền xanh dương) Mục "Cài đặt Ứng dụng vào Thiết bị" —
+/// KHÔNG còn tô nền, chỉ còn chữ đậm màu xanh lá đậm kèm icon cùng màu, để
+/// nổi bật vừa đủ so với các dòng text thường khác trong menu "+ Thêm lựa
+/// chọn", không chiếm hẳn cả dòng như trước.
 Widget _mucMenuThemNoiBatXanh(int gia, String chu) {
   return _DongMenuCoTheBam(
     gia: gia,
-    mauNen: const Color(0xFF1A73E8),
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.install_mobile, size: 17, color: Colors.white),
+        Icon(Icons.install_mobile, size: 17, color: Colors.green.shade800),
         const SizedBox(width: 8),
         Text(chu,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+            style: TextStyle(
+                fontSize: 13, fontWeight: FontWeight.bold, color: Colors.green.shade800)),
       ],
     ),
   );
@@ -1676,6 +1711,7 @@ class _NutTaiKhoanMenu extends StatelessWidget {
     required this.khiBamQuanLyGopY,
     required this.khiBamDanhSachUser,
     required this.khiBamCanhBaoApi,
+    this.coCanhBaoApi = false,
     this.tenHienThiDaDangNhap,
     this.emailDaDangNhap,
     this.urlAnhDaiDienDaDangNhap,
@@ -1706,8 +1742,12 @@ class _NutTaiKhoanMenu extends StatelessWidget {
   final VoidCallback khiBamDanhSachUser;
 
   /// (YÊU CẦU MỚI — chỉ admin) Mục "Cảnh báo hạn mức API" — mở
-  /// `moModalCanhBaoApi`. Cùng điều kiện hiện với [khiBamQuanLyGopY].
+  /// `moModalCanhBaoApi`. Cùng điều kiện ADMIN với [khiBamQuanLyGopY],
+  /// CỘNG THÊM [coCanhBaoApi] — chỉ hiện khi THẬT SỰ có gì cần báo cáo.
   final VoidCallback khiBamCanhBaoApi;
+
+  /// Xem `ThanhCongCu.coCanhBaoApi`.
+  final bool coCanhBaoApi;
 
   /// Khác `null` nghĩa là ĐANG đăng nhập — tên/avatar hiện thêm ở dòng CUỐI
   /// CÙNG của menu. Cả ba đều `null` cùng lúc khi chưa đăng nhập.
@@ -1879,7 +1919,14 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                   daDangNhap ? 'Đăng xuất' : 'Đăng nhập bằng tài khoản Google',
                   icon: daDangNhap ? Icons.logout : Icons.login,
                 ),
-                // (YÊU CẦU MỚI — chỉ admin) Ba mục quản lý, CHỈ hiện khi
+                // (YÊU CẦU MỚI) "Cảnh báo hạn mức API" nằm GIỮA "Đăng xuất"
+                // và "Các ý kiến góp ý..." — CHỈ hiện khi admin VÀ thật sự
+                // có cảnh báo cần báo cáo ([coCanhBaoApi]), khác hai mục
+                // quản lý khác (chỉ cần admin, không cần dữ liệu).
+                if (daDangNhap && laAdminEmail(emailDaDangNhap) && coCanhBaoApi)
+                  _mucMenuThem(32, 'Cảnh báo hạn mức API',
+                      icon: Icons.warning_amber_outlined, mauChu: Colors.orange.shade800),
+                // (YÊU CẦU MỚI — chỉ admin) Hai mục quản lý, CHỈ hiện khi
                 // đang đăng nhập ĐÚNG một trong hai email admin — đây chỉ
                 // là lớp ẨN/HIỆN giao diện, quyền THẬT nằm ở luật Firestore
                 // (xem `quyen_admin.dart`).
@@ -1887,8 +1934,6 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                   _mucMenuThem(30, 'Các ý kiến góp ý, báo lỗi của user',
                       icon: Icons.rate_review_outlined),
                   _mucMenuThem(31, 'Các User đã đăng nhập', icon: Icons.group_outlined),
-                  _mucMenuThem(32, 'Cảnh báo hạn mức API',
-                      icon: Icons.warning_amber_outlined, mauChu: Colors.orange.shade800),
                 ],
                 // (YÊU CẦU MỚI) Đang đăng nhập — hiện tên + avatar của tài
                 // khoản ở dòng CUỐI CÙNG của menu, không bấm được (chỉ để
