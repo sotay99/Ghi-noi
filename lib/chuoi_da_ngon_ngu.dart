@@ -271,6 +271,14 @@ class Ch {
   static String luyenGoPhim10Ngon(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Luyện gõ phím bằng 10 ngón tay' : 'Practice 10-finger typing';
 
+  static String gioiThieuLuyenGoPhim(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Có rất nhiều trang web miễn phí giúp bạn luyện gõ mười ngón '
+          'mà không cần nhìn bàn phím. Bấm vào link dưới đây để tìm và '
+          'chọn trang web phù hợp với bạn:'
+      : 'There are many free websites that help you practice touch typing '
+          'without looking at the keyboard. Tap the link below to find and '
+          'pick the one that suits you:';
+
   static String caiDatUngDungVaoThietBiNoiBat(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Cài đặt Ứng dụng vào Thiết bị' : 'Install App on this Device';
 

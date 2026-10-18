@@ -35,6 +35,25 @@ Future<void> taiNgonNgu() async {
   _daChonNgonNgu = kho.getBool(_khoaDaChonNgonNgu) ?? false;
 }
 
+/// Từ khoá tìm kiếm Google cho mục "Luyện gõ phím bằng 10 ngón tay" —
+/// mỗi ngôn ngữ một từ khoá tự nhiên (không cần dịch sát nghĩa). Thêm ngôn
+/// ngữ mới vào enum ở trên mà quên thêm case ở đây thì rơi vào `default`
+/// (từ khoá tiếng Anh) thay vì vỡ ứng dụng.
+String tuKhoaLuyenGoPhim(NgonNgu nn) {
+  switch (nn) {
+    case NgonNgu.vi:
+      return 'luyện gõ phím bằng 10 ngón tay';
+    case NgonNgu.en:
+      return 'touch typing practice 10 fingers';
+  }
+}
+
+/// Đường link tìm kiếm Google đã mã hoá đúng theo ngôn ngữ hiện tại — dùng
+/// `Uri.encodeQueryComponent` nên không cần tự escape tay, đúng với mọi
+/// ngôn ngữ (kể cả tiếng Trung/Thái sau này).
+String linkTimKiemLuyenGoPhim(NgonNgu nn) =>
+    'https://www.google.com/search?q=${Uri.encodeQueryComponent(tuKhoaLuyenGoPhim(nn))}';
+
 Future<void> datNgonNgu(NgonNgu nn) async {
   ngonNguHienTai.value = nn;
   _daChonNgonNgu = true;

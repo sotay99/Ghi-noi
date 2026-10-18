@@ -5,10 +5,11 @@
 
 import 'package:flutter/material.dart';
 
+import 'chuoi_da_ngon_ngu.dart';
 import 'mo_lien_ket_ngoai.dart';
+import 'ngon_ngu.dart';
 
 const _mauChinh = Color(0xFF1A73E8);
-const _tuKhoaTimKiem = 'luyện gõ phím bằng 10 ngón tay';
 
 void moModalLuyenGoPhim(BuildContext context) {
   showDialog<void>(
@@ -16,10 +17,10 @@ void moModalLuyenGoPhim(BuildContext context) {
     builder: (ctx) => AlertDialog(
       title: Row(
         children: [
-          const Expanded(child: Text('Luyện gõ phím bằng 10 ngón tay')),
+          Expanded(child: Text(Ch.luyenGoPhim10Ngon(ngonNguHienTai.value))),
           IconButton(
             icon: const Icon(Icons.close, color: Colors.red),
-            tooltip: 'Đóng',
+            tooltip: Ch.dong(ngonNguHienTai.value),
             onPressed: () => Navigator.of(ctx).pop(),
             visualDensity: VisualDensity.compact,
           ),
@@ -31,23 +32,19 @@ void moModalLuyenGoPhim(BuildContext context) {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Có rất nhiều trang web miễn phí giúp bạn luyện gõ mười ngón '
-              'mà không cần nhìn bàn phím. Bấm vào link dưới đây để tìm và '
-              'chọn trang web phù hợp với bạn:',
-              style: TextStyle(fontSize: 14, height: 1.5),
+            Text(
+              Ch.gioiThieuLuyenGoPhim(ngonNguHienTai.value),
+              style: const TextStyle(fontSize: 14, height: 1.5),
             ),
             const SizedBox(height: 14),
             InkWell(
               onTap: () {
-                moLienKetNgoai(
-                  'https://www.google.com/search?q=${Uri.encodeQueryComponent(_tuKhoaTimKiem)}',
-                );
+                moLienKetNgoai(linkTimKiemLuyenGoPhim(ngonNguHienTai.value));
                 Navigator.of(ctx).pop();
               },
-              child: const Text(
-                _tuKhoaTimKiem,
-                style: TextStyle(
+              child: Text(
+                tuKhoaLuyenGoPhim(ngonNguHienTai.value),
+                style: const TextStyle(
                   color: _mauChinh,
                   fontWeight: FontWeight.w600,
                   decoration: TextDecoration.underline,
