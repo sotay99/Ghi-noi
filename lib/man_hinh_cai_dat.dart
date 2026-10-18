@@ -214,9 +214,9 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 ChCaiDat.giaiThichNganTieuDe(_nn),
-                style: TextStyle(
+                style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
                   letterSpacing: 0.5,
@@ -226,9 +226,9 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
               const SizedBox(height: 8),
               _doanVanCoDam(ngan),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 ChCaiDat.giaiThichChiTietTieuDe(_nn),
-                style: TextStyle(
+                style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
                   letterSpacing: 0.5,
@@ -959,7 +959,7 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
             if (nhan.isEmpty) return;
             Navigator.of(ctx).pop(nhan.toUpperCase());
           },
-          child: const SizedBox(
+          child: SizedBox(
             height: 60,
             child: Center(child: Text(ChCaiDat.hayNhanMotPhimBatKy(_nn))),
           ),
