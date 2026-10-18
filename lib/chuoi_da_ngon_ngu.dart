@@ -1052,6 +1052,76 @@ class Ch {
           'ảnh bằng công cụ bên ngoài rồi thử lại.'
       : 'Image "$tenTep" is ${soMB}MB, over the 15MB limit. Please compress '
           'the image with an external tool and try again.';
+
+  // ----------------------------------------------------- Modal "Donate"
+  static String donateUngHoCamOnTacGia(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Donate ủng hộ - cảm ơn tác giả' : 'Donate - thank the author';
+
+  static String noiDungDonate(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Flowrite vẫn đang trong quá trình xây dựng và hoàn thiện. '
+          'Donate của bạn giúp tác giả có thêm kinh phí trả cho bộ nhớ '
+          'đám mây, các API xử lý văn bản/hình ảnh/âm thanh, duy trì '
+          'app, đưa app lên các chợ ứng dụng, và phát triển thêm những '
+          'app mới trong tương lai.\n\n'
+          'Donate là nguồn động lực để tác giả tiếp tục, giúp Flowrite '
+          'luôn luôn miễn phí cho mọi người. Nhiều hay ít đều quý giá — '
+          'cảm ơn bạn rất nhiều!'
+      : 'Flowrite is still being built and improved. '
+          'Your donation helps the author cover cloud storage, text/image/'
+          'audio processing APIs, app maintenance, publishing to app '
+          'stores, and building new apps in the future.\n\n'
+          'Donations are motivation for the author to keep going, and keep '
+          'Flowrite free for everyone. Every amount matters — thank you so much!';
+
+  static String donateQuaPaypal(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Donate qua Paypal' : 'Donate via Paypal';
+
+  static String quetMaHoacBamLinkPaypal(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Quét mã hoặc bấm link dưới để mở trang nhận donate trên Paypal.'
+      : 'Scan the code or tap the link below to open the Paypal donation page.';
+
+  static String linkPaypal(NgonNgu nn) => nn == NgonNgu.vi ? 'Link Paypal' : 'Paypal link';
+
+  static String email(NgonNgu nn) => nn == NgonNgu.vi ? 'Email' : 'Email';
+
+  static String ten(NgonNgu nn) => nn == NgonNgu.vi ? 'Tên' : 'Name';
+
+  static String donateQuaMomo(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Donate qua Momo' : 'Donate via Momo';
+
+  static String moAppMomoQuetMa(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Mở app Momo rồi quét mã này, hoặc chuyển trực tiếp tới số điện thoại dưới đây.'
+      : 'Open the Momo app and scan this code, or transfer directly to the phone number below.';
+
+  static String soDienThoai(NgonNgu nn) => nn == NgonNgu.vi ? 'Số điện thoại' : 'Phone number';
+
+  static String donateQuaNganHangTPBank(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Donate qua Ngân hàng TPBank (Việt Nam)'
+      : 'Donate via TPBank (Vietnam)';
+
+  static String donateQuaNganHangTPBankNgan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Donate qua Ngân hàng TPBank' : 'Donate via TPBank';
+
+  static String moAppNganHangVietQr(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Mở app ngân hàng bất kỳ (hỗ trợ VietQR) rồi quét mã này.'
+      : 'Open any banking app that supports VietQR and scan this code.';
+
+  static String nganHang(NgonNgu nn) => nn == NgonNgu.vi ? 'Ngân hàng' : 'Bank';
+
+  static String soTaiKhoan(NgonNgu nn) => nn == NgonNgu.vi ? 'Số tài khoản' : 'Account number';
+
+  static String khongTaiDuocMaQr(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Không tải được mã QR — kiểm tra lại mạng.' : 'Could not load the QR code — check your connection.';
+
+  static String khuyenKhichGhiNoiDungChuyenKhoan(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Khuyến khích ghi thêm nội dung chuyển khoản: "Donate app Flowrite" — '
+          'để tác giả biết được nguồn donate.'
+      : 'Please add a transfer note: "Donate app Flowrite" — so the author knows where the donation is from.';
+
+  static String chep(NgonNgu nn) => nn == NgonNgu.vi ? 'Chép' : 'Copy';
+
+  static String daChepTen(NgonNgu nn, String ten) =>
+      nn == NgonNgu.vi ? 'Đã chép "$ten"' : 'Copied "$ten"';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt

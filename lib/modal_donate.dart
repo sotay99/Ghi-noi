@@ -8,7 +8,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'chuoi_da_ngon_ngu.dart';
 import 'mo_lien_ket_ngoai.dart';
+import 'ngon_ngu.dart';
 import 'thong_bao_giua.dart';
 
 void moModalDonate(BuildContext context) {
@@ -24,10 +26,10 @@ void moModalDonate(BuildContext context) {
           children: [
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Donate ủng hộ - cảm ơn tác giả',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    Ch.donateUngHoCamOnTacGia(ngonNguHienTai.value),
+                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                   ),
                 ),
                 IconButton(
@@ -37,40 +39,33 @@ void moModalDonate(BuildContext context) {
               ],
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Flowrite vẫn đang trong quá trình xây dựng và hoàn thiện. '
-              'Donate của bạn giúp tác giả có thêm kinh phí trả cho bộ nhớ '
-              'đám mây, các API xử lý văn bản/hình ảnh/âm thanh, duy trì '
-              'app, đưa app lên các chợ ứng dụng, và phát triển thêm những '
-              'app mới trong tương lai.\n\n'
-              'Donate là nguồn động lực để tác giả tiếp tục, giúp Flowrite '
-              'luôn luôn miễn phí cho mọi người. Nhiều hay ít đều quý giá — '
-              'cảm ơn bạn rất nhiều!',
-              style: TextStyle(fontSize: 13.5, height: 1.45),
+            Text(
+              Ch.noiDungDonate(ngonNguHienTai.value),
+              style: const TextStyle(fontSize: 13.5, height: 1.45),
             ),
             const SizedBox(height: 18),
             _nutDonate(
               context,
               icon: Icons.payment,
-              nhan: 'Donate qua Paypal',
+              nhan: Ch.donateQuaPaypal(ngonNguHienTai.value),
               khiBam: () => _moModalQr(
                 context,
-                tieuDe: 'Donate qua Paypal',
+                tieuDe: Ch.donateQuaPaypal(ngonNguHienTai.value),
                 urlAnhQr:
                     'https://api.qrserver.com/v1/create-qr-code/?size=260x260&data='
                     '${Uri.encodeComponent('https://www.paypal.com/ncp/payment/JJDRYY4HXDHB6')}',
-                moTaQr: 'Quét mã hoặc bấm link dưới để mở trang nhận donate trên Paypal.',
-                dongThongTin: const [
+                moTaQr: Ch.quetMaHoacBamLinkPaypal(ngonNguHienTai.value),
+                dongThongTin: [
                   // (YÊU CẦU MỚI) Bấm TRỰC TIẾP vào link cũng mở được (ngoài
                   // nút chép) — gạch chân + chữ xanh dương để người dùng
                   // biết bấm được, xem `urlMo`/`_dongTinChepDuoc`.
                   _DongThongTin(
-                    nhan: 'Link Paypal',
+                    nhan: Ch.linkPaypal(ngonNguHienTai.value),
                     gia: 'paypal.com/ncp/payment/JJDRYY4HXDHB6',
                     urlMo: 'https://www.paypal.com/ncp/payment/JJDRYY4HXDHB6',
                   ),
-                  _DongThongTin(nhan: 'Email', gia: 'lookatmevanthanhpham@gmail.com'),
-                  _DongThongTin(nhan: 'Tên', gia: 'PHAM VAN THANH'),
+                  _DongThongTin(nhan: Ch.email(ngonNguHienTai.value), gia: 'lookatmevanthanhpham@gmail.com'),
+                  _DongThongTin(nhan: Ch.ten(ngonNguHienTai.value), gia: 'PHAM VAN THANH'),
                 ],
               ),
             ),
@@ -78,17 +73,17 @@ void moModalDonate(BuildContext context) {
             _nutDonate(
               context,
               icon: Icons.phone_android,
-              nhan: 'Donate qua Momo',
+              nhan: Ch.donateQuaMomo(ngonNguHienTai.value),
               khiBam: () => _moModalQr(
                 context,
-                tieuDe: 'Donate qua Momo',
+                tieuDe: Ch.donateQuaMomo(ngonNguHienTai.value),
                 urlAnhQr:
                     'https://api.qrserver.com/v1/create-qr-code/?size=260x260&data='
                     '${Uri.encodeComponent('https://nhantien.momo.vn/0376060540')}',
-                moTaQr: 'Mở app Momo rồi quét mã này, hoặc chuyển trực tiếp tới số điện thoại dưới đây.',
-                dongThongTin: const [
-                  _DongThongTin(nhan: 'Số điện thoại', gia: '0376060540'),
-                  _DongThongTin(nhan: 'Tên', gia: 'PHAM VAN THANH'),
+                moTaQr: Ch.moAppMomoQuetMa(ngonNguHienTai.value),
+                dongThongTin: [
+                  _DongThongTin(nhan: Ch.soDienThoai(ngonNguHienTai.value), gia: '0376060540'),
+                  _DongThongTin(nhan: Ch.ten(ngonNguHienTai.value), gia: 'PHAM VAN THANH'),
                 ],
               ),
             ),
@@ -96,18 +91,18 @@ void moModalDonate(BuildContext context) {
             _nutDonate(
               context,
               icon: Icons.account_balance,
-              nhan: 'Donate qua Ngân hàng TPBank (Việt Nam)',
+              nhan: Ch.donateQuaNganHangTPBank(ngonNguHienTai.value),
               khiBam: () => _moModalQr(
                 context,
-                tieuDe: 'Donate qua Ngân hàng TPBank',
+                tieuDe: Ch.donateQuaNganHangTPBankNgan(ngonNguHienTai.value),
                 urlAnhQr:
                     'https://img.vietqr.io/image/970423-10001034843-compact2.png'
                     '?accountName=${Uri.encodeComponent('PHAM VAN THANH')}',
-                moTaQr: 'Mở app ngân hàng bất kỳ (hỗ trợ VietQR) rồi quét mã này.',
-                dongThongTin: const [
-                  _DongThongTin(nhan: 'Ngân hàng', gia: 'TPBank'),
-                  _DongThongTin(nhan: 'Số tài khoản', gia: '10001034843'),
-                  _DongThongTin(nhan: 'Tên', gia: 'PHAM VAN THANH'),
+                moTaQr: Ch.moAppNganHangVietQr(ngonNguHienTai.value),
+                dongThongTin: [
+                  _DongThongTin(nhan: Ch.nganHang(ngonNguHienTai.value), gia: 'TPBank'),
+                  _DongThongTin(nhan: Ch.soTaiKhoan(ngonNguHienTai.value), gia: '10001034843'),
+                  _DongThongTin(nhan: Ch.ten(ngonNguHienTai.value), gia: 'PHAM VAN THANH'),
                 ],
               ),
             ),
@@ -183,14 +178,14 @@ void _moModalQr(
                   urlAnhQr,
                   width: 220,
                   height: 220,
-                  errorBuilder: (_, __, ___) => const SizedBox(
+                  errorBuilder: (_, __, ___) => SizedBox(
                     width: 220,
                     height: 220,
                     child: Center(
                       child: Text(
-                        'Không tải được mã QR — kiểm tra lại mạng.',
+                        Ch.khongTaiDuocMaQr(ngonNguHienTai.value),
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.red, fontSize: 12),
+                        style: const TextStyle(color: Colors.red, fontSize: 12),
                       ),
                     ),
                   ),
@@ -215,10 +210,9 @@ void _moModalQr(
                 color: const Color(0xFFFFF4E5),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Text(
-                'Khuyến khích ghi thêm nội dung chuyển khoản: "Donate app Flowrite" — '
-                'để tác giả biết được nguồn donate.',
-                style: TextStyle(fontSize: 12.5, color: Color(0xFF8A5300)),
+              child: Text(
+                Ch.khuyenKhichGhiNoiDungChuyenKhoan(ngonNguHienTai.value),
+                style: const TextStyle(fontSize: 12.5, color: Color(0xFF8A5300)),
               ),
             ),
           ],
@@ -271,10 +265,10 @@ Widget _dongTinChepDuoc(BuildContext context, _DongThongTin d) {
         ),
         IconButton(
           icon: const Icon(Icons.copy, size: 17),
-          tooltip: 'Chép',
+          tooltip: Ch.chep(ngonNguHienTai.value),
           onPressed: () {
             Clipboard.setData(ClipboardData(text: d.gia));
-            hienThongBaoGiua(context, 'Đã chép "${d.nhan}"');
+            hienThongBaoGiua(context, Ch.daChepTen(ngonNguHienTai.value, d.nhan));
           },
         ),
       ],
