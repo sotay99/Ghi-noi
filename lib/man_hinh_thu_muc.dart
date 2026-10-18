@@ -13,7 +13,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'cai_dat.dart';
+import 'chuoi_da_ngon_ngu.dart';
 import 'kho_du_lieu.dart';
+import 'ngon_ngu.dart';
 import 'luu_va_chia_se_tep.dart';
 import 'mau_co_ban.dart';
 import 'mo_hinh.dart';
@@ -187,9 +189,16 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     return (ms ~/ _nhipNhayNhayMs).isEven;
   }
 
+  void _khiDoiNgonNgu() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
+    // (ĐA NGÔN NGỮ) Vẽ lại màn hình này khi người dùng đổi ngôn ngữ — xem
+    // chú thích y hệt ở `_TrangSoanThaoState` trong `trang_soan_thao.dart`.
+    ngonNguHienTai.addListener(_khiDoiNgonNgu);
     _kho = widget.kho;
     // (YÊU CẦU MỚI) Có nhớ từ lần mở trước (trong CÙNG phiên app, CÙNG kho
     // ghi chú đang mở) thì vào đúng chỗ đó; chưa có gì (lần đầu, vừa F5,
@@ -235,6 +244,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     _oTimKiemThuMuc.dispose();
     _nhipNhayNhay?.cancel();
     _cuonDanhSachThuMuc.dispose();
+    ngonNguHienTai.removeListener(_khiDoiNgonNgu);
     super.dispose();
   }
 
@@ -581,7 +591,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     required String id,
     required String tenCu,
   }) async {
-    final ten = await _hoiTen(tieuDe: 'Đổi tên', tenBanDau: tenCu);
+    final ten = await _hoiTen(tieuDe: Ch.doiTen(ngonNguHienTai.value), tenBanDau: tenCu);
     if (ten == null || ten.trim().isEmpty) return;
     final loi = laThuMuc
         ? _kho.doiTenThuMuc(id, ten.trim())
@@ -599,7 +609,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   Future<void> _chonMau({required bool laThuMuc, required String id}) async {
     final mau = await hienThiChonMauCoBanChoTen(
       context,
-      tieuDe: laThuMuc ? 'Chọn màu Tên Thư mục' : 'Chọn màu Tên Tệp',
+      tieuDe: laThuMuc ? Ch.chonMauTenThuMuc(ngonNguHienTai.value) : Ch.chonMauTenTep(ngonNguHienTai.value),
     );
     if (mau == null) return;
     if (laThuMuc) {
@@ -1193,12 +1203,12 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
               TextButton.icon(
                 onPressed: coChon ? () => _datNhieu(laCat: false) : null,
                 icon: const Icon(Icons.copy_outlined, size: 18),
-                label: const Text('Sao chép'),
+                label: const Text(Ch.saoChep(ngonNguHienTai.value)),
               ),
               TextButton.icon(
                 onPressed: coChon ? () => _datNhieu(laCat: true) : null,
                 icon: const Icon(Icons.cut_outlined, size: 18),
-                label: const Text('Cắt (di chuyển)'),
+                label: const Text(Ch.catDiChuyen(ngonNguHienTai.value)),
               ),
               TextButton.icon(
                 onPressed: coChon ? _chonMauNhieu : null,
@@ -1213,7 +1223,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                   color: coChon ? Colors.red.shade600 : null,
                 ),
                 label: Text(
-                  'Chuyển vào thùng rác',
+                  Ch.chuyenVaoThungRac(ngonNguHienTai.value),
                   style: TextStyle(color: coChon ? Colors.red.shade600 : null),
                 ),
               ),
@@ -1537,16 +1547,16 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                       ]),
                     ),
                     const PopupMenuDivider(),
-                    _mucMenuIcon(1, Icons.create_new_folder_outlined, 'Tạo thư mục mới'),
-                    _mucMenuIcon(6, Icons.upload_file_outlined, 'Nhập ZIP hoặc TXT vào đây'),
+                    _mucMenuIcon(1, Icons.create_new_folder_outlined, Ch.taoThuMucMoi(ngonNguHienTai.value)),
+                    _mucMenuIcon(6, Icons.upload_file_outlined, Ch.nhapZipHoacTxt(ngonNguHienTai.value)),
                     const PopupMenuDivider(),
-                    _mucMenuIcon(2, Icons.checklist_outlined, 'Chọn nhiều'),
-                    _mucMenuIcon(3, Icons.download_outlined, 'Tải Thư mục này về thiết bị'),
-                    _mucMenuIcon(4, Icons.info_outline, 'Thông tin thư mục này'),
+                    _mucMenuIcon(2, Icons.checklist_outlined, Ch.chonNhieu(ngonNguHienTai.value)),
+                    _mucMenuIcon(3, Icons.download_outlined, Ch.taiThuMucVeThietBi(ngonNguHienTai.value)),
+                    _mucMenuIcon(4, Icons.info_outline, Ch.thongTinThuMucNay(ngonNguHienTai.value)),
                     const PopupMenuDivider(),
                     _mucMenuIcon(5, Icons.delete_outline,
-                        _laKhoDamMay ? 'Thùng rác Đám mây' : 'Thùng rác Nội bộ'),
-                    _mucMenuIcon(7, Icons.search, 'Tìm kiếm trong này'),
+                        _laKhoDamMay ? Ch.thungRacDamMay(ngonNguHienTai.value) : Ch.thungRacNoiBo(ngonNguHienTai.value)),
+                    _mucMenuIcon(7, Icons.search, Ch.timKiemTrongNay(ngonNguHienTai.value)),
                   ];
                 },
               ),
@@ -1679,13 +1689,13 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
           }
         },
         itemBuilder: (ctx) => [
-          _mucMenuIcon('doi_ten', Icons.edit_outlined, 'Đổi tên'),
-          _mucMenuIcon('cat', Icons.drive_file_move_outline, 'Cắt (di chuyển)'),
-          _mucMenuIcon('chep', Icons.copy_outlined, 'Sao chép'),
-          _mucMenuIcon('mau', Icons.palette_outlined, 'Chọn màu Tên Thư mục'),
-          _mucMenuIcon('tai', Icons.download_outlined, 'Tải Thư mục này về thiết bị'),
-          _mucMenuIcon('thong_tin', Icons.info_outline, 'Thông tin thư mục này'),
-          _mucMenuIcon('xoa', Icons.delete_outline, 'Chuyển vào thùng rác'),
+          _mucMenuIcon('doi_ten', Icons.edit_outlined, Ch.doiTen(ngonNguHienTai.value)),
+          _mucMenuIcon('cat', Icons.drive_file_move_outline, Ch.catDiChuyen(ngonNguHienTai.value)),
+          _mucMenuIcon('chep', Icons.copy_outlined, Ch.saoChep(ngonNguHienTai.value)),
+          _mucMenuIcon('mau', Icons.palette_outlined, Ch.chonMauTenThuMuc(ngonNguHienTai.value)),
+          _mucMenuIcon('tai', Icons.download_outlined, Ch.taiThuMucVeThietBi(ngonNguHienTai.value)),
+          _mucMenuIcon('thong_tin', Icons.info_outline, Ch.thongTinThuMucNay(ngonNguHienTai.value)),
+          _mucMenuIcon('xoa', Icons.delete_outline, Ch.chuyenVaoThungRac(ngonNguHienTai.value)),
         ],
       );
 
@@ -1721,18 +1731,18 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
           }
         },
         itemBuilder: (ctx) => [
-          _mucMenuIcon('doi_ten', Icons.edit_outlined, 'Đổi tên'),
-          _mucMenuIcon('cat', Icons.drive_file_move_outline, 'Cắt (di chuyển)'),
-          _mucMenuIcon('chep', Icons.copy_outlined, 'Sao chép'),
-          _mucMenuIcon('tai_ve', Icons.download_outlined, 'Tải về'),
+          _mucMenuIcon('doi_ten', Icons.edit_outlined, Ch.doiTen(ngonNguHienTai.value)),
+          _mucMenuIcon('cat', Icons.drive_file_move_outline, Ch.catDiChuyen(ngonNguHienTai.value)),
+          _mucMenuIcon('chep', Icons.copy_outlined, Ch.saoChep(ngonNguHienTai.value)),
+          _mucMenuIcon('tai_ve', Icons.download_outlined, Ch.taiVe(ngonNguHienTai.value)),
           // (YÊU CẦU MỚI) CHỈ dành cho tệp trên Bộ nhớ đám mây — tệp nội bộ
           // không có nơi công khai để trỏ link tới.
           if (_laKhoDamMay)
-            _mucMenuIcon('chia_se_link', Icons.link, 'Chia sẻ tệp bằng đường link',
+            _mucMenuIcon('chia_se_link', Icons.link, Ch.chiaSeTepBangDuongLink(ngonNguHienTai.value),
                 mauChu: const Color(0xFF0D47A1)),
-          _mucMenuIcon('mau', Icons.palette_outlined, 'Chọn màu Tên Tệp'),
-          _mucMenuIcon('thong_tin', Icons.info_outline, 'Thông tin tệp này'),
-          _mucMenuIcon('xoa', Icons.delete_outline, 'Chuyển vào thùng rác'),
+          _mucMenuIcon('mau', Icons.palette_outlined, Ch.chonMauTenTep(ngonNguHienTai.value)),
+          _mucMenuIcon('thong_tin', Icons.info_outline, Ch.thongTinTepNay(ngonNguHienTai.value)),
+          _mucMenuIcon('xoa', Icons.delete_outline, Ch.chuyenVaoThungRac(ngonNguHienTai.value)),
         ],
       );
 
@@ -2015,17 +2025,17 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                 }
                               },
                               itemBuilder: (ctx) => [
-                                _mucMenuIcon('doi_ten', Icons.edit_outlined, 'Đổi tên'),
+                                _mucMenuIcon('doi_ten', Icons.edit_outlined, Ch.doiTen(ngonNguHienTai.value)),
                                 _mucMenuIcon(
-                                    'cat', Icons.drive_file_move_outline, 'Cắt (di chuyển)'),
-                                _mucMenuIcon('chep', Icons.copy_outlined, 'Sao chép'),
+                                    'cat', Icons.drive_file_move_outline, Ch.catDiChuyen(ngonNguHienTai.value)),
+                                _mucMenuIcon('chep', Icons.copy_outlined, Ch.saoChep(ngonNguHienTai.value)),
                                 _mucMenuIcon(
-                                    'mau', Icons.palette_outlined, 'Chọn màu Tên Thư mục'),
+                                    'mau', Icons.palette_outlined, Ch.chonMauTenThuMuc(ngonNguHienTai.value)),
                                 _mucMenuIcon(
-                                    'tai', Icons.download_outlined, 'Tải Thư mục này về thiết bị'),
+                                    'tai', Icons.download_outlined, Ch.taiThuMucVeThietBi(ngonNguHienTai.value)),
                                 _mucMenuIcon(
-                                    'thong_tin', Icons.info_outline, 'Thông tin thư mục này'),
-                                _mucMenuIcon('xoa', Icons.delete_outline, 'Chuyển vào thùng rác'),
+                                    'thong_tin', Icons.info_outline, Ch.thongTinThuMucNay(ngonNguHienTai.value)),
+                                _mucMenuIcon('xoa', Icons.delete_outline, Ch.chuyenVaoThungRac(ngonNguHienTai.value)),
                               ],
                             ),
                           ),
@@ -2113,19 +2123,19 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                 }
                               },
                               itemBuilder: (ctx) => [
-                                _mucMenuIcon('doi_ten', Icons.edit_outlined, 'Đổi tên'),
+                                _mucMenuIcon('doi_ten', Icons.edit_outlined, Ch.doiTen(ngonNguHienTai.value)),
                                 _mucMenuIcon(
-                                    'cat', Icons.drive_file_move_outline, 'Cắt (di chuyển)'),
-                                _mucMenuIcon('chep', Icons.copy_outlined, 'Sao chép'),
-                                _mucMenuIcon('tai_ve', Icons.download_outlined, 'Tải về'),
+                                    'cat', Icons.drive_file_move_outline, Ch.catDiChuyen(ngonNguHienTai.value)),
+                                _mucMenuIcon('chep', Icons.copy_outlined, Ch.saoChep(ngonNguHienTai.value)),
+                                _mucMenuIcon('tai_ve', Icons.download_outlined, Ch.taiVe(ngonNguHienTai.value)),
                                 if (_laKhoDamMay)
                                   _mucMenuIcon('chia_se_link', Icons.link,
-                                      'Chia sẻ tệp bằng đường link',
+                                      Ch.chiaSeTepBangDuongLink(ngonNguHienTai.value),
                                       mauChu: const Color(0xFF0D47A1)),
-                                _mucMenuIcon('mau', Icons.palette_outlined, 'Chọn màu Tên Tệp'),
+                                _mucMenuIcon('mau', Icons.palette_outlined, Ch.chonMauTenTep(ngonNguHienTai.value)),
                                 _mucMenuIcon(
-                                    'thong_tin', Icons.info_outline, 'Thông tin tệp này'),
-                                _mucMenuIcon('xoa', Icons.delete_outline, 'Chuyển vào thùng rác'),
+                                    'thong_tin', Icons.info_outline, Ch.thongTinTepNay(ngonNguHienTai.value)),
+                                _mucMenuIcon('xoa', Icons.delete_outline, Ch.chuyenVaoThungRac(ngonNguHienTai.value)),
                               ],
                             ),
                           ),

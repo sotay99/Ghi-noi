@@ -132,6 +132,42 @@ class Ch {
 
   static String xoaTep(NgonNgu nn) => nn == NgonNgu.vi ? 'Xoá tệp' : 'Delete file';
 
+  // ----------------------------------------------- Cây thư mục (thêm lượt này)
+  static String taoThuMucMoi(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tạo thư mục mới' : 'Create new folder';
+
+  static String nhapZipHoacTxt(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Nhập ZIP hoặc TXT vào đây'
+      : 'Import ZIP or TXT here';
+
+  static String chonNhieu(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chọn nhiều' : 'Select multiple';
+
+  static String thongTinThuMucNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Thông tin thư mục này' : 'This folder\'s info';
+
+  static String timKiemTrongNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tìm kiếm trong này' : 'Search inside this';
+
+  static String doiTen(NgonNgu nn) => nn == NgonNgu.vi ? 'Đổi tên' : 'Rename';
+
+  static String catDiChuyen(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Cắt (di chuyển)' : 'Cut (move)';
+
+  static String saoChep(NgonNgu nn) => nn == NgonNgu.vi ? 'Sao chép' : 'Copy';
+
+  static String chonMauTenThuMuc(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chọn màu Tên Thư mục' : 'Pick folder name color';
+
+  static String chonMauTenTep(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chọn màu Tên Tệp' : 'Pick file name color';
+
+  static String thongTinTepNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Thông tin tệp này' : 'This file\'s info';
+
+  static String chuyenVaoThungRac(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chuyển vào thùng rác' : 'Move to trash';
+
   // ------------------------------------------------------------- Chung
   static String dong(NgonNgu nn) => nn == NgonNgu.vi ? 'Đóng' : 'Close';
 
