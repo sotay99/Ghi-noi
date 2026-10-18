@@ -11418,7 +11418,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         viTriManHinh.dx,
         viTriManHinh.dy,
       ),
-      items: const [
+      items: [
         PopupMenuItem(value: 'mo', child: Text(Ch.moLink(ngonNguHienTai.value))),
         PopupMenuItem(
           value: 'khongPhaiLink',
@@ -12018,7 +12018,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         viTriManHinh.dx,
         viTriManHinh.dy,
       ),
-      items: const [
+      items: [
         PopupMenuItem(value: 'dung', child: Text(Ch.dungDeXuatNay(ngonNguHienTai.value))),
         PopupMenuItem(value: 'bo', child: Text(Ch.boDeXuatNayTraLaiNhuCu(ngonNguHienTai.value))),
       ],
@@ -12108,7 +12108,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         viTriManHinh.dx,
         viTriManHinh.dy,
       ),
-      items: const [
+      items: [
         PopupMenuItem(
           value: 'xoa',
           child: Row(children: [
