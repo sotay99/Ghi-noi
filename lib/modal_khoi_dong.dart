@@ -6,9 +6,11 @@
 import 'package:flutter/material.dart';
 
 import 'cai_dat.dart';
+import 'chuoi_da_ngon_ngu.dart';
 import 'khoi_dong_tep.dart';
 import 'kho_du_lieu.dart';
 import 'mo_hinh.dart';
+import 'ngon_ngu.dart';
 
 const _mauChinh = Color(0xFF1A73E8);
 
@@ -211,7 +213,9 @@ class _ManHinhCaiDatKhoiDongState extends State<_ManHinhCaiDatKhoiDong> {
   /// nhớ Nội bộ/Bộ nhớ trên đám mây) rồi tới từng thư mục cha, cách nhau
   /// " / ". `null` nếu [id] không còn tồn tại (đã xoá) hay không rõ.
   String? _duongDanThuMuc(KhoDuLieu kho, String id) {
-    final goc = kho is KhoDuLieuDamMay ? 'Bộ nhớ trên đám mây' : 'Bộ nhớ Nội bộ';
+    final goc = kho is KhoDuLieuDamMay
+        ? Ch.boNhoTrenDamMay(ngonNguHienTai.value)
+        : Ch.boNhoNoiBo(ngonNguHienTai.value);
     if (id == thuMucGoc) return goc;
     final cac = <String>[];
     var hienTai = kho.timThuMuc(id);
@@ -239,10 +243,10 @@ class _ManHinhCaiDatKhoiDongState extends State<_ManHinhCaiDatKhoiDong> {
       appBar: AppBar(
         backgroundColor: _mauChinh,
         foregroundColor: Colors.white,
-        title: const Text('Khi khởi động App: Mở tệp...'),
+        title: Text(Ch.khiKhoiDongAppMoTep(ngonNguHienTai.value)),
         leading: IconButton(
           icon: const Icon(Icons.close),
-          tooltip: 'Đóng',
+          tooltip: Ch.dong(ngonNguHienTai.value),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -250,10 +254,9 @@ class _ManHinhCaiDatKhoiDongState extends State<_ManHinhCaiDatKhoiDong> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
-            const Text(
-              'Mỗi khi vào lại App, thì sẽ vào trong nội dung soạn thảo của '
-              'tệp nào?',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+            Text(
+              Ch.moiKhiVaoLaiAppSeVaoNoiDungTepNao(ngonNguHienTai.value),
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
             ),
             const SizedBox(height: 12),
             RadioListTile<String>(
@@ -261,7 +264,7 @@ class _ManHinhCaiDatKhoiDongState extends State<_ManHinhCaiDatKhoiDong> {
               value: 'ganDayNhat',
               groupValue: _kieu,
               activeColor: _mauChinh,
-              title: const Text('Mở tệp đang soạn thảo gần đây nhất'),
+              title: Text(Ch.moTepDangSoanThaoGanDayNhat(ngonNguHienTai.value)),
               onChanged: (v) => _datKieu(v!),
             ),
             const Divider(height: 8),
@@ -270,14 +273,14 @@ class _ManHinhCaiDatKhoiDongState extends State<_ManHinhCaiDatKhoiDong> {
               value: 'tepTrong',
               groupValue: _kieu,
               activeColor: _mauChinh,
-              title: const Text('Mở tệp trống'),
+              title: Text(Ch.moTepTrong(ngonNguHienTai.value)),
               onChanged: (v) => _datKieu(v!),
             ),
             if (_kieu == 'tepTrong')
               Padding(
                 padding: const EdgeInsets.only(left: 32, bottom: 8),
                 child: _nutChonViTri(
-                  nhanKhiChua: 'Chọn thư mục cụ thể cho tệp rỗng',
+                  nhanKhiChua: Ch.chonThuMucCuTheChoTepRong(ngonNguHienTai.value),
                   duongDan: _thuMucKho != null && _thuMucId != null
                       ? _duongDanThuMuc(_thuMucKho!, _thuMucId!)
                       : null,
@@ -290,7 +293,7 @@ class _ManHinhCaiDatKhoiDongState extends State<_ManHinhCaiDatKhoiDong> {
               value: 'tepChiDinh',
               groupValue: _kieu,
               activeColor: _mauChinh,
-              title: const Text('Mở tệp được chỉ định'),
+              title: Text(Ch.moTepDuocChiDinh(ngonNguHienTai.value)),
               onChanged: (v) => _datKieu(v!),
             ),
             if (_kieu == 'tepChiDinh')
@@ -304,7 +307,8 @@ class _ManHinhCaiDatKhoiDongState extends State<_ManHinhCaiDatKhoiDong> {
                       value: true,
                       groupValue: _subA,
                       activeColor: _mauChinh,
-                      title: Text('Mở tệp ${widget.ghiChuHienTai.ten} đang soạn thảo'),
+                      title: Text(Ch.moTepTenDangSoanThao(
+                          ngonNguHienTai.value, widget.ghiChuHienTai.ten)),
                       onChanged: (_) => _chonTepDangSoanThao(),
                     ),
                     RadioListTile<bool>(
@@ -312,14 +316,14 @@ class _ManHinhCaiDatKhoiDongState extends State<_ManHinhCaiDatKhoiDong> {
                       value: false,
                       groupValue: _subA,
                       activeColor: _mauChinh,
-                      title: const Text('Chọn tệp trong cây thư mục'),
+                      title: Text(Ch.chonTepTrongCayThuMuc(ngonNguHienTai.value)),
                       onChanged: (_) => _chonSubB(),
                     ),
                     if (!_subA)
                       Padding(
                         padding: const EdgeInsets.only(left: 32, bottom: 8),
                         child: _nutChonViTri(
-                          nhanKhiChua: 'Chọn tệp',
+                          nhanKhiChua: Ch.chonTep(ngonNguHienTai.value),
                           duongDan: _tepKho != null && _tepId != null
                               ? _duongDanTep(_tepKho!, _tepId!)
                               : null,

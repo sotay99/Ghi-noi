@@ -9,7 +9,9 @@
 
 import 'package:flutter/material.dart';
 
+import 'chuoi_da_ngon_ngu.dart';
 import 'mo_hinh.dart';
+import 'ngon_ngu.dart';
 
 enum KetQuaNhapZip { huy, dayVaoHienTai, chonViTriKhac }
 
@@ -48,7 +50,7 @@ class _ModalNhapZipState extends State<ModalNhapZip> {
     if (widget.nguon.length == 1 && widget.nguon.single.laZip) {
       return widget.nguon.single.tenNguon;
     }
-    return 'Các tệp tin và thư mục chuẩn bị nhập vào app';
+    return Ch.cacTepTinVaThuMucChuanBiNhapVaoApp(ngonNguHienTai.value);
   }
 
   void _vaoThuMuc(NutZip n) {
@@ -95,11 +97,11 @@ class _ModalNhapZipState extends State<ModalNhapZip> {
     return ListView(
       children: [
         if (tepTxtRieng.isNotEmpty) ...[
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: Text(
-              'Tệp TXT riêng lẻ',
-              style: TextStyle(fontWeight: FontWeight.bold, color: _mauTimDam),
+              Ch.tepTxtRiengLe(ngonNguHienTai.value),
+              style: const TextStyle(fontWeight: FontWeight.bold, color: _mauTimDam),
             ),
           ),
           for (final n in tepTxtRieng) _dongMuc(n),
@@ -114,11 +116,11 @@ class _ModalNhapZipState extends State<ModalNhapZip> {
             ),
           ),
           if (nhom.goc.isEmpty)
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Text(
-                'Không có tệp .txt hợp lệ nào trong tệp nén này.',
-                style: TextStyle(fontSize: 12, color: Color(0xFF9AA0A6)),
+                Ch.khongCoTepTxtHopLeNaoTrongTepNenNay(ngonNguHienTai.value),
+                style: const TextStyle(fontSize: 12, color: Color(0xFF9AA0A6)),
               ),
             )
           else
@@ -145,7 +147,7 @@ class _ModalNhapZipState extends State<ModalNhapZip> {
           leading: _tenDuongDan.isEmpty
               ? IconButton(
                   icon: const Icon(Icons.close),
-                  tooltip: 'Đóng',
+                  tooltip: Ch.dong(ngonNguHienTai.value),
                   onPressed: () => Navigator.of(context).pop(KetQuaNhapZip.huy),
                 )
               : IconButton(
@@ -160,19 +162,16 @@ class _ModalNhapZipState extends State<ModalNhapZip> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Chỉ hiện các tệp .txt (tối đa 2 MB mỗi tệp) và thư mục '
-                    'có chứa .txt bên trong tệp vừa chọn — tệp/thư mục khác '
-                    'đã được ẩn khỏi kết quả.',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+                  Text(
+                    Ch.chiHienCacTepTxtGhiChu(ngonNguHienTai.value),
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
                   ),
                   if (widget.coTepQuaNang)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 4),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
                       child: Text(
-                        'Có ít nhất 1 tệp .txt nặng hơn 2 MB đã bị bỏ qua vì '
-                        'dễ làm app giật/lag khi mở.',
-                        style: TextStyle(fontSize: 12, color: _mauTimDam),
+                        Ch.coTepTxtNangHonBiBoQua(ngonNguHienTai.value),
+                        style: const TextStyle(fontSize: 12, color: _mauTimDam),
                       ),
                     ),
                 ],
@@ -182,10 +181,10 @@ class _ModalNhapZipState extends State<ModalNhapZip> {
               child: _oGoc
                   ? _danhSachGoc()
                   : _hienTai!.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Text(
-                            'Thư mục trống',
-                            style: TextStyle(color: Color(0xFF9AA0A6)),
+                            Ch.thuMucTrong(ngonNguHienTai.value),
+                            style: const TextStyle(color: Color(0xFF9AA0A6)),
                           ),
                         )
                       : ListView(
@@ -206,17 +205,17 @@ class _ModalNhapZipState extends State<ModalNhapZip> {
                     children: [
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(KetQuaNhapZip.huy),
-                        child: const Text('Hủy kết quả này'),
+                        child: Text(Ch.huyKetQuaNayNhapZip(ngonNguHienTai.value)),
                       ),
                       OutlinedButton(
                         onPressed: () =>
                             Navigator.of(context).pop(KetQuaNhapZip.chonViTriKhac),
-                        child: const Text('Chọn vị trí khác'),
+                        child: Text(Ch.chonViTriKhac(ngonNguHienTai.value)),
                       ),
                       FilledButton(
                         onPressed: () =>
                             Navigator.of(context).pop(KetQuaNhapZip.dayVaoHienTai),
-                        child: const Text('Đưa vào thư mục hiện tại'),
+                        child: Text(Ch.dayVaoThuMucHienTai(ngonNguHienTai.value)),
                       ),
                     ],
                   ),

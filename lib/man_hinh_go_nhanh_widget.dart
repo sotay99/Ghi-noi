@@ -5,9 +5,11 @@
 // đọc lại cả ghi chú dài).
 import 'package:flutter/material.dart';
 
+import 'chuoi_da_ngon_ngu.dart';
 import 'ghi_chu_nhanh_widget.dart';
 import 'kho_du_lieu.dart';
 import 'mo_hinh.dart';
+import 'ngon_ngu.dart';
 
 class ManHinhGoNhanhWidget extends StatefulWidget {
   const ManHinhGoNhanhWidget({super.key, required this.idWidget});
@@ -112,18 +114,18 @@ class _ManHinhGoNhanhWidgetState extends State<ManHinhGoNhanhWidget> {
 
   Widget _loiMucTieu() {
     final chu = _trangThai == _TrangThaiGoNhanh.khongCoMucTieu
-        ? 'Widget này chưa được cấu hình đúng — hãy xoá widget rồi đặt lại ở màn hình chính.'
-        : 'Ghi chú "$_tenGhiChu" mà widget này trỏ tới không còn nữa (đã xoá hoặc đang ở '
-            'Thùng rác) — hãy xoá widget rồi đặt lại, chọn một ghi chú khác.';
+        ? Ch.widgetChuaDuocCauHinhDung(ngonNguHienTai.value)
+        : Ch.ghiChuMaWidgetTroToiKhongConNua(ngonNguHienTai.value, _tenGhiChu);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        Row(
           children: [
-            Icon(Icons.error_outline, color: Colors.red),
-            SizedBox(width: 8),
-            Text('Không ghi được', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Icon(Icons.error_outline, color: Colors.red),
+            const SizedBox(width: 8),
+            Text(Ch.khongGhiDuoc(ngonNguHienTai.value),
+                style: const TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
         const SizedBox(height: 10),
@@ -133,7 +135,7 @@ class _ManHinhGoNhanhWidgetState extends State<ManHinhGoNhanhWidget> {
           alignment: Alignment.centerRight,
           child: TextButton(
             onPressed: () => Navigator.of(context).maybePop(),
-            child: const Text('Đóng'),
+            child: Text(Ch.dong(ngonNguHienTai.value)),
           ),
         ),
       ],
@@ -151,7 +153,7 @@ class _ManHinhGoNhanhWidgetState extends State<ManHinhGoNhanhWidget> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Ghi nhanh vào "$_tenGhiChu"',
+                Ch.ghiNhanhVaoTen(ngonNguHienTai.value, _tenGhiChu),
                 style: const TextStyle(fontWeight: FontWeight.bold),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -164,9 +166,9 @@ class _ManHinhGoNhanhWidgetState extends State<ManHinhGoNhanhWidget> {
           autofocus: true,
           maxLines: 5,
           minLines: 3,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            hintText: 'Nhập ghi chú rồi bấm Lưu...',
+          decoration: InputDecoration(
+            border: const OutlineInputBorder(),
+            hintText: Ch.nhapGhiChuRoiBamLuu(ngonNguHienTai.value),
           ),
         ),
         const SizedBox(height: 10),
@@ -175,12 +177,12 @@ class _ManHinhGoNhanhWidgetState extends State<ManHinhGoNhanhWidget> {
           children: [
             TextButton(
               onPressed: () => Navigator.of(context).maybePop(),
-              child: const Text('Đóng'),
+              child: Text(Ch.dong(ngonNguHienTai.value)),
             ),
             const SizedBox(width: 8),
             FilledButton(
               onPressed: _dangLuu ? null : _luu,
-              child: const Text('Lưu'),
+              child: Text(Ch.luu(ngonNguHienTai.value)),
             ),
           ],
         ),

@@ -7,7 +7,9 @@
 // APK" đang có).
 import 'package:flutter/material.dart';
 
+import 'chuoi_da_ngon_ngu.dart';
 import 'mo_lien_ket_ngoai.dart';
+import 'ngon_ngu.dart';
 
 void moModalCaiDatUngDung(BuildContext context) {
   Navigator.of(context).push(
@@ -60,7 +62,7 @@ class _TrangCaiDatUngDung extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A73E8),
         foregroundColor: Colors.white,
-        title: const Text('Cài đặt Ứng dụng vào Thiết bị'),
+        title: Text(Ch.caiDatUngDungVaoThietBi(ngonNguHienTai.value)),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -71,48 +73,31 @@ class _TrangCaiDatUngDung extends StatelessWidget {
               _khoiCaiDat(
                 icon: Icons.language,
                 mauIcon: const Color(0xFF1A73E8),
-                tieuDe: 'Cài đặt bằng trình duyệt Chrome (PC, điện thoại, máy tính bảng)',
-                moTa:
-                    'Mở trang web này bằng trình duyệt Chrome (hoặc Edge, Brave — cùng '
-                    'nền Chromium). Nhìn lên thanh địa chỉ phía trên, bấm vào nút "Cài '
-                    'đặt" (hình máy tính có mũi tên, hoặc hình dấu "+"). App sẽ hiện ra '
-                    'ngay ở màn hình chính thiết bị của bạn, giống một app thật — không '
-                    'cần CH Play hay App Store, mở lên là chạy, không còn thanh địa chỉ '
-                    'của trình duyệt nữa.',
+                tieuDe: Ch.caiDatBangChrome(ngonNguHienTai.value),
+                moTa: Ch.moTaCaiDatChrome(ngonNguHienTai.value),
               ),
               const SizedBox(height: 28),
               _khoiCaiDat(
                 icon: Icons.apple,
                 mauIcon: Colors.black,
-                tieuDe: 'Cài đặt cho iPhone, iPad',
-                moTa:
-                    'Bản app riêng cho iPhone/iPad sẽ không bị kẹt bàn phím ảo như bản '
-                    'web, và "Micro vừa nói vừa ra chữ" hoạt động đầy đủ (bản web trên '
-                    'iPhone hiện phải tắt tính năng này).',
-                tenNutCaiDat: 'Cài đặt cho iPhone, iPad',
+                tieuDe: Ch.caiDatChoIphoneIpad(ngonNguHienTai.value),
+                moTa: Ch.moTaCaiDatIphone(ngonNguHienTai.value),
+                tenNutCaiDat: Ch.caiDatChoIphoneIpad(ngonNguHienTai.value),
                 khiBamCaiDat: () => _hienThongBaoNhoCoNutDong(
                   context,
-                  'App cho iPhone/iPad đang trong quá trình xây dựng — hiện kinh phí '
-                  'còn eo hẹp nên chưa thể triển khai ngay. Khi có bản chính thức, '
-                  'Flowrite sẽ thông báo tới bạn. Cảm ơn bạn đã quan tâm!',
+                  Ch.thongBaoIphoneDangXayDung(ngonNguHienTai.value),
                 ),
               ),
               const SizedBox(height: 28),
               _khoiCaiDat(
                 icon: Icons.android,
                 mauIcon: const Color(0xFF3DDC84),
-                tieuDe: 'Cài đặt cho điện thoại, máy tính bảng Android',
-                moTa:
-                    'Bản APK không bị kẹt bàn phím ảo như bản web, và có thêm Widget '
-                    '"Ghi nhanh" đặt ngay ở màn hình chính (màn hình chủ) của điện '
-                    'thoại, máy tính bảng — ghi nhanh một ý mà không cần mở hẳn app.',
-                tenNutCaiDat: 'Cài đặt cho Android',
+                tieuDe: Ch.caiDatChoAndroid(ngonNguHienTai.value),
+                moTa: Ch.moTaCaiDatAndroid(ngonNguHienTai.value),
+                tenNutCaiDat: Ch.caiDatChoAndroidNut(ngonNguHienTai.value),
                 khiBamCaiDat: () => _hienThongBaoNhoCoNutDong(
                   context,
-                  'App chưa đưa lên CH Play — hiện chỉ tải file APK trực tiếp. Sau khi '
-                  'bấm nút dưới đây, máy sẽ tải file APK về; mở file đó lên để cài. '
-                  'Máy sẽ hỏi quyền "Cài đặt từ nguồn không xác định" — chọn Cho phép, '
-                  'rồi tiếp tục theo các bước của trình cài đặt gói Android là xong.',
+                  Ch.thongBaoAndroidChuaLenChPlay(ngonNguHienTai.value),
                 ),
                 khiBamTaiApk: () =>
                     moLienKetNgoai('https://github.com/sotay99/ghi-noi/releases/latest'),
@@ -172,7 +157,7 @@ class _TrangCaiDatUngDung extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: khiBamTaiApk,
                 icon: const Icon(Icons.download),
-                label: const Text('Tải file APK về máy và cài đặt'),
+                label: Text(Ch.taiFileApkVeMayVaCaiDat(ngonNguHienTai.value)),
               ),
             ),
           ],

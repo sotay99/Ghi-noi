@@ -1471,6 +1471,291 @@ class Ch {
 
   static String timTrongTuDienHintText(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Tìm trong từ điển...' : 'Search the dictionary...';
+
+  // ---------------------------------- Modal "Cài đặt nút Kiểm tra toàn văn"
+  static String kiemToanVanMoPhong(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Kiểm toàn văn' : 'Full-text check';
+
+  static String giaiThichDoDaiDeXuat(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đây là độ dài THAM KHẢO cho từng đoạn mà AI đề xuất khi bấm "Kiểm tra '
+          'toàn văn" — không phải giới hạn cứng nhắc, AI vẫn có thể vượt ra ngoài '
+          'khoảng này nếu ngữ cảnh đòi hỏi.\n\n'
+          'Đoạn đề xuất càng NGẮN thì càng bám sát nguyên văn của bạn, ít khả năng '
+          'lệch ý hơn, nhưng có thể chưa đủ mượt vì AI phải sửa từng mẩu nhỏ.\n\n'
+          'Đoạn đề xuất càng DÀI thì AI càng có chỗ để viết lại cho gọn gàng, súc '
+          'tích hơn, nhưng cũng dễ lệch khỏi ý gốc của bạn hơn vì AI phải diễn đạt '
+          'lại nhiều hơn.\n\n'
+          'Khoảng ký tự tham khảo cho từng mức:\n'
+          'Rất ngắn: khoảng 4–8 ký tự\n'
+          'Ngắn: khoảng 8–14 ký tự\n'
+          'Trung bình: khoảng 12–20 ký tự\n'
+          'Dài: khoảng 20–34 ký tự\n'
+          'Rất dài: khoảng 34–56 ký tự'
+      : 'This is a REFERENCE length for each paragraph the AI suggests when you '
+          'tap "Full-text check" — not a hard limit, the AI may still go beyond '
+          'it if context calls for it.\n\n'
+          'A SHORTER suggested paragraph stays closer to your original wording, '
+          'with less risk of drifting from your meaning, but may feel less '
+          'polished since the AI has to fix small pieces at a time.\n\n'
+          'A LONGER suggested paragraph gives the AI more room to rewrite '
+          'smoothly and concisely, but is more likely to drift from your '
+          'original intent since the AI has to rephrase more.\n\n'
+          'Reference character ranges per level:\n'
+          'Very short: about 4–8 characters\n'
+          'Short: about 8–14 characters\n'
+          'Medium: about 12–20 characters\n'
+          'Long: about 20–34 characters\n'
+          'Very long: about 34–56 characters';
+
+  static String giaiThichCauLenhTuyChinh(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đây là câu lệnh RIÊNG của bạn, gửi kèm theo chỉ dẫn gốc của hệ thống mỗi '
+          'lần bấm "Kiểm tra toàn văn". Nếu ý bạn viết ở đây xung đột với chỉ dẫn '
+          'gốc, AI sẽ ưu tiên làm theo ý của bạn trước.\n\n'
+          'Ví dụ: bạn có thể dặn AI giữ nguyên văn phong thân mật, tránh dùng từ Hán '
+          'Việt, hoặc luôn viết hoa một tên riêng nào đó.'
+      : 'This is YOUR OWN instruction, sent along with the system\'s original '
+          'guidance every time you tap "Full-text check". If what you write here '
+          'conflicts with the original guidance, the AI will prioritize your '
+          'instruction.\n\n'
+          'Example: you can ask the AI to keep a casual tone, avoid certain '
+          'words, or always capitalize a specific proper name.';
+
+  static String cauLenhRiengCuaBan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Câu lệnh riêng của bạn' : 'Your own instruction';
+
+  static String viDuGiuVanPhongThanMat(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Ví dụ: giữ văn phong thân mật, tránh từ Hán Việt...'
+      : 'Example: keep a casual tone, avoid certain words...';
+
+  static String cauLenhGuiKemChiDanGoc(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Câu lệnh này được gửi kèm theo chỉ dẫn gốc của hệ thống mỗi '
+          'lần bấm "Kiểm tra toàn văn", và được ưu tiên hơn nếu có xung '
+          'đột.'
+      : 'This instruction is sent along with the system\'s original guidance '
+          'every time you tap "Full-text check", and takes priority if there '
+          'is a conflict.';
+
+  static String caiDatNutKiemTraToanVanTieuDe(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Cài đặt nút "Kiểm tra toàn văn"'
+      : 'Settings for the "Full-text check" button';
+
+  static String deSuDungChucNangKiemTraToanVan(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Để sử dụng chức năng kiểm tra toàn văn bằng AI, vui lòng bấm nút '
+          '"Làm việc với AI" ở thanh công cụ rồi chọn mục '
+      : 'To use the AI full-text check feature, tap the '
+          '"Work with AI" button on the toolbar, then choose ';
+
+  static String dayLaBuocQuanTrongSauMoiLanSoanXong(NgonNgu nn) =>
+      nn == NgonNgu.vi
+          ? 'Đây là bước quan trọng sau mỗi lần soạn xong 1 bài văn bản.'
+          : 'This is an important step after finishing writing a document.';
+
+  static String caiDatTinhNangNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'CÀI ĐẶT TÍNH NĂNG NÀY' : 'SETTINGS FOR THIS FEATURE';
+
+  static String doDaiTungDoanVanDuocDeXuat(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Độ dài của từng đoạn văn được đề xuất'
+      : 'Length of each suggested paragraph';
+
+  static String tuyChinhCauLenhChoAiLamViec(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Tùy chỉnh câu lệnh để cho AI làm việc'
+      : 'Customize the instruction for the AI';
+
+  static String cauLenhRiengDangTrong(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Câu lệnh riêng của bạn đang trống'
+      : 'Your own instruction is empty';
+
+  static String cauLenhDangChuaSoTu(NgonNgu nn, int soTu) => nn == NgonNgu.vi
+      ? 'Câu lệnh của bạn đang chứa $soTu từ'
+      : 'Your instruction currently has $soTu word${soTu == 1 ? '' : 's'}';
+
+  // -------------------------------- Trang "Cài đặt Ứng dụng vào Thiết bị"
+  static String caiDatBangChrome(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Cài đặt bằng trình duyệt Chrome (PC, điện thoại, máy tính bảng)'
+      : 'Install via Chrome browser (PC, phone, tablet)';
+
+  static String moTaCaiDatChrome(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Mở trang web này bằng trình duyệt Chrome (hoặc Edge, Brave — cùng '
+          'nền Chromium). Nhìn lên thanh địa chỉ phía trên, bấm vào nút "Cài '
+          'đặt" (hình máy tính có mũi tên, hoặc hình dấu "+"). App sẽ hiện ra '
+          'ngay ở màn hình chính thiết bị của bạn, giống một app thật — không '
+          'cần CH Play hay App Store, mở lên là chạy, không còn thanh địa chỉ '
+          'của trình duyệt nữa.'
+      : 'Open this website in Chrome (or Edge, Brave — same Chromium base). '
+          'Look at the address bar above and tap the "Install" button (a '
+          'computer icon with an arrow, or a "+" icon). The app will appear '
+          'right on your device\'s home screen, just like a real app — no '
+          'Play Store or App Store needed, it just opens and runs, with no '
+          'browser address bar anymore.';
+
+  static String caiDatChoIphoneIpad(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Cài đặt cho iPhone, iPad' : 'Install for iPhone, iPad';
+
+  static String moTaCaiDatIphone(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bản app riêng cho iPhone/iPad sẽ không bị kẹt bàn phím ảo như bản '
+          'web, và "Micro vừa nói vừa ra chữ" hoạt động đầy đủ (bản web trên '
+          'iPhone hiện phải tắt tính năng này).'
+      : 'A dedicated iPhone/iPad app won\'t get stuck with the on-screen '
+          'keyboard like the web version, and "real-time speech-to-text '
+          'Mic" works fully (the web version on iPhone currently has to turn '
+          'this feature off).';
+
+  static String thongBaoIphoneDangXayDung(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'App cho iPhone/iPad đang trong quá trình xây dựng — hiện kinh phí '
+          'còn eo hẹp nên chưa thể triển khai ngay. Khi có bản chính thức, '
+          'Flowrite sẽ thông báo tới bạn. Cảm ơn bạn đã quan tâm!'
+      : 'The iPhone/iPad app is still being built — funding is currently '
+          'tight so it can\'t be released right away. Flowrite will let you '
+          'know once the official version is ready. Thank you for your '
+          'interest!';
+
+  static String caiDatChoAndroid(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Cài đặt cho điện thoại, máy tính bảng Android'
+      : 'Install for Android phone, tablet';
+
+  static String moTaCaiDatAndroid(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bản APK không bị kẹt bàn phím ảo như bản web, và có thêm Widget '
+          '"Ghi nhanh" đặt ngay ở màn hình chính (màn hình chủ) của điện '
+          'thoại, máy tính bảng — ghi nhanh một ý mà không cần mở hẳn app.'
+      : 'The APK version won\'t get stuck with the on-screen keyboard like '
+          'the web version, and also adds a "Quick note" Widget right on '
+          'your phone or tablet\'s home screen — jot down an idea without '
+          'fully opening the app.';
+
+  static String caiDatChoAndroidNut(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Cài đặt cho Android' : 'Install for Android';
+
+  static String thongBaoAndroidChuaLenChPlay(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'App chưa đưa lên CH Play — hiện chỉ tải file APK trực tiếp. Sau khi '
+          'bấm nút dưới đây, máy sẽ tải file APK về; mở file đó lên để cài. '
+          'Máy sẽ hỏi quyền "Cài đặt từ nguồn không xác định" — chọn Cho phép, '
+          'rồi tiếp tục theo các bước của trình cài đặt gói Android là xong.'
+      : 'The app isn\'t on the Play Store yet — the APK file is downloaded '
+          'directly instead. After tapping the button below, your device '
+          'will download the APK file; open it to install. Your device will '
+          'ask for permission to "Install from unknown sources" — choose '
+          'Allow, then follow the Android installer\'s steps to finish.';
+
+  static String taiFileApkVeMayVaCaiDat(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Tải file APK về máy và cài đặt'
+      : 'Download the APK file and install it';
+
+  // ---------------------------------------------- Modal nhập ZIP/TXT
+  static String cacTepTinVaThuMucChuanBiNhapVaoApp(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Các tệp tin và thư mục chuẩn bị nhập vào app'
+      : 'Files and folders ready to import into the app';
+
+  static String tepTxtRiengLe(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tệp TXT riêng lẻ' : 'Standalone TXT files';
+
+  static String khongCoTepTxtHopLeNaoTrongTepNenNay(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Không có tệp .txt hợp lệ nào trong tệp nén này.'
+      : 'No valid .txt files found inside this archive.';
+
+  static String chiHienCacTepTxtGhiChu(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Chỉ hiện các tệp .txt (tối đa 2 MB mỗi tệp) và thư mục '
+          'có chứa .txt bên trong tệp vừa chọn — tệp/thư mục khác '
+          'đã được ẩn khỏi kết quả.'
+      : 'Only .txt files (up to 2 MB each) and folders containing .txt files '
+          'inside the file you just chose are shown — other files/folders '
+          'have been hidden from the result.';
+
+  static String coTepTxtNangHonBiBoQua(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Có ít nhất 1 tệp .txt nặng hơn 2 MB đã bị bỏ qua vì '
+          'dễ làm app giật/lag khi mở.'
+      : 'At least 1 .txt file larger than 2 MB was skipped because it could '
+          'make the app stutter/lag when opened.';
+
+  static String thuMucTrong(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Thư mục trống' : 'Empty folder';
+
+  static String huyKetQuaNayNhapZip(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Hủy kết quả này' : 'Discard this result';
+
+  static String chonViTriKhac(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chọn vị trí khác' : 'Choose another location';
+
+  static String dayVaoThuMucHienTai(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đưa vào thư mục hiện tại' : 'Import into current folder';
+
+  // --------------------------------------- Modal "Khi khởi động App"
+  static String khiKhoiDongAppMoTep(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Khi khởi động App: Mở tệp...' : 'On app startup: Open file...';
+
+  static String moiKhiVaoLaiAppSeVaoNoiDungTepNao(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Mỗi khi vào lại App, thì sẽ vào trong nội dung soạn thảo của '
+          'tệp nào?'
+      : 'Every time you return to the App, which file\'s content should it '
+          'open?';
+
+  static String moTepDangSoanThaoGanDayNhat(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Mở tệp đang soạn thảo gần đây nhất' : 'Open the most recently edited file';
+
+  static String moTepTrong(NgonNgu nn) => nn == NgonNgu.vi ? 'Mở tệp trống' : 'Open a blank file';
+
+  static String chonThuMucCuTheChoTepRong(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Chọn thư mục cụ thể cho tệp rỗng'
+      : 'Choose a specific folder for the blank file';
+
+  static String moTepDuocChiDinh(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Mở tệp được chỉ định' : 'Open a specified file';
+
+  static String moTepTenDangSoanThao(NgonNgu nn, String tenTep) => nn == NgonNgu.vi
+      ? 'Mở tệp $tenTep đang soạn thảo'
+      : 'Open the file $tenTep currently being edited';
+
+  static String chonTepTrongCayThuMuc(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chọn tệp trong cây thư mục' : 'Choose a file from the folder tree';
+
+  static String chonTep(NgonNgu nn) => nn == NgonNgu.vi ? 'Chọn tệp' : 'Choose file';
+
+  // -------------------------------------- Modal "Thông tin chi tiết"
+  static String viTriLa(NgonNgu nn, String viTri) =>
+      nn == NgonNgu.vi ? 'Vị trí: $viTri' : 'Location: $viTri';
+
+  static String tenLa(NgonNgu nn, String ten) =>
+      nn == NgonNgu.vi ? 'Tên: $ten' : 'Name: $ten';
+
+  static String kichThuocLa(NgonNgu nn, String kichThuoc) =>
+      nn == NgonNgu.vi ? 'Kích thước: $kichThuoc' : 'Size: $kichThuoc';
+
+  static String gomCoThuMucVaTepOTrangDau(NgonNgu nn, int soThuMuc, int soGhiChu) => nn == NgonNgu.vi
+      ? 'Gồm có $soThuMuc thư mục và $soGhiChu tệp tin ở trang đầu.'
+      : 'Contains $soThuMuc folder${soThuMuc == 1 ? '' : 's'} and $soGhiChu file${soGhiChu == 1 ? '' : 's'} on this page.';
+
+  static String tongTatCaCoThuMucVaTepBenTrong(NgonNgu nn, int soThuMuc, int soGhiChu) => nn == NgonNgu.vi
+      ? 'Tổng tất cả có $soThuMuc thư mục và $soGhiChu tệp tin bên trong.'
+      : 'In total there are $soThuMuc folder${soThuMuc == 1 ? '' : 's'} and $soGhiChu file${soGhiChu == 1 ? '' : 's'} inside.';
+
+  static String chuSoHuuLa(NgonNgu nn) => nn == NgonNgu.vi ? 'Chủ sở hữu: ' : 'Owner: ';
+
+  // --------------------------------------------- Màn hình "Ghi nhanh" widget
+  static String widgetChuaDuocCauHinhDung(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Widget này chưa được cấu hình đúng — hãy xoá widget rồi đặt lại ở màn hình chính.'
+      : 'This widget isn\'t configured correctly — please remove it and set it up again on the home screen.';
+
+  static String ghiChuMaWidgetTroToiKhongConNua(NgonNgu nn, String tenGhiChu) => nn == NgonNgu.vi
+      ? 'Ghi chú "$tenGhiChu" mà widget này trỏ tới không còn nữa (đã xoá hoặc đang ở '
+          'Thùng rác) — hãy xoá widget rồi đặt lại, chọn một ghi chú khác.'
+      : 'The note "$tenGhiChu" that this widget points to no longer exists (it was '
+          'deleted or is in the Trash) — please remove the widget and set it up '
+          'again, choosing a different note.';
+
+  static String khongGhiDuoc(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Không ghi được' : 'Couldn\'t save';
+
+  static String ghiNhanhVaoTen(NgonNgu nn, String tenGhiChu) =>
+      nn == NgonNgu.vi ? 'Ghi nhanh vào "$tenGhiChu"' : 'Quick note into "$tenGhiChu"';
+
+  static String nhapGhiChuRoiBamLuu(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Nhập ghi chú rồi bấm Lưu...' : 'Type your note then tap Save...';
+
+  // -------------------------------------- Modal "Nghe bản ghi âm này"
+  static String taiFileGhiAmVeMay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tải file ghi âm về máy' : 'Download the recording';
+
+  static String chuyenHoaTheGhiAmNayThanhVanBan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chuyển hoá thẻ ghi âm này thành văn bản' : 'Transcribe this recording card to text';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt

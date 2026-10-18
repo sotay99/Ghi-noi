@@ -6,6 +6,8 @@
 import 'package:flutter/material.dart';
 
 import 'cai_dat.dart';
+import 'chuoi_da_ngon_ngu.dart';
+import 'ngon_ngu.dart';
 
 /// Mô phỏng đúng style của nút "Kiểm tra toàn văn" thật trên thanh công cụ:
 /// icon `task_alt` + chữ, cùng màu xanh lá `Colors.green.shade600`.
@@ -27,7 +29,7 @@ class _NutKiemTraToanVanMoPhong extends StatelessWidget {
           Icon(Icons.task_alt, size: 15, color: Colors.green.shade600),
           const SizedBox(width: 4),
           Text(
-            'Kiểm toàn văn',
+            Ch.kiemToanVanMoPhong(ngonNguHienTai.value),
             style: TextStyle(fontSize: 11, color: Colors.green.shade600),
           ),
         ],
@@ -47,7 +49,7 @@ void _hienGiaiThich(BuildContext context, String tieuDe, String noiDung) {
           Expanded(child: Text(tieuDe)),
           IconButton(
             icon: const Icon(Icons.close, color: Colors.red),
-            tooltip: 'Đóng',
+            tooltip: Ch.dong(ngonNguHienTai.value),
             onPressed: () => Navigator.of(ctx).pop(),
           ),
         ],
@@ -59,28 +61,9 @@ void _hienGiaiThich(BuildContext context, String tieuDe, String noiDung) {
   );
 }
 
-const _giaiThichDoDaiDeXuat =
-    'Đây là độ dài THAM KHẢO cho từng đoạn mà AI đề xuất khi bấm "Kiểm tra '
-    'toàn văn" — không phải giới hạn cứng nhắc, AI vẫn có thể vượt ra ngoài '
-    'khoảng này nếu ngữ cảnh đòi hỏi.\n\n'
-    'Đoạn đề xuất càng NGẮN thì càng bám sát nguyên văn của bạn, ít khả năng '
-    'lệch ý hơn, nhưng có thể chưa đủ mượt vì AI phải sửa từng mẩu nhỏ.\n\n'
-    'Đoạn đề xuất càng DÀI thì AI càng có chỗ để viết lại cho gọn gàng, súc '
-    'tích hơn, nhưng cũng dễ lệch khỏi ý gốc của bạn hơn vì AI phải diễn đạt '
-    'lại nhiều hơn.\n\n'
-    'Khoảng ký tự tham khảo cho từng mức:\n'
-    'Rất ngắn: khoảng 4–8 ký tự\n'
-    'Ngắn: khoảng 8–14 ký tự\n'
-    'Trung bình: khoảng 12–20 ký tự\n'
-    'Dài: khoảng 20–34 ký tự\n'
-    'Rất dài: khoảng 34–56 ký tự';
+String _giaiThichDoDaiDeXuat(NgonNgu nn) => Ch.giaiThichDoDaiDeXuat(nn);
 
-const _giaiThichCauLenhTuyChinh =
-    'Đây là câu lệnh RIÊNG của bạn, gửi kèm theo chỉ dẫn gốc của hệ thống mỗi '
-    'lần bấm "Kiểm tra toàn văn". Nếu ý bạn viết ở đây xung đột với chỉ dẫn '
-    'gốc, AI sẽ ưu tiên làm theo ý của bạn trước.\n\n'
-    'Ví dụ: bạn có thể dặn AI giữ nguyên văn phong thân mật, tránh dùng từ Hán '
-    'Việt, hoặc luôn viết hoa một tên riêng nào đó.';
+String _giaiThichCauLenhTuyChinh(NgonNgu nn) => Ch.giaiThichCauLenhTuyChinh(nn);
 
 /// Mở modal "Cài đặt nút Kiểm tra toàn văn".
 void moModalCaiDatKiemTraToanVan(BuildContext context, CaiDat caiDat) {
@@ -115,7 +98,7 @@ class _ThanCaiDatKiemTraToanVanState extends State<_ThanCaiDatKiemTraToanVan> {
     final ketQua = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Câu lệnh riêng của bạn'),
+        title: Text(Ch.cauLenhRiengCuaBan(ngonNguHienTai.value)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -125,28 +108,26 @@ class _ThanCaiDatKiemTraToanVanState extends State<_ThanCaiDatKiemTraToanVan> {
               maxLines: 5,
               minLines: 3,
               maxLength: CaiDat.gioiHanCauLenhTuyChinh,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: 'Ví dụ: giữ văn phong thân mật, tránh từ Hán Việt...',
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                hintText: Ch.viDuGiuVanPhongThanMat(ngonNguHienTai.value),
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
-              'Câu lệnh này được gửi kèm theo chỉ dẫn gốc của hệ thống mỗi '
-              'lần bấm "Kiểm tra toàn văn", và được ưu tiên hơn nếu có xung '
-              'đột.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+            Text(
+              Ch.cauLenhGuiKemChiDanGoc(ngonNguHienTai.value),
+              style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Huỷ'),
+            child: Text(Ch.huy(ngonNguHienTai.value)),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(oNhap.text.trim()),
-            child: const Text('Lưu'),
+            child: Text(Ch.luu(ngonNguHienTai.value)),
           ),
         ],
       ),
@@ -171,18 +152,17 @@ class _ThanCaiDatKiemTraToanVanState extends State<_ThanCaiDatKiemTraToanVan> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Cài đặt nút "Kiểm tra toàn văn"',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+            Text(
+              Ch.caiDatNutKiemTraToanVanTieuDe(ngonNguHienTai.value),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
             ),
             const SizedBox(height: 16),
             Text.rich(
               TextSpan(
                 style: const TextStyle(height: 1.5, color: Colors.black87),
                 children: [
-                  const TextSpan(
-                      text: 'Để sử dụng chức năng kiểm tra toàn văn bằng AI, vui lòng bấm nút '
-                          '"Làm việc với AI" ở thanh công cụ rồi chọn mục '),
+                  TextSpan(
+                      text: Ch.deSuDungChucNangKiemTraToanVan(ngonNguHienTai.value)),
                   const WidgetSpan(
                     alignment: PlaceholderAlignment.middle,
                     child: _NutKiemTraToanVanMoPhong(),
@@ -192,14 +172,14 @@ class _ThanCaiDatKiemTraToanVanState extends State<_ThanCaiDatKiemTraToanVan> {
               ),
             ),
             const SizedBox(height: 10),
-            const Text(
-              'Đây là bước quan trọng sau mỗi lần soạn xong 1 bài văn bản.',
-              style: TextStyle(height: 1.5, color: Color(0xFF5F6368)),
+            Text(
+              Ch.dayLaBuocQuanTrongSauMoiLanSoanXong(ngonNguHienTai.value),
+              style: const TextStyle(height: 1.5, color: Color(0xFF5F6368)),
             ),
             const SizedBox(height: 24),
-            const Text(
-              'CÀI ĐẶT TÍNH NĂNG NÀY',
-              style: TextStyle(
+            Text(
+              Ch.caiDatTinhNangNay(ngonNguHienTai.value),
+              style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
                 letterSpacing: 0.5,
@@ -211,10 +191,10 @@ class _ThanCaiDatKiemTraToanVanState extends State<_ThanCaiDatKiemTraToanVan> {
             // ---- Độ dài đoạn đề xuất ----
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Độ dài của từng đoạn văn được đề xuất',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                    Ch.doDaiTungDoanVanDuocDeXuat(ngonNguHienTai.value),
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
                   ),
                 ),
               ],
@@ -242,10 +222,10 @@ class _ThanCaiDatKiemTraToanVanState extends State<_ThanCaiDatKiemTraToanVan> {
               child: TextButton(
                 onPressed: () => _hienGiaiThich(
                   context,
-                  'Độ dài của từng đoạn văn được đề xuất',
-                  _giaiThichDoDaiDeXuat,
+                  Ch.doDaiTungDoanVanDuocDeXuat(ngonNguHienTai.value),
+                  _giaiThichDoDaiDeXuat(ngonNguHienTai.value),
                 ),
-                child: const Text('Tìm hiểu thêm'),
+                child: Text(Ch.timHieuThem(ngonNguHienTai.value)),
               ),
             ),
             const SizedBox(height: 16),
@@ -257,10 +237,10 @@ class _ThanCaiDatKiemTraToanVanState extends State<_ThanCaiDatKiemTraToanVan> {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Tùy chỉnh câu lệnh để cho AI làm việc',
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                        Ch.tuyChinhCauLenhChoAiLamViec(ngonNguHienTai.value),
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
                       ),
                     ),
                     const Icon(Icons.chevron_right, color: Color(0xFF9AA0A6)),
@@ -270,8 +250,8 @@ class _ThanCaiDatKiemTraToanVanState extends State<_ThanCaiDatKiemTraToanVan> {
             ),
             Text(
               _cauLenhTuyChinh.trim().isEmpty
-                  ? 'Câu lệnh riêng của bạn đang trống'
-                  : 'Câu lệnh của bạn đang chứa $soTu từ',
+                  ? Ch.cauLenhRiengDangTrong(ngonNguHienTai.value)
+                  : Ch.cauLenhDangChuaSoTu(ngonNguHienTai.value, soTu),
               style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
             ),
             Align(
@@ -279,10 +259,10 @@ class _ThanCaiDatKiemTraToanVanState extends State<_ThanCaiDatKiemTraToanVan> {
               child: TextButton(
                 onPressed: () => _hienGiaiThich(
                   context,
-                  'Tùy chỉnh câu lệnh để cho AI làm việc',
-                  _giaiThichCauLenhTuyChinh,
+                  Ch.tuyChinhCauLenhChoAiLamViec(ngonNguHienTai.value),
+                  _giaiThichCauLenhTuyChinh(ngonNguHienTai.value),
                 ),
-                child: const Text('Tìm hiểu thêm'),
+                child: Text(Ch.timHieuThem(ngonNguHienTai.value)),
               ),
             ),
           ],

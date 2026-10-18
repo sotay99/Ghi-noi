@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
+import 'chuoi_da_ngon_ngu.dart';
+import 'ngon_ngu.dart';
 import 'nguon_am_thanh_the_ghi_am.dart';
 import 'tai_ve_bytes.dart';
 
@@ -134,7 +136,7 @@ class _ModalNgheLaiGhiAmState extends State<_ModalNgheLaiGhiAm> {
         ? 0.0
         : (viTriHienThi.inMilliseconds / tongMili).clamp(0.0, 1.0);
     return AlertDialog(
-      title: const Text('Nghe bản ghi âm này'),
+      title: Text(Ch.ngheBanGhiAmNay(ngonNguHienTai.value)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -172,14 +174,14 @@ class _ModalNgheLaiGhiAmState extends State<_ModalNgheLaiGhiAm> {
       actions: [
         TextButton(
           onPressed: _taiVeMay,
-          child: const Text('Tải file ghi âm về máy'),
+          child: Text(Ch.taiFileGhiAmVeMay(ngonNguHienTai.value)),
         ),
         TextButton(
           onPressed: () async {
             await _player.stop();
             if (context.mounted) Navigator.of(context).pop(false);
           },
-          child: const Text('Đóng'),
+          child: Text(Ch.dong(ngonNguHienTai.value)),
         ),
         FilledButton(
           style: FilledButton.styleFrom(backgroundColor: Colors.blue.shade700),
@@ -187,7 +189,7 @@ class _ModalNgheLaiGhiAmState extends State<_ModalNgheLaiGhiAm> {
             await _player.stop();
             if (context.mounted) Navigator.of(context).pop(true);
           },
-          child: const Text('Chuyển hoá thẻ ghi âm này thành văn bản'),
+          child: Text(Ch.chuyenHoaTheGhiAmNayThanhVanBan(ngonNguHienTai.value)),
         ),
       ],
     );

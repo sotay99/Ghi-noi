@@ -5,7 +5,9 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import 'chuoi_da_ngon_ngu.dart';
 import 'kho_du_lieu.dart';
+import 'ngon_ngu.dart';
 
 /// "1,2 KB"/"3,4 MB" — dưới 1024 byte thì hiện nguyên byte, không làm tròn
 /// số lẻ gây hiểu lầm cho những tệp nhỏ.
@@ -24,12 +26,13 @@ Widget _dongThongTin(String s) => Padding(
 
 Widget _tieuDeVaNutDong(BuildContext context) => Row(
       children: [
-        const Expanded(
-          child: Text('Thông tin chi tiết', style: TextStyle(fontWeight: FontWeight.bold)),
+        Expanded(
+          child: Text(Ch.thongTinChiTiet(ngonNguHienTai.value),
+              style: const TextStyle(fontWeight: FontWeight.bold)),
         ),
         IconButton(
           icon: const Icon(Icons.close),
-          tooltip: 'Đóng',
+          tooltip: Ch.dong(ngonNguHienTai.value),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ],
@@ -57,18 +60,18 @@ void hienThongTinThuMuc(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (viTri != null) _dongThongTin('Vị trí: $viTri'),
-          _dongThongTin('Tên: $ten'),
-          _dongThongTin('Kích thước: ${dinhDangKichThuoc(sau.tongByte)}'),
+          if (viTri != null) _dongThongTin(Ch.viTriLa(ngonNguHienTai.value, viTri)),
+          _dongThongTin(Ch.tenLa(ngonNguHienTai.value, ten)),
+          _dongThongTin(Ch.kichThuocLa(ngonNguHienTai.value, dinhDangKichThuoc(sau.tongByte))),
           _dongThongTin(
-            'Gồm có ${truc.soThuMuc} thư mục và ${truc.soGhiChu} tệp tin ở trang đầu.',
+            Ch.gomCoThuMucVaTepOTrangDau(ngonNguHienTai.value, truc.soThuMuc, truc.soGhiChu),
           ),
           _dongThongTin(
-            'Tổng tất cả có ${sau.soThuMuc} thư mục và ${sau.soGhiChu} tệp tin bên trong.',
+            Ch.tongTatCaCoThuMucVaTepBenTrong(ngonNguHienTai.value, sau.soThuMuc, sau.soGhiChu),
           ),
           // (CHỦ Ý để trống) — dành cho tên chủ sở hữu khi có bộ nhớ đám
           // mây/đăng nhập Google, chưa có gì để hiện bây giờ.
-          _dongThongTin('Chủ sở hữu: '),
+          _dongThongTin(Ch.chuSoHuuLa(ngonNguHienTai.value)),
         ],
       ),
     ),
@@ -94,10 +97,10 @@ void hienThongTinGhiChu(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (viTri != null) _dongThongTin('Vị trí: $viTri'),
-          _dongThongTin('Tên: $ten'),
-          _dongThongTin('Kích thước: ${dinhDangKichThuoc(soByte)}'),
-          _dongThongTin('Chủ sở hữu: '),
+          if (viTri != null) _dongThongTin(Ch.viTriLa(ngonNguHienTai.value, viTri)),
+          _dongThongTin(Ch.tenLa(ngonNguHienTai.value, ten)),
+          _dongThongTin(Ch.kichThuocLa(ngonNguHienTai.value, dinhDangKichThuoc(soByte))),
+          _dongThongTin(Ch.chuSoHuuLa(ngonNguHienTai.value)),
         ],
       ),
     ),
