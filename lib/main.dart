@@ -18,11 +18,14 @@ import 'khoi_dong_lai_app.dart';
 import 'khoi_dong_tep.dart';
 import 'man_hinh_go_nhanh_widget.dart';
 import 'man_hinh_widget_cau_hinh.dart';
+import 'modal_chon_ngon_ngu.dart';
+import 'ngon_ngu.dart';
 import 'trang_soan_thao.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await taiNgonNgu();
   // (SỬA LỖI NGHIÊM TRỌNG) KHÔNG `await` — App Check (Play Integrity) có
   // thể chậm/treo trên APK sideload, xem chú thích ở `khoiTaoAppCheck`.
   // Chạy nền, không chặn màn hình đầu tiên vẽ ra.
@@ -59,6 +62,8 @@ class _UngDungFlowriteState extends State<UngDungFlowrite> {
   YeuCauMoTuWidget? _yeuCauWidget;
   bool _daDocYeuCauWidget = false;
 
+  final _navigatorKey = GlobalKey<NavigatorState>();
+
   @override
   void initState() {
     super.initState();
@@ -90,12 +95,19 @@ class _UngDungFlowriteState extends State<UngDungFlowrite> {
       _khoMoDau = khoChon;
       _idGhiChuMoDau = idChon;
     });
+    if (!daChonNgonNgu) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _navigatorKey.currentContext;
+        if (ctx != null) moModalChonNgonNgu(ctx, batBuocChon: true);
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final yeuCauWidget = _yeuCauWidget;
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: 'Flowrite',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(

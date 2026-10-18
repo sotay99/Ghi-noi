@@ -21,11 +21,14 @@ import 'firebase_options.dart';
 import 'kho_du_lieu.dart';
 import 'khoi_dong_lai_app.dart';
 import 'khoi_dong_tep.dart';
+import 'modal_chon_ngon_ngu.dart';
+import 'ngon_ngu.dart';
 import 'trang_soan_thao.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await taiNgonNgu();
   // (SỬA LỖI NGHIÊM TRỌNG) KHÔNG `await` — xem chú thích ở `khoiTaoAppCheck`.
   // Chạy nền, không chặn màn hình đầu tiên vẽ ra.
   unawaited(khoiTaoAppCheck());
@@ -51,6 +54,8 @@ class _UngDungFlowriteWebDayDuState extends State<UngDungFlowriteWebDayDu> {
   /// `main.dart` (cùng logic y hệt, chỉ khác giao diện khởi động).
   KhoDuLieu? _khoMoDau;
 
+  final _navigatorKey = GlobalKey<NavigatorState>();
+
   @override
   void initState() {
     super.initState();
@@ -71,11 +76,18 @@ class _UngDungFlowriteWebDayDuState extends State<UngDungFlowriteWebDayDu> {
       _khoMoDau = khoChon;
       _idGhiChuMoDau = idChon;
     });
+    if (!daChonNgonNgu) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _navigatorKey.currentContext;
+        if (ctx != null) moModalChonNgonNgu(ctx, batBuocChon: true);
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       // (YÊU CẦU MỚI) Tên hiện ở tab trình duyệt — 3 emoji: Đám mây/Cuốn
       // sách đang mở/Tay cầm bút viết.
       title: 'Flowrite - ☁️📖✍️',

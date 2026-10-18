@@ -8,6 +8,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
+import 'modal_chon_ngon_ngu.dart';
 import 'quyen_admin.dart';
 import 'vong_song_am.dart';
 
@@ -1693,7 +1694,8 @@ class _NutThemMenu extends StatelessWidget {
 /// Menu thả xuống của nút "Tài khoản của bạn" — cùng cơ chế với
 /// `_NutThemMenu`/`_NutAIMenu`. "Điều khoản sử dụng"/"Bảo mật và quyền
 /// riêng tư" mở `TrangDieuKhoan`/`TrangBaoMat` (toàn màn hình, nội dung
-/// chọn/copy được). "Language - Ngôn ngữ" vẫn CHƯA gắn logic, chờ gắn sau.
+/// chọn/copy được). "Ngôn ngữ - Language" mở `moModalChonNgonNgu` (xem
+/// `modal_chon_ngon_ngu.dart`), không bắt buộc chọn (đã chọn trước rồi).
 class _NutTaiKhoanMenu extends StatelessWidget {
   const _NutTaiKhoanMenu({
     required this.rong,
@@ -1861,6 +1863,9 @@ class _NutTaiKhoanMenu extends StatelessWidget {
               case 27:
                 khiBamKhoiDongTep();
                 break;
+              case 6:
+                moModalChonNgonNgu(context);
+                break;
               case 3:
                 khiBamDieuKhoan();
                 break;
@@ -1889,7 +1894,7 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                 // Hai mục mới — CHƯA gắn logic (chờ gắn sau), tạm đặt ở đầu
                 // menu, cùng kiểu dòng với "Cài đặt Micro"/"Cài đặt Hiển thị
                 // và tự động sửa" bên dưới.
-                _mucMenuThem(6, 'Language - Ngôn ngữ', icon: Icons.language),
+                _mucMenuThem(6, 'Ngôn ngữ - Language', icon: Icons.language),
                 _mucMenuThem(27, 'Khi khởi động App: Mở tệp...', icon: Icons.description_outlined),
                 _dividerMenu(),
                 // (YÊU CẦU MỚI) Năm mục "Cài đặt..." — chữ màu TÍM để phân
