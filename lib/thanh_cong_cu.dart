@@ -9,6 +9,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'modal_chon_ngon_ngu.dart';
+import 'ngon_ngu.dart';
+import 'chuoi_da_ngon_ngu.dart';
 import 'quyen_admin.dart';
 import 'vong_song_am.dart';
 
@@ -436,7 +438,7 @@ class ThanhCongCu extends StatelessWidget {
                               ? [
                                   _NutCoChuThich(
                                     hien: hienChuThich,
-                                    chu: 'Làm việc với AI',
+                                    chu: Ch.nutLamViecVoiAi(ngonNguHienTai.value),
                                     child: _NutAIMenu(
                                       rong: rong,
                                       khiBamCaiDatKiemTraToanVan: khiBamCaiDatKiemTraToanVan,
@@ -482,7 +484,7 @@ class ThanhCongCu extends StatelessWidget {
                           ),
                           _NutCoChuThich(
                             hien: hienChuThich,
-                            chu: 'Làm việc với AI',
+                            chu: Ch.nutLamViecVoiAi(ngonNguHienTai.value),
                             child: _NutAIMenu(
                               rong: rong,
                               khiBamCaiDatKiemTraToanVan: khiBamCaiDatKiemTraToanVan,
@@ -744,7 +746,7 @@ class _NutGhiAmTron extends StatelessWidget {
     return Semantics(
       button: true,
       enabled: !biKhoa,
-      label: dangGhiAm ? 'Dừng ghi âm' : 'Ghi âm',
+      label: dangGhiAm ? Ch.dungGhiAm(ngonNguHienTai.value) : Ch.ghiAm(ngonNguHienTai.value),
       child: Tooltip(
         message: biKhoa
             ? 'Đang dùng Micro — tắt Micro trước khi ghi âm'
@@ -1583,7 +1585,7 @@ class _NutThemMenu extends StatelessWidget {
           child: rong
               ? const _KhungNutRong(
                   bieuTuong: Icons.add_circle_outline,
-                  nhan: 'Thêm lựa chọn',
+                  nhan: Ch.nutThemLuaChon(ngonNguHienTai.value),
                 )
               : Container(
                   width: 38,
@@ -1645,7 +1647,7 @@ class _NutThemMenu extends StatelessWidget {
             return [
               // Nút X đỏ đóng menu + hai nút cuộn — luôn ở đầu danh sách,
               // KHÔNG cuộn theo phần còn lại.
-              _mucDongMenu(cuon, tenMenu: 'Thêm lựa chọn', mauDamTenMenu: Colors.red.shade200),
+              _mucDongMenu(cuon, tenMenu: Ch.nutThemLuaChon(ngonNguHienTai.value), mauDamTenMenu: Colors.red.shade200),
               _mucCuonDanhSach(ctx, cuon, [
                 // Ba mục đầu — dời từ ba nút riêng trên thanh công cụ trên
                 // (Sao chép tất cả/Xoá tất cả) xuống đây, cộng thêm mục gộp
@@ -1820,7 +1822,7 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                     children: [
                       haiIcon,
                       SizedBox(width: 6),
-                      Text('Tài khoản-Cài đặt',
+                      Text(Ch.nutTaiKhoanCaiDat(ngonNguHienTai.value),
                           style: TextStyle(fontSize: 12, color: Color(0xFF5F6368))),
                     ],
                   ),
@@ -2094,9 +2096,9 @@ class _NutAIMenu extends StatelessWidget {
     final noiBat = coVungChonThatSu();
     return Semantics(
       button: true,
-      label: 'Làm việc với AI',
+      label: Ch.nutLamViecVoiAi(ngonNguHienTai.value),
       child: Tooltip(
-        message: 'Làm việc với AI',
+        message: Ch.nutLamViecVoiAi(ngonNguHienTai.value),
         child: PopupMenuButton<int>(
           key: khoaMenuAI,
           onOpened: khiMoMenu,
@@ -2111,7 +2113,7 @@ class _NutAIMenu extends StatelessWidget {
           child: rong
               ? _KhungNutRong(
                   bieuTuong: Icons.smart_toy_outlined,
-                  nhan: 'Làm việc với AI',
+                  nhan: Ch.nutLamViecVoiAi(ngonNguHienTai.value),
                   mau: noiBat ? Colors.white : const Color(0xFF5F6368),
                   mauNen: noiBat ? const Color(0xFF1A73E8) : Colors.white,
                 )
@@ -2156,7 +2158,7 @@ class _NutAIMenu extends StatelessWidget {
             return [
               // Nút X đỏ đóng menu + hai nút cuộn — luôn ở đầu danh sách,
               // KHÔNG cuộn theo phần còn lại.
-              _mucDongMenu(cuon, tenMenu: 'Làm việc với AI', mauDamTenMenu: Colors.green.shade200),
+              _mucDongMenu(cuon, tenMenu: Ch.nutLamViecVoiAi(ngonNguHienTai.value), mauDamTenMenu: Colors.green.shade200),
               _mucCuonDanhSach(ctx, cuon, [
                 // Ba mục đầu menu — "Chuyển hình ảnh thành văn bản" dời từ
                 // menu "+ Thêm lựa chọn" sang đây (đổi tên mục ảnh) — đã gắn
@@ -2251,7 +2253,7 @@ class _NutAIMenu extends StatelessWidget {
                       Icon(Icons.task_alt, size: 16, color: Colors.green.shade600),
                       const SizedBox(width: 8),
                       Text(
-                        coDoanChon ? 'Kiểm tra đoạn văn này' : 'Kiểm tra toàn văn',
+                        coDoanChon ? Ch.kiemTraDoanVanNay(ngonNguHienTai.value) : Ch.kiemTraToanVan(ngonNguHienTai.value),
                         style: TextStyle(color: Colors.green.shade600),
                       ),
                     ],

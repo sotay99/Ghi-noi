@@ -69,6 +69,8 @@ import 'modal_tu_dien_chinh_ta.dart';
 import 'modal_tu_dien_nhap_lieu_nhanh.dart';
 import 'modal_nghe_lai_ghi_am.dart';
 import 'mo_hinh.dart';
+import 'ngon_ngu.dart';
+import 'chuoi_da_ngon_ngu.dart';
 import 'phien_ban_web_day_du.dart';
 import 'the_ghi_am.dart';
 import 'thanh_cong_cu.dart';
@@ -4256,9 +4258,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
   }
 
+  void _khiDoiNgonNgu() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
+    // (ĐA NGÔN NGỮ) Vẽ lại toàn trang khi người dùng đổi ngôn ngữ ở modal
+    // Cài đặt — không bọc `ValueListenableBuilder` quanh cả cây widget (file
+    // này quá lớn, rủi ro cao), chỉ nghe trực tiếp rồi `setState` rỗng.
+    ngonNguHienTai.addListener(_khiDoiNgonNgu);
     _ghiChuHienTai = widget.kho.timGhiChu(widget.ghiChuId)!;
     _ganDauDaMoTepChoLichSu(widget.ghiChuId);
     _ghiNhoGanDayNhatChoKhoiDong();
@@ -4664,6 +4674,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   @override
   void dispose() {
+    ngonNguHienTai.removeListener(_khiDoiNgonNgu);
     HardwareKeyboard.instance.removeHandler(_khiPhimTatMicro);
     HardwareKeyboard.instance.removeHandler(_khiPhimTatGhiAm);
     HardwareKeyboard.instance.removeHandler(_khiPhimTatBoNhoTam);
@@ -15259,7 +15270,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             children: const [
               Icon(Icons.folder, size: 18, color: Color(0xFF5F6368)),
               SizedBox(width: 6),
-              Text('Thư mục',
+              Text(Ch.nutThuMuc(ngonNguHienTai.value),
                   style: TextStyle(fontSize: 13, color: Color(0xFF5F6368))),
             ],
           ),
@@ -15375,13 +15386,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           _nutMoRongTep(),
           _nutVuongDieuHuongTep(
             Icons.arrow_back,
-            'Tệp trước',
+            Ch.tepTruoc(ngonNguHienTai.value),
             coNhieuHonMotTep ? () => _chuyenTepTrongThuMuc(-1) : null,
             oBienGioi: coNhieuHonMotTep && oDauDanhSach,
           ),
           _nutVuongDieuHuongTep(
             Icons.arrow_forward,
-            'Tệp sau',
+            Ch.tepSau(ngonNguHienTai.value),
             coNhieuHonMotTep ? () => _chuyenTepTrongThuMuc(1) : null,
             oBienGioi: coNhieuHonMotTep && oCuoiDanhSach,
           ),
@@ -16038,7 +16049,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             // trùng với nút All/Copy/Cắt ngoài màn hình chính) xuống đây,
             // ngay cạnh "Đóng", cả ba căn phải sát mép phải màn hình.
             _NutPhimAo(
-              nhan: 'Lùi lại',
+              nhan: Ch.luiLai(ngonNguHienTai.value),
               icon: Icons.undo,
               moTa: 'Lùi lại (Ctrl + Z)',
               mauNen: Colors.red.shade50,
@@ -16048,7 +16059,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             ),
             SizedBox(width: khoangCach),
             _NutPhimAo(
-              nhan: 'Tiến tới',
+              nhan: Ch.tienToi(ngonNguHienTai.value),
               icon: Icons.redo,
               moTa: 'Tiến tới (Ctrl + Shift + Z)',
               mauNen: Colors.red.shade50,
@@ -18580,7 +18591,7 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
                   icon: const Icon(Icons.help_outline, size: 18),
                   // (YÊU CẦU MỚI) Màn hẹp bề ngang: rút gọn còn "Hướng dẫn"
                   // (vẫn giữ icon) — màn rộng giữ nguyên tên đầy đủ.
-                  label: Text(manHinhHepBeNgang ? 'Hướng dẫn' : 'Hướng dẫn sử dụng'),
+                  label: Text(manHinhHepBeNgang ? Ch.nutHuongDan(ngonNguHienTai.value) : Ch.nutHuongDanDayDu(ngonNguHienTai.value)),
                   style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
                 ),
                 TextButton.icon(
@@ -19056,7 +19067,7 @@ class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNha
                 TextButton.icon(
                   onPressed: _moHuongDan,
                   icon: const Icon(Icons.help_outline, size: 18),
-                  label: Text(manHinhHepBeNgang ? 'Hướng dẫn' : 'Hướng dẫn sử dụng'),
+                  label: Text(manHinhHepBeNgang ? Ch.nutHuongDan(ngonNguHienTai.value) : Ch.nutHuongDanDayDu(ngonNguHienTai.value)),
                   style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
                 ),
                 TextButton.icon(

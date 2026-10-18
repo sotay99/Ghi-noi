@@ -20,6 +20,9 @@ class Ch {
   static String nutHuongDan(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Hướng dẫn' : 'Guide';
 
+  static String nutHuongDanDayDu(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Hướng dẫn sử dụng' : 'User guide';
+
   static String nutLamViecVoiAi(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Làm việc với AI' : 'Work with AI';
 
@@ -41,6 +44,12 @@ class Ch {
 
   // ------------------------------------------------- Menu "Làm việc với AI"
   static String ghiAm(NgonNgu nn) => nn == NgonNgu.vi ? 'Ghi âm' : 'Record audio';
+
+  static String dungGhiAm(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Dừng ghi âm' : 'Stop recording';
+
+  static String kiemTraDoanVanNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Kiểm tra đoạn văn này' : 'Check this paragraph';
 
   static String micro(NgonNgu nn) => nn == NgonNgu.vi ? 'Micro' : 'Microphone';
 
