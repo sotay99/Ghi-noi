@@ -803,6 +803,99 @@ class Ch {
   static String xoaBanNayDongTrinhGhiAm(NgonNgu nn) => nn == NgonNgu.vi
       ? 'Xoá bản này-Đóng trình ghi âm'
       : 'Delete this recording-Close';
+
+  // ---------------------------------------------- Snackbar/thông báo nhanh
+  static String khongKiemTraDuoc(NgonNgu nn, String loi) =>
+      nn == NgonNgu.vi ? 'Không kiểm tra được: $loi' : 'Could not check: $loi';
+  static String daXoaDoanVan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đã xoá đoạn văn.' : 'Paragraph deleted.';
+  static String khongTheHoanTacKhiConTheChuaXuLy(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Không thể hoàn tác thêm khi còn thẻ ghi âm chưa xử lý xong.'
+      : 'Cannot undo further while a recording card is still being processed.';
+  static String khongTheLamLaiKhiConTheChuaXuLy(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Không thể làm lại thêm khi còn thẻ ghi âm chưa xử lý xong.'
+      : 'Cannot redo further while a recording card is still being processed.';
+  static String chuaCoChuNaoDeChep(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chưa có chữ nào để chép.' : 'There is no text to copy yet.';
+  static String daSaoChepTatCaToast(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đã sao chép tất cả' : 'Copied all';
+  static String trangDangTrongKhongCoGiDeXoa(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Trang đang trống, không có gì để xoá.'
+      : 'The page is empty — nothing to delete.';
+  static String daXoaTatCaToast(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đã xoá tất cả' : 'Deleted all';
+  static String daSaoChepTatCaVaXoa(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đã sao chép tất cả và xoá' : 'Copied all and deleted';
+  static String khongMoDuocHopThoaiChonTep(NgonNgu nn, String e) => nn == NgonNgu.vi
+      ? 'Không mở được hộp thoại chọn tệp: $e'
+      : 'Could not open the file picker: $e';
+  static String khongDocDuocNoiDungTepVuaChon(NgonNgu nn, String e) => nn == NgonNgu.vi
+      ? 'Không đọc được nội dung tệp vừa chọn: $e'
+      : 'Could not read the selected file: $e';
+  static String chuyenTepThatBai(NgonNgu nn, String loi) => nn == NgonNgu.vi
+      ? 'Chuyển tệp thất bại: $loi'
+      : 'File conversion failed: $loi';
+  static String khongMoDuocHopThoaiChonAnh(NgonNgu nn, String e) => nn == NgonNgu.vi
+      ? 'Không mở được hộp thoại chọn ảnh: $e'
+      : 'Could not open the image picker: $e';
+  static String khongDocDuocNoiDungAnhVuaChon(NgonNgu nn, String e) => nn == NgonNgu.vi
+      ? 'Không đọc được nội dung ảnh vừa chọn: $e'
+      : 'Could not read the selected image: $e';
+  static String chuyenAnhThatBai(NgonNgu nn, String loi) => nn == NgonNgu.vi
+      ? 'Chuyển ảnh thất bại: $loi'
+      : 'Image conversion failed: $loi';
+  static String tomTatThatBai(NgonNgu nn, String loi) => nn == NgonNgu.vi
+      ? 'Tóm tắt thất bại: $loi'
+      : 'Summarizing failed: $loi';
+  static String moRongThatBai(NgonNgu nn, String loi) => nn == NgonNgu.vi
+      ? 'Mở rộng thất bại: $loi'
+      : 'Expanding failed: $loi';
+  static String vietLaiThatBai(NgonNgu nn, String loi) => nn == NgonNgu.vi
+      ? 'Viết lại thất bại: $loi'
+      : 'Rewriting failed: $loi';
+  static String daSaoChepToast(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đã sao chép.' : 'Copied.';
+  static String daThayTheToanBoVanBan(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đã thay thế toàn bộ văn bản.'
+      : 'The whole text has been replaced.';
+  static String doanVanBanGocDaThayDoi(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đoạn văn bản gốc đã thay đổi, không thể thay thế. Vui lòng thử lại.'
+      : 'The original text has changed, so it cannot be replaced. Please try again.';
+  static String daThayTheDoanVanBanDaChon(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đã thay thế đoạn văn bản đã chọn.'
+      : 'The selected paragraph has been replaced.';
+  static String khongMoDuocCamera(NgonNgu nn, String e) =>
+      nn == NgonNgu.vi ? 'Không mở được camera: $e' : 'Could not open the camera: $e';
+  static String khongDocDuocAnhVuaChup(NgonNgu nn, String e) => nn == NgonNgu.vi
+      ? 'Không đọc được ảnh vừa chụp: $e'
+      : 'Could not read the captured photo: $e';
+  static String anhVuaChupNangQuaMB(NgonNgu nn, String soMB) => nn == NgonNgu.vi
+      ? 'Ảnh vừa chụp nặng ${soMB}MB, vượt quá 15MB cho phép.'
+      : 'The captured photo is ${soMB}MB, over the 15MB limit.';
+  static String dangMoTrinhGhiAmHayDongTruocKhiTimKiem(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đang mở trình ghi âm — hãy đóng trình ghi âm trước khi tìm kiếm.'
+      : 'The voice recorder is open — close it before searching.';
+  static String ghiChuDangMoDaBiXoaDaTaoMoi(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Ghi chú đang mở đã bị xoá, đã tạo ghi chú mới.'
+      : 'The open note was deleted — a new note has been created.';
+  static String dangMoTimKiemHayDongTruocKhiGhiAm(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đang mở tìm kiếm — hãy đóng tìm kiếm trước khi ghi âm.'
+      : 'Search is open — close it before recording audio.';
+  static String khongXinDuocQuyenMicroDeGhiAm(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Không xin được quyền micro để ghi âm.'
+      : 'Could not get microphone permission to record audio.';
+  static String theGhiAmLoiGui(NgonNgu nn, int soThe, String e) => nn == NgonNgu.vi
+      ? 'Thẻ ghi âm #$soThe: lỗi gửi — $e'
+      : 'Recording card #$soThe: send error — $e';
+  static String khongCoTheGhiAmNaoDeGui(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Không có thẻ ghi âm nào trong văn bản để gửi.'
+      : 'There is no recording card in the text to send.';
+  static String theGhiAmDaBiXoaVinhVien(NgonNgu nn, int soThe) => nn == NgonNgu.vi
+      ? 'Thẻ ghi âm #$soThe: dữ liệu đã bị xoá vĩnh viễn trước đó, không thể chuyển hoá được nữa.'
+      : 'Recording card #$soThe: its data was permanently deleted earlier and can no longer be converted.';
+  static String dangDungMicroTatTruocKhiGhiAmChamCham(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đang dùng Micro — tắt Micro trước khi ghi âm.'
+      : 'Microphone in use — turn it off before recording audio.';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt

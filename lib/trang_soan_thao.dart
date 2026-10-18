@@ -2127,7 +2127,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
   void _moTimKiem() {
     if (_trinhGhiAmMo) {
-      _bao('Đang mở trình ghi âm — hãy đóng trình ghi âm trước khi tìm kiếm.');
+      _bao(Ch.dangMoTrinhGhiAmHayDongTruocKhiTimKiem(ngonNguHienTai.value));
       return;
     }
     _oTimKiem.text = _boNhoTimKiemGanNhat;
@@ -5245,7 +5245,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       final moi = widget.kho.taoGhiChuMoi(thuMucGoc);
       await widget.kho.luu();
       _moGhiChu(moi.id);
-      _bao('Ghi chú đang mở đã bị xoá, đã tạo ghi chú mới.');
+      _bao(Ch.ghiChuDangMoDaBiXoaDaTaoMoi(ngonNguHienTai.value));
     } else {
       setState(() => _tenController.text = vanConDo.ten);
     }
@@ -7721,7 +7721,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
     if (_hienThanhTimKiem) {
-      _bao('Đang mở tìm kiếm — hãy đóng tìm kiếm trước khi ghi âm.');
+      _bao(Ch.dangMoTimKiemHayDongTruocKhiGhiAm(ngonNguHienTai.value));
       return;
     }
     // (YÊU CẦU MỚI — loại trừ lẫn nhau Ghi âm/Micro) Nút bấm tay đã bị khoá
@@ -7729,13 +7729,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // qua chạm thường — chốt an toàn này chỉ còn cần cho đường vào khác
     // (phím tắt Ghi âm bấm trong lúc Micro đang nghe).
     if (_muonNghe) {
-      _bao('Đang dùng Micro — tắt Micro trước khi ghi âm.');
+      _bao(Ch.dangDungMicroTatTruocKhiGhiAmChamCham(ngonNguHienTai.value));
       return;
     }
     final ok = await ghiAmTheKhoiTao();
     if (!mounted) return;
     if (!ok) {
-      _bao('Không xin được quyền micro để ghi âm.');
+      _bao(Ch.khongXinDuocQuyenMicroDeGhiAm(ngonNguHienTai.value));
       return;
     }
     setState(() => _trinhGhiAmMo = true);
@@ -8550,8 +8550,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // Không còn dữ liệu (đã bị xoá vĩnh viễn từ trước) — báo rõ lý do,
       // đừng im lặng làm người dùng tưởng app bị treo.
       if (baoLoi) {
-        _bao('Thẻ ghi âm #$soThe: dữ liệu đã bị xoá vĩnh viễn trước đó, '
-            'không thể chuyển hoá được nữa.');
+        _bao(Ch.theGhiAmDaBiXoaVinhVien(ngonNguHienTai.value, soThe));
       }
       return;
     }
@@ -8603,7 +8602,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       if (e is LoiHanMucAi) {
         if (baoLoi && mounted) await hienHopThoaiHanMucAi(context, e.thongDiep);
       } else if (baoLoi) {
-        _bao('Thẻ ghi âm #$soThe: lỗi gửi — $e');
+        _bao(Ch.theGhiAmLoiGui(ngonNguHienTai.value, soThe, '$e'));
       }
     } finally {
       _theGhiAmDangGui.remove(soThe);
@@ -8617,7 +8616,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final vanBan = _boDieuKhien.text;
     final cacKhop = reTheGhiAmHoanChinh.allMatches(vanBan).toList();
     if (cacKhop.isEmpty) {
-      _bao('Không có thẻ ghi âm nào trong văn bản để gửi.');
+      _bao(Ch.khongCoTheGhiAmNaoDeGui(ngonNguHienTai.value));
       return;
     }
     for (final khop in cacKhop.reversed) {
@@ -11772,7 +11771,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
     if (loiXayRa != null || ketQua == null) {
-      _bao('Không kiểm tra được: $loiXayRa');
+      _bao(Ch.khongKiemTraDuoc(ngonNguHienTai.value, loiXayRa));
       return;
     }
 
@@ -12152,7 +12151,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _boDieuKhien.canXoa.remove(x);
       _ghiVaoO(moi, x.batDau);
       _henLuu();
-      _bao('Đã xoá đoạn văn.');
+      _bao(Ch.daXoaDoanVan(ngonNguHienTai.value));
     } else {
       _batNhapNhayCanXoa(x);
     }
@@ -13421,7 +13420,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     if (truoc == null) {
       _lichSuLui.addAll(biNhayQua.reversed); // trả lại đúng thứ tự cũ.
-      _bao('Không thể hoàn tác thêm khi còn thẻ ghi âm chưa xử lý xong.');
+      _bao(Ch.khongTheHoanTacKhiConTheChuaXuLy(ngonNguHienTai.value));
       return;
     }
     _lichSuToi.add(_chupTrangThai(
@@ -13458,7 +13457,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     if (sau == null) {
       _lichSuToi.addAll(biNhayQua.reversed);
-      _bao('Không thể làm lại thêm khi còn thẻ ghi âm chưa xử lý xong.');
+      _bao(Ch.khongTheLamLaiKhiConTheChuaXuLy(ngonNguHienTai.value));
       return;
     }
     _lichSuLui.add(_chupTrangThai(
@@ -13550,11 +13549,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Future<bool> _chepTatCa({bool baoKetQua = true}) async {
     final chu = _boDieuKhien.text;
     if (chu.isEmpty) {
-      if (baoKetQua) _bao('Chưa có chữ nào để chép.');
+      if (baoKetQua) _bao(Ch.chuaCoChuNaoDeChep(ngonNguHienTai.value));
       return false;
     }
     await Clipboard.setData(ClipboardData(text: chu));
-    if (baoKetQua && mounted) _bao('Đã sao chép tất cả');
+    if (baoKetQua && mounted) _bao(Ch.daSaoChepTatCaToast(ngonNguHienTai.value));
     return true;
   }
 
@@ -13564,7 +13563,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// tắt đi khi gọi từ đó với cùng lý do như ở [_chepTatCa].
   Future<bool> _xoaTatCa({bool baoKetQua = true}) async {
     if (_boDieuKhien.text.isEmpty) {
-      if (baoKetQua) _bao('Trang đang trống, không có gì để xoá.');
+      if (baoKetQua) _bao(Ch.trangDangTrongKhongCoGiDeXoa(ngonNguHienTai.value));
       return false;
     }
 
@@ -13595,7 +13594,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _viTriChoVietHoa = null;
     _boQuaCauNay = _micro.isListening;
     await _luuVanBan();
-    if (baoKetQua && mounted) _bao('Đã xoá tất cả');
+    if (baoKetQua && mounted) _bao(Ch.daXoaTatCaToast(ngonNguHienTai.value));
     return true;
   }
 
@@ -13606,7 +13605,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final daChep = await _chepTatCa(baoKetQua: false);
     if (!daChep || !mounted) return;
     await _xoaTatCa(baoKetQua: false);
-    if (mounted) _bao('Đã sao chép tất cả và xoá');
+    if (mounted) _bao(Ch.daSaoChepTatCaVaXoa(ngonNguHienTai.value));
   }
 
   void _moModalCaiDatKiemTraToanVan() {
@@ -13790,7 +13789,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         allowedExtensions: _duoiTepAmThanhHoTro,
       );
     } catch (e) {
-      if (mounted) _bao('Không mở được hộp thoại chọn tệp: $e');
+      if (mounted) _bao(Ch.khongMoDuocHopThoaiChonTep(ngonNguHienTai.value, '$e'));
       return;
     }
     if (tep == null) return; // người dùng huỷ chọn.
@@ -13799,7 +13798,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     try {
       bytes = await tep.readAsBytes();
     } catch (e) {
-      _bao('Không đọc được nội dung tệp vừa chọn: $e');
+      _bao(Ch.khongDocDuocNoiDungTepVuaChon(ngonNguHienTai.value, '$e'));
       return;
     }
     if (bytes.length > _gioiHanTepAmThanhByte) {
@@ -13852,7 +13851,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
     if (loi != null || vanBanKetQua == null || vanBanKetQua.trim().isEmpty) {
-      _bao('Chuyển tệp thất bại: ${loi ?? "không có nội dung trả về."}');
+      _bao(Ch.chuyenTepThatBai(ngonNguHienTai.value, loi ?? 'không có nội dung trả về.'));
       return;
     }
 
@@ -13900,7 +13899,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         allowedExtensions: _duoiAnhHoTro,
       );
     } catch (e) {
-      if (mounted) _bao('Không mở được hộp thoại chọn ảnh: $e');
+      if (mounted) _bao(Ch.khongMoDuocHopThoaiChonAnh(ngonNguHienTai.value, '$e'));
       return;
     }
     if (tep == null) return; // người dùng huỷ chọn.
@@ -13909,7 +13908,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     try {
       bytes = await tep.readAsBytes();
     } catch (e) {
-      _bao('Không đọc được nội dung ảnh vừa chọn: $e');
+      _bao(Ch.khongDocDuocNoiDungAnhVuaChon(ngonNguHienTai.value, '$e'));
       return;
     }
     if (bytes.length > _gioiHanTepAnhByte) {
@@ -13959,7 +13958,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
     if (loi != null || vanBanKetQua == null || vanBanKetQua.trim().isEmpty) {
-      _bao('Chuyển ảnh thất bại: ${loi ?? "không có nội dung trả về."}');
+      _bao(Ch.chuyenAnhThatBai(ngonNguHienTai.value, loi ?? 'không có nội dung trả về.'));
       return;
     }
 
@@ -14184,7 +14183,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
     if (loi != null || vanBanKetQua == null || vanBanKetQua.trim().isEmpty) {
-      _bao('Tóm tắt thất bại: ${loi ?? "không có nội dung trả về."}');
+      _bao(Ch.tomTatThatBai(ngonNguHienTai.value, loi ?? 'không có nội dung trả về.'));
       return;
     }
 
@@ -14367,7 +14366,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
     if (loi != null || vanBanKetQua == null || vanBanKetQua.trim().isEmpty) {
-      _bao('Mở rộng thất bại: ${loi ?? "không có nội dung trả về."}');
+      _bao(Ch.moRongThatBai(ngonNguHienTai.value, loi ?? 'không có nội dung trả về.'));
       return;
     }
 
@@ -14502,7 +14501,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
     if (loi != null || vanBanKetQua == null || vanBanKetQua.trim().isEmpty) {
-      _bao('Viết lại thất bại: ${loi ?? "không có nội dung trả về."}');
+      _bao(Ch.vietLaiThatBai(ngonNguHienTai.value, loi ?? 'không có nội dung trả về.'));
       return;
     }
 
@@ -14630,7 +14629,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           TextButton(
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: _oKetQuaToanVan?.text ?? ''));
-              if (mounted) _bao('Đã sao chép.');
+              if (mounted) _bao(Ch.daSaoChepToast(ngonNguHienTai.value));
             },
             child: Text(Ch.saoChepTatCa(ngonNguHienTai.value)),
           ),
@@ -14714,7 +14713,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // nguyên cơ chế `_VungKhongPhuHop` của "đoạn AI đề xuất thay thế" (mục
     // "Kiểm tra toàn văn"), xem `_nhapNhayToanVan`.
     if (mounted) _nhapNhayToanVan(0, vanBanMoi.length);
-    if (mounted) _bao('Đã thay thế toàn bộ văn bản.');
+    if (mounted) _bao(Ch.daThayTheToanBoVanBan(ngonNguHienTai.value));
   }
 
   /// Cho khoảng chữ [batDau, ketThuc) — thường là TOÀN BỘ văn bản vừa được
@@ -14806,7 +14805,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Future<void> _thayTheDoanDangChon(TextSelection vung, String vanBanMoi) async {
     final vbHienTai = _boDieuKhien.text;
     if (vung.start < 0 || vung.end > vbHienTai.length || vung.start >= vung.end) {
-      _bao('Đoạn văn bản gốc đã thay đổi, không thể thay thế. Vui lòng thử lại.');
+      _bao(Ch.doanVanBanGocDaThayDoi(ngonNguHienTai.value));
       return;
     }
     _luuDiemMoc();
@@ -14818,7 +14817,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _neo = viTriConTroMoi;
     await _luuVanBan();
     if (mounted) _nhapNhayToanVan(vung.start, viTriConTroMoi);
-    if (mounted) _bao('Đã thay thế đoạn văn bản đã chọn.');
+    if (mounted) _bao(Ch.daThayTheDoanVanBanDaChon(ngonNguHienTai.value));
   }
 
   /// Dịch mọi "viTri" trong [kq] thêm [dich] — dùng khi "Kiểm tra lỗi chính
@@ -14856,7 +14855,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     try {
       anh = await ImagePicker().pickImage(source: ImageSource.camera);
     } catch (e) {
-      if (mounted) _bao('Không mở được camera: $e');
+      if (mounted) _bao(Ch.khongMoDuocCamera(ngonNguHienTai.value, '$e'));
       return;
     }
     if (anh == null) return; // người dùng huỷ chụp (bấm lùi lại/đóng camera).
@@ -14865,12 +14864,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     try {
       bytes = await anh.readAsBytes();
     } catch (e) {
-      if (mounted) _bao('Không đọc được ảnh vừa chụp: $e');
+      if (mounted) _bao(Ch.khongDocDuocAnhVuaChup(ngonNguHienTai.value, '$e'));
       return;
     }
     if (bytes.length > _gioiHanTepAnhByte) {
       final soMB = (bytes.length / (1024 * 1024)).toStringAsFixed(1);
-      _bao('Ảnh vừa chụp nặng ${soMB}MB, vượt quá 15MB cho phép.');
+      _bao(Ch.anhVuaChupNangQuaMB(ngonNguHienTai.value, soMB));
       return;
     }
 
@@ -14915,7 +14914,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
     if (loi != null || vanBanKetQua == null || vanBanKetQua.trim().isEmpty) {
-      _bao('Chuyển ảnh thất bại: ${loi ?? "không có nội dung trả về."}');
+      _bao(Ch.chuyenAnhThatBai(ngonNguHienTai.value, loi ?? 'không có nội dung trả về.'));
       return;
     }
 
@@ -14991,7 +14990,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   await Clipboard.setData(
                     ClipboardData(text: _oKetQuaFileAmThanh?.text ?? ''),
                   );
-                  if (mounted) _bao('Đã sao chép.');
+                  if (mounted) _bao(Ch.daSaoChepToast(ngonNguHienTai.value));
                 },
                 child: Text(Ch.saoChepTatCa(ngonNguHienTai.value)),
               ),
