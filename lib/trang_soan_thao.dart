@@ -61,6 +61,7 @@ import 'lua_chon_phim_tat.dart';
 import 'luu_va_chia_se_tep.dart';
 import 'modal_chia_se_tep.dart';
 import 'modal_thong_tin_muc.dart';
+import 'tai_ve_ghi_chu.dart';
 import 'dinh_dang_doan_van_tu_dien.dart';
 import 'man_hinh_cai_dat.dart';
 import 'man_hinh_thu_muc.dart';
