@@ -40,13 +40,13 @@ const _ngoiNhaChung = '#ngoi-nha-chung#';
 /// (YÊU CẦU MỚI) Dòng menu có icon SÁT NGHĨA đứng trước chữ — dùng chung
 /// cho mọi `PopupMenuButton` trong màn hình này (menu trên cùng, menu
 /// "..." của từng thư mục/tệp).
-PopupMenuItem<T> _mucMenuIcon<T>(T value, IconData icon, String chu) {
+PopupMenuItem<T> _mucMenuIcon<T>(T value, IconData icon, String chu, {Color? mauChu}) {
   return PopupMenuItem<T>(
     value: value,
     child: Row(children: [
       Icon(icon, size: 18, color: const Color(0xFF5F6368)),
       const SizedBox(width: 10),
-      Text(chu),
+      Text(chu, style: mauChu != null ? TextStyle(color: mauChu) : null),
     ]),
   );
 }
@@ -708,7 +708,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   /// hiệu ứng/luồng của "Vị trí Tệp đang soạn thảo").
   Future<void> _moThungRac() async {
     final ketQua = await Navigator.of(context).push<({bool laThuMuc, String id})>(
-      MaterialPageRoute(builder: (_) => ModalThungRac(kho: _kho)),
+      MaterialPageRoute(builder: (_) => ModalThungRac(kho: _kho, laDamMay: _laKhoDamMay)),
     );
     if (ketQua == null || !mounted) return;
     final thuMucId = ketQua.laThuMuc
@@ -1544,7 +1544,8 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                     _mucMenuIcon(3, Icons.download_outlined, 'Tải Thư mục này về thiết bị'),
                     _mucMenuIcon(4, Icons.info_outline, 'Thông tin thư mục này'),
                     const PopupMenuDivider(),
-                    _mucMenuIcon(5, Icons.delete_outline, 'Thùng rác Nội bộ'),
+                    _mucMenuIcon(5, Icons.delete_outline,
+                        _laKhoDamMay ? 'Thùng rác Đám mây' : 'Thùng rác Nội bộ'),
                     _mucMenuIcon(7, Icons.search, 'Tìm kiếm trong này'),
                   ];
                 },
@@ -1727,7 +1728,8 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
           // (YÊU CẦU MỚI) CHỈ dành cho tệp trên Bộ nhớ đám mây — tệp nội bộ
           // không có nơi công khai để trỏ link tới.
           if (_laKhoDamMay)
-            _mucMenuIcon('chia_se_link', Icons.link, 'Chia sẻ tệp bằng đường link'),
+            _mucMenuIcon('chia_se_link', Icons.link, 'Chia sẻ tệp bằng đường link',
+                mauChu: const Color(0xFF0D47A1)),
           _mucMenuIcon('mau', Icons.palette_outlined, 'Chọn màu Tên Tệp'),
           _mucMenuIcon('thong_tin', Icons.info_outline, 'Thông tin tệp này'),
           _mucMenuIcon('xoa', Icons.delete_outline, 'Chuyển vào thùng rác'),
@@ -2118,7 +2120,8 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                                 _mucMenuIcon('tai_ve', Icons.download_outlined, 'Tải về'),
                                 if (_laKhoDamMay)
                                   _mucMenuIcon('chia_se_link', Icons.link,
-                                      'Chia sẻ tệp bằng đường link'),
+                                      'Chia sẻ tệp bằng đường link',
+                                      mauChu: const Color(0xFF0D47A1)),
                                 _mucMenuIcon('mau', Icons.palette_outlined, 'Chọn màu Tên Tệp'),
                                 _mucMenuIcon(
                                     'thong_tin', Icons.info_outline, 'Thông tin tệp này'),

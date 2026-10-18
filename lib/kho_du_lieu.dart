@@ -798,6 +798,11 @@ class KhoDuLieuDamMay extends KhoDuLieu {
             'noiDung': g.noiDung,
             'chuSoHuu': FirebaseAuth.instance.currentUser?.email ?? '',
             'idTepGoc': g.id,
+            // (YÊU CẦU MỚI) `thoiGianXoa != null` nghĩa là tệp đang ở
+            // Thùng rác Đám mây — trang xem công khai không được hiển thị
+            // nội dung lúc này. Ghi lại ĐÚNG mỗi lần lưu (không chỉ lúc
+            // chuyển vào/ra thùng rác) nên luôn khớp trạng thái thật.
+            'khaDung': g.thoiGianXoa == null,
           });
           coGhi = true;
         }
@@ -812,6 +817,19 @@ class KhoDuLieuDamMay extends KhoDuLieu {
 
     if (coGhi) await batch.commit();
     _chupAnh();
+  }
+
+  /// (YÊU CẦU MỚI — "Ngừng chia sẻ - Thu hồi Link") Xoá hẳn document công
+  /// khai `chiaSeTep/<mã>` VÀ bỏ `maChiaSe` khỏi tệp — lần sau bấm "Chia sẻ
+  /// tệp bằng đường link" lại sẽ sinh MÃ MỚI (link cũ không bao giờ sống
+  /// lại). Gọi `luu()` ngay sau để đồng bộ việc bỏ `maChiaSe` lên
+  /// `_colGhiChu` luôn.
+  Future<void> ngungChiaSeTep(GhiChuFile ghiChu) async {
+    final maCu = ghiChu.maChiaSe;
+    if (maCu == null) return;
+    ghiChu.maChiaSe = null;
+    await _db.collection('chiaSeTep').doc(maCu).delete();
+    await luu();
   }
 
   String get _khoaCache => '$_tienToKhoaCache$uid';

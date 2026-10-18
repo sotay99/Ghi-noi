@@ -23,9 +23,17 @@ typedef _MucThungRac = ({
 /// bên gọi (`ManHinhThuMuc`) nhảy thẳng tới đó; trả về `null` nếu chỉ đóng
 /// modal bình thường (bấm nút đóng, hoặc chỉ bấm "Đã hiểu").
 class ModalThungRac extends StatefulWidget {
-  const ModalThungRac({super.key, required this.kho});
+  const ModalThungRac({super.key, required this.kho, this.laDamMay = false});
 
   final KhoDuLieu kho;
+
+  /// (YÊU CẦU MỚI — "Thùng rác Đám mây") `true` khi [kho] là
+  /// `KhoDuLieuDamMay` — chỉ đổi chữ nghĩa hiển thị ("Nội bộ" → "Đám mây")
+  /// và màu nền; dữ liệu đọc/ghi vẫn luôn là CHÍNH `kho` được truyền vào
+  /// (mỗi `KhoDuLieu`/`KhoDuLieuDamMay` tự giữ `thuMuc`/`ghiChu` riêng của
+  /// nó, nên thùng rác của 2 bộ nhớ đã tách biệt tự nhiên theo đối tượng,
+  /// không cần thêm trường "nguồn" nào).
+  final bool laDamMay;
 
   @override
   State<ModalThungRac> createState() => _ModalThungRacState();
@@ -33,6 +41,9 @@ class ModalThungRac extends StatefulWidget {
 
 class _ModalThungRacState extends State<ModalThungRac> {
   KhoDuLieu get _kho => widget.kho;
+  bool get _laDamMay => widget.laDamMay;
+  String get _tenBoNho => _laDamMay ? 'Bộ nhớ Đám mây' : 'Bộ nhớ Nội bộ';
+  String get _tenThungRac => _laDamMay ? 'Thùng rác Đám mây' : 'Thùng rác Bộ nhớ Nội bộ';
 
   /// Địa chỉ đầy đủ (người đọc được) của một thư mục, dùng để báo "đã khôi
   /// phục về vị trí ..." — ví dụ "Bộ nhớ Nội bộ / Thư mục A / Thư mục con".
@@ -45,7 +56,7 @@ class _ModalThungRacState extends State<ModalThungRac> {
       ds.add(t.ten);
       hienTai = t.chaId;
     }
-    ds.add('Bộ nhớ Nội bộ');
+    ds.add(_tenBoNho);
     return ds.reversed.join(' / ');
   }
 
@@ -210,6 +221,8 @@ class _ModalThungRacState extends State<ModalThungRac> {
         kho: _kho,
         onMoMenu: _moMenuMuc,
         dinhDangThoiGian: _dinhDangThoiGian,
+        tenThungRac: _tenThungRac,
+        laDamMay: _laDamMay,
       ),
     ));
     if (mounted) setState(() {});
@@ -219,8 +232,10 @@ class _ModalThungRacState extends State<ModalThungRac> {
   Widget build(BuildContext context) {
     final ds = _kho.mucTrongThungRac;
     return Scaffold(
+      backgroundColor: _laDamMay ? const Color(0xFFE6F4EA) : null,
       appBar: AppBar(
-        title: const Text('Thùng rác Bộ nhớ Nội bộ'),
+        backgroundColor: _laDamMay ? const Color(0xFFE6F4EA) : null,
+        title: Text(_tenThungRac),
         leading: IconButton(
           icon: const Icon(Icons.close),
           tooltip: 'Đóng',
@@ -311,11 +326,15 @@ class _ManHinhTimKiemThungRac extends StatefulWidget {
     required this.kho,
     required this.onMoMenu,
     required this.dinhDangThoiGian,
+    required this.tenThungRac,
+    required this.laDamMay,
   });
 
   final KhoDuLieu kho;
   final void Function(BuildContext, _MucThungRac) onMoMenu;
   final String Function(DateTime) dinhDangThoiGian;
+  final String tenThungRac;
+  final bool laDamMay;
 
   @override
   State<_ManHinhTimKiemThungRac> createState() => _ManHinhTimKiemThungRacState();
@@ -356,6 +375,7 @@ class _ManHinhTimKiemThungRacState extends State<_ManHinhTimKiemThungRac> {
     final coGoTim = _oTimKiem.text.trim().isNotEmpty;
     final ketQua = _ketQua();
     return Scaffold(
+      backgroundColor: widget.laDamMay ? const Color(0xFFE6F4EA) : null,
       body: SafeArea(
         child: Column(
           children: [
@@ -363,9 +383,9 @@ class _ManHinhTimKiemThungRacState extends State<_ManHinhTimKiemThungRac> {
               color: const Color(0xFFF1F3F4),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                child: const Text(
-                  'Tìm kiếm trong "Thùng rác bộ nhớ nội bộ"',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                child: Text(
+                  'Tìm kiếm trong "${widget.tenThungRac}"',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

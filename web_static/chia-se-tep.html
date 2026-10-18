@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Shared file — Flowrite</title>
+<link rel="icon" type="image/png" href="/favicon.png" />
 <meta name="robots" content="noindex" />
 <style>
   :root { color-scheme: light; }
@@ -22,7 +23,9 @@
   header h1 {
     flex: 1 1 auto; min-width: 0; font-size: 17px; font-weight: 600;
     margin: 0; overflow-wrap: anywhere; word-break: break-word;
+    display: flex; align-items: center; gap: 10px;
   }
+  header h1 img { width: 26px; height: 26px; flex: 0 0 auto; border-radius: 6px; }
   .info-btn {
     flex: 0 0 auto; width: 32px; height: 32px; border-radius: 50%;
     border: 1.5px solid #5f6368; background: #fff; color: #5f6368;
@@ -41,13 +44,19 @@
   .state-msg { color: #5f6368; font-size: 14px; padding: 24px 0; }
   footer {
     position: fixed; left: 0; right: 0; bottom: 0;
-    background: #1a73e8; color: #fff; text-align: center;
+    background: #202124; color: #fff; text-align: center;
     padding: 10px 16px; z-index: 3;
   }
   footer a {
-    color: #fff; font-weight: 700; text-decoration: none; font-size: 14.5px;
+    display: inline-block; text-decoration: none; font-size: 14.5px;
+    padding: 8px 18px; border-radius: 20px;
+    background: linear-gradient(90deg, #34a853, #fbbc04);
   }
-  footer .view-only { display: block; font-size: 11.5px; opacity: 0.85; margin-top: 2px; }
+  footer a span {
+    color: #ffffff; font-weight: 800;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+  }
+  footer .view-only { display: block; font-size: 11.5px; opacity: 0.85; margin-top: 6px; color: #fff; }
   .menu {
     position: fixed; top: 54px; right: 12px; background: #fff;
     border: 1px solid #dadce0; border-radius: 8px;
@@ -67,20 +76,20 @@
 </head>
 <body>
   <header>
-    <h1 id="file-title">Loading…</h1>
+    <h1 id="file-title"><img src="/icons/Icon-192.png" alt="" /><span id="file-title-text">Loading…</span></h1>
     <button class="info-btn" id="info-btn" aria-label="Info" title="Info">i</button>
   </header>
   <main>
     <div id="content" class="state-msg">Loading…</div>
   </main>
   <footer>
-    <a href="https://flowrite.pro">Go to Flowrite.pro homepage</a>
+    <a href="https://flowrite.pro" target="_blank" rel="noopener">Go to <span>Flowrite.pro</span> homepage</a>
     <span class="view-only">View only — cannot be edited</span>
   </footer>
   <div class="menu" id="menu">
-    <button id="btn-download">Download to device</button>
+    <button id="btn-download">&#11015; Download to device</button>
     <div class="row" id="row-owner">Owner: —</div>
-    <div class="row" id="row-info">File info</div>
+    <div class="row" id="row-info">Words: —</div>
   </div>
 
 <script>
@@ -91,7 +100,7 @@
   var URL_DOC = 'https://firestore.googleapis.com/v1/projects/' + PROJECT +
       '/databases/(default)/documents/chiaSeTep/' + encodeURIComponent(ma);
 
-  var elTitle = document.getElementById('file-title');
+  var elTitleText = document.getElementById('file-title-text');
   var elContent = document.getElementById('content');
   var elMenu = document.getElementById('menu');
   var elInfoBtn = document.getElementById('info-btn');
@@ -100,7 +109,7 @@
   var elBtnDownload = document.getElementById('btn-download');
 
   var tenHienTai = '';
-  var noiDungHienTai = '';
+  var noiDungHienTai = ''; // văn bản THẬT, đã cắt bỏ hậu tố định dạng thủ công
   var chuSoHuuHienTai = '';
   var daTaiLanDau = false;
 
@@ -110,15 +119,41 @@
     return '';
   }
 
-  function render(ten, noiDung, chuSoHuu) {
-    tenHienTai = ten;
-    noiDungHienTai = noiDung;
-    chuSoHuuHienTai = chuSoHuu;
-    document.title = ten + ' — Flowrite';
-    elTitle.textContent = ten;
-    elContent.textContent = noiDung;
-    elContent.classList.remove('state-msg');
-    elRowOwner.innerHTML = 'Owner: <b>' + escapeHtml(chuSoHuu || 'unknown') + '</b>';
+  // Y chang `_diemBatDauDinhDangThuCong` ở `lib/trang_soan_thao.dart` —
+  // tách phần văn bản hiển thị ra khỏi khối định dạng thủ công (base64
+  // JSON) gắn ở cuối. Không tìm thấy mốc này thì toàn bộ là văn bản, không
+  // có định dạng gì thêm.
+  var MOC_DINH_DANG = '\n§FLOWRITE-DINHDANGTHUCONG-V1§';
+
+  function tachDinhDangThuCong(raw) {
+    var vt = raw.indexOf(MOC_DINH_DANG);
+    if (vt < 0) return { text: raw, vungs: [] };
+    var text = raw.substring(0, vt);
+    var b64 = raw.substring(vt + MOC_DINH_DANG.length);
+    var vungs = [];
+    try {
+      var json = decodeURIComponent(
+        Array.prototype.map
+          .call(atob(b64), function (c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+          })
+          .join('')
+      );
+      var ds = JSON.parse(json);
+      if (Array.isArray(ds)) vungs = ds;
+    } catch (e) {
+      vungs = [];
+    }
+    return { text: text, vungs: vungs };
+  }
+
+  function argbToCss(argb) {
+    var hex = (argb & 0xffffff).toString(16);
+    while (hex.length < 6) hex = '0' + hex;
+    var alpha = ((argb >>> 24) & 0xff) / 255;
+    return 'rgba(' + parseInt(hex.substr(0, 2), 16) + ',' +
+      parseInt(hex.substr(2, 2), 16) + ',' + parseInt(hex.substr(4, 2), 16) +
+      ',' + alpha.toFixed(3) + ')';
   }
 
   function escapeHtml(s) {
@@ -127,8 +162,82 @@
     });
   }
 
+  // Dựng lại HTML có định dạng (đậm/nghiêng/gạch chân/gạch ngang/màu chữ/
+  // màu nền) từ [text] + danh sách vùng [vungs] — mỗi vùng {vt, kt, dam,
+  // ngh, gc, gn, mc, mn} y chang `_VungDinhDangThuCong.toJson()`. Không
+  // đụng tới `treMu`/`treChan` (chữ trên/dưới) ở trang xem này — hiếm dùng,
+  // bỏ qua an toàn hơn là hiển thị sai kích cỡ.
+  function renderNoiDungDinhDang(text, vungs) {
+    if (!vungs || vungs.length === 0) {
+      elContent.textContent = text;
+      return;
+    }
+    var kieu = new Array(text.length).fill(null);
+    for (var i = 0; i < vungs.length; i++) {
+      var v = vungs[i];
+      var batDau = v.vt, ketThuc = v.kt;
+      if (typeof batDau !== 'number' || typeof ketThuc !== 'number') continue;
+      batDau = Math.max(0, batDau);
+      ketThuc = Math.min(text.length, ketThuc);
+      for (var p = batDau; p < ketThuc; p++) {
+        kieu[p] = v;
+      }
+    }
+    var html = '';
+    var i2 = 0;
+    while (i2 < text.length) {
+      var v2 = kieu[i2];
+      var j = i2 + 1;
+      while (j < text.length && kieu[j] === v2) j++;
+      var doan = escapeHtml(text.substring(i2, j)).replace(/\n/g, '<br>');
+      if (v2) {
+        var styleParts = [];
+        if (v2.mc != null) styleParts.push('color:' + argbToCss(v2.mc));
+        if (v2.mn != null) styleParts.push('background-color:' + argbToCss(v2.mn));
+        var tag = doan;
+        if (v2.dam) tag = '<b>' + tag + '</b>';
+        if (v2.ngh) tag = '<i>' + tag + '</i>';
+        if (v2.gc && v2.gn) tag = '<span style="text-decoration:underline line-through">' + tag + '</span>';
+        else if (v2.gc) tag = '<u>' + tag + '</u>';
+        else if (v2.gn) tag = '<s>' + tag + '</s>';
+        if (styleParts.length) tag = '<span style="' + styleParts.join(';') + '">' + tag + '</span>';
+        html += tag;
+      } else {
+        html += doan;
+      }
+      i2 = j;
+    }
+    elContent.innerHTML = html;
+  }
+
+  function capNhatThongTinTep() {
+    var vb = noiDungHienTai || '';
+    var soTu = vb.trim() === '' ? 0 : (vb.match(/\S+/g) || []).length;
+    var soKyTuCoDauCach = vb.length;
+    var soKyTuKhongDauCach = vb.replace(/\s/g, '').length;
+    var soDoan = vb === '' ? 0 : (1 + (vb.match(/\n/g) || []).length);
+    elRowInfo.innerHTML =
+      'Words: <b>' + soTu + '</b><br>' +
+      'Characters (with spaces): <b>' + soKyTuCoDauCach + '</b><br>' +
+      'Characters (no spaces): <b>' + soKyTuKhongDauCach + '</b><br>' +
+      'Paragraphs: <b>' + soDoan + '</b>';
+  }
+
+  function render(ten, noiDungRaw, chuSoHuu) {
+    var tach = tachDinhDangThuCong(noiDungRaw);
+    tenHienTai = ten;
+    noiDungHienTai = tach.text;
+    chuSoHuuHienTai = chuSoHuu;
+    document.title = ten + ' — Flowrite';
+    elTitleText.textContent = ten;
+    renderNoiDungDinhDang(tach.text, tach.vungs);
+    elContent.classList.remove('state-msg');
+    elRowOwner.innerHTML = 'Owner: <b>' + escapeHtml(chuSoHuu || 'unknown') + '</b>';
+    capNhatThongTinTep();
+  }
+
   function showError(msg) {
-    elTitle.textContent = 'Not available';
+    elTitleText.textContent = 'Not available';
     elContent.textContent = msg;
     elContent.classList.add('state-msg');
   }
@@ -141,6 +250,8 @@
       })
       .then(function (doc) {
         var f = doc.fields || {};
+        var khaDung = !f.khaDung || f.khaDung.booleanValue !== false;
+        if (!khaDung) throw new Error('not-available');
         render(
           fsValueToString(f.ten) || 'Untitled',
           fsValueToString(f.noiDung),
@@ -148,8 +259,11 @@
         );
         daTaiLanDau = true;
       })
-      .catch(function () {
-        if (!daTaiLanDau) {
+      .catch(function (e) {
+        if (e && e.message === 'not-available') {
+          showError('This link is not available.');
+          daTaiLanDau = true;
+        } else if (!daTaiLanDau) {
           showError('This link is invalid, or the file is no longer shared.');
         }
       });
@@ -185,19 +299,6 @@
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     elMenu.classList.remove('open');
-  });
-
-  elRowInfo.addEventListener('click', function () {
-    var vb = noiDungHienTai || '';
-    var soTu = vb.trim() === '' ? 0 : (vb.match(/\S+/g) || []).length;
-    var soKyTuCoDauCach = vb.length;
-    var soKyTuKhongDauCach = vb.replace(/\s/g, '').length;
-    var soDoan = vb === '' ? 0 : (1 + (vb.match(/\n/g) || []).length);
-    elRowInfo.innerHTML =
-      'Words: <b>' + soTu + '</b><br>' +
-      'Characters (with spaces): <b>' + soKyTuCoDauCach + '</b><br>' +
-      'Characters (no spaces): <b>' + soKyTuKhongDauCach + '</b><br>' +
-      'Paragraphs: <b>' + soDoan + '</b>';
   });
 })();
 </script>
