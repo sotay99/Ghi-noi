@@ -11,8 +11,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'cai_dat.dart';
+import 'chuoi_da_ngon_ngu.dart';
 import 'kho_du_lieu.dart';
 import 'mo_hinh.dart';
+import 'ngon_ngu.dart';
 import 'thong_bao_giua.dart';
 
 /// (YÊU CẦU MỚI) Quyết định kho + id ghi chú sẽ mở ngay khi app vừa khởi
@@ -199,7 +201,7 @@ class _ManHinhChonKhoiDongState extends State<_ManHinhChonKhoiDong> {
     if (uid == null) {
       hienThongBaoGiua(
         context,
-        'Cần đăng nhập Google trước (menu "Tài khoản và Cài đặt" ở trang soạn thảo).',
+        Ch.canDangNhapGoogleTruoc(ngonNguHienTai.value),
       );
       return;
     }
@@ -214,16 +216,16 @@ class _ManHinhChonKhoiDongState extends State<_ManHinhChonKhoiDong> {
     } on ChuaCoMangVaChuaCoCacheOffline {
       if (!mounted) return;
       setState(() => _dangTaiDamMay = false);
-      hienThongBaoGiua(context, 'Vui lòng kết nối internet.');
+      hienThongBaoGiua(context, Ch.vuiLongKetNoiInternet(ngonNguHienTai.value));
     } catch (e) {
       if (!mounted) return;
       setState(() => _dangTaiDamMay = false);
-      hienThongBaoGiua(context, 'Không mở được Bộ nhớ trên đám mây: $e');
+      hienThongBaoGiua(context, Ch.khongMoDuocBoNhoDamMay(ngonNguHienTai.value, e));
     }
   }
 
   void _baoDangNangCap() {
-    hienThongBaoGiua(context, 'Tính năng đang nâng cấp');
+    hienThongBaoGiua(context, Ch.tinhNangDangNangCap(ngonNguHienTai.value));
   }
 
   /// Hộp thoại đặt tên khi TẠO MỚI (thư mục hoặc tệp) — Y HỆT
@@ -261,7 +263,7 @@ class _ManHinhChonKhoiDongState extends State<_ManHinhChonKhoiDong> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(null),
-                child: const Text('Huỷ'),
+                child: Text(Ch.huy(ngonNguHienTai.value)),
               ),
               FilledButton(
                 onPressed: () {
@@ -272,7 +274,7 @@ class _ManHinhChonKhoiDongState extends State<_ManHinhChonKhoiDong> {
                   }
                   Navigator.of(ctx).pop(bo.text.trim());
                 },
-                child: const Text('Lưu'),
+                child: Text(Ch.luu(ngonNguHienTai.value)),
               ),
             ],
           );
@@ -284,7 +286,8 @@ class _ManHinhChonKhoiDongState extends State<_ManHinhChonKhoiDong> {
   Future<void> _taoThuMucMoi() async {
     final kho = _kho!;
     final goiY = kho.tenThuMucGoiY(_thuMucHienTaiId);
-    final ten = await _hoiTenMoiTao(tieuDe: 'Thư mục mới', tenGoiY: goiY);
+    final ten = await _hoiTenMoiTao(
+        tieuDe: Ch.thuMucMoiTieuDe(ngonNguHienTai.value), tenGoiY: goiY);
     if (ten == null || !mounted) return;
     final t = kho.taoThuMucMoi(_thuMucHienTaiId);
     t.ten = ten;
@@ -295,7 +298,8 @@ class _ManHinhChonKhoiDongState extends State<_ManHinhChonKhoiDong> {
   Future<void> _taoTepMoi() async {
     final kho = _kho!;
     final goiY = kho.tenGhiChuGoiY(_thuMucHienTaiId);
-    final ten = await _hoiTenMoiTao(tieuDe: 'Ghi chú mới', tenGoiY: goiY);
+    final ten = await _hoiTenMoiTao(
+        tieuDe: Ch.ghiChuMoiTieuDe(ngonNguHienTai.value), tenGoiY: goiY);
     if (ten == null || !mounted) return;
     final g = kho.taoGhiChuMoi(_thuMucHienTaiId);
     g.ten = ten;
@@ -321,7 +325,9 @@ class _ManHinhChonKhoiDongState extends State<_ManHinhChonKhoiDong> {
           icon: const Icon(Icons.arrow_back),
           onPressed: _lui,
         ),
-        title: Text(laChonThuMuc ? 'Chọn thư mục' : 'Chọn tệp'),
+        title: Text(laChonThuMuc
+            ? Ch.chonThuMucTieuDe(ngonNguHienTai.value)
+            : Ch.chonTep(ngonNguHienTai.value)),
         actions: [
           // (SỬA LỖI — icon biến mất trên bản dựng thật) Dùng emoji (Text)
           // thay `Icon(IconData)` — icon Material không được dùng ở BẤT KỲ
@@ -330,13 +336,13 @@ class _ManHinhChonKhoiDongState extends State<_ManHinhChonKhoiDong> {
           if (!_laNgoiNhaChung)
             IconButton(
               icon: const Text('📁', style: TextStyle(fontSize: 20)),
-              tooltip: 'Tạo thư mục mới',
+              tooltip: Ch.taoThuMucMoi(ngonNguHienTai.value),
               onPressed: _taoThuMucMoi,
             ),
           if (!_laNgoiNhaChung && !laChonThuMuc)
             IconButton(
               icon: const Text('📝', style: TextStyle(fontSize: 20)),
-              tooltip: 'Tạo tệp văn bản mới',
+              tooltip: Ch.taoTepVanBanMoi(ngonNguHienTai.value),
               onPressed: _taoTepMoi,
             ),
         ],
@@ -357,16 +363,14 @@ class _ManHinhChonKhoiDongState extends State<_ManHinhChonKhoiDong> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'Mỗi khi khởi động lại App, sẽ vào tệp trống (không có '
-                    'ký tự) trong thư mục được chọn, nếu không có tệp nào '
-                    'trống thì App sẽ tự động tạo tệp trống.',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+                  Text(
+                    Ch.giaiThichChonThuMucKhoiDong(ngonNguHienTai.value),
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
                   ),
                   const SizedBox(height: 8),
                   FilledButton(
                     onPressed: _chonThuMucNay,
-                    child: const Text('Chọn thư mục này'),
+                    child: Text(Ch.chonThuMucNayNut(ngonNguHienTai.value)),
                   ),
                 ],
               ),
@@ -381,7 +385,7 @@ class _ManHinhChonKhoiDongState extends State<_ManHinhChonKhoiDong> {
       children: [
         ListTile(
           leading: Icon(Icons.smartphone, color: Colors.blue.shade700),
-          title: const Text('Bộ nhớ Nội bộ'),
+          title: Text(Ch.boNhoNoiBo(ngonNguHienTai.value)),
           onTap: () => _moThuMuc(widget.khoNoiBo, thuMucGoc),
         ),
         ListTile(
@@ -392,12 +396,12 @@ class _ManHinhChonKhoiDongState extends State<_ManHinhChonKhoiDong> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : Icon(Icons.cloud_outlined, color: Colors.lightBlue.shade400),
-          title: const Text('Bộ nhớ trên đám mây'),
+          title: Text(Ch.boNhoTrenDamMay(ngonNguHienTai.value)),
           onTap: _dangTaiDamMay ? null : _vaoBoNhoDamMay,
         ),
         ListTile(
           leading: Icon(Icons.folder_shared_outlined, color: Colors.green.shade600),
-          title: const Text('Bộ nhớ được chia sẻ với bạn'),
+          title: Text(Ch.boNhoDuocChiaSeVoiBan(ngonNguHienTai.value)),
           onTap: _baoDangNangCap,
         ),
       ],
@@ -418,8 +422,8 @@ class _ManHinhChonKhoiDongState extends State<_ManHinhChonKhoiDong> {
           // phải "trống hoàn toàn" (có thể còn tệp bên trong, chỉ là
           // không liên quan tới việc chọn thư mục ở đây).
           laChonTep
-              ? 'Thư mục trống'
-              : 'Trong này không còn thư mục con nào nữa',
+              ? Ch.thuMucTrong(ngonNguHienTai.value)
+              : Ch.khongConThuMucConNaoNua(ngonNguHienTai.value),
           style: const TextStyle(color: Color(0xFF9AA0A6)),
         ),
       );

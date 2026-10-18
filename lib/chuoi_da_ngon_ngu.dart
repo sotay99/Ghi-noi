@@ -1756,6 +1756,42 @@ class Ch {
 
   static String chuyenHoaTheGhiAmNayThanhVanBan(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Chuyển hoá thẻ ghi âm này thành văn bản' : 'Transcribe this recording card to text';
+
+  // -------------------------------------- Màn "Chọn thư mục/tệp" khi khởi động
+  static String canDangNhapGoogleTruoc(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Cần đăng nhập Google trước (menu "Tài khoản và Cài đặt" ở trang soạn thảo).'
+      : 'You need to sign in with Google first (see the "Account and Settings" menu on the editor screen).';
+
+  static String vuiLongKetNoiInternet(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Vui lòng kết nối internet.' : 'Please connect to the internet.';
+
+  static String khongMoDuocBoNhoDamMay(NgonNgu nn, Object e) => nn == NgonNgu.vi
+      ? 'Không mở được Bộ nhớ trên đám mây: $e'
+      : 'Could not open Cloud storage: $e';
+
+  static String thuMucMoiTieuDe(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Thư mục mới' : 'New folder';
+
+  static String ghiChuMoiTieuDe(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Ghi chú mới' : 'New note';
+
+  static String chonThuMucTieuDe(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chọn thư mục' : 'Choose folder';
+
+  static String giaiThichChonThuMucKhoiDong(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Mỗi khi khởi động lại App, sẽ vào tệp trống (không có ký tự) trong '
+          'thư mục được chọn, nếu không có tệp nào trống thì App sẽ tự động '
+          'tạo tệp trống.'
+      : 'Every time the app restarts, it opens an empty note (no characters) '
+          'inside the chosen folder; if there is no empty note, the app will '
+          'automatically create one.';
+
+  static String chonThuMucNayNut(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chọn thư mục này' : 'Choose this folder';
+
+  static String khongConThuMucConNaoNua(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Trong này không còn thư mục con nào nữa'
+      : 'There are no more subfolders in here';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt
