@@ -281,8 +281,6 @@ class Ch {
       nn == NgonNgu.vi ? 'Donate ủng hộ-cảm ơn tác giả' : 'Donate to support the author';
 
   // ------------------------------------------------------------ Thùng rác
-  static String dong(NgonNgu nn) => nn == NgonNgu.vi ? 'Đóng' : 'Close';
-
   static String timKiemTrongThungRac(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Tìm kiếm trong thùng rác' : 'Search in trash';
 

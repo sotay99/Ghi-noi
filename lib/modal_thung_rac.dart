@@ -5,9 +5,11 @@
 
 import 'package:flutter/material.dart';
 
+import 'chuoi_da_ngon_ngu.dart';
 import 'kho_du_lieu.dart';
 import 'mo_hinh.dart';
 import 'modal_thong_tin_muc.dart';
+import 'ngon_ngu.dart';
 
 typedef _MucThungRac = ({
   bool laThuMuc,
@@ -93,19 +95,19 @@ class _ModalThungRacState extends State<ModalThungRac> {
           children: [
             ListTile(
               leading: const Icon(Icons.restore_outlined),
-              title: const Text('Khôi phục về vị trí cũ'),
+              title: Text(Ch.khoiPhucVeViTriCu(ngonNguHienTai.value)),
               onTap: () => Navigator.of(ctx).pop('khoi_phuc'),
             ),
             ListTile(
               leading: Icon(Icons.delete_forever_outlined,
                   color: Colors.red.shade600),
-              title: Text('Xoá vĩnh viễn',
+              title: Text(Ch.xoaVinhVien(ngonNguHienTai.value),
                   style: TextStyle(color: Colors.red.shade600)),
               onTap: () => Navigator.of(ctx).pop('xoa_vinh_vien'),
             ),
             ListTile(
               leading: const Icon(Icons.info_outline),
-              title: const Text('Thông tin chi tiết'),
+              title: Text(Ch.thongTinChiTiet(ngonNguHienTai.value)),
               onTap: () => Navigator.of(ctx).pop('thong_tin'),
             ),
           ],
@@ -127,16 +129,16 @@ class _ModalThungRacState extends State<ModalThungRac> {
       context: context,
       builder: (ctx) => AlertDialog(
         icon: const Icon(Icons.restore_outlined, size: 28),
-        title: const Text('Khôi phục?'),
-        content: Text('Khôi phục "${muc.ten}" về vị trí cũ?'),
+        title: Text(Ch.khoiPhucHoi(ngonNguHienTai.value)),
+        content: Text(Ch.khoiPhucVeViTriCuHoi(ngonNguHienTai.value, muc.ten)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Không'),
+            child: Text(Ch.khong(ngonNguHienTai.value)),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Khôi phục'),
+            child: Text(Ch.khoiPhuc(ngonNguHienTai.value)),
           ),
         ],
       ),
@@ -156,17 +158,16 @@ class _ModalThungRacState extends State<ModalThungRac> {
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         icon: const Icon(Icons.check_circle_outline, color: Colors.green, size: 28),
-        title: Text('${muc.laThuMuc ? "Thư mục" : "Tệp"} "${muc.ten}" '
-            'đã được khôi phục thành công'),
-        content: Text('Ở tại vị trí: $diaChi'),
+        title: Text(Ch.daKhoiPhucThanhCong(ngonNguHienTai.value, muc.laThuMuc, muc.ten)),
+        content: Text(Ch.oTaiViTri(ngonNguHienTai.value, diaChi)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Đã hiểu'),
+            child: Text(Ch.daHieu(ngonNguHienTai.value)),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Đến vị trí vừa được khôi phục'),
+            child: Text(Ch.denViTriVuaDuocKhoiPhuc(ngonNguHienTai.value)),
           ),
         ],
       ),
@@ -181,22 +182,20 @@ class _ModalThungRacState extends State<ModalThungRac> {
       context: context,
       builder: (ctx) => AlertDialog(
         icon: const Icon(Icons.delete_forever_outlined, size: 28),
-        title: const Text('Xoá vĩnh viễn?'),
+        title: Text(Ch.xoaVinhVienHoi(ngonNguHienTai.value)),
         content: Text(
-          'Xoá vĩnh viễn "${muc.ten}"'
-          '${muc.laThuMuc ? " và toàn bộ nội dung bên trong nó" : ""}. '
-          'Không thể khôi phục lại được nữa. Bạn có chắc chắn không?',
+          Ch.xoaVinhVienXacNhan(ngonNguHienTai.value, muc.laThuMuc, muc.ten),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Không'),
+            child: Text(Ch.khong(ngonNguHienTai.value)),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style:
                 FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
-            child: const Text('Xoá vĩnh viễn'),
+            child: Text(Ch.xoaVinhVien(ngonNguHienTai.value)),
           ),
         ],
       ),
@@ -238,23 +237,23 @@ class _ModalThungRacState extends State<ModalThungRac> {
         title: Text(_tenThungRac),
         leading: IconButton(
           icon: const Icon(Icons.close),
-          tooltip: 'Đóng',
+          tooltip: Ch.dong(ngonNguHienTai.value),
           onPressed: () => Navigator.of(context).pop(),
         ),
         // (YÊU CẦU MỚI) Nút tìm kiếm — sát mép phải, cùng dòng với tiêu đề.
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
-            tooltip: 'Tìm kiếm trong thùng rác',
+            tooltip: Ch.timKiemTrongThungRac(ngonNguHienTai.value),
             onPressed: _moTimKiemThungRac,
           ),
         ],
       ),
       body: ds.isEmpty
-          ? const Center(
+          ? Center(
               child: Text(
-                'Thùng rác trống',
-                style: TextStyle(color: Color(0xFF9AA0A6)),
+                Ch.thungRacTrong(ngonNguHienTai.value),
+                style: const TextStyle(color: Color(0xFF9AA0A6)),
               ),
             )
           : ListView.builder(
@@ -281,7 +280,7 @@ class _ModalThungRacState extends State<ModalThungRac> {
                     muc.ten,
                     style: muc.mau != null ? TextStyle(color: Color(muc.mau!)) : null,
                   ),
-                  subtitle: Text('Đã xoá lúc ${_dinhDangThoiGian(muc.thoiGianXoa)}'),
+                  subtitle: Text(Ch.daXoaLuc(ngonNguHienTai.value, _dinhDangThoiGian(muc.thoiGianXoa))),
                   onTap: () => _moMenuMuc(context, muc),
                   trailing: const Icon(Icons.more_vert),
                 );
@@ -456,7 +455,7 @@ class _ManHinhTimKiemThungRacState extends State<_ManHinhTimKiemThungRac> {
                                       : null,
                                 ),
                                 subtitle: Text(
-                                  'Đã xoá lúc ${widget.dinhDangThoiGian(muc.thoiGianXoa)}',
+                                  Ch.daXoaLuc(ngonNguHienTai.value, widget.dinhDangThoiGian(muc.thoiGianXoa)),
                                 ),
                                 onTap: () => widget.onMoMenu(context, muc),
                                 trailing: const Icon(Icons.more_vert),
