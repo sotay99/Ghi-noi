@@ -3578,7 +3578,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               child: TextField(
                 controller: _oTimKiem,
                 focusNode: _focusTimKiem,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   isDense: true,
                   hintText: Ch.timTrongVanBan(ngonNguHienTai.value),
                   border: OutlineInputBorder(),
@@ -3656,7 +3656,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               child: TextField(
                 controller: _oThayThe,
                 focusNode: _focusThayThe,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   isDense: true,
                   hintText: Ch.thayTheKyTuTrenBangGi(ngonNguHienTai.value),
                   border: OutlineInputBorder(),
@@ -14079,7 +14079,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           controller: oCauLenh,
                           maxLines: 3,
                           maxLength: 500,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             border: OutlineInputBorder(),
                             hintText: Ch.viDuChiGiuYChinh(ngonNguHienTai.value),
                             contentPadding: EdgeInsets.all(8),
@@ -14262,7 +14262,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           controller: oCauLenh,
                           maxLines: 3,
                           maxLength: 500,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             border: OutlineInputBorder(),
                             hintText: Ch.viDuThemViDuMinhHoa(ngonNguHienTai.value),
                             contentPadding: EdgeInsets.all(8),
@@ -14409,7 +14409,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   controller: oCauLenh,
                   maxLines: 3,
                   maxLength: 500,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     border: OutlineInputBorder(),
                     hintText: Ch.viDuVietGiongTrangTrong(ngonNguHienTai.value),
                     contentPadding: EdgeInsets.all(8),
