@@ -58,6 +58,9 @@ import 'kiem_tra_chinh_ta.dart';
 import 'kiem_tra_toan_van.dart';
 import 'loai_thiet_bi.dart';
 import 'lua_chon_phim_tat.dart';
+import 'luu_va_chia_se_tep.dart';
+import 'modal_chia_se_tep.dart';
+import 'modal_thong_tin_muc.dart';
 import 'dinh_dang_doan_van_tu_dien.dart';
 import 'man_hinh_cai_dat.dart';
 import 'man_hinh_thu_muc.dart';
@@ -15422,6 +15425,28 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               _xoaTepHienTaiTuThanhCongCu();
             case 'mau':
               _chonMauTenTepHienTai();
+            case 'tai_ve':
+              () async {
+                hienThongBaoGiua(context, 'Đang tải file TXT về thiết bị');
+                try {
+                  final tenTep =
+                      '${_ghiChuHienTai.ten.trim().isEmpty ? 'Ghi chú' : _ghiChuHienTai.ten.trim()}.txt';
+                  await luuVaChiaSeGhiChu(
+                      tenTep, _ghiChuHienTai.noiDung, _ghiChuHienTai.ten);
+                } catch (_) {
+                  if (mounted) {
+                    hienThongBaoGiua(context, 'Không xuất được tệp. Thử lại sau.');
+                  }
+                }
+              }();
+            case 'thong_tin':
+              hienThongTinGhiChu(
+                  context, ten: _ghiChuHienTai.ten, noiDung: _ghiChuHienTai.noiDung);
+            case 'chia_se_link':
+              if (widget.kho is KhoDuLieuDamMay) {
+                hienModalChiaSeTep(context,
+                    ghiChu: _ghiChuHienTai, kho: widget.kho as KhoDuLieuDamMay);
+              }
           }
         },
         itemBuilder: (ctx) {
@@ -15447,6 +15472,22 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             PopupMenuItem(value: 'taoMoi', child: dong(Icons.note_add_outlined, 'Tạo Tệp văn bản mới')),
             PopupMenuItem(value: 'xoa', child: dong(Icons.delete_outline, 'Chuyển vào thùng rác')),
             PopupMenuItem(value: 'mau', child: dong(Icons.palette_outlined, 'Chọn màu Tên Tệp')),
+            PopupMenuItem(
+                value: 'tai_ve',
+                child: dong(Icons.download_outlined, Ch.taiVe(ngonNguHienTai.value))),
+            PopupMenuItem(
+                value: 'thong_tin',
+                child: dong(Icons.info_outline, Ch.thongTinTepNay(ngonNguHienTai.value))),
+            if (widget.kho is KhoDuLieuDamMay)
+              PopupMenuItem(
+                value: 'chia_se_link',
+                child: Row(children: [
+                  const Icon(Icons.link, size: 18, color: Color(0xFF0D47A1)),
+                  const SizedBox(width: 10),
+                  Text(Ch.chiaSeTepBangDuongLink(ngonNguHienTai.value),
+                      style: const TextStyle(color: Color(0xFF0D47A1))),
+                ]),
+              ),
             const PopupMenuDivider(),
             dongThongTin('Số từ: $soTu'),
             dongThongTin('Ký tự (có dấu cách): $soKyTuCoDauCach'),

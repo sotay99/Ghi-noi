@@ -13,9 +13,11 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'chuoi_da_ngon_ngu.dart';
 import 'kho_du_lieu.dart';
 import 'mo_hinh.dart';
 import 'mo_lien_ket_ngoai.dart';
+import 'ngon_ngu.dart';
 import 'thong_bao_giua.dart';
 
 const _bangChuMaChiaSe =
@@ -47,7 +49,7 @@ Future<void> hienModalChiaSeTep(
   if (daThuHoi == true && context.mounted) {
     hienThongBaoGiua(
       context,
-      'Link chia sẻ đã bị xoá, không ai có thể sử dụng lại link đó được nữa',
+      Ch.linkChiaSeDaBiXoa(ngonNguHienTai.value),
     );
   }
 }
@@ -85,20 +87,17 @@ class _HopThoaiChiaSeTepState extends State<_HopThoaiChiaSeTep> {
       context: context,
       builder: (ctx) => AlertDialog(
         icon: const Icon(Icons.link_off, size: 28, color: Colors.red),
-        title: const Text('Ngừng chia sẻ?'),
-        content: const Text(
-          'Link hiện tại sẽ bị thu hồi vĩnh viễn. Nếu chia sẻ lại tệp này, '
-          'một link MỚI sẽ được tạo ra. Bạn có chắc chắn không?',
-        ),
+        title: Text(Ch.ngungChiaSeHoi(ngonNguHienTai.value)),
+        content: Text(Ch.ngungChiaSeNoiDungHoi(ngonNguHienTai.value)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Không'),
+            child: Text(Ch.khong(ngonNguHienTai.value)),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
-            child: const Text('Ngừng chia sẻ'),
+            child: Text(Ch.ngungChiaSe(ngonNguHienTai.value)),
           ),
         ],
       ),
@@ -112,7 +111,7 @@ class _HopThoaiChiaSeTepState extends State<_HopThoaiChiaSeTep> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Chia sẻ tệp bằng đường link'),
+      title: Text(Ch.chiaSeTepBangDuongLink(ngonNguHienTai.value)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -140,11 +139,9 @@ class _HopThoaiChiaSeTepState extends State<_HopThoaiChiaSeTep> {
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
-            'Bất kỳ ai có đường link này đều có thể xem tệp, không thể sửa, '
-            'nội dung tệp được đồng bộ theo thời gian thực khi có sự thay '
-            'đổi.',
-            style: TextStyle(fontSize: 12.5, color: Color(0xFF5F6368)),
+          Text(
+            Ch.ghiChuAiCungXemDuocLink(ngonNguHienTai.value),
+            style: const TextStyle(fontSize: 12.5, color: Color(0xFF5F6368)),
           ),
           const SizedBox(height: 16),
           Row(
@@ -170,7 +167,7 @@ class _HopThoaiChiaSeTepState extends State<_HopThoaiChiaSeTep> {
                 child: OutlinedButton.icon(
                   onPressed: () => moLienKetNgoai(_link),
                   icon: const Icon(Icons.open_in_new, size: 18),
-                  label: const Text('Mở Link'),
+                  label: Text(Ch.moLink(ngonNguHienTai.value)),
                 ),
               ),
             ],
@@ -182,7 +179,7 @@ class _HopThoaiChiaSeTepState extends State<_HopThoaiChiaSeTep> {
               onPressed: _thuHoi,
               style: OutlinedButton.styleFrom(foregroundColor: Colors.red.shade600),
               icon: const Icon(Icons.link_off, size: 18),
-              label: const Text('Ngừng chia sẻ - Thu hồi Link'),
+              label: Text(Ch.ngungChiaSeThuHoiLink(ngonNguHienTai.value)),
             ),
           ),
         ],
@@ -190,7 +187,7 @@ class _HopThoaiChiaSeTepState extends State<_HopThoaiChiaSeTep> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Đóng'),
+          child: Text(Ch.dong(ngonNguHienTai.value)),
         ),
       ],
     );

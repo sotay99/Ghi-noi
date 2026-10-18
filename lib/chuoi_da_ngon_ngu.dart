@@ -335,6 +335,32 @@ class Ch {
 
   static String daXoaLuc(NgonNgu nn, String thoiGian) =>
       nn == NgonNgu.vi ? 'Đã xoá lúc $thoiGian' : 'Deleted at $thoiGian';
+
+  // ------------------------------------------------- Modal "Chia sẻ tệp bằng link"
+  static String ghiChuAiCungXemDuocLink(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bất kỳ ai có đường link này đều có thể xem tệp, không thể sửa, '
+          'nội dung tệp được đồng bộ theo thời gian thực khi có sự thay đổi.'
+      : 'Anyone with this link can view the file, but cannot edit it — '
+          'content updates in real time whenever it changes.';
+
+  static String ngungChiaSeThuHoiLink(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Ngừng chia sẻ - Thu hồi Link' : 'Stop sharing - Revoke Link';
+
+  static String ngungChiaSeHoi(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Ngừng chia sẻ?' : 'Stop sharing?';
+
+  static String ngungChiaSeNoiDungHoi(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Link hiện tại sẽ bị thu hồi vĩnh viễn. Nếu chia sẻ lại tệp này, '
+          'một link MỚI sẽ được tạo ra. Bạn có chắc chắn không?'
+      : 'The current link will be permanently revoked. Sharing this file '
+          'again will generate a NEW link. Are you sure?';
+
+  static String ngungChiaSe(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Ngừng chia sẻ' : 'Stop sharing';
+
+  static String linkChiaSeDaBiXoa(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Link chia sẻ đã bị xoá, không ai có thể sử dụng lại link đó được nữa'
+      : 'The share link has been deleted — no one can use it again.';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt
