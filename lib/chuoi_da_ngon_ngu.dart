@@ -692,6 +692,41 @@ class Ch {
   static String themNhanhVaoTuDien(NgonNgu nn) => nn == NgonNgu.vi
       ? 'Thêm nhanh vào từ điển nhập liệu nhanh'
       : 'Quickly add to the quick-entry dictionary';
+
+  // ------------------------------------------- Dialog/toast trang_soan_thao.dart (lượt 2)
+  static String timHieuThem(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tìm hiểu thêm' : 'Learn more';
+  static String kyTuDacBiet(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Ký tự đặc biệt' : 'Special characters';
+  static String nguongHaiChamDau(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Ngưỡng:' : 'Threshold:';
+  static String soGiay(NgonNgu nn, int giay) =>
+      nn == NgonNgu.vi ? '$giay giây' : '$giay sec';
+  static String sapChamGioiHan60Giay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Sắp chạm giới hạn 60 giây' : 'Approaching the 60-second limit';
+  static String xoa(NgonNgu nn) => nn == NgonNgu.vi ? 'Xoá' : 'Delete';
+  static String xoaTheGhiAmNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Xoá thẻ ghi âm này' : 'Delete this recording card';
+  static String theDangGuiPhienAmXoaSeBo(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Thẻ này ĐANG được gửi đi phiên âm — xoá sẽ bỏ luôn kết quả sắp về, '
+          'không thể phục hồi lại được. Bạn có chắc chắn muốn xoá không?'
+      : "This card is currently being transcribed — deleting it discards the "
+          "incoming result and can't be undone. Are you sure you want to delete it?";
+  static String theGhiAmSeBiXoaVinhVien(NgonNgu nn, int soThe) => nn == NgonNgu.vi
+      ? 'Thẻ ghi âm #$soThe sẽ bị xoá VĨNH VIỄN, không thể phục hồi lại được. '
+          'Bạn có chắc chắn muốn xoá không?'
+      : 'Recording card #$soThe will be PERMANENTLY deleted and cannot be '
+          'recovered. Are you sure you want to delete it?';
+  static String huyDeXuat(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Huỷ đề xuất' : 'Dismiss suggestion';
+  static String deXuatXoa(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đề xuất Xoá' : 'Suggested: Delete';
+  static String xoaTatCaDam(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Xoá tất cả' : 'Delete all';
+  static String tamDungCoDauCach(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tạm dừng ' : 'Paused ';
+  static String banGhiAmSoCoDauCach(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Bản Ghi âm số ' : 'Recording No. ';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt

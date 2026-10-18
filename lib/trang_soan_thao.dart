@@ -2596,7 +2596,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   minimumSize: const Size(0, 28),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                child: const Text('Tìm hiểu thêm', style: TextStyle(fontSize: 12)),
+                child: Text(Ch.timHieuThem(ngonNguHienTai.value), style: const TextStyle(fontSize: 12)),
               ),
             ),
         ],
@@ -5965,7 +5965,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   Row(
                     children: [
                       const Expanded(
-                        child: Text('Ký tự đặc biệt', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        child: Text(Ch.kyTuDacBiet(ngonNguHienTai.value), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       ),
                       IconButton(
                         icon: const Icon(Icons.close, color: Colors.red),
@@ -7568,9 +7568,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 if (batTam) ...[
                   Row(
                     children: [
-                      const Text('Ngưỡng:', style: TextStyle(fontSize: 13)),
+                      Text(Ch.nguongHaiChamDau(ngonNguHienTai.value), style: const TextStyle(fontSize: 13)),
                       const SizedBox(width: 8),
-                      Text('$giayTam giây',
+                      Text(Ch.soGiay(ngonNguHienTai.value, giayTam),
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     ],
                   ),
@@ -8019,7 +8019,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       ],
                     ),
                   )
-                : Text('Sắp chạm giới hạn 60 giây', style: kieuTieuDe),
+                : Text(Ch.sapChamGioiHan60Giay(ngonNguHienTai.value), style: kieuTieuDe),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -8330,7 +8330,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: Text('Xoá', style: TextStyle(color: Colors.red.shade600)),
+              child: Text(Ch.xoa(ngonNguHienTai.value), style: TextStyle(color: Colors.red.shade600)),
             ),
           ],
         ),
@@ -8666,7 +8666,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           child: Row(children: [
             Icon(Icons.delete_outline, size: 18, color: Colors.red.shade600),
             const SizedBox(width: 10),
-            Text('Xoá thẻ ghi âm này', style: TextStyle(color: Colors.red.shade600)),
+            Text(Ch.xoaTheGhiAmNay(ngonNguHienTai.value), style: TextStyle(color: Colors.red.shade600)),
           ]),
         ),
         const PopupMenuItem(
@@ -8992,7 +8992,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           child: Row(children: [
             Icon(Icons.delete_outline, size: 18, color: Colors.red.shade600),
             const SizedBox(width: 10),
-            Text('Xoá thẻ ghi âm này', style: TextStyle(color: Colors.red.shade600)),
+            Text(Ch.xoaTheGhiAmNay(ngonNguHienTai.value), style: TextStyle(color: Colors.red.shade600)),
           ]),
         ),
       ],
@@ -9007,9 +9007,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       context: context,
       builder: (context) => AlertDialog(
         title: Text(Ch.xoaTheGhiAm(ngonNguHienTai.value)),
-        content: const Text('Thẻ này ĐANG được gửi đi phiên âm — xoá sẽ bỏ '
-            'luôn kết quả sắp về, không thể phục hồi lại được. Bạn có chắc '
-            'chắn muốn xoá không?'),
+        content: Text(Ch.theDangGuiPhienAmXoaSeBo(ngonNguHienTai.value)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -9017,7 +9015,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: Text('Xoá', style: TextStyle(color: Colors.red.shade600)),
+            child: Text(Ch.xoa(ngonNguHienTai.value), style: TextStyle(color: Colors.red.shade600)),
           ),
         ],
       ),
@@ -9098,7 +9096,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(true),
-                  child: Text('Xoá',
+                  child: Text(Ch.xoa(ngonNguHienTai.value),
                       style: TextStyle(color: Colors.red.shade600)),
                 ),
               ],
@@ -9161,8 +9159,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         context: context,
         builder: (context) => AlertDialog(
           title: Text(Ch.xoaTheGhiAm(ngonNguHienTai.value)),
-          content: Text('Thẻ ghi âm #$soThe sẽ bị xoá VĨNH VIỄN, không thể '
-              'phục hồi lại được. Bạn có chắc chắn muốn xoá không?'),
+          content: Text(Ch.theGhiAmSeBiXoaVinhVien(ngonNguHienTai.value, soThe)),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -9170,7 +9167,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: Text('Xoá', style: TextStyle(color: Colors.red.shade600)),
+              child: Text(Ch.xoa(ngonNguHienTai.value), style: TextStyle(color: Colors.red.shade600)),
             ),
           ],
         ),
@@ -11349,11 +11346,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         const PopupMenuDivider(),
         PopupMenuItem(
           value: ('xoa', null),
-          child: Text('Xoá', style: TextStyle(color: Colors.red.shade600)),
+          child: Text(Ch.xoa(ngonNguHienTai.value), style: TextStyle(color: Colors.red.shade600)),
         ),
         PopupMenuItem(
           value: ('huy', null),
-          child: Text('Huỷ đề xuất', style: TextStyle(color: Colors.green.shade700)),
+          child: Text(Ch.huyDeXuat(ngonNguHienTai.value), style: TextStyle(color: Colors.green.shade700)),
         ),
       ],
     );
@@ -11472,7 +11469,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             child: Row(children: [
               Icon(Icons.delete_outline, size: 18, color: Colors.red.shade600),
               const SizedBox(width: 10),
-              Text('Đề xuất Xoá', style: TextStyle(color: Colors.red.shade600)),
+              Text(Ch.deXuatXoa(ngonNguHienTai.value), style: TextStyle(color: Colors.red.shade600)),
             ]),
           ),
         const PopupMenuDivider(),
@@ -11481,7 +11478,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           child: Row(children: [
             Icon(Icons.delete_outline, size: 18, color: Colors.red.shade600),
             const SizedBox(width: 10),
-            Text('Xoá', style: TextStyle(color: Colors.red.shade600)),
+            Text(Ch.xoa(ngonNguHienTai.value), style: TextStyle(color: Colors.red.shade600)),
           ]),
         ),
         PopupMenuItem(
@@ -11489,7 +11486,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           child: Row(children: [
             Icon(Icons.undo, size: 18, color: Colors.green.shade700),
             const SizedBox(width: 10),
-            Text('Huỷ đề xuất', style: TextStyle(color: Colors.green.shade700)),
+            Text(Ch.huyDeXuat(ngonNguHienTai.value), style: TextStyle(color: Colors.green.shade700)),
           ]),
         ),
         const PopupMenuItem(
@@ -14003,7 +14000,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           TextButton(onPressed: () => Navigator.of(ctx2).pop(false), child: Text(Ch.huy(ngonNguHienTai.value))),
           TextButton(
             onPressed: () => Navigator.of(ctx2).pop(true),
-            child: const Text('Xoá tất cả', style: TextStyle(color: Colors.red)),
+            child: Text(Ch.xoaTatCaDam(ngonNguHienTai.value), style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -14094,7 +14091,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                         alignment: Alignment.centerRight,
                         child: TextButton(
                           onPressed: () => _xacNhanXoaCauLenh(ctx, oCauLenh, () => capNhat(() {})),
-                          child: const Text('Xoá tất cả', style: TextStyle(color: Colors.red)),
+                          child: Text(Ch.xoaTatCaDam(ngonNguHienTai.value), style: const TextStyle(color: Colors.red)),
                         ),
                       ),
                     ],
@@ -14277,7 +14274,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                         alignment: Alignment.centerRight,
                         child: TextButton(
                           onPressed: () => _xacNhanXoaCauLenh(ctx, oCauLenh, () => capNhat(() {})),
-                          child: const Text('Xoá tất cả', style: TextStyle(color: Colors.red)),
+                          child: Text(Ch.xoaTatCaDam(ngonNguHienTai.value), style: const TextStyle(color: Colors.red)),
                         ),
                       ),
                     ],
@@ -14423,7 +14420,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () => _xacNhanXoaCauLenh(ctx, oCauLenh, () => capNhat(() {})),
-                    child: const Text('Xoá tất cả', style: TextStyle(color: Colors.red)),
+                    child: Text(Ch.xoaTatCaDam(ngonNguHienTai.value), style: const TextStyle(color: Colors.red)),
                   ),
                 ),
               ],
@@ -14623,7 +14620,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         actions: [
           TextButton(
             onPressed: () => _xacNhanHuyKetQuaToanVan(ctx),
-            child: Text('Huỷ', style: TextStyle(color: Colors.red.shade600)),
+            child: Text(Ch.huy(ngonNguHienTai.value), style: TextStyle(color: Colors.red.shade600)),
           ),
           TextButton(
             onPressed: () async {
@@ -14667,7 +14664,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx2).pop(true),
-            child: Text('Huỷ', style: TextStyle(color: Colors.red.shade600)),
+            child: Text(Ch.huy(ngonNguHienTai.value), style: TextStyle(color: Colors.red.shade600)),
           ),
         ],
       ),
@@ -14979,7 +14976,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         actions: [
           TextButton(
             onPressed: () => _xacNhanHuyKetQuaFileAmThanh(ctx),
-            child: Text('Huỷ', style: TextStyle(color: Colors.red.shade600)),
+            child: Text(Ch.huy(ngonNguHienTai.value), style: TextStyle(color: Colors.red.shade600)),
           ),
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -15036,7 +15033,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx2).pop(true),
-            child: Text('Huỷ', style: TextStyle(color: Colors.red.shade600)),
+            child: Text(Ch.huy(ngonNguHienTai.value), style: TextStyle(color: Colors.red.shade600)),
           ),
         ],
       ),
@@ -16337,7 +16334,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (_theGhiAmDangTamDung)
-                      Text('Tạm dừng ', style: kieuSo)
+                      Text(Ch.tamDungCoDauCach(ngonNguHienTai.value), style: kieuSo)
                     else
                       _ChuLuonSong(chu: 'Đang Ghi âm ', mau: Colors.red.shade700, coChu: coChu),
                     _SoPhutGiayGhiAm(thoiLuong: gia, style: kieuSo),
@@ -17483,7 +17480,7 @@ class _DongBanGhiAmSoNhapNhayState extends State<_DongBanGhiAmSoNhapNhay>
           alignment: WrapAlignment.center,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Text('Bản Ghi âm số ',
+            Text(Ch.banGhiAmSoCoDauCach(ngonNguHienTai.value),
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: widget.coChu)),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
