@@ -996,6 +996,62 @@ class Ch {
       : '• "Replace here": replaces only the currently selected result (the number shown, e.g. 3/5).\n\n'
           '• "All": replaces every result at once, with a confirmation first.\n\n'
           '• Leave the Replace box empty and tap either button: that search result is DELETED, no need to type anything to replace it with.';
+
+  // --------------------------------------------- Modal "Danh sách phím tắt"
+  static String microVaGhiAm(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Micro và Ghi âm' : 'Microphone and Recording';
+
+  static String dieuHuong(NgonNgu nn) => nn == NgonNgu.vi ? 'Điều hướng' : 'Navigation';
+
+  static String chung(NgonNgu nn) => nn == NgonNgu.vi ? 'Chung' : 'General';
+
+  static String dinhDangVanBanDeMuc(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Định dạng văn bản' : 'Text formatting';
+
+  static String moTaThemBamNhanhLienTiep(NgonNgu nn, String phim) => nn == NgonNgu.vi
+      ? ' (bấm $phim rồi buông ra, bấm lại lần nữa trong 1 giây)'
+      : ' (press $phim and release, then press it again within 1 second)';
+
+  static String batTatMicro(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bật/tắt Micro (vừa nói vừa ra chữ)'
+      : 'Turn Microphone on/off (speak and type at once)';
+
+  static String moDongTrinhGhiAm(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Mở/đóng trình Ghi âm (ghi âm xong mới ra chữ)'
+      : 'Open/close the Recorder (record first, transcribe after)';
+
+  static String anHienBoNhoTamDanVanBan(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Ẩn/hiện Bộ nhớ tạm để dán văn bản'
+      : 'Show/hide the clipboard history panel';
+
+  static String anHienTuDienNhapLieuNhanh(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Ẩn/hiện Từ điển nhập liệu nhanh'
+      : 'Show/hide the quick-dictionary panel';
+
+  static String danChuTho(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Dán chữ thô, không kèm định dạng văn bản'
+      : 'Paste as plain text, without formatting';
+
+  static String xoaDinhDangKemMoTa(NgonNgu nn, String moTaPhim) => nn == NgonNgu.vi
+      ? '$moTaPhim — đưa văn bản về trạng thái ban đầu (không áp dụng cho các đoạn AI đang đề xuất)'
+      : '$moTaPhim — reverts the text to its original state (doesn\'t apply to pending AI suggestions)';
+
+  static String huongDanBamPhimTat(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Để sử dụng phím tắt: Một ngón tay bấm và giữ im phím Ctrl, '
+          'sau đó ngón tay thứ hai bấm phím còn lại.'
+      : 'To use a shortcut: hold Ctrl down with one finger, then press the other key with a second finger.';
+
+  static String tepAmThanhVuotQuaGioiHan(NgonNgu nn, String tenTep, String soMB) => nn == NgonNgu.vi
+      ? 'Tệp "$tenTep" nặng ${soMB}MB, vượt quá 25MB cho phép. Hãy nén '
+          'hoặc cắt ngắn tệp âm thanh bằng công cụ bên ngoài rồi thử lại.'
+      : 'File "$tenTep" is ${soMB}MB, over the 25MB limit. Please compress '
+          'or trim the audio file with an external tool and try again.';
+
+  static String anhVuotQuaGioiHan(NgonNgu nn, String tenTep, String soMB) => nn == NgonNgu.vi
+      ? 'Ảnh "$tenTep" nặng ${soMB}MB, vượt quá 15MB cho phép. Hãy nén '
+          'ảnh bằng công cụ bên ngoài rồi thử lại.'
+      : 'Image "$tenTep" is ${soMB}MB, over the 15MB limit. Please compress '
+          'the image with an external tool and try again.';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt

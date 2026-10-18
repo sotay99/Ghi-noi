@@ -13608,15 +13608,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// Ghi âm (đọc `widget.caiDat.phimTatMicro`/`phimTatGhiAm`, cũng động —
   /// luôn khớp với Cài đặt).
   void _moDanhSachPhimTat() {
-    String tim(String khoa) => CaiDat.phimTatCoDinh[khoa] ?? khoa;
+    String tim(String khoa) =>
+        CaiDat.moTaPhimTat(CaiDat.phimTatCoDinh[khoa], ngonNguHienTai.value);
 
     // Hai kiểu "bấm 2 lần liên tiếp" không tự nói lên cách kích hoạt qua
     // mỗi cái tên ngắn (`LuaChonPhimTat.nhan`) — ghi rõ thêm ở đây, đúng
     // yêu cầu "phải giải thích rõ kích hoạt nó như thế nào".
     String moTaThem(LuaChonPhimTat lc) => switch (lc.loai) {
-          'ctrlDup' => ' (bấm Ctrl rồi buông ra, bấm lại lần nữa trong 1 giây)',
-          'shiftDup' => ' (bấm Shift rồi buông ra, bấm lại lần nữa trong 1 giây)',
-          'altDup' => ' (bấm Alt rồi buông ra, bấm lại lần nữa trong 1 giây)',
+          'ctrlDup' => Ch.moTaThemBamNhanhLienTiep(ngonNguHienTai.value, 'Ctrl'),
+          'shiftDup' => Ch.moTaThemBamNhanhLienTiep(ngonNguHienTai.value, 'Shift'),
+          'altDup' => Ch.moTaThemBamNhanhLienTiep(ngonNguHienTai.value, 'Alt'),
           _ => '',
         };
 
@@ -13662,33 +13663,33 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                deMuc('Micro và Ghi âm'),
+                deMuc(Ch.microVaGhiAm(ngonNguHienTai.value)),
                 dong(
                   widget.caiDat.phimTatMicro.nhan,
-                  'Bật/tắt Micro (vừa nói vừa ra chữ)'
+                  '${Ch.batTatMicro(ngonNguHienTai.value)}'
                       '${moTaThem(widget.caiDat.phimTatMicro)}',
                 ),
                 dong(
                   widget.caiDat.phimTatGhiAm.nhan,
-                  'Mở/đóng trình Ghi âm (ghi âm xong mới ra chữ)'
+                  '${Ch.moDongTrinhGhiAm(ngonNguHienTai.value)}'
                       '${moTaThem(widget.caiDat.phimTatGhiAm)}',
                 ),
                 if (widget.caiDat.boNhoTamDanVanBanBat)
                   dong(
                     widget.caiDat.phimTatBoNhoTam.nhan,
-                    'Ẩn/hiện Bộ nhớ tạm để dán văn bản'
+                    '${Ch.anHienBoNhoTamDanVanBan(ngonNguHienTai.value)}'
                         '${moTaThem(widget.caiDat.phimTatBoNhoTam)}',
                   ),
                 if (_tuDienNhapLieuNhanhBatKyNguon)
                   dong(
                     widget.caiDat.phimTatTuDienNhapLieuNhanh.nhan,
-                    'Ẩn/hiện Từ điển nhập liệu nhanh'
+                    '${Ch.anHienTuDienNhapLieuNhanh(ngonNguHienTai.value)}'
                         '${moTaThem(widget.caiDat.phimTatTuDienNhapLieuNhanh)}',
                   ),
-                deMuc('Điều hướng'),
+                deMuc(Ch.dieuHuong(ngonNguHienTai.value)),
                 dong('Ctrl + Z', tim('Ctrl+Z')),
                 dong('Ctrl + Shift + Z', tim('Ctrl+Shift+Z')),
-                deMuc('Chung'),
+                deMuc(Ch.chung(ngonNguHienTai.value)),
                 dong('Ctrl + F', tim('Ctrl+F')),
                 dong('Ctrl + A', tim('Ctrl+A')),
                 dong('Ctrl + S', tim('Ctrl+S')),
@@ -13697,9 +13698,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 dong('Ctrl + V', tim('Ctrl+V')),
                 // (YÊU CẦU MỚI) Chỉ LIỆT KÊ — phím tắt này do HỆ ĐIỀU HÀNH/
                 // TRÌNH DUYỆT xử lý sẵn, app không tự viết logic riêng cho nó.
-                dong('Ctrl + Shift + V', 'Dán chữ thô, không kèm định dạng văn bản'),
+                dong('Ctrl + Shift + V', Ch.danChuTho(ngonNguHienTai.value)),
                 dong('Ctrl + Enter', tim('Ctrl+Enter')),
-                deMuc('Định dạng văn bản'),
+                deMuc(Ch.dinhDangVanBanDeMuc(ngonNguHienTai.value)),
                 dong('Ctrl + B', tim('Ctrl+B')),
                 dong('Ctrl + I', tim('Ctrl+I')),
                 dong('Ctrl + U', tim('Ctrl+U')),
@@ -13709,12 +13710,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 dong('Ctrl + Shift + C', tim('Ctrl+Shift+C')),
                 dong('Ctrl + Shift + H', tim('Ctrl+Shift+H')),
                 dong('Ctrl + Q',
-                    '${tim('Ctrl+Q')} — đưa văn bản về trạng thái ban đầu (không áp dụng cho các đoạn AI đang đề xuất)'),
+                    Ch.xoaDinhDangKemMoTa(ngonNguHienTai.value, tim('Ctrl+Q'))),
                 const SizedBox(height: 12),
-                const Text(
-                  'Để sử dụng phím tắt: Một ngón tay bấm và giữ im phím Ctrl, '
-                  'sau đó ngón tay thứ hai bấm phím còn lại.',
-                  style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12, color: Color(0xFF5F6368)),
+                Text(
+                  Ch.huongDanBamPhimTat(ngonNguHienTai.value),
+                  style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 12, color: Color(0xFF5F6368)),
                 ),
               ],
             ),
@@ -13794,8 +13794,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     if (bytes.length > _gioiHanTepAmThanhByte) {
       final soMB = (bytes.length / (1024 * 1024)).toStringAsFixed(1);
-      _bao('Tệp "${tep.name}" nặng ${soMB}MB, vượt quá 25MB cho phép. Hãy nén '
-          'hoặc cắt ngắn tệp âm thanh bằng công cụ bên ngoài rồi thử lại.');
+      _bao(Ch.tepAmThanhVuotQuaGioiHan(ngonNguHienTai.value, tep.name, soMB));
       return;
     }
 
@@ -13904,8 +13903,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     if (bytes.length > _gioiHanTepAnhByte) {
       final soMB = (bytes.length / (1024 * 1024)).toStringAsFixed(1);
-      _bao('Ảnh "${tep.name}" nặng ${soMB}MB, vượt quá 15MB cho phép. Hãy nén '
-          'ảnh bằng công cụ bên ngoài rồi thử lại.');
+      _bao(Ch.anhVuotQuaGioiHan(ngonNguHienTai.value, tep.name, soMB));
       return;
     }
 

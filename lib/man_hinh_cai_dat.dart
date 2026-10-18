@@ -1128,8 +1128,9 @@ class _ManHinhCaiDatState extends State<ManHinhCaiDat> {
                   if (moi.loai == 'ctrl') {
                     final xungDotCoDinh = CaiDat.tenXungDot(moi);
                     if (xungDotCoDinh != null) {
+                      final xungDotCoDinhDaDich = CaiDat.moTaPhimTat(xungDotCoDinh, _nn);
                       capNhatModal(() => loiXungDot = ChCaiDat
-                          .phimTatDangTrungVoiChucNang(_nn, xungDotCoDinh, moi.nhan));
+                          .phimTatDangTrungVoiChucNang(_nn, xungDotCoDinhDaDich, moi.nhan));
                       return;
                     }
                   }

@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dinh_dang_doan_van_tu_dien.dart';
 import 'loai_thiet_bi.dart';
 import 'lua_chon_phim_tat.dart';
+import 'ngon_ngu.dart';
 
 /// Một cặp từ trong "Từ điển sửa lỗi chính tả của bạn" (xem
 /// `moModalTuDienChinhTa` trong `modal_tu_dien_chinh_ta.dart`) — [loi] là
@@ -1235,5 +1236,55 @@ class CaiDat {
   static String? tenXungDot(LuaChonPhimTat moi) {
     if (moi.loai != 'ctrl') return null;
     return phimTatCoDinh['Ctrl+${moi.phim}'];
+  }
+
+  /// Bản dịch hiển thị cho MỘT khoá của [phimTatCoDinh] (hoặc cho giá trị
+  /// trả về của [tenXungDot], vì cả hai đều là giá trị trong map này) — dùng
+  /// khi hiện ra UI, [phimTatCoDinh] bản thân vẫn giữ tiếng Việt làm khoá
+  /// tra cứu nội bộ ổn định.
+  static String moTaPhimTat(String? moTaVi, NgonNgu nn) {
+    if (moTaVi == null) return '';
+    switch (moTaVi) {
+      case 'Lùi lại':
+        return nn == NgonNgu.vi ? 'Lùi lại' : 'Undo';
+      case 'Tiến tới':
+        return nn == NgonNgu.vi ? 'Tiến tới' : 'Redo';
+      case 'Tìm kiếm và Thay thế':
+        return nn == NgonNgu.vi ? 'Tìm kiếm và Thay thế' : 'Find and replace';
+      case 'Chọn tất cả':
+        return nn == NgonNgu.vi ? 'Chọn tất cả' : 'Select all';
+      case 'Lưu':
+        return nn == NgonNgu.vi ? 'Lưu' : 'Save';
+      case 'Cắt':
+        return nn == NgonNgu.vi ? 'Cắt' : 'Cut';
+      case 'Sao chép':
+        return nn == NgonNgu.vi ? 'Sao chép' : 'Copy';
+      case 'Dán':
+        return nn == NgonNgu.vi ? 'Dán' : 'Paste';
+      case 'Đậm':
+        return nn == NgonNgu.vi ? 'Đậm' : 'Bold';
+      case 'Nghiêng':
+        return nn == NgonNgu.vi ? 'Nghiêng' : 'Italic';
+      case 'Gạch chân':
+        return nn == NgonNgu.vi ? 'Gạch chân' : 'Underline';
+      case 'Gạch ngang thân':
+        return nn == NgonNgu.vi ? 'Gạch ngang thân' : 'Strikethrough';
+      case 'Chữ trên (superscript)':
+        return nn == NgonNgu.vi ? 'Chữ trên (superscript)' : 'Superscript';
+      case 'Chữ dưới (subscript)':
+        return nn == NgonNgu.vi ? 'Chữ dưới (subscript)' : 'Subscript';
+      case 'Màu chữ':
+        return nn == NgonNgu.vi ? 'Màu chữ' : 'Text color';
+      case 'Màu nền chữ':
+        return nn == NgonNgu.vi ? 'Màu nền chữ' : 'Text background color';
+      case 'Xoá định dạng văn bản':
+        return nn == NgonNgu.vi ? 'Xoá định dạng văn bản' : 'Clear text formatting';
+      case 'Gửi tin nhắn ở các kênh trò chuyện':
+        return nn == NgonNgu.vi
+            ? 'Gửi tin nhắn ở các kênh trò chuyện'
+            : 'Send message in chat channels';
+      default:
+        return moTaVi;
+    }
   }
 }
