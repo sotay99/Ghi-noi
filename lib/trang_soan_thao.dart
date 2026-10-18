@@ -8196,14 +8196,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _dongBangDieuKhienGhiAmNeuMo();
     if (mounted) setState(() => _trinhGhiAmMo = false);
     if (soThe == null) return;
-    _nhanTrangThaiGhiAmGheDe.value = TrangThaiGheDe(LoaiTrangThaiGheDe.dangChuyen, soThe);
-    unawaited(_guiVaXuLyMotThe(soThe, baoLoi: true).then((_) {
+    final soTheKhongNull = soThe;
+    _nhanTrangThaiGhiAmGheDe.value = TrangThaiGheDe(LoaiTrangThaiGheDe.dangChuyen, soTheKhongNull);
+    unawaited(_guiVaXuLyMotThe(soTheKhongNull, baoLoi: true).then((_) {
       if (!mounted) return;
       _nhanTrangThaiGhiAmGheDe.value = TrangThaiGheDe(
-          _vanBanDaTraVeTheoTheGhiAm.containsKey(soThe)
+          _vanBanDaTraVeTheoTheGhiAm.containsKey(soTheKhongNull)
               ? LoaiTrangThaiGheDe.daChuyenXong
               : LoaiTrangThaiGheDe.loiKhiChuyen,
-          soThe,
+          soTheKhongNull,
         );
     }));
   }
@@ -11761,7 +11762,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
     if (loiXayRa != null || ketQua == null) {
-      _bao(Ch.khongKiemTraDuoc(ngonNguHienTai.value, loiXayRa));
+      _bao(Ch.khongKiemTraDuoc(ngonNguHienTai.value, '$loiXayRa'));
       return;
     }
 
