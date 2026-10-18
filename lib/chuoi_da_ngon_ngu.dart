@@ -727,6 +727,54 @@ class Ch {
       nn == NgonNgu.vi ? 'Tạm dừng ' : 'Paused ';
   static String banGhiAmSoCoDauCach(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Bản Ghi âm số ' : 'Recording No. ';
+
+  // ------------------------------------------- Tooltip/hintText trang_soan_thao.dart
+  static String ketQuaTruoc(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Kết quả trước' : 'Previous result';
+  static String ketQuaTiepTheo(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Kết quả tiếp theo' : 'Next result';
+  static String xoaNoiDungTim(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Xoá nội dung tìm' : 'Clear search text';
+  static String thayTheKyTuTrenBangGi(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Thay thế những ký tự trên bằng ký tự gì?' : 'Replace the text above with what?';
+  static String timTrongVanBan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tìm trong văn bản...' : 'Search in text...';
+  static String xoaNoiDungThayThe(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Xoá nội dung thay thế' : 'Clear replacement text';
+  static String xoaDinhDangVanBan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Xoá định dạng văn bản (Ctrl+Q)' : 'Clear text formatting (Ctrl+Q)';
+  static String hoanDoiHoaThuong(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Hoán đổi chữ Hoa chữ thường' : 'Swap uppercase/lowercase';
+  static String chonKieuHoaThuong(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chọn kiểu Hoa/thường' : 'Choose a case style';
+  static String tichChonCheckbox(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Tích chọn — chèn ô 🔲 đầu đoạn văn, gạch ngang cả đoạn khi bấm chuyển thành ✅'
+      : 'Checkbox — inserts a 🔲 at the start of the paragraph, strikes through '
+          'the paragraph when tapped to turn into ✅';
+  static String viDuChiGiuYChinh(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Ví dụ: chỉ giữ lại các ý chính về...' : 'E.g.: keep only the main ideas about...';
+  static String viDuThemViDuMinhHoa(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Ví dụ: thêm ví dụ minh hoạ cho...' : 'E.g.: add an illustrative example for...';
+  static String viDuVietGiongTrangTrong(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Ví dụ: viết theo giọng trang trọng hơn...' : 'E.g.: write in a more formal tone...';
+  static String cuonLenDauVanBan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Cuộn lên đầu văn bản' : 'Scroll to the top of the text';
+  static String cuonXuongCuoiVanBan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Cuộn xuống cuối văn bản' : 'Scroll to the bottom of the text';
+  static String luiLaiCoPhimTat(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Lùi lại (Ctrl + Z)' : 'Undo (Ctrl + Z)';
+  static String tienToiCoPhimTat(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tiến tới (Ctrl + Shift + Z)' : 'Redo (Ctrl + Shift + Z)';
+  static String thuGonAnThanhCongCu(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Thu gọn — ẩn hết thanh công cụ phía trên'
+      : 'Collapse — hide all toolbars above';
+  static String chonMauKhac(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chọn màu khác' : 'Choose another color';
+  static String themNoiDungVaoDongNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Thêm nội dung vào dòng này' : 'Add content to this line';
+  static String boNhoTamCoPhimTat(NgonNgu nn, String phimTat) => nn == NgonNgu.vi
+      ? 'Bộ nhớ tạm để dán văn bản ($phimTat)'
+      : 'Clipboard for pasting text ($phimTat)';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt

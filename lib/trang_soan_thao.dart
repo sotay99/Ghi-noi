@@ -2619,7 +2619,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             Expanded(child: Text(tieuDe)),
             IconButton(
               icon: const Icon(Icons.close, color: Colors.red),
-              tooltip: 'Đóng',
+              tooltip: Ch.dong(ngonNguHienTai.value),
               onPressed: () => Navigator.of(ctx).pop(),
             ),
           ],
@@ -3580,7 +3580,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 focusNode: _focusTimKiem,
                 decoration: const InputDecoration(
                   isDense: true,
-                  hintText: 'Tìm trong văn bản...',
+                  hintText: Ch.timTrongVanBan(ngonNguHienTai.value),
                   border: OutlineInputBorder(),
                 ),
                 onSubmitted: (_) => _dieuHuongTimKiem(1),
@@ -3596,7 +3596,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           ),
           IconButton(
             icon: const Icon(Icons.keyboard_arrow_up),
-            tooltip: 'Kết quả trước',
+            tooltip: Ch.ketQuaTruoc(ngonNguHienTai.value),
             onPressed: _ketQuaTimKiem.isEmpty ? null : () => _dieuHuongTimKiem(-1),
             visualDensity: manHinhHep ? VisualDensity.compact : VisualDensity.standard,
             constraints: manHinhHep ? kichThuocNutNho : null,
@@ -3604,14 +3604,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           ),
           IconButton(
             icon: const Icon(Icons.keyboard_arrow_down),
-            tooltip: 'Kết quả tiếp theo',
+            tooltip: Ch.ketQuaTiepTheo(ngonNguHienTai.value),
             onPressed: _ketQuaTimKiem.isEmpty ? null : () => _dieuHuongTimKiem(1),
             visualDensity: manHinhHep ? VisualDensity.compact : VisualDensity.standard,
             constraints: manHinhHep ? kichThuocNutNho : null,
             padding: manHinhHep ? EdgeInsets.zero : const EdgeInsets.all(8),
           ),
           _NutXoaCoThongBao(
-            tooltip: 'Xoá nội dung tìm',
+            tooltip: Ch.xoaNoiDungTim(ngonNguHienTai.value),
             onXoa: () => _oTimKiem.clear(),
             nho: manHinhHep,
           ),
@@ -3658,7 +3658,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 focusNode: _focusThayThe,
                 decoration: const InputDecoration(
                   isDense: true,
-                  hintText: 'Thay thế những ký tự trên bằng ký tự gì?',
+                  hintText: Ch.thayTheKyTuTrenBangGi(ngonNguHienTai.value),
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -3682,13 +3682,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             child: Text(Ch.tatCaVienBan(ngonNguHienTai.value)),
           ),
           _NutXoaCoThongBao(
-            tooltip: 'Xoá nội dung thay thế',
+            tooltip: Ch.xoaNoiDungThayThe(ngonNguHienTai.value),
             onXoa: () => _oThayThe.clear(),
             nho: manHinhHep,
           ),
           IconButton(
             icon: const Icon(Icons.settings, size: 20),
-            tooltip: 'Cài đặt tìm kiếm và hướng dẫn thay thế',
+            tooltip: Ch.caiDatTimKiemVaThayThe(ngonNguHienTai.value),
             onPressed: _moCaiDatTimKiemVaHuongDanThayThe,
             visualDensity: manHinhHep ? VisualDensity.compact : VisualDensity.standard,
             constraints: manHinhHep ? kichThuocNutNho : null,
@@ -3783,7 +3783,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           ),
           IconButton(
             iconSize: 20,
-            tooltip: 'Xoá định dạng văn bản (Ctrl+Q)',
+            tooltip: Ch.xoaDinhDangVanBan(ngonNguHienTai.value),
             icon: const Icon(Icons.format_clear),
             visualDensity: matDoNut,
             constraints: kichThuocNut,
@@ -3792,8 +3792,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           ),
           IconButton(
             iconSize: 20,
-            tooltip: 'Tích chọn — chèn ô 🔲 đầu đoạn văn, gạch ngang cả đoạn '
-                'khi bấm chuyển thành ✅',
+            tooltip: Ch.tichChonCheckbox(ngonNguHienTai.value),
             icon: const Text('✅', style: TextStyle(fontSize: 16)),
             visualDensity: matDoNut,
             constraints: kichThuocNut,
@@ -3804,7 +3803,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           // xem `_apDungHoanDoiChuHoaThuong`.
           IconButton(
             iconSize: 20,
-            tooltip: 'Hoán đổi chữ Hoa chữ thường',
+            tooltip: Ch.hoanDoiHoaThuong(ngonNguHienTai.value),
             icon: const Text('Aa', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
             visualDensity: matDoNut,
             constraints: kichThuocNut,
@@ -3812,7 +3811,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             onPressed: () => _apDungHoanDoiChuHoaThuong(),
           ),
           PopupMenuButton<int>(
-            tooltip: 'Chọn kiểu Hoa/thường',
+            tooltip: Ch.chonKieuHoaThuong(ngonNguHienTai.value),
             icon: const Icon(Icons.arrow_drop_down, size: 18),
             padding: EdgeInsets.zero,
             onSelected: (kieu) => _apDungHoanDoiChuHoaThuong(kieuCoDinh: kieu),
@@ -5969,7 +5968,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       ),
                       IconButton(
                         icon: const Icon(Icons.close, color: Colors.red),
-                        tooltip: 'Đóng bảng',
+                        tooltip: Ch.dongBang(ngonNguHienTai.value),
                         onPressed: () => Navigator.of(ctx).pop(),
                       ),
                     ],
@@ -7537,7 +7536,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               Expanded(child: Text(Ch.tuDongChuyenHoaVanBan(ngonNguHienTai.value))),
               IconButton(
                 icon: const Icon(Icons.close, color: Colors.red),
-                tooltip: 'Đóng',
+                tooltip: Ch.dong(ngonNguHienTai.value),
                 onPressed: () => Navigator.of(ctx).pop(),
               ),
             ],
@@ -13655,7 +13654,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             Expanded(child: Text(Ch.danhSachPhimTat(ngonNguHienTai.value))),
             IconButton(
               icon: const Icon(Icons.close, color: Colors.red),
-              tooltip: 'Đóng',
+              tooltip: Ch.dong(ngonNguHienTai.value),
               onPressed: () => Navigator.of(ctx).pop(),
             ),
           ],
@@ -14082,7 +14081,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           maxLength: 500,
                           decoration: const InputDecoration(
                             border: OutlineInputBorder(),
-                            hintText: 'Ví dụ: chỉ giữ lại các ý chính về...',
+                            hintText: Ch.viDuChiGiuYChinh(ngonNguHienTai.value),
                             contentPadding: EdgeInsets.all(8),
                           ),
                         ),
@@ -14265,7 +14264,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           maxLength: 500,
                           decoration: const InputDecoration(
                             border: OutlineInputBorder(),
-                            hintText: 'Ví dụ: thêm ví dụ minh hoạ cho...',
+                            hintText: Ch.viDuThemViDuMinhHoa(ngonNguHienTai.value),
                             contentPadding: EdgeInsets.all(8),
                           ),
                         ),
@@ -14412,7 +14411,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   maxLength: 500,
                   decoration: const InputDecoration(
                     border: OutlineInputBorder(),
-                    hintText: 'Ví dụ: viết theo giọng trang trọng hơn...',
+                    hintText: Ch.viDuVietGiongTrangTrong(ngonNguHienTai.value),
                     contentPadding: EdgeInsets.all(8),
                   ),
                 ),
@@ -15717,7 +15716,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         // font icon chỉ giữ icon nào chắc chắn dùng được). Đổi qua emoji
         // (`Text`) — y hệt cách đã né lỗi này ở nút "🔤"/"🔼" bên dưới.
         icon: const Text('📋', style: TextStyle(fontSize: 18)),
-        tooltip: 'Bộ nhớ tạm để dán văn bản (${widget.caiDat.phimTatBoNhoTam.nhan})',
+        tooltip: Ch.boNhoTamCoPhimTat(
+            ngonNguHienTai.value, widget.caiDat.phimTatBoNhoTam.nhan),
         visualDensity: VisualDensity.compact,
         constraints: _kichThuocNutTren,
         padding: EdgeInsets.zero,
@@ -15747,7 +15747,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           child: IconButton(
             onPressed: _cuonVanBanLenDauTrang,
             icon: const Icon(Icons.arrow_upward, size: 20),
-            tooltip: 'Cuộn lên đầu văn bản',
+            tooltip: Ch.cuonLenDauVanBan(ngonNguHienTai.value),
             visualDensity: VisualDensity.compact,
             constraints: _kichThuocNutTren,
             padding: EdgeInsets.zero,
@@ -15758,7 +15758,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           child: IconButton(
             onPressed: _cuonVanBanXuongCuoiTrang,
             icon: const Icon(Icons.arrow_downward, size: 20),
-            tooltip: 'Cuộn xuống cuối văn bản',
+            tooltip: Ch.cuonXuongCuoiVanBan(ngonNguHienTai.value),
             visualDensity: VisualDensity.compact,
             constraints: _kichThuocNutTren,
             padding: EdgeInsets.zero,
@@ -15778,7 +15778,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         IconButton(
           onPressed: _lichSuLui.isEmpty ? null : _lui,
           icon: const Icon(Icons.undo, size: 22),
-          tooltip: 'Lùi lại (Ctrl + Z)',
+          tooltip: Ch.luiLaiCoPhimTat(ngonNguHienTai.value),
           visualDensity: VisualDensity.compact,
           constraints: _kichThuocNutTren,
           padding: EdgeInsets.zero,
@@ -15786,7 +15786,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         IconButton(
           onPressed: _lichSuToi.isEmpty ? null : _toi,
           icon: const Icon(Icons.redo, size: 22),
-          tooltip: 'Tiến tới (Ctrl + Shift + Z)',
+          tooltip: Ch.tienToiCoPhimTat(ngonNguHienTai.value),
           visualDensity: VisualDensity.compact,
           constraints: _kichThuocNutTren,
           padding: EdgeInsets.zero,
@@ -15863,7 +15863,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             unawaited(_dayCaiDatDongBoTaiKhoan({'thuGonThanhCongCu': true}));
           },
           icon: const Text('🔼', style: TextStyle(fontSize: 18)),
-          tooltip: 'Thu gọn — ẩn hết thanh công cụ phía trên',
+          tooltip: Ch.thuGonAnThanhCongCu(ngonNguHienTai.value),
           visualDensity: VisualDensity.compact,
           constraints: _kichThuocNutTren,
           padding: EdgeInsets.zero,
@@ -18124,7 +18124,7 @@ class _NutMauDinhDang extends StatelessWidget {
           ),
           IconButton(
             iconSize: 18,
-            tooltip: 'Chọn màu khác',
+            tooltip: Ch.chonMauKhac(ngonNguHienTai.value),
             icon: const Icon(Icons.arrow_drop_down),
             onPressed: () => showDialog<void>(
               context: context,
@@ -18136,7 +18136,7 @@ class _NutMauDinhDang extends StatelessWidget {
                     Expanded(child: Text(Ch.chonMau(ngonNguHienTai.value))),
                     IconButton(
                       icon: const Icon(Icons.close, color: Colors.red),
-                      tooltip: 'Đóng',
+                      tooltip: Ch.dong(ngonNguHienTai.value),
                       onPressed: () => Navigator.of(dialogCtx).pop(),
                     ),
                   ],
@@ -18346,7 +18346,7 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
             Expanded(child: Text(Ch.huongDanBoNhoTam(ngonNguHienTai.value))),
             IconButton(
               icon: const Icon(Icons.close, color: Colors.red),
-              tooltip: 'Đóng',
+              tooltip: Ch.dong(ngonNguHienTai.value),
               onPressed: () => Navigator.of(ctx).pop(),
             ),
           ],
@@ -18568,7 +18568,7 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
               opacity: rong ? 0.35 : 1.0,
               child: const Text('📖', style: TextStyle(fontSize: 16)),
             ),
-            tooltip: 'Thêm nhanh vào Từ điển nhập liệu nhanh',
+            tooltip: Ch.themNhanhVaoTuDien(ngonNguHienTai.value),
             visualDensity: VisualDensity.compact,
             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             padding: EdgeInsets.zero,
@@ -18592,7 +18592,7 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
           IconButton(
             onPressed: () => Navigator.of(context).pop(),
             icon: const Icon(Icons.close, color: Colors.red),
-            tooltip: 'Đóng',
+            tooltip: Ch.dong(ngonNguHienTai.value),
             visualDensity: VisualDensity.compact,
           ),
         ],
@@ -18872,7 +18872,7 @@ class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNha
             Expanded(child: Text(Ch.huongDanTuDienNhapLieuNhanh(ngonNguHienTai.value))),
             IconButton(
               icon: const Icon(Icons.close, color: Colors.red),
-              tooltip: 'Đóng',
+              tooltip: Ch.dong(ngonNguHienTai.value),
               onPressed: () => Navigator.of(ctx).pop(),
             ),
           ],
@@ -19082,7 +19082,7 @@ class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNha
           IconButton(
             onPressed: () => Navigator.of(context).pop(),
             icon: const Icon(Icons.close, color: Colors.red),
-            tooltip: 'Đóng',
+            tooltip: Ch.dong(ngonNguHienTai.value),
             visualDensity: VisualDensity.compact,
           ),
         ],
@@ -19475,7 +19475,7 @@ class _HopThoaiThemNhanhTuDienState extends State<_HopThoaiThemNhanhTuDien>
               IconButton(
                 onPressed: () => _bamDong(i),
                 icon: const Icon(Icons.add_circle_outline, size: 18),
-                tooltip: 'Thêm nội dung vào dòng này',
+                tooltip: Ch.themNoiDungVaoDongNay(ngonNguHienTai.value),
                 visualDensity: VisualDensity.compact,
                 constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
                 padding: EdgeInsets.zero,
@@ -19558,7 +19558,7 @@ class _HopThoaiThemNhanhTuDienState extends State<_HopThoaiThemNhanhTuDien>
           IconButton(
             onPressed: () => Navigator.of(context).pop(),
             icon: const Icon(Icons.close, color: Colors.red),
-            tooltip: 'Đóng',
+            tooltip: Ch.dong(ngonNguHienTai.value),
             visualDensity: VisualDensity.compact,
           ),
         ],
