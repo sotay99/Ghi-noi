@@ -328,10 +328,14 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     // (YÊU CẦU MỚI) Đứng NGAY tại gốc (không phải một thư mục con nào bên
     // trong) — đổi tên hiển thị, xem màu ở `_dongTenThuMuc`.
     if (_thuMucHienTaiId == thuMucGoc) {
-      return _laKhoDamMay ? 'Bộ nhớ trên đám mây' : 'Bộ nhớ Nội bộ';
+      return _laKhoDamMay
+          ? Ch.boNhoTrenDamMay(ngonNguHienTai.value)
+          : Ch.boNhoNoiBo(ngonNguHienTai.value);
     }
     return _kho.timThuMuc(_thuMucHienTaiId)?.ten ??
-        (_laKhoDamMay ? 'Bộ nhớ trên đám mây' : 'Bộ nhớ Nội bộ');
+        (_laKhoDamMay
+              ? Ch.boNhoTrenDamMay(ngonNguHienTai.value)
+              : Ch.boNhoNoiBo(ngonNguHienTai.value));
   }
 
   /// (YÊU CẦU MỚI) "Bộ nhớ được chia sẻ với bạn" — để dành cho sau này,
@@ -566,7 +570,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(null),
-                child: const Text('Huỷ'),
+                child: Text(Ch.huy(ngonNguHienTai.value)),
               ),
               FilledButton(
                 onPressed: () {
@@ -577,7 +581,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                   }
                   Navigator.of(ctx).pop(bo.text.trim());
                 },
-                child: const Text('Lưu'),
+                child: Text(Ch.luu(ngonNguHienTai.value)),
               ),
             ],
           );
@@ -640,7 +644,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(null),
-            child: const Text('Huỷ'),
+            child: Text(Ch.huy(ngonNguHienTai.value)),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(bo.text),
@@ -1099,7 +1103,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   Future<void> _chonMauNhieu() async {
     final mau = await hienThiChonMauCoBanChoTen(
       context,
-      tieuDe: 'Chọn màu cho tên',
+      tieuDe: Ch.chonMauChoTen(ngonNguHienTai.value),
     );
     if (mau == null) return;
     for (final id in _dsThuMucDaChon) {
@@ -1168,14 +1172,14 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                     value: daChonHet,
                     onChanged: (v) => _datChonTatCa(v ?? false, noiDung),
                   ),
-                  const Text('Chọn tất cả'),
+                  Text(Ch.chonTatCa(ngonNguHienTai.value)),
                 ],
               ),
             ),
             TextButton(
               onPressed: _huyChonNhieu,
               style: TextButton.styleFrom(foregroundColor: Colors.red.shade600),
-              child: const Text('Hủy chọn nhiều'),
+              child: Text(Ch.huyChonNhieu(ngonNguHienTai.value)),
             ),
           ],
         ),
@@ -1212,7 +1216,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
               TextButton.icon(
                 onPressed: coChon ? _chonMauNhieu : null,
                 icon: const Icon(Icons.format_color_text_outlined, size: 18),
-                label: const Text('Chọn màu cho tên'),
+                label: Text(Ch.chonMauChoTen(ngonNguHienTai.value)),
               ),
               TextButton.icon(
                 onPressed: coChon ? _xoaNhieuVaoThungRac : null,
@@ -1358,12 +1362,12 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : Icon(Icons.cloud_outlined, color: Colors.lightBlue.shade400),
-          title: const Text('Bộ nhớ trên đám mây'),
+          title: Text(Ch.boNhoTrenDamMay(ngonNguHienTai.value)),
           onTap: _dangTaiDamMay ? null : _vaoBoNhoDamMay,
         ),
         ListTile(
           leading: Icon(Icons.folder_shared_outlined, color: Colors.green.shade600),
-          title: const Text('Bộ nhớ được chia sẻ với bạn'),
+          title: Text(Ch.boNhoDuocChiaSeVoiBan(ngonNguHienTai.value)),
           onTap: _baoDangNangCap,
         ),
       ],
@@ -1383,12 +1387,12 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
           TextButton.icon(
             onPressed: _veTrangSoanThao,
             icon: const Icon(Icons.arrow_back, size: 18),
-            label: const Text('Quay lại Trang soạn thảo'),
+            label: Text(Ch.quayLaiTrangSoanThao(ngonNguHienTai.value)),
           ),
           TextButton.icon(
             onPressed: _toiViTriTepDangSoanThao,
             icon: const Icon(Icons.my_location, size: 18),
-            label: const Text('Vị trí Tệp đang soạn thảo'),
+            label: Text(Ch.viTriTepDangSoanThao(ngonNguHienTai.value)),
           ),
         ],
       ),
@@ -1525,7 +1529,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                         Icon(Icons.arrow_upward,
                             size: 18, color: !dangNguoc ? null : const Color(0xFF9AA0A6)),
                         const SizedBox(width: 10),
-                        const Text('Sắp xếp A → Z'),
+                        Text(Ch.sapXepATrenZ(ngonNguHienTai.value)),
                         if (!dangNguoc) ...[
                           const SizedBox(width: 6),
                           const Icon(Icons.check, size: 18),
@@ -1538,7 +1542,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                         Icon(Icons.arrow_downward,
                             size: 18, color: dangNguoc ? null : const Color(0xFF9AA0A6)),
                         const SizedBox(width: 10),
-                        const Text('Sắp xếp Z → A'),
+                        Text(Ch.sapXepZTrenA(ngonNguHienTai.value)),
                         if (dangNguoc) ...[
                           const SizedBox(width: 6),
                           const Icon(Icons.check, size: 18),
@@ -1814,7 +1818,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                       TextButton(
                         onPressed: _tatTimKiem,
                         style: TextButton.styleFrom(foregroundColor: Colors.red.shade600),
-                        child: const Text('Tắt'),
+                        child: Text(Ch.tat(ngonNguHienTai.value)),
                       ),
                     ],
                   ),
@@ -2176,11 +2180,11 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                         ),
                         TextButton(
                           onPressed: _huyChoDan,
-                          child: const Text('Huỷ'),
+                          child: Text(Ch.huy(ngonNguHienTai.value)),
                         ),
                         FilledButton(
                           onPressed: _dan,
-                          child: const Text('Dán'),
+                          child: Text(Ch.dan(ngonNguHienTai.value)),
                         ),
                       ],
                     ),
@@ -2214,11 +2218,11 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                         ),
                         TextButton(
                           onPressed: _huyZipDangChoNhap,
-                          child: const Text('Huỷ'),
+                          child: Text(Ch.huy(ngonNguHienTai.value)),
                         ),
                         FilledButton(
                           onPressed: _dayZipVaoDay,
-                          child: const Text('Đưa vào chỗ này'),
+                          child: Text(Ch.duaVaoChoNay(ngonNguHienTai.value)),
                         ),
                       ],
                     ),

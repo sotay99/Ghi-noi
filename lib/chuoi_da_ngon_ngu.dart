@@ -496,6 +496,45 @@ class Ch {
   static String khongCoTepHopLeDeNhapTxtQua2Mb(NgonNgu nn) => nn == NgonNgu.vi
       ? 'Không có tệp hợp lệ để nhập — tệp TXT quá 2 MB đã bị bỏ qua'
       : 'No valid files to import — TXT files over 2 MB were skipped';
+
+  // ------------------------------------------------- Cây thư mục (lượt dịch tiếp)
+  static String luu(NgonNgu nn) => nn == NgonNgu.vi ? 'Lưu' : 'Save';
+
+  static String tat(NgonNgu nn) => nn == NgonNgu.vi ? 'Tắt' : 'Turn off';
+
+  static String dan(NgonNgu nn) => nn == NgonNgu.vi ? 'Dán' : 'Paste';
+
+  static String huyChonNhieu(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Hủy chọn nhiều' : 'Cancel multi-select';
+
+  static String chonMauChoTen(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chọn màu cho tên' : 'Choose a name color';
+
+  static String boNhoNoiBo(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Bộ nhớ Nội bộ' : 'Local storage';
+
+  static String boNhoTrenDamMay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Bộ nhớ trên đám mây' : 'Cloud storage';
+
+  static String boNhoDuocChiaSeVoiBan(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bộ nhớ được chia sẻ với bạn'
+      : 'Storage shared with you';
+
+  static String quayLaiTrangSoanThao(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Quay lại Trang soạn thảo' : 'Back to the editor';
+
+  static String viTriTepDangSoanThao(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Vị trí Tệp đang soạn thảo'
+      : 'Location of the file being edited';
+
+  static String sapXepATrenZ(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Sắp xếp A → Z' : 'Sort A → Z';
+
+  static String sapXepZTrenA(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Sắp xếp Z → A' : 'Sort Z → A';
+
+  static String duaVaoChoNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đưa vào chỗ này' : 'Move here';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt
