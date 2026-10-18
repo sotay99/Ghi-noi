@@ -7452,14 +7452,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// để bảng điều khiển (`_BangDieuKhienGhiAm`, một route riêng dựng MỘT
   /// LẦN qua `showGeneralDialog`, không tự rebuild theo `setState` của
   /// trang) vẫn thấy cập nhật khi đang mở — xem `_hoanThanhChuyenThanhVanBan`.
-  final ValueNotifier<String?> _nhanTrangThaiGhiAmGheDe = ValueNotifier(null);
+  final ValueNotifier<TrangThaiGheDe?> _nhanTrangThaiGhiAmGheDe = ValueNotifier(null);
 
   /// Còn gì để "Xoá bản này" ở nút Xoá không — chỉ đúng khi thẻ vừa chốt ĐÃ
   /// chuyển hoá xong hẳn (thành công), không còn gì đang ghi/đang gửi/lỗi
   /// chờ gửi lại để xoá nữa. Dùng đổi nhãn nút "Xoá bản này-Đóng trình ghi
   /// âm" thành chỉ "Đóng trình ghi âm" khi không còn gì để xoá.
   bool get _khongCoGiDeXoaTrongTrinhGhiAm =>
-      (_nhanTrangThaiGhiAmGheDe.value ?? '').startsWith('Đã chuyển xong');
+      _nhanTrangThaiGhiAmGheDe.value?.loai == LoaiTrangThaiGheDe.daChuyenXong;
 
   /// Bộ nhớ đệm văn bản AI đã trả về, theo số thẻ — sống suốt phiên làm
   /// việc, KHÔNG mất khi thẻ bị xoá khỏi văn bản (khác với 3 map/set ở
@@ -8206,12 +8206,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _dongBangDieuKhienGhiAmNeuMo();
     if (mounted) setState(() => _trinhGhiAmMo = false);
     if (soThe == null) return;
-    _nhanTrangThaiGhiAmGheDe.value = 'Đang chuyển #$soThe';
+    _nhanTrangThaiGhiAmGheDe.value = TrangThaiGheDe(LoaiTrangThaiGheDe.dangChuyen, soThe);
     unawaited(_guiVaXuLyMotThe(soThe, baoLoi: true).then((_) {
       if (!mounted) return;
-      _nhanTrangThaiGhiAmGheDe.value = _vanBanDaTraVeTheoTheGhiAm.containsKey(soThe)
-          ? 'Đã chuyển xong #$soThe'
-          : 'Lỗi khi chuyển #$soThe — thử lại sau';
+      _nhanTrangThaiGhiAmGheDe.value = TrangThaiGheDe(
+          _vanBanDaTraVeTheoTheGhiAm.containsKey(soThe)
+              ? LoaiTrangThaiGheDe.daChuyenXong
+              : LoaiTrangThaiGheDe.loiKhiChuyen,
+          soThe,
+        );
     }));
   }
 
@@ -8351,9 +8354,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // bỏ qua mọi việc chèn/gắn lại nhãn (xem `if (viTri >= 0)` ở đó), không
     // cần thêm cờ "đã huỷ" riêng.
     final gheDe = _nhanTrangThaiGhiAmGheDe.value;
-    if (gheDe != null && gheDe.startsWith('Đang chuyển')) {
-      final soThe = int.tryParse(RegExp(r'\d+').firstMatch(gheDe)?.group(0) ?? '');
-      if (soThe != null) _xoaTokenDangChuyenKhoiVanBanNeuCon(soThe);
+    if (gheDe != null && gheDe.loai == LoaiTrangThaiGheDe.dangChuyen) {
+      _xoaTokenDangChuyenKhoiVanBanNeuCon(gheDe.soThe);
     }
     _nhanTrangThaiGhiAmGheDe.value = null;
     await _huyThangBanGhiDangDoDang();
@@ -8904,7 +8906,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         // điều khiển rơi vào nhánh "Đang chuẩn bị…" (chỉ đúng nghĩa trong
         // khoảnh khắc BẮT ĐẦU một thẻ MỚI, không đúng cho trạng thái này)
         // — giờ gán đúng nghĩa: đã ghi xong, còn chờ chuyển hoá tay.
-        setState(() => _nhanTrangThaiGhiAmGheDe.value = 'Đã ghi xong #$soThe — chưa chuyển hoá');
+        setState(() => _nhanTrangThaiGhiAmGheDe.value =
+            TrangThaiGheDe(LoaiTrangThaiGheDe.daGhiXongChuaChuyen, soThe));
         return;
       }
       // Bấm "Chuyển hoá..." ngay trong modal nghe lại — đóng NGAY cả bảng
@@ -8913,12 +8916,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // chuyển ở nền sau).
       _dongBangDieuKhienGhiAmNeuMo();
       if (mounted) setState(() => _trinhGhiAmMo = false);
-      _nhanTrangThaiGhiAmGheDe.value = 'Đang chuyển #$soThe';
+      _nhanTrangThaiGhiAmGheDe.value = TrangThaiGheDe(LoaiTrangThaiGheDe.dangChuyen, soThe);
       unawaited(_guiVaXuLyMotThe(soThe, baoLoi: true).then((_) {
         if (!mounted) return;
-        _nhanTrangThaiGhiAmGheDe.value = _vanBanDaTraVeTheoTheGhiAm.containsKey(soThe)
-            ? 'Đã chuyển xong #$soThe'
-            : 'Lỗi khi chuyển #$soThe — thử lại sau';
+        _nhanTrangThaiGhiAmGheDe.value = TrangThaiGheDe(
+            _vanBanDaTraVeTheoTheGhiAm.containsKey(soThe)
+                ? LoaiTrangThaiGheDe.daChuyenXong
+                : LoaiTrangThaiGheDe.loiKhiChuyen,
+            soThe,
+          );
       }));
     } finally {
       _dangMoModalNgheLaiGhiAm = false;
@@ -16300,12 +16306,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // còn ghi âm thật nữa, đứng yên không lượn sóng, thay hẳn cho đồng hồ
       // ghi âm cho tới khi bắt đầu ghi thẻ mới (`_nhanTrangThaiGhiAmGheDe`
       // reset về null lúc đó).
-      child: ValueListenableBuilder<String?>(
+      child: ValueListenableBuilder<TrangThaiGheDe?>(
         valueListenable: _nhanTrangThaiGhiAmGheDe,
         builder: (context, ghe, _) {
           if (ghe != null) {
             return Text(
-              ghe,
+              Ch.trangThaiGheDe(ghe.loai, ghe.soThe, ngonNguHienTai.value),
               style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold, fontSize: coChu),
             );
           }
@@ -16424,8 +16430,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // Không còn gì để xoá (thẻ vừa chốt đã chuyển hoá xong hẳn) — chỉ
       // còn ý nghĩa "đóng trình ghi âm" đơn thuần.
       nhan: _khongCoGiDeXoaTrongTrinhGhiAm
-          ? 'Đóng trình ghi âm'
-          : 'Xoá bản này-Đóng trình ghi âm',
+          ? Ch.dongTrinhGhiAm(ngonNguHienTai.value)
+          : Ch.xoaBanNayDongTrinhGhiAm(ngonNguHienTai.value),
       icon: Icons.delete_outline,
       mauNen: Colors.red.shade100,
       mauChu: Colors.red.shade900,
@@ -17534,7 +17540,7 @@ class _BangDieuKhienGhiAm extends StatefulWidget {
 
   /// Đè nhãn "Đang chuyển #N"/"Đã chuyển xong #N" khi thẻ vừa chốt không
   /// còn ghi âm thật nữa — xem `_TrangSoanThaoState._nhanTrangThaiGhiAmGheDe`.
-  final ValueNotifier<String?> trangThaiGheDe;
+  final ValueNotifier<TrangThaiGheDe?> trangThaiGheDe;
   final ValueNotifier<int> songAmTick;
   final List<double> songAm;
   final bool dangTamDungBanDau;
@@ -17774,11 +17780,11 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
               // ở AppBar, để bảng điều khiển (nếu còn mở lúc bấm "Hoàn
               // thành-Chuyển thành văn bản") cũng đổi chữ theo đúng thời
               // gian thực.
-              child: ValueListenableBuilder<String?>(
+              child: ValueListenableBuilder<TrangThaiGheDe?>(
                 valueListenable: widget.trangThaiGheDe,
                 builder: (context, ghe, _) => ghe != null
                     ? Text(
-                        ghe,
+                        Ch.trangThaiGheDe(ghe.loai, ghe.soThe, ngonNguHienTai.value),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.red.shade700,
@@ -17917,15 +17923,15 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
                       // Nhãn đổi thành "Đóng trình ghi âm" khi không còn gì
                       // để xoá (thẻ vừa chốt đã chuyển hoá xong hẳn) — y hệt
                       // nút "Xoá bản này" ở AppBar (`_khongCoGiDeXoaTrongTrinhGhiAm`).
-                      ValueListenableBuilder<String?>(
+                      ValueListenableBuilder<TrangThaiGheDe?>(
                         valueListenable: widget.trangThaiGheDe,
                         builder: (context, ghe, _) => _oHang(
                           nhanPhim: 'phím 5',
                           icon: Icons.delete_outline,
                           mau: Colors.red.shade900,
-                          nhan: (ghe ?? '').startsWith('Đã chuyển xong')
-                              ? 'Đóng trình ghi âm'
-                              : 'Xoá bản này và Đóng trình ghi âm',
+                          nhan: ghe?.loai == LoaiTrangThaiGheDe.daChuyenXong
+                              ? Ch.dongTrinhGhiAm(ngonNguHienTai.value)
+                              : Ch.xoaBanNayVaDongTrinhGhiAm(ngonNguHienTai.value),
                           onBam: _cacHanhDongPhimSo[4],
                           manHinhHep: manHinhHep,
                         ),

@@ -61,3 +61,17 @@ Future<void> datNgonNgu(NgonNgu nn) async {
   await kho.setString(_khoaNgonNgu, nn == NgonNgu.en ? 'en' : 'vi');
   await kho.setBool(_khoaDaChonNgonNgu, true);
 }
+
+/// Trạng thái của thẻ ghi âm vừa chốt (không còn ghi âm thật nữa, đang gửi
+/// AI hoặc đã có kết quả) — tách RIÊNG khỏi chuỗi hiển thị để so khớp nội
+/// bộ (`startsWith`/`==` trên chuỗi tiếng Việt cũ) không bị phá khi người
+/// dùng đổi ngôn ngữ. Chuỗi hiển thị dịch qua `Ch.trangThaiGheDe` ở
+/// `chuoi_da_ngon_ngu.dart`. Đặt ở đây (không phải `trang_soan_thao.dart`)
+/// để tránh import vòng với `chuoi_da_ngon_ngu.dart`.
+enum LoaiTrangThaiGheDe { dangChuyen, daChuyenXong, loiKhiChuyen, daGhiXongChuaChuyen }
+
+class TrangThaiGheDe {
+  const TrangThaiGheDe(this.loai, this.soThe);
+  final LoaiTrangThaiGheDe loai;
+  final int soThe;
+}

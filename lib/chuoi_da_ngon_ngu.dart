@@ -775,6 +775,34 @@ class Ch {
   static String boNhoTamCoPhimTat(NgonNgu nn, String phimTat) => nn == NgonNgu.vi
       ? 'Bộ nhớ tạm để dán văn bản ($phimTat)'
       : 'Clipboard for pasting text ($phimTat)';
+
+  /// Nhãn trạng thái của thẻ ghi âm vừa chốt (không còn ghi âm thật nữa) —
+  /// xem `LoaiTrangThaiGheDe`/`TrangThaiGheDe` ở `trang_soan_thao.dart`.
+  static String trangThaiGheDe(LoaiTrangThaiGheDe loai, int soThe, NgonNgu nn) {
+    switch (loai) {
+      case LoaiTrangThaiGheDe.dangChuyen:
+        return nn == NgonNgu.vi ? 'Đang chuyển #$soThe' : 'Converting #$soThe';
+      case LoaiTrangThaiGheDe.daChuyenXong:
+        return nn == NgonNgu.vi ? 'Đã chuyển xong #$soThe' : 'Converted #$soThe';
+      case LoaiTrangThaiGheDe.loiKhiChuyen:
+        return nn == NgonNgu.vi
+            ? 'Lỗi khi chuyển #$soThe — thử lại sau'
+            : 'Error converting #$soThe — try again later';
+      case LoaiTrangThaiGheDe.daGhiXongChuaChuyen:
+        return nn == NgonNgu.vi
+            ? 'Đã ghi xong #$soThe — chưa chuyển hoá'
+            : 'Recording #$soThe done — not converted yet';
+    }
+  }
+
+  static String dongTrinhGhiAm(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đóng trình ghi âm' : 'Close voice recorder';
+  static String xoaBanNayVaDongTrinhGhiAm(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Xoá bản này và Đóng trình ghi âm'
+      : 'Delete this recording and close';
+  static String xoaBanNayDongTrinhGhiAm(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Xoá bản này-Đóng trình ghi âm'
+      : 'Delete this recording-Close';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt
