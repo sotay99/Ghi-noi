@@ -2473,7 +2473,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final dongY = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Xác nhận thay thế'),
+        title: Text(Ch.xacNhanThayThe(ngonNguHienTai.value)),
         content: RichText(
           text: TextSpan(
             style: const TextStyle(color: Colors.black87, fontSize: 15),
@@ -2497,11 +2497,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Huỷ'),
+            child: Text(Ch.huy(ngonNguHienTai.value)),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Chấp nhận'),
+            child: Text(Ch.chapNhan(ngonNguHienTai.value)),
           ),
         ],
       ),
@@ -2654,7 +2654,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           }
 
           return AlertDialog(
-            title: const Text('Cài đặt tìm kiếm và hướng dẫn thay thế'),
+            title: Text(Ch.caiDatTimKiemVaThayThe(ngonNguHienTai.value)),
             content: SizedBox(
               width: 360,
               child: SingleChildScrollView(
@@ -2730,7 +2730,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Đã hiểu'),
+                child: Text(Ch.daHieu(ngonNguHienTai.value)),
               ),
             ],
           );
@@ -3625,7 +3625,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               minimumSize: manHinhHep ? const Size(0, 36) : null,
             ),
             onPressed: _dongTimKiem,
-            child: const Text('Tắt'),
+            child: Text(Ch.tat(ngonNguHienTai.value)),
           ),
         ],
       ),
@@ -3671,7 +3671,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               minimumSize: manHinhHep ? const Size(0, 36) : null,
             ),
             onPressed: _ketQuaTimKiem.isEmpty ? null : _thayChoNay,
-            child: const Text('Thay chỗ này'),
+            child: Text(Ch.thayChoNay(ngonNguHienTai.value)),
           ),
           TextButton(
             style: TextButton.styleFrom(
@@ -3679,7 +3679,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               minimumSize: manHinhHep ? const Size(0, 36) : null,
             ),
             onPressed: _ketQuaTimKiem.isEmpty ? null : _xacNhanThayTatCa,
-            child: const Text('Tất cả'),
+            child: Text(Ch.tatCaVienBan(ngonNguHienTai.value)),
           ),
           _NutXoaCoThongBao(
             tooltip: 'Xoá nội dung thay thế',
@@ -3834,14 +3834,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   }
                 });
                 return const [
-                  PopupMenuItem<int>(enabled: false, child: Text('Chưa có vùng chọn')),
+                  PopupMenuItem<int>(enabled: false, child: Text(Ch.chuaCoVungChon(ngonNguHienTai.value))),
                 ];
               }
               return const [
-                PopupMenuItem(value: 0, child: Text('Viết Hoa chữ đầu tiên ở tất cả các từ')),
-                PopupMenuItem(value: 1, child: Text('Viết Hoa tất cả các ký tự')),
-                PopupMenuItem(value: 2, child: Text('Viết thường tất cả các ký tự')),
-                PopupMenuItem(value: 3, child: Text('Viết Hoa chữ đầu tiên của từ đầu tiên')),
+                PopupMenuItem(value: 0, child: Text(Ch.vietHoaChuDauMoiTu(ngonNguHienTai.value))),
+                PopupMenuItem(value: 1, child: Text(Ch.vietHoaTatCaKyTu(ngonNguHienTai.value))),
+                PopupMenuItem(value: 2, child: Text(Ch.vietThuongTatCaKyTu(ngonNguHienTai.value))),
+                PopupMenuItem(value: 3, child: Text(Ch.vietHoaChuDauCau(ngonNguHienTai.value))),
               ];
             },
           ),
@@ -4628,16 +4628,16 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         final chac = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Đăng xuất'),
-            content: const Text('Bạn có chắc chắn muốn đăng xuất không?'),
+            title: Text(Ch.dangXuat(ngonNguHienTai.value)),
+            content: Text(Ch.xacNhanDangXuat(ngonNguHienTai.value)),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('Huỷ'),
+                child: Text(Ch.huy(ngonNguHienTai.value)),
               ),
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('Đăng xuất'),
+                child: Text(Ch.dangXuat(ngonNguHienTai.value)),
               ),
             ],
           ),
@@ -5327,7 +5327,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, capNhat) {
           return AlertDialog(
-            title: const Text('Tạo tệp văn bản mới'),
+            title: Text(Ch.taoTepVanBanMoi(ngonNguHienTai.value)),
             content: TextField(
               controller: bo,
               autofocus: true,
@@ -5346,7 +5346,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(null),
-                child: const Text('Huỷ'),
+                child: Text(Ch.huy(ngonNguHienTai.value)),
               ),
               FilledButton(
                 onPressed: () {
@@ -5357,7 +5357,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   }
                   Navigator.of(ctx).pop(bo.text.trim());
                 },
-                child: const Text('Tạo'),
+                child: Text(Ch.tao(ngonNguHienTai.value)),
               ),
             ],
           );
@@ -6031,7 +6031,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       Expanded(
                         child: OutlinedButton(
                           onPressed: () => Navigator.of(ctx).pop(),
-                          child: const Text('Đóng bảng'),
+                          child: Text(Ch.dongBang(ngonNguHienTai.value)),
                         ),
                       ),
                     ],
@@ -7534,7 +7534,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           // gọn gàng ở góc trên bên phải.
           title: Row(
             children: [
-              const Expanded(child: Text('Tự động chuyển hoá văn bản')),
+              Expanded(child: Text(Ch.tuDongChuyenHoaVanBan(ngonNguHienTai.value))),
               IconButton(
                 icon: const Icon(Icons.close, color: Colors.red),
                 tooltip: 'Đóng',
@@ -7557,7 +7557,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 const SizedBox(height: 8),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Tự động chuyển hoá'),
+                  title: Text(Ch.tuDongChuyenHoa(ngonNguHienTai.value)),
                   value: batTam,
                   onChanged: (v) async {
                     capNhatModal(() => batTam = v);
@@ -7617,7 +7617,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, capNhatModal) => AlertDialog(
-          title: const Text('Cài đặt chế độ tự động Mở bảng điều khiển trình ghi âm'),
+          title: Text(Ch.caiDatTuDongMoBangGhiAm(ngonNguHienTai.value)),
           content: SizedBox(
             width: 360,
             child: Column(
@@ -7694,13 +7694,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Huỷ')),
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(Ch.huy(ngonNguHienTai.value))),
             FilledButton(
               onPressed: () async {
                 await widget.caiDat.datTuDongMoBangDieuKhienGhiAm(chonTam);
                 if (ctx.mounted) Navigator.of(ctx).pop();
               },
-              child: const Text('Lưu'),
+              child: Text(Ch.luu(ngonNguHienTai.value)),
             ),
           ],
         ),
@@ -8089,28 +8089,28 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   Navigator.of(context).pop();
                   _chotTheGhiAmVaBatDauTheMoiDoQuaGioiHan(tuDong: false);
                 },
-                child: const Text('Tạo bản ghi âm mới'),
+                child: Text(Ch.taoBanGhiAmMoi(ngonNguHienTai.value)),
               ),
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pop();
                   _hoanThanhChuyenThanhVanBan();
                 },
-                child: const Text('Hoàn thành đoạn này và chuyển thành văn bản'),
+                child: Text(Ch.hoanThanhDoanVaChuyenVanBan(ngonNguHienTai.value)),
               ),
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pop();
                   _hoanThanhPhatDeNgheLai();
                 },
-                child: const Text('Hoàn thành đoạn này và phát lại để nghe'),
+                child: Text(Ch.hoanThanhDoanVaPhatLai(ngonNguHienTai.value)),
               ),
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pop();
                   _dongTrinhGhiAmThe();
                 },
-                child: const Text('Hoàn thành đoạn này và đóng trình ghi âm'),
+                child: Text(Ch.hoanThanhDoanVaDongTrinhGhiAm(ngonNguHienTai.value)),
               ),
             ],
           );
@@ -8315,7 +8315,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       final dongY = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Xoá bản ghi âm đang dở dang?'),
+          title: Text(Ch.xoaBanGhiAmDangDoDang(ngonNguHienTai.value)),
           content: Text(
             'Bản ghi âm đang dở dang này đã ghi được '
             '${dinhDangMmSs(_thoiLuongTheGhiAmDangGhi.value)}. Xoá đi sẽ mất '
@@ -8326,7 +8326,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Không, giữ lại'),
+              child: Text(Ch.khongGiuLai(ngonNguHienTai.value)),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
@@ -8642,7 +8642,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           child: Row(children: [
             Icon(Icons.transcribe, size: 18, color: Color(0xFF5F6368)),
             SizedBox(width: 10),
-            Text('Chuyển hoá TẤT CẢ thẻ ghi âm'),
+            Text(Ch.chuyenHoaTatCaTheGhiAm(ngonNguHienTai.value)),
           ]),
         ),
         const PopupMenuItem(
@@ -8650,7 +8650,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           child: Row(children: [
             Icon(Icons.graphic_eq, size: 18, color: Color(0xFF5F6368)),
             SizedBox(width: 10),
-            Text('Chỉ chuyển hoá thẻ này'),
+            Text(Ch.chiChuyenHoaTheNay(ngonNguHienTai.value)),
           ]),
         ),
         const PopupMenuItem(
@@ -8658,7 +8658,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           child: Row(children: [
             Icon(Icons.play_circle_outline, size: 18, color: Color(0xFF5F6368)),
             SizedBox(width: 10),
-            Text('Nghe bản ghi âm này'),
+            Text(Ch.ngheBanGhiAmNay(ngonNguHienTai.value)),
           ]),
         ),
         PopupMenuItem(
@@ -8674,7 +8674,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           child: Row(children: [
             Icon(Icons.swap_vert, size: 18, color: Color(0xFF5F6368)),
             SizedBox(width: 10),
-            Text('Thay đổi vị trí của thẻ này'),
+            Text(Ch.thayDoiViTriTheNay(ngonNguHienTai.value)),
           ]),
         ),
       ],
@@ -8874,7 +8874,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         await showDialog<void>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Không còn bản ghi âm'),
+            title: Text(Ch.khongConBanGhiAm(ngonNguHienTai.value)),
             content: const Text(
               'Cái thẻ này đã được chuyển hoá rồi nên không còn bản ghi âm '
               'nào nữa. Bạn chỉ có thể bấm nút Chuyển hoá thì có thể xem toàn '
@@ -8883,7 +8883,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Đã hiểu'),
+                child: Text(Ch.daHieu(ngonNguHienTai.value)),
               ),
             ],
           ),
@@ -8984,7 +8984,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           child: Row(children: [
             Icon(Icons.play_circle_outline, size: 18, color: Color(0xFF5F6368)),
             SizedBox(width: 10),
-            Text('Nghe bản ghi âm này'),
+            Text(Ch.ngheBanGhiAmNay(ngonNguHienTai.value)),
           ]),
         ),
         PopupMenuItem(
@@ -9006,14 +9006,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final dongY = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Xoá thẻ ghi âm?'),
+        title: Text(Ch.xoaTheGhiAm(ngonNguHienTai.value)),
         content: const Text('Thẻ này ĐANG được gửi đi phiên âm — xoá sẽ bỏ '
             'luôn kết quả sắp về, không thể phục hồi lại được. Bạn có chắc '
             'chắn muốn xoá không?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Không, giữ lại'),
+            child: Text(Ch.khongGiuLai(ngonNguHienTai.value)),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
@@ -9075,7 +9075,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       dongY = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
-              title: const Text('Xoá thẻ ghi âm?'),
+              title: Text(Ch.xoaTheGhiAm(ngonNguHienTai.value)),
               content: Text(soLuongThe > 1
                   ? 'Vùng chọn này chứa $soLuongThe thẻ ghi âm — xoá sẽ HUỶ '
                       'LUÔN những thẻ đó, không thể phục hồi lại được. Bạn '
@@ -9094,7 +9094,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Không, giữ lại'),
+                  child: Text(Ch.khongGiuLai(ngonNguHienTai.value)),
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(true),
@@ -9160,13 +9160,13 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       final dongY = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Xoá thẻ ghi âm?'),
+          title: Text(Ch.xoaTheGhiAm(ngonNguHienTai.value)),
           content: Text('Thẻ ghi âm #$soThe sẽ bị xoá VĨNH VIỄN, không thể '
               'phục hồi lại được. Bạn có chắc chắn muốn xoá không?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Không, giữ lại'),
+              child: Text(Ch.khongGiuLai(ngonNguHienTai.value)),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
@@ -9205,7 +9205,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('Không khả dụng trên iPhone'),
+        title: Text(Ch.khongKhaDungTrenIphone(ngonNguHienTai.value)),
         content: const Text(
           'Micro (vừa nói vừa ra chữ) tại điện thoại Iphone không thể khả '
           'dụng trên môi trường Website, chỉ khả dụng trên môi trường app '
@@ -9216,7 +9216,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         actions: [
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Đã hiểu'),
+            child: Text(Ch.daHieu(ngonNguHienTai.value)),
           ),
         ],
       ),
@@ -11423,10 +11423,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         viTriManHinh.dy,
       ),
       items: const [
-        PopupMenuItem(value: 'mo', child: Text('Mở link')),
+        PopupMenuItem(value: 'mo', child: Text(Ch.moLink(ngonNguHienTai.value))),
         PopupMenuItem(
           value: 'khongPhaiLink',
-          child: Text('Đây không phải là link'),
+          child: Text(Ch.dayKhongPhaiLaLink(ngonNguHienTai.value)),
         ),
       ],
     );
@@ -11497,7 +11497,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           child: Row(children: [
             Icon(Icons.done_all, size: 18, color: Color(0xFF5F6368)),
             SizedBox(width: 10),
-            Text('Chấp nhận tất cả đề xuất của từ điển'),
+            Text(Ch.chapNhanTatCaDeXuatTuDien(ngonNguHienTai.value)),
           ]),
         ),
         PopupMenuItem(
@@ -11505,7 +11505,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           child: Row(children: [
             const Icon(Icons.done, size: 18, color: Color(0xFF5F6368)),
             const SizedBox(width: 10),
-            Expanded(child: Text('Chấp nhận các đề xuất liên quan đến "${loi.tu}"')),
+            Expanded(child: Text(Ch.chapNhanDeXuatLienQuan(ngonNguHienTai.value, loi.tu))),
           ]),
         ),
       ],
@@ -11724,7 +11724,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 Navigator.of(ctx).pop();
               },
               style: FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
-              child: const Text('Dừng ngay lập tức'),
+              child: Text(Ch.dungNgayLapTuc(ngonNguHienTai.value)),
             ),
           ),
         ],
@@ -11795,7 +11795,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             children: [
               Icon(Icons.check_circle, color: Colors.green),
               SizedBox(width: 12),
-              Text('AI đã trả về kết quả'),
+              Text(Ch.aiDaTraVeKetQua(ngonNguHienTai.value)),
             ],
           ),
         );
@@ -12023,8 +12023,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         viTriManHinh.dy,
       ),
       items: const [
-        PopupMenuItem(value: 'dung', child: Text('Dùng đề xuất này')),
-        PopupMenuItem(value: 'bo', child: Text('Bỏ đề xuất này và trả lại như cũ')),
+        PopupMenuItem(value: 'dung', child: Text(Ch.dungDeXuatNay(ngonNguHienTai.value))),
+        PopupMenuItem(value: 'bo', child: Text(Ch.boDeXuatNayTraLaiNhuCu(ngonNguHienTai.value))),
       ],
     );
     if (chon == null || !mounted) return;
@@ -12118,7 +12118,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           child: Row(children: [
             Icon(Icons.delete_outline, size: 18, color: Color(0xFF5F6368)),
             SizedBox(width: 10),
-            Text('Chấp nhận xoá đoạn văn này'),
+            Text(Ch.chapNhanXoaDoanVanNay(ngonNguHienTai.value)),
           ]),
         ),
         PopupMenuItem(
@@ -12126,7 +12126,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           child: Row(children: [
             Icon(Icons.restore, size: 18, color: Color(0xFF5F6368)),
             SizedBox(width: 10),
-            Text('Khôi phục đoạn văn này — không xoá'),
+            Text(Ch.khoiPhucDoanVanNayKhongXoa(ngonNguHienTai.value)),
           ]),
         ),
       ],
@@ -13655,7 +13655,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         // gàng ở góc trên bên phải.
         title: Row(
           children: [
-            const Expanded(child: Text('Danh sách phím tắt')),
+            Expanded(child: Text(Ch.danhSachPhimTat(ngonNguHienTai.value))),
             IconButton(
               icon: const Icon(Icons.close, color: Colors.red),
               tooltip: 'Đóng',
@@ -13823,7 +13823,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               child: CircularProgressIndicator(strokeWidth: 2.5),
             ),
             SizedBox(width: 16),
-            Expanded(child: Text('Đang chuyển tệp âm thanh thành văn bản...')),
+            Expanded(child: Text(Ch.dangChuyenTepAmThanhThanhVanBan(ngonNguHienTai.value))),
           ],
         ),
       ),
@@ -13933,7 +13933,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               child: CircularProgressIndicator(strokeWidth: 2.5),
             ),
             SizedBox(width: 16),
-            Expanded(child: Text('Đang chuyển hình ảnh thành văn bản...')),
+            Expanded(child: Text(Ch.dangChuyenHinhAnhThanhVanBan(ngonNguHienTai.value))),
           ],
         ),
       ),
@@ -13997,10 +13997,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final dongY = await showDialog<bool>(
       context: ctx,
       builder: (ctx2) => AlertDialog(
-        title: const Text('Xoá tất cả câu lệnh?'),
-        content: const Text('Toàn bộ nội dung đang ghi trong ô câu lệnh sẽ bị xoá sạch. Bạn chắc chứ?'),
+        title: Text(Ch.xoaTatCaCauLenh(ngonNguHienTai.value)),
+        content: Text(Ch.noiDungCauLenhSeBiXoaSach(ngonNguHienTai.value)),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx2).pop(false), child: const Text('Huỷ')),
+          TextButton(onPressed: () => Navigator.of(ctx2).pop(false), child: Text(Ch.huy(ngonNguHienTai.value))),
           TextButton(
             onPressed: () => Navigator.of(ctx2).pop(true),
             child: const Text('Xoá tất cả', style: TextStyle(color: Colors.red)),
@@ -14048,7 +14048,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       controlAffinity: ListTileControlAffinity.leading,
                       value: chonPhanTram,
                       onChanged: (gia) => capNhat(() => chonPhanTram = gia ?? false),
-                      title: const Text('Tóm tắt theo phần trăm'),
+                      title: Text(Ch.tomTatTheoPhanTram(ngonNguHienTai.value)),
                     ),
                     if (chonPhanTram) ...[
                       Text(
@@ -14074,7 +14074,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       controlAffinity: ListTileControlAffinity.leading,
                       value: chonCauLenh,
                       onChanged: (gia) => capNhat(() => chonCauLenh = gia ?? false),
-                      title: const Text('Rút gọn theo yêu cầu của bạn'),
+                      title: Text(Ch.rutGonTheoYeuCau(ngonNguHienTai.value)),
                     ),
                     if (chonCauLenh) ...[
                       Padding(
@@ -14105,7 +14105,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Đóng bảng'),
+                child: Text(Ch.dongBang(ngonNguHienTai.value)),
               ),
               FilledButton(
                 onPressed: !coTheGui
@@ -14119,7 +14119,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           huongDanNguoiDung: chonCauLenh ? oCauLenh.text : null,
                         );
                       },
-                child: const Text('Gửi cho AI xử lý'),
+                child: Text(Ch.guiChoAiXuLy(ngonNguHienTai.value)),
               ),
             ],
           );
@@ -14154,7 +14154,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               child: CircularProgressIndicator(strokeWidth: 2.5),
             ),
             SizedBox(width: 16),
-            Expanded(child: Text('Đang tóm tắt toàn văn...')),
+            Expanded(child: Text(Ch.dangTomTatToanVan(ngonNguHienTai.value))),
           ],
         ),
       ),
@@ -14231,7 +14231,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       controlAffinity: ListTileControlAffinity.leading,
                       value: chonPhanTram,
                       onChanged: (gia) => capNhat(() => chonPhanTram = gia ?? false),
-                      title: const Text('Mở rộng theo phần trăm'),
+                      title: Text(Ch.moRongTheoPhanTram(ngonNguHienTai.value)),
                     ),
                     if (chonPhanTram) ...[
                       Text(
@@ -14257,7 +14257,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       controlAffinity: ListTileControlAffinity.leading,
                       value: chonCauLenh,
                       onChanged: (gia) => capNhat(() => chonCauLenh = gia ?? false),
-                      title: const Text('Mở rộng theo yêu cầu của bạn'),
+                      title: Text(Ch.moRongTheoYeuCau(ngonNguHienTai.value)),
                     ),
                     if (chonCauLenh) ...[
                       Padding(
@@ -14288,7 +14288,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Đóng bảng'),
+                child: Text(Ch.dongBang(ngonNguHienTai.value)),
               ),
               FilledButton(
                 onPressed: !coTheGui
@@ -14302,7 +14302,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                           huongDanNguoiDung: chonCauLenh ? oCauLenh.text : null,
                         );
                       },
-                child: const Text('Gửi cho AI xử lý'),
+                child: Text(Ch.guiChoAiXuLy(ngonNguHienTai.value)),
               ),
             ],
           );
@@ -14337,7 +14337,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               child: CircularProgressIndicator(strokeWidth: 2.5),
             ),
             SizedBox(width: 16),
-            Expanded(child: Text('Đang mở rộng toàn văn...')),
+            Expanded(child: Text(Ch.dangMoRongToanVan(ngonNguHienTai.value))),
           ],
         ),
       ),
@@ -14432,7 +14432,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Đóng bảng'),
+              child: Text(Ch.dongBang(ngonNguHienTai.value)),
             ),
             FilledButton(
               onPressed: () {
@@ -14443,7 +14443,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   huongDanNguoiDung: oCauLenh.text,
                 );
               },
-              child: const Text('Gửi cho AI xử lý'),
+              child: Text(Ch.guiChoAiXuLy(ngonNguHienTai.value)),
             ),
           ],
         ),
@@ -14473,7 +14473,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               child: CircularProgressIndicator(strokeWidth: 2.5),
             ),
             SizedBox(width: 16),
-            Expanded(child: Text('Đang viết lại toàn văn...')),
+            Expanded(child: Text(Ch.dangVietLaiToanVan(ngonNguHienTai.value))),
           ],
         ),
       ),
@@ -14557,7 +14557,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Trò chuyện'),
+        title: Text(Ch.troChuyenDangNangCapTieuDe(ngonNguHienTai.value)),
         content: const Text(
           'Tính năng này giúp bạn trò chuyện với mọi người... Tính năng '
           'này hiện đang nâng cấp.',
@@ -14565,7 +14565,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Đã hiểu'),
+            child: Text(Ch.daHieu(ngonNguHienTai.value)),
           ),
         ],
       ),
@@ -14630,7 +14630,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               await Clipboard.setData(ClipboardData(text: _oKetQuaToanVan?.text ?? ''));
               if (mounted) _bao('Đã sao chép.');
             },
-            child: const Text('Sao chép tất cả'),
+            child: Text(Ch.saoChepTatCa(ngonNguHienTai.value)),
           ),
           FilledButton(
             onPressed: () {
@@ -14655,7 +14655,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final dongY = await showDialog<bool>(
       context: context,
       builder: (ctx2) => AlertDialog(
-        title: const Text('Huỷ kết quả này?'),
+        title: Text(Ch.huyKetQuaNay(ngonNguHienTai.value)),
         content: const Text(
           'Văn bản AI vừa trả về (kể cả phần bạn đã sửa, nếu có) sẽ mất hẳn, '
           'không thể lấy lại. Bạn có chắc chắn muốn huỷ không?',
@@ -14663,7 +14663,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx2).pop(false),
-            child: const Text('Không, giữ lại'),
+            child: Text(Ch.khongGiuLai(ngonNguHienTai.value)),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx2).pop(true),
@@ -14889,7 +14889,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               child: CircularProgressIndicator(strokeWidth: 2.5),
             ),
             SizedBox(width: 16),
-            Expanded(child: Text('Đang chuyển hình ảnh thành văn bản...')),
+            Expanded(child: Text(Ch.dangChuyenHinhAnhThanhVanBan(ngonNguHienTai.value))),
           ],
         ),
       ),
@@ -14991,7 +14991,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   );
                   if (mounted) _bao('Đã sao chép.');
                 },
-                child: const Text('Sao chép tất cả'),
+                child: Text(Ch.saoChepTatCa(ngonNguHienTai.value)),
               ),
               const SizedBox(width: 8),
               OutlinedButton(
@@ -14999,7 +14999,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   Navigator.of(ctx).pop();
                   _batDauChonViTriChenFile();
                 },
-                child: const Text('Chọn vị trí để chèn văn bản'),
+                child: Text(Ch.chonViTriDeChenVanBan(ngonNguHienTai.value)),
               ),
               const SizedBox(width: 8),
               FilledButton(
@@ -15009,7 +15009,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   _dongHanKetQuaFileAmThanh();
                   if (vb.isNotEmpty) _chenKyTuTuPhimAo(vb);
                 },
-                child: const Text('Chèn vào văn bản đang soạn'),
+                child: Text(Ch.chenVaoVanBanDangSoan(ngonNguHienTai.value)),
               ),
             ],
           ),
@@ -15024,7 +15024,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final dongY = await showDialog<bool>(
       context: context,
       builder: (ctx2) => AlertDialog(
-        title: const Text('Huỷ kết quả từ AI?'),
+        title: Text(Ch.huyKetQuaTuAi(ngonNguHienTai.value)),
         content: const Text(
           'Văn bản AI vừa phiên âm (kể cả phần bạn đã sửa, nếu có) sẽ mất hẳn, '
           'không thể lấy lại. Bạn có chắc chắn muốn huỷ không?',
@@ -15032,7 +15032,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx2).pop(false),
-            child: const Text('Không, giữ lại'),
+            child: Text(Ch.khongGiuLai(ngonNguHienTai.value)),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx2).pop(true),
@@ -15163,7 +15163,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Không áp dụng được chữ trên'),
+        title: Text(Ch.khongApDungDuocChuTren(ngonNguHienTai.value)),
         content: const Text(
           'Định dạng chữ trên (superscript) chỉ áp dụng cho con số và chữ cái '
           '(chữ thường) trong bảng chữ cái Quốc tế.',
@@ -15171,7 +15171,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Đã hiểu'),
+            child: Text(Ch.daHieu(ngonNguHienTai.value)),
           ),
         ],
       ),
@@ -15617,7 +15617,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           }
 
           return AlertDialog(
-            title: const Text('Đổi tên tệp'),
+            title: Text(Ch.doiTenTep(ngonNguHienTai.value)),
             content: TextField(
               controller: bo,
               autofocus: true,
@@ -15631,9 +15631,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Huỷ - quay lại'),
+                child: Text(Ch.huyQuayLai(ngonNguHienTai.value)),
               ),
-              FilledButton(onPressed: luu, child: const Text('Lưu thay đổi')),
+              FilledButton(onPressed: luu, child: Text(Ch.luuThayDoi(ngonNguHienTai.value))),
             ],
           );
         },
@@ -16694,7 +16694,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     TextButton(
                       onPressed: () =>
                           moLienKetNgoai('https://github.com/sotay99/ghi-noi/releases/latest'),
-                      child: const Text('Tải APK'),
+                      child: Text(Ch.taiApk(ngonNguHienTai.value)),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close, size: 18),
@@ -16731,7 +16731,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     TextButton(
                       onPressed: () =>
                           moLienKetNgoai('https://github.com/sotay99/ghi-noi/releases/latest'),
-                      child: const Text('Tải bản mới'),
+                      child: Text(Ch.taiBanMoi(ngonNguHienTai.value)),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close, size: 18),
@@ -18136,7 +18136,7 @@ class _NutMauDinhDang extends StatelessWidget {
                 // đỏ gọn gàng ở góc trên bên phải.
                 title: Row(
                   children: [
-                    const Expanded(child: Text('Chọn màu')),
+                    Expanded(child: Text(Ch.chonMau(ngonNguHienTai.value))),
                     IconButton(
                       icon: const Icon(Icons.close, color: Colors.red),
                       tooltip: 'Đóng',
@@ -18346,7 +18346,7 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
         // `modal_thong_tin_muc.dart`.
         title: Row(
           children: [
-            const Expanded(child: Text('Hướng dẫn sử dụng bảng Bộ nhớ tạm')),
+            Expanded(child: Text(Ch.huongDanBoNhoTam(ngonNguHienTai.value))),
             IconButton(
               icon: const Icon(Icons.close, color: Colors.red),
               tooltip: 'Đóng',
@@ -18591,7 +18591,7 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
       // không có tham số riêng cho việc này).
       title: Row(
         children: [
-          const Expanded(child: Text('Bộ nhớ tạm để dán văn bản')),
+          Expanded(child: Text(Ch.boNhoTamDeDanVanBan(ngonNguHienTai.value))),
           IconButton(
             onPressed: () => Navigator.of(context).pop(),
             icon: const Icon(Icons.close, color: Colors.red),
@@ -18639,7 +18639,7 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
                 TextButton.icon(
                   onPressed: () => moModalBoNhoTam(context, widget.caiDat),
                   icon: const Icon(Icons.settings_outlined, size: 18),
-                  label: const Text('Cài đặt'),
+                  label: Text(Ch.caiDat(ngonNguHienTai.value)),
                   style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
                 ),
               ],
@@ -18872,7 +18872,7 @@ class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNha
       builder: (ctx) => AlertDialog(
         title: Row(
           children: [
-            const Expanded(child: Text('Hướng dẫn sử dụng Từ điển nhập liệu nhanh')),
+            Expanded(child: Text(Ch.huongDanTuDienNhapLieuNhanh(ngonNguHienTai.value))),
             IconButton(
               icon: const Icon(Icons.close, color: Colors.red),
               tooltip: 'Đóng',
@@ -19081,7 +19081,7 @@ class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNha
     return AlertDialog(
       title: Row(
         children: [
-          const Expanded(child: Text('Từ điển nhập liệu nhanh')),
+          Expanded(child: Text(Ch.tuDienNhapLieuNhanh(ngonNguHienTai.value))),
           IconButton(
             onPressed: () => Navigator.of(context).pop(),
             icon: const Icon(Icons.close, color: Colors.red),
@@ -19122,7 +19122,7 @@ class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNha
                     if (mounted) setState(() {});
                   },
                   icon: const Icon(Icons.settings_outlined, size: 18),
-                  label: const Text('Cài đặt'),
+                  label: Text(Ch.caiDat(ngonNguHienTai.value)),
                   style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
                 ),
               ],
@@ -19396,7 +19396,7 @@ class _HopThoaiThemNhanhTuDienState extends State<_HopThoaiThemNhanhTuDien>
     final dongY = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Thay thế nội dung đã có trong dòng này?'),
+        title: Text(Ch.thayTheNoiDungDongNay(ngonNguHienTai.value)),
         content: Text(
           'Dòng Phím ${chuCaiTuDienNhapLieuNhanh(i)} này đã có nội dung — nội dung cũ sẽ bị mất, '
           'thay bằng đoạn vừa chọn. Bạn có chắc chắn không?',
@@ -19404,11 +19404,11 @@ class _HopThoaiThemNhanhTuDienState extends State<_HopThoaiThemNhanhTuDien>
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Huỷ - Quay lại'),
+            child: Text(Ch.huyQuayLai(ngonNguHienTai.value)),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Có - Xác nhận thay thế'),
+            child: Text(Ch.coXacNhanThayThe(ngonNguHienTai.value)),
           ),
         ],
       ),
@@ -19557,7 +19557,7 @@ class _HopThoaiThemNhanhTuDienState extends State<_HopThoaiThemNhanhTuDien>
     return AlertDialog(
       title: Row(
         children: [
-          const Expanded(child: Text('Thêm nhanh vào từ điển nhập liệu nhanh')),
+          Expanded(child: Text(Ch.themNhanhVaoTuDien(ngonNguHienTai.value))),
           IconButton(
             onPressed: () => Navigator.of(context).pop(),
             icon: const Icon(Icons.close, color: Colors.red),

@@ -535,6 +535,163 @@ class Ch {
 
   static String duaVaoChoNay(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Đưa vào chỗ này' : 'Move here';
+
+  // ------------------------------------------- Dialog/toast trang_soan_thao.dart
+  static String xacNhanThayThe(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Xác nhận thay thế' : 'Confirm replace';
+  static String chapNhan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chấp nhận' : 'Accept';
+  static String caiDatTimKiemVaThayThe(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Cài đặt tìm kiếm và hướng dẫn thay thế'
+      : 'Find & replace settings and guide';
+  static String thayChoNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Thay chỗ này' : 'Replace here';
+  static String tatCaVienBan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tất cả' : 'All';
+  static String chuaCoVungChon(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chưa có vùng chọn' : 'No selection yet';
+  static String vietHoaChuDauMoiTu(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Viết Hoa chữ đầu tiên ở tất cả các từ'
+      : 'Capitalize first letter of every word';
+  static String vietHoaTatCaKyTu(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Viết Hoa tất cả các ký tự' : 'Capitalize all characters';
+  static String vietThuongTatCaKyTu(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Viết thường tất cả các ký tự' : 'Lowercase all characters';
+  static String vietHoaChuDauCau(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Viết Hoa chữ đầu tiên của từ đầu tiên'
+      : 'Capitalize first letter of the first word';
+  static String xacNhanDangXuat(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bạn có chắc chắn muốn đăng xuất không?'
+      : 'Are you sure you want to sign out?';
+  static String taoTepVanBanMoi(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tạo tệp văn bản mới' : 'Create new text file';
+  static String tao(NgonNgu nn) => nn == NgonNgu.vi ? 'Tạo' : 'Create';
+  static String dongBang(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đóng bảng' : 'Close panel';
+  static String tuDongChuyenHoaVanBan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tự động chuyển hoá văn bản' : 'Auto-transcribe text';
+  static String tuDongChuyenHoa(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tự động chuyển hoá' : 'Auto-transcribe';
+  static String caiDatTuDongMoBangGhiAm(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Cài đặt chế độ tự động Mở bảng điều khiển trình ghi âm'
+      : 'Auto-open recorder panel settings';
+  static String taoBanGhiAmMoi(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tạo bản ghi âm mới' : 'Create new recording';
+  static String hoanThanhDoanVaChuyenVanBan(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Hoàn thành đoạn này và chuyển thành văn bản'
+      : 'Finish this segment and transcribe it';
+  static String hoanThanhDoanVaPhatLai(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Hoàn thành đoạn này và phát lại để nghe'
+      : 'Finish this segment and play it back';
+  static String hoanThanhDoanVaDongTrinhGhiAm(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Hoàn thành đoạn này và đóng trình ghi âm'
+      : 'Finish this segment and close the recorder';
+  static String xoaBanGhiAmDangDoDang(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Xoá bản ghi âm đang dở dang?'
+      : 'Delete the unfinished recording?';
+  static String khongGiuLai(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Không, giữ lại' : 'No, keep it';
+  static String chuyenHoaTatCaTheGhiAm(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Chuyển hoá TẤT CẢ thẻ ghi âm'
+      : 'Transcribe ALL recording cards';
+  static String chiChuyenHoaTheNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chỉ chuyển hoá thẻ này' : 'Transcribe only this card';
+  static String ngheBanGhiAmNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Nghe bản ghi âm này' : 'Listen to this recording';
+  static String thayDoiViTriTheNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Thay đổi vị trí của thẻ này' : 'Move this card';
+  static String khongConBanGhiAm(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Không còn bản ghi âm' : 'No recording left';
+  static String xoaTheGhiAm(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Xoá thẻ ghi âm?' : 'Delete the recording card?';
+  static String khongKhaDungTrenIphone(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Không khả dụng trên iPhone' : 'Not available on iPhone';
+  static String dayKhongPhaiLaLink(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đây không phải là link' : 'This is not a link';
+  static String chapNhanTatCaDeXuatTuDien(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Chấp nhận tất cả đề xuất của từ điển'
+      : 'Accept all dictionary suggestions';
+  static String chapNhanDeXuatLienQuan(NgonNgu nn, String tu) => nn == NgonNgu.vi
+      ? 'Chấp nhận các đề xuất liên quan đến "$tu"'
+      : 'Accept the suggestions related to "$tu"';
+  static String dungNgayLapTuc(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Dừng ngay lập tức' : 'Stop immediately';
+  static String aiDaTraVeKetQua(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'AI đã trả về kết quả' : 'AI has returned a result';
+  static String dungDeXuatNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Dùng đề xuất này' : 'Use this suggestion';
+  static String boDeXuatNayTraLaiNhuCu(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bỏ đề xuất này và trả lại như cũ'
+      : 'Discard this suggestion and revert';
+  static String chapNhanXoaDoanVanNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chấp nhận xoá đoạn văn này' : 'Accept deleting this paragraph';
+  static String khoiPhucDoanVanNayKhongXoa(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Khôi phục đoạn văn này — không xoá'
+      : "Restore this paragraph — don't delete";
+  static String dangChuyenTepAmThanhThanhVanBan(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đang chuyển tệp âm thanh thành văn bản...'
+      : 'Converting audio file to text...';
+  static String dangChuyenHinhAnhThanhVanBan(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đang chuyển hình ảnh thành văn bản...'
+      : 'Converting image to text...';
+  static String xoaTatCaCauLenh(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Xoá tất cả câu lệnh?' : 'Delete all prompts?';
+  static String noiDungCauLenhSeBiXoaSach(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Toàn bộ nội dung đang ghi trong ô câu lệnh sẽ bị xoá sạch. Bạn chắc chứ?'
+      : 'All content in the prompt box will be cleared. Are you sure?';
+  static String tomTatTheoPhanTram(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tóm tắt theo phần trăm' : 'Summarize by percentage';
+  static String rutGonTheoYeuCau(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Rút gọn theo yêu cầu của bạn' : 'Shorten as you request';
+  static String guiChoAiXuLy(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Gửi cho AI xử lý' : 'Send to AI';
+  static String dangTomTatToanVan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đang tóm tắt toàn văn...' : 'Summarizing whole text...';
+  static String moRongTheoPhanTram(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Mở rộng theo phần trăm' : 'Expand by percentage';
+  static String moRongTheoYeuCau(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Mở rộng theo yêu cầu của bạn' : 'Expand as you request';
+  static String dangMoRongToanVan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đang mở rộng toàn văn...' : 'Expanding whole text...';
+  static String dangVietLaiToanVan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đang viết lại toàn văn...' : 'Rewriting whole text...';
+  static String troChuyenDangNangCapTieuDe(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Trò chuyện' : 'Chat';
+  static String huyKetQuaNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Huỷ kết quả này?' : 'Discard this result?';
+  static String chonViTriDeChenVanBan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chọn vị trí để chèn văn bản' : 'Choose where to insert the text';
+  static String chenVaoVanBanDangSoan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chèn vào văn bản đang soạn' : 'Insert into the text being edited';
+  static String huyKetQuaTuAi(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Huỷ kết quả từ AI?' : 'Discard the AI result?';
+  static String khongApDungDuocChuTren(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Không áp dụng được chữ trên' : "Can't apply superscript";
+  static String doiTenTep(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đổi tên tệp' : 'Rename file';
+  static String huyQuayLai(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Huỷ - quay lại' : 'Cancel - go back';
+  static String luuThayDoi(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Lưu thay đổi' : 'Save changes';
+  static String taiApk(NgonNgu nn) => nn == NgonNgu.vi ? 'Tải APK' : 'Download APK';
+  static String taiBanMoi(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tải bản mới' : 'Download update';
+  static String chonMau(NgonNgu nn) => nn == NgonNgu.vi ? 'Chọn màu' : 'Choose color';
+  static String huongDanBoNhoTam(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Hướng dẫn sử dụng bảng Bộ nhớ tạm' : 'How to use the Clipboard panel';
+  static String boNhoTamDeDanVanBan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Bộ nhớ tạm để dán văn bản' : 'Clipboard for pasting text';
+  static String huongDanTuDienNhapLieuNhanh(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Hướng dẫn sử dụng Từ điển nhập liệu nhanh'
+      : 'How to use the Quick-entry Dictionary';
+  static String thayTheNoiDungDongNay(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Thay thế nội dung đã có trong dòng này?'
+      : 'Replace the existing content in this line?';
+  static String coXacNhanThayThe(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Có - Xác nhận thay thế' : 'Yes - confirm replace';
+  static String themNhanhVaoTuDien(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Thêm nhanh vào từ điển nhập liệu nhanh'
+      : 'Quickly add to the quick-entry dictionary';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt
