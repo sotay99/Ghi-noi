@@ -26,6 +26,8 @@ import 'package:speech_to_text/speech_to_text.dart';
 
 import 'cai_dat.dart';
 import 'canh_bao_han_muc_ai.dart';
+import 'chuoi_da_ngon_ngu.dart';
+import 'chuoi_tro_chuyen.dart';
 import 'doan_thiet_bi.dart';
 import 'ghi_am_the.dart';
 import 'gui_ghi_am_gemini.dart';
@@ -33,6 +35,7 @@ import 'gui_tro_chuyen_gemini.dart';
 import 'ket_qua_ghi_am_the.dart';
 import 'loai_thiet_bi.dart';
 import 'lua_chon_phim_tat.dart';
+import 'ngon_ngu.dart';
 import 'the_ghi_am.dart' show dinhDangMmSs;
 import 'theo_doi_tap_doi_phim.dart';
 import 'thong_bao_giua.dart';
@@ -91,6 +94,11 @@ class ManHinhTroChuyen extends StatefulWidget {
 }
 
 class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
+  /// Ngôn ngữ hiện tại — gán lại mỗi lần `_build` chạy (qua
+  /// `ValueListenableBuilder<NgonNgu>` ở `build()`), các hàm con trong State
+  /// này đọc field này thay vì nhận tham số riêng.
+  NgonNgu _nn = ngonNguHienTai.value;
+
   // (YÊU CẦU MỚI) Bản thường (`TextEditingController`) không tô được nền
   // riêng cho "thẻ ghi âm" — đổi qua `_BoDieuKhienChat` (cuối tệp), tự tô
   // nền token `〔🎙️ ...〕` và chặn con trỏ đứng/xoá lẻ bên trong token.
@@ -257,18 +265,12 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('Không khả dụng trên iPhone'),
-        content: const Text(
-          'Micro (vừa nói vừa ra chữ) tại điện thoại Iphone không thể khả '
-          'dụng trên môi trường Website, chỉ khả dụng trên môi trường app '
-          'mobile. Nếu bạn cho rằng thiết bị của bạn không phải Iphone, hãy '
-          'bấm vào Cài đặt Micro. Bạn có thể tải app mobile cho Iphone để '
-          'sử dụng tính năng này.',
-        ),
+        title: Text(ChTroChuyen.khongKhaDungTrenIphone(_nn)),
+        content: Text(ChTroChuyen.giaiThichMicIphoneKhongKhaDung(_nn)),
         actions: [
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Đã hiểu'),
+            child: Text(ChTroChuyen.daHieu(_nn)),
           ),
         ],
       ),
@@ -720,8 +722,8 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
       );
       if (!_micKhoiTaoXong) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Máy không dùng được micro. Hãy kiểm tra quyền ghi âm.'),
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(ChTroChuyen.mayKhongDungDuocMicro(_nn)),
           ));
         }
         return;
@@ -929,9 +931,8 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
           _micDangNghe = false;
           _micDangNgheThat = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text(
-              'Micro liên tục không bật lại được — đã tắt. Hãy thử bấm lại.'),
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(ChTroChuyen.microLienTucKhongBatLaiDuoc(_nn)),
         ));
       }
       return;
@@ -1290,7 +1291,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     if (cauHoi.length > 10000) {
       hienThongBaoGiua(
         context,
-        'Tin nhắn vượt quá 10.000 ký tự - không thể gửi',
+        ChTroChuyen.tinNhanVuotQua10000KyTu(_nn),
       );
       return;
     }
@@ -1312,7 +1313,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
         widget.layVanBanHienTai().length > 20000) {
       hienThongBaoGiua(
         context,
-        'Toàn bộ văn bản vượt quá 20.000 ký tự - không thể sử dụng AI',
+        ChTroChuyen.toanBoVanBanVuotQua20000KyTu(_nn),
       );
       return;
     }
@@ -1320,7 +1321,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
         (_noiDungDoanChonDinhKem ?? '').length > 10000) {
       hienThongBaoGiua(
         context,
-        'Vùng chọn vượt quá 10.000 ký tự - không thể sử dụng AI',
+        ChTroChuyen.vungChonVuotQua10000KyTu(_nn),
       );
       return;
     }
@@ -1402,14 +1403,14 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
       if (loi != null && !coChu) {
         // Lỗi ngay từ đầu, chưa nhận được chữ nào — thay hẳn bằng thông
         // báo lỗi (tin nhắn rỗng để nguyên nhìn rất kỳ).
-        widget.lichSu[chiSoAi].choHienThi = 'AI trả lời thất bại: $loi';
+        widget.lichSu[chiSoAi].choHienThi = ChTroChuyen.aiTraLoiThatBai(_nn, loi);
       } else if (loi != null) {
         // Đã nhận được một phần rồi mới đứt giữa chừng (mất mạng...) — giữ
         // lại phần đã có, chỉ báo thêm là bị ngắt ngang.
-        widget.lichSu[chiSoAi].choHienThi += '\n\n[Bị ngắt giữa chừng: $loi]';
+        widget.lichSu[chiSoAi].choHienThi += ChTroChuyen.biNgatGiuaChung(_nn, loi);
       } else if (widget.lichSu[chiSoAi].choHienThi.trim().isEmpty) {
         widget.lichSu[chiSoAi].choHienThi =
-            'AI trả lời thất bại: không có nội dung trả về.';
+            ChTroChuyen.aiTraLoiThatBaiKhongCoNoiDung(_nn);
       }
     });
     _cuonXuongDuoi();
@@ -1449,7 +1450,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
             Expanded(child: Text(tieuDe)),
             IconButton(
               icon: const Icon(Icons.close, color: Colors.red),
-              tooltip: 'Đóng',
+              tooltip: Ch.dong(_nn),
               onPressed: () => Navigator.of(ctx).pop(),
             ),
           ],
@@ -1505,20 +1506,17 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     final dongY = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Xoá cuộc trò chuyện?'),
-        content: const Text(
-          'Toàn bộ tin nhắn trong cuộc trò chuyện này (về tệp ghi chú đang '
-          'mở) sẽ mất hẳn, không thể lấy lại. Bạn có chắc chắn muốn xoá '
-          'không?',
-        ),
+        title: Text(ChTroChuyen.xoaCuocTroChuyenHoi(_nn)),
+        content: Text(ChTroChuyen.xoaCuocTroChuyenNoiDungHoi(_nn)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Không, giữ lại'),
+            child: Text(ChTroChuyen.khongGiuLai(_nn)),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text('Xoá', style: TextStyle(color: Colors.red.shade600)),
+            child: Text(ChTroChuyen.xoa(_nn),
+                style: TextStyle(color: Colors.red.shade600)),
           ),
         ],
       ),
@@ -1536,20 +1534,28 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
 
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder<NgonNgu>(
+      valueListenable: ngonNguHienTai,
+      builder: (context, nn, _) => _build(context, nn),
+    );
+  }
+
+  Widget _build(BuildContext context, NgonNgu nn) {
+    _nn = nn;
     return Scaffold(
       appBar: AppBar(
         backgroundColor: _mauChinh,
         foregroundColor: Colors.white,
-        title: const Text('Trò chuyện về văn bản này'),
+        title: Text(Ch.troChuyenVeVanBanNay(nn)),
         leading: IconButton(
           icon: const Icon(Icons.close),
-          tooltip: 'Đóng',
+          tooltip: Ch.dong(nn),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_outline),
-            tooltip: 'Xoá trò chuyện',
+            tooltip: ChTroChuyen.xoaTroChuyen(nn),
             onPressed: widget.lichSu.isEmpty ? null : _xacNhanXoaTroChuyen,
           ),
         ],
@@ -1559,12 +1565,12 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
           children: [
             Expanded(
               child: widget.lichSu.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Padding(
-                        padding: EdgeInsets.all(24),
+                        padding: const EdgeInsets.all(24),
                         child: Text(
-                          'Bạn có thể hỏi tuỳ ý về văn bản này.',
-                          style: TextStyle(color: Color(0xFF5F6368), fontSize: 15),
+                          ChTroChuyen.banCoTheHoiTuyYVeVanBanNay(_nn),
+                          style: const TextStyle(color: Color(0xFF5F6368), fontSize: 15),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -1602,7 +1608,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                                         ? () => _batDauSua(i)
                                         : null,
                                     onXemDinhKem: () => _hienNoiDungDinhKem(
-                                      'Đoạn văn đang chọn',
+                                      ChTroChuyen.doanVanDangChon(_nn),
                                       t.noiDungDinhKem ?? '',
                                     ),
                                   )
@@ -1619,7 +1625,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                   alignment: Alignment.centerLeft,
                   child: Chip(
                     avatar: const Icon(Icons.edit_outlined, size: 18),
-                    label: const Text('Đang sửa tin nhắn — gửi lại sẽ xoá các tin nhắn sau đó'),
+                    label: Text(ChTroChuyen.dangSuaTinNhan(_nn)),
                     onDeleted: _huySua,
                   ),
                 ),
@@ -1631,12 +1637,12 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                   alignment: Alignment.centerLeft,
                   child: _TheDinhKem(
                     nhan: _dinhKemHienTai == LoaiDinhKemTroChuyen.toanVan
-                        ? 'Toàn bộ văn bản mới nhất'
-                        : 'Đoạn văn đang chọn',
+                        ? ChTroChuyen.toanBoVanBanMoiNhat(_nn)
+                        : ChTroChuyen.doanVanDangChon(_nn),
                     onXoa: _boDinhKem,
                     onBam: _dinhKemHienTai == LoaiDinhKemTroChuyen.doanChon
                         ? () => _hienNoiDungDinhKem(
-                            'Đoạn văn đang chọn', _noiDungDoanChonDinhKem ?? '')
+                            ChTroChuyen.doanVanDangChon(_nn), _noiDungDoanChonDinhKem ?? '')
                         : null,
                   ),
                 ),
@@ -1648,43 +1654,43 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   PopupMenuButton<int>(
-                    tooltip: 'Thêm',
+                    tooltip: ChTroChuyen.them(_nn),
                     icon: const Icon(Icons.add_circle_outline, color: _mauChinh),
                     itemBuilder: (ctx) => [
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 1,
                         child: Row(children: [
-                          Icon(Icons.description_outlined, size: 18, color: Color(0xFF5F6368)),
-                          SizedBox(width: 10),
-                          Text('Toàn bộ văn bản mới nhất'),
+                          const Icon(Icons.description_outlined, size: 18, color: Color(0xFF5F6368)),
+                          const SizedBox(width: 10),
+                          Text(ChTroChuyen.toanBoVanBanMoiNhat(_nn)),
                         ]),
                       ),
                       PopupMenuItem(
                         value: 2,
                         enabled: widget.layDoanVanDangChon() != null,
-                        child: const Row(children: [
-                          Icon(Icons.text_snippet_outlined, size: 18, color: Color(0xFF5F6368)),
-                          SizedBox(width: 10),
-                          Text('Đoạn văn đang chọn'),
+                        child: Row(children: [
+                          const Icon(Icons.text_snippet_outlined, size: 18, color: Color(0xFF5F6368)),
+                          const SizedBox(width: 10),
+                          Text(ChTroChuyen.doanVanDangChon(_nn)),
                         ]),
                       ),
                       const PopupMenuDivider(),
                       PopupMenuItem(
                         value: 3,
                         enabled: !_micDangNghe && !_ghiDangMo,
-                        child: const Row(children: [
-                          Icon(Icons.mic_none, size: 18, color: Color(0xFF5F6368)),
-                          SizedBox(width: 10),
-                          Text('Ghi âm (nói xong mới ra chữ)'),
+                        child: Row(children: [
+                          const Icon(Icons.mic_none, size: 18, color: Color(0xFF5F6368)),
+                          const SizedBox(width: 10),
+                          Text(ChTroChuyen.ghiAmNoiXongMoiRaChu(_nn)),
                         ]),
                       ),
                       PopupMenuItem(
                         value: 4,
                         enabled: !_micDangNghe && !_ghiDangMo,
-                        child: const Row(children: [
-                          Icon(Icons.graphic_eq, size: 18, color: Color(0xFF5F6368)),
-                          SizedBox(width: 10),
-                          Text('Micro (vừa nói vừa ra chữ)'),
+                        child: Row(children: [
+                          const Icon(Icons.graphic_eq, size: 18, color: Color(0xFF5F6368)),
+                          const SizedBox(width: 10),
+                          Text(ChTroChuyen.microVuaNoiVuaRaChu(_nn)),
                         ]),
                       ),
                     ],
@@ -1755,19 +1761,19 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
                               if (mounted) {
                                 hienThongBaoGiua(
                                   context,
-                                  'Tin nhắn không được vượt quá 100.000 ký tự',
+                                  ChTroChuyen.tinNhanKhongDuocVuotQua100000KyTu(_nn),
                                   ganTren: true,
                                 );
                               }
                             }),
                           ],
-                          decoration: const InputDecoration(
-                            hintText: 'Ctrl + Enter để gửi',
-                            border: OutlineInputBorder(
+                          decoration: InputDecoration(
+                            hintText: ChTroChuyen.ctrlEnterDeGui(_nn),
+                            border: const OutlineInputBorder(
                               borderRadius: BorderRadius.all(Radius.circular(20)),
                             ),
                             contentPadding:
-                                EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                             isDense: true,
                           ),
                         ),
@@ -1890,7 +1896,7 @@ class _NutMicNoiChat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Tooltip(
-      message: 'Micro (vừa nói vừa ra chữ)',
+      message: ChTroChuyen.microVuaNoiVuaRaChu(ngonNguHienTai.value),
       child: Material(
         color: Colors.green.shade100,
         shape: const CircleBorder(),
@@ -1962,7 +1968,9 @@ String _boDinhDangMarkdownNgam(String vanBan) {
 void _saoChep(BuildContext context, String chu) {
   Clipboard.setData(ClipboardData(text: chu));
   ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Đã sao chép'), duration: Duration(seconds: 1)),
+    SnackBar(
+        content: Text(ChTroChuyen.daSaoChep(ngonNguHienTai.value)),
+        duration: const Duration(seconds: 1)),
   );
 }
 
@@ -2016,8 +2024,8 @@ class _BongBongNguoiDung extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 4),
               child: _TheDinhKem(
                 nhan: tin.dinhKem == LoaiDinhKemTroChuyen.toanVan
-                    ? 'Toàn bộ văn bản mới nhất'
-                    : 'Đoạn văn đang chọn',
+                    ? ChTroChuyen.toanBoVanBanMoiNhat(ngonNguHienTai.value)
+                    : ChTroChuyen.doanVanDangChon(ngonNguHienTai.value),
                 onBam: tin.dinhKem == LoaiDinhKemTroChuyen.doanChon ? onXemDinhKem : null,
               ),
             ),
@@ -2035,10 +2043,13 @@ class _BongBongNguoiDung extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (onSua != null)
-                _NutHanhDongNho(icon: Icons.edit_outlined, tooltip: 'Sửa', onTap: onSua!),
+                _NutHanhDongNho(
+                    icon: Icons.edit_outlined,
+                    tooltip: ChTroChuyen.sua(ngonNguHienTai.value),
+                    onTap: onSua!),
               _NutHanhDongNho(
                 icon: Icons.copy,
-                tooltip: 'Sao chép',
+                tooltip: Ch.saoChep(ngonNguHienTai.value),
                 onTap: () => _saoChep(context, tin.choHienThi),
               ),
             ],
@@ -2068,11 +2079,12 @@ class _TinNhanAi extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (dangStream && chu.isEmpty) {
-      return const Row(
+      return Row(
         children: [
-          SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-          SizedBox(width: 10),
-          Text('AI đang trả lời...', style: TextStyle(color: Color(0xFF5F6368))),
+          const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+          const SizedBox(width: 10),
+          Text(ChTroChuyen.aiDangTraLoi(ngonNguHienTai.value),
+              style: const TextStyle(color: Color(0xFF5F6368))),
         ],
       );
     }
@@ -2096,7 +2108,7 @@ class _TinNhanAi extends StatelessWidget {
         if (!dangStream)
           _NutHanhDongNho(
             icon: Icons.copy,
-            tooltip: 'Sao chép',
+            tooltip: Ch.saoChep(ngonNguHienTai.value),
             onTap: () => _saoChep(context, _boDinhDangMarkdownNgam(chu)),
           ),
       ],
@@ -2229,7 +2241,7 @@ class _KhungKetQua extends StatelessWidget {
             child: TextButton.icon(
               onPressed: () => _saoChep(context, chu),
               icon: const Icon(Icons.copy, size: 16),
-              label: const Text('Sao chép'),
+              label: Text(Ch.saoChep(ngonNguHienTai.value)),
               style: TextButton.styleFrom(
                 padding: EdgeInsets.zero,
                 minimumSize: const Size(0, 0),
@@ -2415,8 +2427,8 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
     final ok = await ghiAmTheKhoiTao();
     if (!mounted) return;
     if (!ok) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Không dùng được micro để ghi âm. Hãy kiểm tra quyền.'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(ChTroChuyen.khongDungDuocMicroDeGhiAm(ngonNguHienTai.value)),
       ));
       Navigator.of(context).pop();
       return;
@@ -2476,7 +2488,8 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Thẻ ghi âm #$soThe chuyển hoá thất bại: $e'),
+          content: Text(ChTroChuyen.theGhiAmChuyenHoaThatBai(
+              ngonNguHienTai.value, soThe, '$e')),
         ));
       }
     }
@@ -2542,11 +2555,10 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, capNhat) => AlertDialog(
-          title: Text('Sắp chạm giới hạn $tongPhut phút'),
+          title: Text(ChTroChuyen.sapChamGioiHanPhut(ngonNguHienTai.value, tongPhut)),
           content: Text(
-            'Thẻ ghi âm #$_soThe (thẻ tự động thứ $_soLanToiDaTuDongTaoTheLienTiep '
-            'liên tiếp) sắp ghi đủ 60 giây. Nếu không chọn, tới đúng giây thứ 60 '
-            'hệ thống sẽ TỰ HOÀN THÀNH và đóng trình ghi âm luôn.',
+            ChTroChuyen.giaiThichSapChamGioiHan(
+                ngonNguHienTai.value, _soThe, _soLanToiDaTuDongTaoTheLienTiep),
           ),
           actions: [
             TextButton(
@@ -2554,18 +2566,20 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
                 await _tamDungTiepTuc();
                 capNhat(() {});
               },
-              child: Text(_dangTamDung ? 'Tiếp tục' : 'Tạm dừng'),
+              child: Text(_dangTamDung
+                  ? ChTroChuyen.tiepTuc(ngonNguHienTai.value)
+                  : ChTroChuyen.tamDung(ngonNguHienTai.value)),
             ),
             TextButton(
               onPressed: () {
                 Navigator.of(ctx).pop();
                 _hoanThanh(taoTheMoi: false);
               },
-              child: const Text('Hoàn thành và Đóng ngay'),
+              child: Text(ChTroChuyen.hoanThanhVaDongNgay(ngonNguHienTai.value)),
             ),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Đã hiểu'),
+              child: Text(ChTroChuyen.daHieu(ngonNguHienTai.value)),
             ),
           ],
         ),
@@ -2658,7 +2672,7 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
     return PopScope(
       canPop: false,
       child: AlertDialog(
-        title: Text('Bản Ghi âm số $_soThe'),
+        title: Text(ChTroChuyen.banGhiAmSo(ngonNguHienTai.value, _soThe)),
         content: Focus(
           autofocus: true,
           // Chặn hẳn phím Tab khỏi cơ chế di chuyển tiêu điểm (focus
@@ -2678,9 +2692,9 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (!_daSanSang)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Text('Đang chuẩn bị…'),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(ChTroChuyen.dangChuanBi(ngonNguHienTai.value)),
                 )
               else
                 _NhapNhayGhiAmChat(
@@ -2691,7 +2705,10 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(_dangTamDung ? 'Tạm dừng ' : 'Đang Ghi âm ',
+                      Text(
+                          _dangTamDung
+                              ? ChTroChuyen.tamDung(ngonNguHienTai.value)
+                              : ChTroChuyen.dangGhiAm(ngonNguHienTai.value),
                           style: kieuTrangThai),
                       _SoPhutGiayChat(thoiLuong: _thoiLuong, style: kieuTrangThai),
                     ],
@@ -2701,28 +2718,30 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
                 widget.phimTatGhiAm.nhan,
                 _dangTamDung ? Icons.play_circle_outline : Icons.pause_circle_outline,
                 _dangTamDung ? Colors.green.shade800 : Colors.red.shade800,
-                _dangTamDung ? 'Tiếp tục' : 'Tạm dừng',
+                _dangTamDung
+                    ? ChTroChuyen.tiepTuc(ngonNguHienTai.value)
+                    : ChTroChuyen.tamDung(ngonNguHienTai.value),
                 _dangXuLy ? null : _tamDungTiepTuc,
               ),
               _hang(
-                'phím 1',
+                ChTroChuyen.phimSo(ngonNguHienTai.value, 1),
                 Icons.text_snippet_outlined,
                 Colors.green.shade900,
-                'Hoàn thành và Chuyển hoá thành văn bản',
+                ChTroChuyen.hoanThanhVaChuyenHoaThanhVanBan(ngonNguHienTai.value),
                 _dangXuLy ? null : () => _hoanThanh(taoTheMoi: false),
               ),
               _hang(
-                'phím 2',
+                ChTroChuyen.phimSo(ngonNguHienTai.value, 2),
                 Icons.add_circle_outline,
                 Colors.cyan.shade900,
-                'Hoàn thành và Tạo bản ghi âm mới',
+                ChTroChuyen.hoanThanhVaTaoBanGhiAmMoi(ngonNguHienTai.value),
                 _dangXuLy ? null : () => _hoanThanh(taoTheMoi: true),
               ),
               _hang(
-                'phím 5',
+                ChTroChuyen.phimSo(ngonNguHienTai.value, 5),
                 Icons.delete_outline,
                 Colors.red.shade900,
-                'Xoá bản này và Đóng',
+                ChTroChuyen.xoaBanNayVaDong(ngonNguHienTai.value),
                 _dangXuLy ? null : _xoaVaDong,
               ),
             ],
