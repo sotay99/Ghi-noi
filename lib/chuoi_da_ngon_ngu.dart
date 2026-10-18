@@ -1274,6 +1274,118 @@ class Ch {
 
   static String bamDeChonPhim(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Bấm để chọn phím' : 'Tap to choose a key';
+
+  // --------------------------------- Modal "Từ điển nhập liệu nhanh"
+  static String vuiLongDangNhapTaiKhoanGoogleTruoc(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Vui lòng đăng nhập tài khoản Google trước.'
+      : 'Please sign in with a Google account first.';
+
+  static String phimVaDayDuNoiDung(NgonNgu nn, String chuCai) =>
+      nn == NgonNgu.vi ? 'Phím $chuCai — đầy đủ nội dung' : 'Key $chuCai — full content';
+
+  static String xoaNoiDungDongPhim(NgonNgu nn, String chuCai) =>
+      nn == NgonNgu.vi ? 'Xoá nội dung dòng Phím $chuCai?' : 'Clear the content of key $chuCai?';
+
+  static String khongTheHoanTacBanCoChacChan(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Không thể hoàn tác lại được. Bạn có chắc chắn không?'
+      : 'This cannot be undone. Are you sure?';
+
+  static String phimTatChoTuDienNhapLieuNhanh(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Phím tắt cho Từ điển nhập liệu nhanh' : 'Shortcut for the quick-text dictionary';
+
+  static String tenBamAlt2Lan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Bấm Alt 2 lần liên tiếp' : 'Press Alt twice in a row';
+
+  static String giaiThichBamAlt2Lan(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bấm phím Alt, buông ra, rồi bấm lại lần '
+          'nữa trong khoảng 1 giây (mặc định).'
+      : 'Press Alt, release it, then press it again '
+          'within about 1 second (default).';
+
+  static String tenAltShift(NgonNgu nn) => nn == NgonNgu.vi ? 'Alt + Shift' : 'Alt + Shift';
+
+  static String giaiThichAltShift(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Giữ phím Alt và Shift cùng lúc.' : 'Hold the Alt and Shift keys together.';
+
+  static String giaiThichCtrlCongThemTuDien(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Giữ phím Ctrl rồi bấm thêm một phím khác — ví dụ Ctrl + G.'
+      : 'Hold Ctrl and press another key — e.g. Ctrl + G.';
+
+  static String chonThuTuGiuaCacPhimTatChuCai(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Chọn thứ tự giữa các phím tắt chữ cái'
+      : 'Choose the order of the letter shortcuts';
+
+  static String sapXepTheoCacHangChuCaiTrenBanPhim(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Sắp xếp theo các hàng chữ cái trên bàn phím'
+      : 'Sort by keyboard letter rows';
+
+  static String giaiThichSapXepTheoHang(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Sắp xếp theo hàng phím của bàn phím vật lý.'
+      : 'Sort by the physical keyboard\'s key rows.';
+
+  static String sapXepTheoBangChuCaiAZ(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Sắp xếp theo Bảng chữ cái A → Z' : 'Sort alphabetically A → Z';
+
+  static String giaiThichSapXepTheoBangChuCai(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Sắp xếp theo tiêu chuẩn bảng chữ cái quốc tế '
+          'alphabet, tức là từ A đến Z.'
+      : 'Sort by the standard international alphabet, '
+          'from A to Z.';
+
+  static String trongNgoacDon(NgonNgu nn) => nn == NgonNgu.vi ? '(trống)' : '(empty)';
+
+  static String phimChuCai(NgonNgu nn, String chuCai) =>
+      nn == NgonNgu.vi ? 'Phím $chuCai' : 'Key $chuCai';
+
+  static String huyKhongLuuThayDoi(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Huỷ - Không lưu thay đổi' : 'Cancel - Don\'t save changes';
+
+  static String bamVaGiuTungDongKeoThaDeThayDoiViTri(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bấm và giữ từng dòng, sau đó kéo và thả để thay đổi vị trí cho '
+          'từng dòng.'
+      : 'Press and hold a row, then drag and drop it to change its position.';
+
+  static String boNhoDamMayTen(NgonNgu nn) => nn == NgonNgu.vi ? 'Bộ nhớ Đám mây' : 'Cloud storage';
+
+  static String tuDienDamMayLauDaiTrenInternet(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Từ điển này trong Bộ nhớ Đám mây lâu dài trên internet của tài khoản đang đăng nhập vào'
+      : 'This dictionary is stored permanently online, in the Cloud storage of the signed-in account';
+
+  static String tuDienNoiBoLauDaiCuaThietBi(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Từ điển này trong Bộ nhớ nội bộ lâu dài của thiết bị (hoặc của trình duyệt)'
+      : 'This dictionary is stored permanently in the device\'s (or browser\'s) local storage';
+
+  static String batTuDienNhapLieuNhanh(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Bật Từ điển nhập liệu nhanh' : 'Enable the quick-text dictionary';
+
+  static String phimTatAnHienBangTuDienNhapLieuNhanh(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Phím tắt ẩn hiện bảng Từ điển nhập liệu nhanh'
+      : 'Shortcut to show/hide the quick-text dictionary';
+
+  static String thayDoiThuTuGiuaCacDong(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Thay đổi thứ tự giữa các dòng' : 'Change the order of the rows';
+
+  static String gioiThieuTuDienNhapLieuNhanh(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Mỗi dòng ứng với một phím chữ cái trên bàn phím vật lý — gõ '
+          'sẵn đoạn văn bản muốn dán nhanh vào dòng tương ứng. Mở bảng '
+          'bằng nút trên thanh công cụ hoặc phím tắt ở trên, rồi bấm vào '
+          'một dòng (hoặc gõ đúng phím chữ cái của dòng đó) để dán ngay '
+          'vào vị trí con trỏ. Để trống dòng nào cũng được. Mỗi lần sửa '
+          'tự lưu lại ngay, không cần bấm nút Lưu.'
+      : 'Each row corresponds to a letter key on your physical keyboard — '
+          'type in the text you want to quickly paste for that row. Open '
+          'the list with the toolbar button or the shortcut above, then '
+          'tap a row (or type its letter key) to paste it right at the '
+          'cursor. Any row can be left empty. Every edit is saved '
+          'instantly, no Save button needed.';
+
+  static String xemDayDuNoiDungCuaDongNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Xem đầy đủ nội dung của dòng này' : 'View this row\'s full content';
+
+  static String daDan(NgonNgu nn) => nn == NgonNgu.vi ? 'Đã dán' : 'Pasted';
+
+  static String tuDienNhapLieuNhanhTen(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Từ điển nhập liệu nhanh' : 'Quick-text dictionary';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt

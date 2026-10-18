@@ -17,11 +17,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'cai_dat.dart';
+import 'chuoi_da_ngon_ngu.dart';
 import 'dang_nhap_google.dart';
 import 'dinh_dang_clip.dart';
 import 'dinh_dang_doan_van_tu_dien.dart';
 import 'lua_chon_phim_tat.dart';
 import 'mau_phim_tu_dien_nhap_lieu_nhanh.dart';
+import 'ngon_ngu.dart';
 import 'thong_bao_giua.dart';
 import 'tu_dien_dam_may.dart';
 
@@ -164,7 +166,7 @@ class _ManHinhTuDienNhapLieuNhanhState
       final uid = DichVuDangNhapGoogle.instance.nguoiDungHienTai?.uid;
       if (uid == null) {
         if (mounted) {
-          hienThongBaoGiua(context, 'Vui lòng đăng nhập tài khoản Google trước.');
+          hienThongBaoGiua(context, Ch.vuiLongDangNhapTaiKhoanGoogleTruoc(ngonNguHienTai.value));
         }
         return;
       }
@@ -375,13 +377,13 @@ class _ManHinhTuDienNhapLieuNhanhState
                   children: [
                     Expanded(
                       child: Text(
-                        'Phím ${_chuCai(i)} — đầy đủ nội dung',
+                        Ch.phimVaDayDuNoiDung(ngonNguHienTai.value, _chuCai(i)),
                         style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                       ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close, color: Colors.red),
-                      tooltip: 'Đóng',
+                      tooltip: Ch.dong(ngonNguHienTai.value),
                       onPressed: () => Navigator.of(ctx).pop(),
                     ),
                   ],
@@ -414,14 +416,14 @@ class _ManHinhTuDienNhapLieuNhanhState
       context: context,
       builder: (ctx) => AlertDialog(
         icon: const Icon(Icons.delete_forever_outlined, size: 28),
-        title: Text('Xoá nội dung dòng Phím ${_chuCai(i)}?'),
-        content: const Text('Không thể hoàn tác lại được. Bạn có chắc chắn không?'),
+        title: Text(Ch.xoaNoiDungDongPhim(ngonNguHienTai.value, _chuCai(i))),
+        content: Text(Ch.khongTheHoanTacBanCoChacChan(ngonNguHienTai.value)),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Không')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(Ch.khong(ngonNguHienTai.value))),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Xoá'),
+            child: Text(Ch.xoa(ngonNguHienTai.value)),
           ),
         ],
       ),
@@ -467,7 +469,7 @@ class _ManHinhTuDienNhapLieuNhanhState
             final chon = await showDialog<String>(
               context: ctx,
               builder: (ctx2) => AlertDialog(
-                title: const Text('Nhấn một phím'),
+                title: Text(Ch.nhanMotPhim(ngonNguHienTai.value)),
                 content: KeyboardListener(
                   focusNode: tieuDiem,
                   autofocus: true,
@@ -487,13 +489,13 @@ class _ManHinhTuDienNhapLieuNhanhState
                     if (nhan.isEmpty) return;
                     Navigator.of(ctx2).pop(nhan.toUpperCase());
                   },
-                  child: const SizedBox(
+                  child: SizedBox(
                     height: 60,
-                    child: Center(child: Text('Hãy nhấn một phím bất kỳ trên bàn phím...')),
+                    child: Center(child: Text(Ch.hayNhanMotPhimBatKyTrenBanPhim(ngonNguHienTai.value))),
                   ),
                 ),
                 actions: [
-                  TextButton(onPressed: () => Navigator.of(ctx2).pop(), child: const Text('Huỷ')),
+                  TextButton(onPressed: () => Navigator.of(ctx2).pop(), child: Text(Ch.huy(ngonNguHienTai.value))),
                 ],
               ),
             );
@@ -507,7 +509,7 @@ class _ManHinhTuDienNhapLieuNhanhState
           }
 
           return AlertDialog(
-            title: const Text('Phím tắt cho Từ điển nhập liệu nhanh'),
+            title: Text(Ch.phimTatChoTuDienNhapLieuNhanh(ngonNguHienTai.value)),
             content: SizedBox(
               width: 360,
               child: SingleChildScrollView(
@@ -520,20 +522,18 @@ class _ManHinhTuDienNhapLieuNhanhState
                     // khác, không bao giờ trùng).
                     oLuaChon(
                       loai: 'altDup',
-                      nhan: 'Bấm Alt 2 lần liên tiếp',
-                      giaiThich: 'Bấm phím Alt, buông ra, rồi bấm lại lần '
-                          'nữa trong khoảng 1 giây (mặc định).',
+                      nhan: Ch.tenBamAlt2Lan(ngonNguHienTai.value),
+                      giaiThich: Ch.giaiThichBamAlt2Lan(ngonNguHienTai.value),
                     ),
                     oLuaChon(
                       loai: 'altShift',
-                      nhan: 'Alt + Shift',
-                      giaiThich: 'Giữ phím Alt và Shift cùng lúc.',
+                      nhan: Ch.tenAltShift(ngonNguHienTai.value),
+                      giaiThich: Ch.giaiThichAltShift(ngonNguHienTai.value),
                     ),
                     oLuaChon(
                       loai: 'ctrl',
-                      nhan: 'Ctrl + ...',
-                      giaiThich: 'Giữ phím Ctrl rồi bấm thêm một phím khác — '
-                          'ví dụ Ctrl + G.',
+                      nhan: Ch.tenCtrlCongThem(ngonNguHienTai.value),
+                      giaiThich: Ch.giaiThichCtrlCongThemTuDien(ngonNguHienTai.value),
                     ),
                     if (loaiTam == 'ctrl') ...[
                       const SizedBox(height: 4),
@@ -552,7 +552,7 @@ class _ManHinhTuDienNhapLieuNhanhState
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  phimCtrlTam == null ? 'Bấm để chọn phím' : 'Ctrl + $phimCtrlTam',
+                                  phimCtrlTam == null ? Ch.bamDeChonPhim(ngonNguHienTai.value) : 'Ctrl + $phimCtrlTam',
                                   style: TextStyle(
                                     fontWeight: FontWeight.w600,
                                     color: phimCtrlTam == null
@@ -577,11 +577,11 @@ class _ManHinhTuDienNhapLieuNhanhState
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Huỷ')),
+              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(Ch.huy(ngonNguHienTai.value))),
               FilledButton(
                 onPressed: () async {
                   if (loaiTam == 'ctrl' && phimCtrlTam == null) {
-                    capNhatModal(() => loiXungDot = 'Hãy bấm chọn một phím trước khi lưu.');
+                    capNhatModal(() => loiXungDot = Ch.hayBamChonMotPhimTruocKhiLuu(ngonNguHienTai.value));
                     return;
                   }
                   final moi = loaiTam == 'ctrl'
@@ -596,27 +596,23 @@ class _ManHinhTuDienNhapLieuNhanhState
                   if (moi.loai == 'ctrl') {
                     final xungDotCoDinh = CaiDat.tenXungDot(moi);
                     if (xungDotCoDinh != null) {
-                      capNhatModal(() => loiXungDot =
-                          'Phím tắt này đang trùng với chức năng "$xungDotCoDinh" '
-                          '(${moi.nhan}) — chọn phím khác nhé.');
+                      capNhatModal(() => loiXungDot = Ch.phimTatDangTrungVoiChucNang(
+                          ngonNguHienTai.value, xungDotCoDinh, moi.nhan));
                       return;
                     }
                     if (widget.caiDat.phimTatMicro.coBangVoi(moi)) {
-                      capNhatModal(() => loiXungDot =
-                          'Phím tắt này đang trùng với chức năng "Micro (vừa nói vừa ra chữ)" '
-                          '(${moi.nhan}) — chọn phím khác nhé.');
+                      capNhatModal(() => loiXungDot = Ch.phimTatDangTrungVoiChucNang(
+                          ngonNguHienTai.value, Ch.micoVuaNoiVuaRaChuTen(ngonNguHienTai.value), moi.nhan));
                       return;
                     }
                     if (widget.caiDat.phimTatGhiAm.coBangVoi(moi)) {
-                      capNhatModal(() => loiXungDot =
-                          'Phím tắt này đang trùng với chức năng "Ghi âm (Ghi âm xong mới ra chữ)" '
-                          '(${moi.nhan}) — chọn phím khác nhé.');
+                      capNhatModal(() => loiXungDot = Ch.phimTatDangTrungVoiChucNang(
+                          ngonNguHienTai.value, Ch.ghiAmXongMoiRaChuTen(ngonNguHienTai.value), moi.nhan));
                       return;
                     }
                     if (widget.caiDat.phimTatBoNhoTam.coBangVoi(moi)) {
-                      capNhatModal(() => loiXungDot =
-                          'Phím tắt này đang trùng với chức năng "Bộ nhớ tạm để dán văn bản" '
-                          '(${moi.nhan}) — chọn phím khác nhé.');
+                      capNhatModal(() => loiXungDot = Ch.phimTatDangTrungVoiChucNang(
+                          ngonNguHienTai.value, Ch.boNhoTamDanVanBanTen(ngonNguHienTai.value), moi.nhan));
                       return;
                     }
                   }
@@ -626,7 +622,7 @@ class _ManHinhTuDienNhapLieuNhanhState
                   setState(() {});
                   if (ctx.mounted) Navigator.of(ctx).pop();
                 },
-                child: const Text('Lưu'),
+                child: Text(Ch.luu(ngonNguHienTai.value)),
               ),
             ],
           );
@@ -662,10 +658,10 @@ class _ManHinhTuDienNhapLieuNhanhState
       builder: (ctx) => AlertDialog(
         title: Row(
           children: [
-            const Expanded(child: Text('Chọn thứ tự giữa các phím tắt chữ cái')),
+            Expanded(child: Text(Ch.chonThuTuGiuaCacPhimTatChuCai(ngonNguHienTai.value))),
             IconButton(
               icon: const Icon(Icons.close, color: Colors.red),
-              tooltip: 'Đóng',
+              tooltip: Ch.dong(ngonNguHienTai.value),
               onPressed: () => Navigator.of(ctx).pop(),
               visualDensity: VisualDensity.compact,
             ),
@@ -678,14 +674,13 @@ class _ManHinhTuDienNhapLieuNhanhState
             children: [
               oLuaChon(
                 gt: 'hang',
-                nhan: 'Sắp xếp theo các hàng chữ cái trên bàn phím',
-                giaiThich: 'Sắp xếp theo hàng phím của bàn phím vật lý.',
+                nhan: Ch.sapXepTheoCacHangChuCaiTrenBanPhim(ngonNguHienTai.value),
+                giaiThich: Ch.giaiThichSapXepTheoHang(ngonNguHienTai.value),
               ),
               oLuaChon(
                 gt: 'bangChuCai',
-                nhan: 'Sắp xếp theo Bảng chữ cái A → Z',
-                giaiThich: 'Sắp xếp theo tiêu chuẩn bảng chữ cái quốc tế '
-                    'alphabet, tức là từ A đến Z.',
+                nhan: Ch.sapXepTheoBangChuCaiAZ(ngonNguHienTai.value),
+                giaiThich: Ch.giaiThichSapXepTheoBangChuCai(ngonNguHienTai.value),
               ),
             ],
           ),
@@ -809,7 +804,7 @@ class _ManHinhTuDienNhapLieuNhanhState
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              noiDung.trim().isEmpty ? '(trống)' : noiDung.replaceAll('\n', ' '),
+              noiDung.trim().isEmpty ? Ch.trongNgoacDon(ngonNguHienTai.value) : noiDung.replaceAll('\n', ' '),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               softWrap: false,
@@ -877,7 +872,7 @@ class _ManHinhTuDienNhapLieuNhanhState
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    'Phím ${_chuCai(_thuTuSapXep[i])}',
+                    Ch.phimChuCai(ngonNguHienTai.value, _chuCai(_thuTuSapXep[i])),
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -924,7 +919,7 @@ class _ManHinhTuDienNhapLieuNhanhState
                 child: FilledButton(
                   style: FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
                   onPressed: _huySapXepLai,
-                  child: const Text('Huỷ - Không lưu thay đổi'),
+                  child: Text(Ch.huyKhongLuuThayDoi(ngonNguHienTai.value)),
                 ),
               ),
               const SizedBox(width: 12),
@@ -932,16 +927,15 @@ class _ManHinhTuDienNhapLieuNhanhState
                 child: FilledButton(
                   style: FilledButton.styleFrom(backgroundColor: Colors.green.shade600),
                   onPressed: _luuSapXepLai,
-                  child: const Text('Lưu thay đổi'),
+                  child: Text(Ch.luuThayDoi(ngonNguHienTai.value)),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Bấm và giữ từng dòng, sau đó kéo và thả để thay đổi vị trí cho '
-            'từng dòng.',
-            style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+          Text(
+            Ch.bamVaGiuTungDongKeoThaDeThayDoiViTri(ngonNguHienTai.value),
+            style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
           ),
           const SizedBox(height: 8),
           for (var i = 0; i < 26; i++) _dongKeoTha(i),
@@ -957,15 +951,15 @@ class _ManHinhTuDienNhapLieuNhanhState
         children: [
           Row(
             children: [
-              Expanded(child: _nutTabNguon('noiBo', 'Bộ nhớ Nội bộ')),
-              Expanded(child: _nutTabNguon('damMay', 'Bộ nhớ Đám mây')),
+              Expanded(child: _nutTabNguon('noiBo', Ch.boNhoNoiBo(ngonNguHienTai.value))),
+              Expanded(child: _nutTabNguon('damMay', Ch.boNhoDamMayTen(ngonNguHienTai.value))),
             ],
           ),
           const SizedBox(height: 8),
           Text(
             _dangODamMay
-                ? 'Từ điển này trong Bộ nhớ Đám mây lâu dài trên internet của tài khoản đang đăng nhập vào'
-                : 'Từ điển này trong Bộ nhớ nội bộ lâu dài của thiết bị (hoặc của trình duyệt)',
+                ? Ch.tuDienDamMayLauDaiTrenInternet(ngonNguHienTai.value)
+                : Ch.tuDienNoiBoLauDaiCuaThietBi(ngonNguHienTai.value),
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.red.shade700),
           ),
           const SizedBox(height: 16),
@@ -1003,9 +997,9 @@ class _ManHinhTuDienNhapLieuNhanhState
             ),
             child: Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Bật Từ điển nhập liệu nhanh',
+                    Ch.batTuDienNhapLieuNhanh(ngonNguHienTai.value),
                     style: TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -1030,8 +1024,8 @@ class _ManHinhTuDienNhapLieuNhanhState
             ),
           ),
           const SizedBox(height: 16),
-          const Text('Phím tắt ẩn hiện bảng Từ điển nhập liệu nhanh',
-              style: TextStyle(fontWeight: FontWeight.w600)),
+          Text(Ch.phimTatAnHienBangTuDienNhapLieuNhanh(ngonNguHienTai.value),
+              style: const TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           InkWell(
             onTap: _moDoiPhimTat,
@@ -1061,7 +1055,7 @@ class _ManHinhTuDienNhapLieuNhanhState
             child: OutlinedButton.icon(
               onPressed: _batDauSapXepLai,
               icon: const Icon(Icons.swap_vert, size: 18),
-              label: const Text('Thay đổi thứ tự giữa các dòng'),
+              label: Text(Ch.thayDoiThuTuGiuaCacDong(ngonNguHienTai.value)),
             ),
           ),
           const SizedBox(height: 8),
@@ -1072,18 +1066,13 @@ class _ManHinhTuDienNhapLieuNhanhState
             child: OutlinedButton.icon(
               onPressed: _moChonThuTuPhimTat,
               icon: const Icon(Icons.sort_by_alpha, size: 18),
-              label: const Text('Chọn thứ tự giữa các phím tắt chữ cái'),
+              label: Text(Ch.chonThuTuGiuaCacPhimTatChuCai(ngonNguHienTai.value)),
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Mỗi dòng ứng với một phím chữ cái trên bàn phím vật lý — gõ '
-            'sẵn đoạn văn bản muốn dán nhanh vào dòng tương ứng. Mở bảng '
-            'bằng nút trên thanh công cụ hoặc phím tắt ở trên, rồi bấm vào '
-            'một dòng (hoặc gõ đúng phím chữ cái của dòng đó) để dán ngay '
-            'vào vị trí con trỏ. Để trống dòng nào cũng được. Mỗi lần sửa '
-            'tự lưu lại ngay, không cần bấm nút Lưu.',
-            style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+          Text(
+            Ch.gioiThieuTuDienNhapLieuNhanh(ngonNguHienTai.value),
+            style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
           ),
           const SizedBox(height: 8),
           // (YÊU CẦU MỚI) Bọc cả 26 ô trong MỘT `Shortcuts`/`Actions` để
@@ -1121,7 +1110,7 @@ class _ManHinhTuDienNhapLieuNhanhState
         for (final i in thuTuTuDienNhapLieuNhanhTheoKieu(widget.caiDat.thuTuTuDienNhapLieuNhanh)) ...[
           const Divider(height: 24),
           Text(
-            'Phím ${_chuCai(i)}',
+            Ch.phimChuCai(ngonNguHienTai.value, _chuCai(i)),
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
@@ -1166,7 +1155,7 @@ class _ManHinhTuDienNhapLieuNhanhState
                   child: OutlinedButton.icon(
                     onPressed: () => _moXemDayDuDong(i),
                     icon: const Icon(Icons.visibility_outlined, size: 16),
-                    label: const Text('Xem đầy đủ nội dung của dòng này'),
+                    label: Text(Ch.xemDayDuNoiDungCuaDongNay(ngonNguHienTai.value)),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       minimumSize: Size.zero,
@@ -1191,7 +1180,7 @@ class _ManHinhTuDienNhapLieuNhanhState
                     color: _vuaCopy.contains(i) ? Colors.green.shade700 : null,
                   ),
                   label: Text(
-                    _vuaCopy.contains(i) ? 'Đã copy' : 'Copy',
+                    _vuaCopy.contains(i) ? 'Đã copy' : 'Copy', // (giữ cố định, không dịch)
                     style: TextStyle(color: _vuaCopy.contains(i) ? Colors.green.shade700 : null),
                   ),
                   style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
@@ -1204,7 +1193,9 @@ class _ManHinhTuDienNhapLieuNhanhState
                     color: _vuaDan.contains(i) ? Colors.green.shade700 : null,
                   ),
                   label: Text(
-                    _vuaDan.contains(i) ? 'Đã dán' : 'Dán',
+                    _vuaDan.contains(i)
+                        ? Ch.daDan(ngonNguHienTai.value)
+                        : Ch.dan(ngonNguHienTai.value),
                     style: TextStyle(color: _vuaDan.contains(i) ? Colors.green.shade700 : null),
                   ),
                   style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
@@ -1212,7 +1203,7 @@ class _ManHinhTuDienNhapLieuNhanhState
                 TextButton.icon(
                   onPressed: () => _xoaDong(i),
                   icon: Icon(Icons.delete_outline, size: 16, color: Colors.red.shade600),
-                  label: Text('Xoá', style: TextStyle(color: Colors.red.shade600)),
+                  label: Text(Ch.xoa(ngonNguHienTai.value), style: TextStyle(color: Colors.red.shade600)),
                   style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
                 ),
               ],
@@ -1229,10 +1220,10 @@ class _ManHinhTuDienNhapLieuNhanhState
       appBar: AppBar(
         backgroundColor: _mauChinh,
         foregroundColor: Colors.white,
-        title: const Text('Từ điển nhập liệu nhanh'),
+        title: Text(Ch.tuDienNhapLieuNhanhTen(ngonNguHienTai.value)),
         leading: IconButton(
           icon: const Icon(Icons.close),
-          tooltip: 'Đóng',
+          tooltip: Ch.dong(ngonNguHienTai.value),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
