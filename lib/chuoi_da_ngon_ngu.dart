@@ -1157,6 +1157,12 @@ class Ch {
       ? 'Có thắc mắc, góp ý, báo lỗi, vui lòng liên hệ qua một trong các cách sau:'
       : 'For questions, feedback, or bug reports, please contact us via one of the following:';
 
+  static String lienHeEmailKhac(NgonNgu nn, String email) =>
+      '**${nn == NgonNgu.vi ? 'Email khác' : 'Other email'}:** $email';
+
+  static String lienHeDienThoai(NgonNgu nn, String soDienThoai) =>
+      '**${nn == NgonNgu.vi ? 'Điện thoại' : 'Phone'}:** $soDienThoai';
+
   // --------------------------------- Modal "Bộ nhớ tạm để dán văn bản"
   static String hayBamChonMotPhimTruocKhiLuu(NgonNgu nn) => nn == NgonNgu.vi
       ? 'Hãy bấm chọn một phím trước khi lưu.'
@@ -1386,6 +1392,85 @@ class Ch {
 
   static String tuDienNhapLieuNhanhTen(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Từ điển nhập liệu nhanh' : 'Quick-text dictionary';
+
+  // ------------------------------------- Modal "Từ điển sửa lỗi chính tả"
+  static String tuThayTheVaoThuNhat(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Từ thay thế vào thứ nhất' : 'First replacement word';
+
+  static String tuThayTheVaoThuHai(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Từ thay thế vào thứ hai' : 'Second replacement word';
+
+  static String tuThayTheVaoThuBa(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Từ thay thế vào thứ ba' : 'Third replacement word';
+
+  static String xoaHangNay(NgonNgu nn) => nn == NgonNgu.vi ? 'Xoá hàng này' : 'Delete this row';
+
+  static String xoaChuNay(NgonNgu nn) => nn == NgonNgu.vi ? 'Xoá chữ này' : 'Clear this text';
+
+  static String batHoatDongTuDienChinhTa(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bật hoạt động của từ điển sửa lỗi chính tả'
+      : 'Enable the spelling-correction dictionary';
+
+  static String tuDienNayTrenDamMay(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Từ điển này trong Bộ nhớ Đám mây lâu dài trên internet của tài khoản đang đăng nhập vào'
+      : 'This dictionary lives permanently online, in the Cloud Storage of the signed-in account';
+
+  static String tuDienNayNoiBo(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Từ điển này trong Bộ nhớ nội bộ lâu dài của thiết bị (hoặc của trình duyệt)'
+      : 'This dictionary lives permanently in this device\'s (or browser\'s) local storage';
+
+  static String tuDienSuaLoiChinhTaCuaBan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Từ điển sửa lỗi chính tả của bạn' : 'Your spelling-correction dictionary';
+
+  static String timTrongTuDien(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tìm trong từ điển' : 'Search the dictionary';
+
+  static String nutThem(NgonNgu nn) => nn == NgonNgu.vi ? 'Thêm' : 'Add';
+
+  static String nutThemCapTu(NgonNgu nn) => nn == NgonNgu.vi ? 'Thêm cặp từ' : 'Add a word pair';
+
+  static String gioiThieuTuDienChinhTa(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'App tự quét văn bản — từ nào khớp "Từ bị lỗi chính tả hay gặp" sẽ '
+          'được gạch vàng lượn sóng, bấm vào để thay/xoá nhanh. Để trống "Từ '
+          'thay thế vào thứ nhất" (và không thêm từ thay thế nào khác) nghĩa '
+          'là đề xuất xoá hẳn từ đó. Có thể thêm tối đa 3 từ thay thế cho mỗi '
+          'cặp — tất cả đều hiện trong đề xuất, còn "Chấp nhận tất cả đề xuất '
+          'của từ điển" chỉ áp dụng từ thay thế thứ nhất.'
+      : 'The app scans your text automatically — any word matching your '
+          '"Common misspelled word" gets a yellow wavy underline; tap it to '
+          'replace or delete it quickly. Leaving the "First replacement word" '
+          'empty (and adding no other replacement) proposes deleting that '
+          'word outright. You can add up to 3 replacements per pair — all of '
+          'them show up in the suggestion, while "Accept all dictionary '
+          'suggestions" only applies the first replacement.';
+
+  static String tuBiLoiChinhTaHayGap(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Từ bị lỗi chính tả hay gặp' : 'Common misspelled word';
+
+  static String viDuVdMik(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Ví dụ: vd, mik, ...' : 'E.g.: thx, u, ...';
+
+  static String tuNayDaCoTrongMotCapKhac(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Từ này đã có trong một cặp khác — các từ bị lỗi không được trùng nhau.'
+      : 'This word already exists in another pair — misspelled words can\'t repeat.';
+
+  static String deTrongDeXuatXoa(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Để trống = đề xuất xoá' : 'Empty = suggest deleting';
+
+  static String tuThayTheThem(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Từ thay thế thêm' : 'Extra replacement word';
+
+  static String tuThayTheThuNhatKhongDuocGiongHet(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Từ thay thế thứ nhất không được giống hệt từ bị lỗi ở trên.'
+      : 'The first replacement word can\'t be identical to the misspelled word above.';
+
+  static String themTuThayThe(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Thêm Từ thay thế' : 'Add replacement word';
+
+  static String xoaCapTu(NgonNgu nn) => nn == NgonNgu.vi ? 'Xoá cặp từ' : 'Delete word pair';
+
+  static String timTrongTuDienHintText(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tìm trong từ điển...' : 'Search the dictionary...';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt

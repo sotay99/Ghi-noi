@@ -193,12 +193,12 @@ class _TrangGopYState extends State<_TrangGopY> {
           mauVien: const Color(0xFFB7E1C1),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              DoanPhapLy('**Email:** lookatmevanthanhpham@gmail.com'),
-              SizedBox(height: 6),
-              DoanPhapLy('**Email khác:** 219thanhdeptrai@gmail.com'),
-              SizedBox(height: 6),
-              DoanPhapLy('**Điện thoại:** +84 91 711 4941'),
+            children: [
+              const DoanPhapLy('**Email:** lookatmevanthanhpham@gmail.com'),
+              const SizedBox(height: 6),
+              DoanPhapLy(Ch.lienHeEmailKhac(ngonNguHienTai.value, '219thanhdeptrai@gmail.com')),
+              const SizedBox(height: 6),
+              DoanPhapLy(Ch.lienHeDienThoai(ngonNguHienTai.value, '+84 91 711 4941')),
             ],
           ),
         ),

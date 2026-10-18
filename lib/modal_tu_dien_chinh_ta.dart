@@ -14,7 +14,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'cai_dat.dart';
+import 'chuoi_da_ngon_ngu.dart';
 import 'dang_nhap_google.dart';
+import 'ngon_ngu.dart';
 import 'thong_bao_giua.dart';
 import 'tu_dien_dam_may.dart';
 
@@ -60,11 +62,16 @@ class _KetQuaTimTuDien {
   final int ketThuc;
 }
 
-const _nhanThuThayThe = [
-  'Từ thay thế vào thứ nhất',
-  'Từ thay thế vào thứ hai',
-  'Từ thay thế vào thứ ba',
-];
+String _nhanThuThayThe(int chiSo, NgonNgu nn) {
+  switch (chiSo) {
+    case 0:
+      return Ch.tuThayTheVaoThuNhat(nn);
+    case 1:
+      return Ch.tuThayTheVaoThuHai(nn);
+    default:
+      return Ch.tuThayTheVaoThuBa(nn);
+  }
+}
 
 class _ManHinhTuDienChinhTa extends StatefulWidget {
   const _ManHinhTuDienChinhTa({required this.caiDat, this.noiDungCanDua});
@@ -190,7 +197,8 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
       final uid = DichVuDangNhapGoogle.instance.nguoiDungHienTai?.uid;
       if (uid == null) {
         if (mounted) {
-          hienThongBaoGiua(context, 'Vui lòng đăng nhập tài khoản Google trước.');
+          hienThongBaoGiua(
+              context, Ch.vuiLongDangNhapTaiKhoanGoogleTruoc(ngonNguHienTai.value));
         }
         return;
       }
@@ -231,6 +239,11 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _dienNoiDungVaoCapRong(noiDung));
     }
     _oTimKiemTuDien.addListener(_capNhatKetQuaTimTuDien);
+    ngonNguHienTai.addListener(_khiDoiNgonNgu);
+  }
+
+  void _khiDoiNgonNgu() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -240,6 +253,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
     _cuon.dispose();
     _oTimKiemTuDien.dispose();
     _focusTimKiemTuDien.dispose();
+    ngonNguHienTai.removeListener(_khiDoiNgonNgu);
     _huyCacControllerCu();
     super.dispose();
   }
@@ -590,7 +604,9 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
             ),
             IconButton(
               icon: const Icon(Icons.close, size: 18),
-              tooltip: khiXoaHang != null ? 'Xoá hàng này' : 'Xoá chữ này',
+              tooltip: khiXoaHang != null
+                  ? Ch.xoaHangNay(ngonNguHienTai.value)
+                  : Ch.xoaChuNay(ngonNguHienTai.value),
               onPressed: khiXoaHang ??
                   () {
                     controller.clear();
@@ -621,10 +637,10 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
       ),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Text(
-              'Bật hoạt động của từ điển sửa lỗi chính tả',
-              style: TextStyle(fontWeight: FontWeight.w600),
+              Ch.batHoatDongTuDienChinhTa(ngonNguHienTai.value),
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
           Switch(
@@ -656,15 +672,17 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
         children: [
           Row(
             children: [
-              Expanded(child: _nutTabNguon('noiBo', 'Bộ nhớ Nội bộ')),
-              Expanded(child: _nutTabNguon('damMay', 'Bộ nhớ Đám mây')),
+              Expanded(
+                  child: _nutTabNguon('noiBo', Ch.boNhoNoiBo(ngonNguHienTai.value))),
+              Expanded(
+                  child: _nutTabNguon('damMay', Ch.boNhoTrenDamMay(ngonNguHienTai.value))),
             ],
           ),
           const SizedBox(height: 8),
           Text(
             _dangODamMay
-                ? 'Từ điển này trong Bộ nhớ Đám mây lâu dài trên internet của tài khoản đang đăng nhập vào'
-                : 'Từ điển này trong Bộ nhớ nội bộ lâu dài của thiết bị (hoặc của trình duyệt)',
+                ? Ch.tuDienNayTrenDamMay(ngonNguHienTai.value)
+                : Ch.tuDienNayNoiBo(ngonNguHienTai.value),
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.red.shade700),
           ),
           const SizedBox(height: 16),
@@ -697,10 +715,10 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
       appBar: AppBar(
         backgroundColor: _mauChinh,
         foregroundColor: Colors.white,
-        title: const Text('Từ điển sửa lỗi chính tả của bạn'),
+        title: Text(Ch.tuDienSuaLoiChinhTaCuaBan(ngonNguHienTai.value)),
         leading: IconButton(
           icon: const Icon(Icons.close),
-          tooltip: 'Đóng',
+          tooltip: Ch.dong(ngonNguHienTai.value),
           onPressed: () => Navigator.of(context).pop(),
         ),
         // "+ Thêm cặp từ" luôn ở góc trên bên phải, cùng dòng tiêu đề — lướt
@@ -711,7 +729,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
           // này, cạnh "+ Thêm cặp từ".
           IconButton(
             icon: const Icon(Icons.search),
-            tooltip: 'Tìm trong từ điển',
+            tooltip: Ch.timTrongTuDien(ngonNguHienTai.value),
             onPressed: _hienThanhTimKiemTuDien ? _dongTimKiemTuDien : _moTimKiemTuDien,
           ),
           Padding(
@@ -722,7 +740,9 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
               // (YÊU CẦU MỚI) Màn hẹp: rút gọn chữ còn "Thêm" (vẫn giữ icon)
               // cho đỡ chật — màn rộng giữ nguyên tên đầy đủ.
               label: Text(
-                MediaQuery.sizeOf(context).width < 600 ? 'Thêm' : 'Thêm cặp từ',
+                MediaQuery.sizeOf(context).width < 600
+                    ? Ch.nutThem(ngonNguHienTai.value)
+                    : Ch.nutThemCapTu(ngonNguHienTai.value),
               ),
               style: TextButton.styleFrom(
                 foregroundColor: Colors.white,
@@ -755,24 +775,18 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
             _thanChonNguon(),
             _congTacBatTat(),
             const SizedBox(height: 16),
-            const Text(
-              'App tự quét văn bản — từ nào khớp "Từ bị lỗi chính tả hay '
-              'gặp" sẽ được gạch vàng lượn sóng, bấm vào để thay/xoá nhanh. '
-              'Để trống "Từ thay thế vào thứ nhất" (và không thêm từ thay '
-              'thế nào khác) nghĩa là đề xuất xoá hẳn từ đó. Có thể thêm tối '
-              'đa 3 từ thay thế cho mỗi cặp — tất cả đều hiện trong đề xuất, '
-              'còn "Chấp nhận tất cả đề xuất của từ điển" chỉ áp dụng từ thay '
-              'thế thứ nhất.',
-              style: TextStyle(height: 1.5, color: Color(0xFF5F6368)),
+            Text(
+              Ch.gioiThieuTuDienChinhTa(ngonNguHienTai.value),
+              style: const TextStyle(height: 1.5, color: Color(0xFF5F6368)),
             ),
             const SizedBox(height: 8),
             for (final c in _ds) ...[
               KeyedSubtree(key: _khoaCap[c], child: const Divider(height: 28)),
               _oNhap(
-                nhan: 'Từ bị lỗi chính tả hay gặp',
+                nhan: Ch.tuBiLoiChinhTaHayGap(ngonNguHienTai.value),
                 controller: _oLoi[c]!,
                 focusNode: _focusLoi[c],
-                goiY: 'Ví dụ: vd, mik, ...',
+                goiY: Ch.viDuVdMik(ngonNguHienTai.value),
                 // (YÊU CẦU MỚI) Cặp rỗng hoàn toàn (xem `_capRong`) — viền
                 // xanh dương đậm ở MỌI trường trong cặp đó, phân biệt với
                 // các cặp còn lại. Tự hết ngay khi cặp không còn rỗng nữa
@@ -780,7 +794,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
                 noiBatRong: _laCapRong(c),
                 noiBatVangNhapNhay: c == _capVuaThem && _capVuaThemSang,
                 canhBao: _loiTrungTuLoi.contains(c)
-                    ? 'Từ này đã có trong một cặp khác — các từ bị lỗi không được trùng nhau.'
+                    ? Ch.tuNayDaCoTrongMotCapKhac(ngonNguHienTai.value)
                     : null,
                 onChanged: (gia) {
                   setState(() {
@@ -799,13 +813,15 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
               const SizedBox(height: 10),
               for (var i = 0; i < _oThayThe[c]!.length; i++) ...[
                 _oNhap(
-                  nhan: _nhanThuThayThe[i],
+                  nhan: _nhanThuThayThe(i, ngonNguHienTai.value),
                   controller: _oThayThe[c]![i],
                   focusNode: _focusThayThe[c]?[i],
-                  goiY: i == 0 ? 'Để trống = đề xuất xoá' : 'Từ thay thế thêm',
+                  goiY: i == 0
+                      ? Ch.deTrongDeXuatXoa(ngonNguHienTai.value)
+                      : Ch.tuThayTheThem(ngonNguHienTai.value),
                   noiBatRong: _laCapRong(c),
                   canhBao: i == 0 && _loiTrungThayThe.contains(c)
-                      ? 'Từ thay thế thứ nhất không được giống hệt từ bị lỗi ở trên.'
+                      ? Ch.tuThayTheThuNhatKhongDuocGiongHet(ngonNguHienTai.value)
                       : null,
                   khiXoaHang: i == 0 ? null : () => _xoaHangTuThayThe(c, i),
                   onChanged: (gia) {
@@ -824,7 +840,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
                   child: TextButton.icon(
                     onPressed: () => _themTuThayThe(c),
                     icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Thêm Từ thay thế'),
+                    label: Text(Ch.themTuThayThe(ngonNguHienTai.value)),
                   ),
                 ),
               const SizedBox(height: 8),
@@ -833,7 +849,8 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
                 child: TextButton.icon(
                   onPressed: () => _xoaCap(c),
                   icon: Icon(Icons.delete_outline, size: 18, color: Colors.red.shade600),
-                  label: Text('Xoá cặp từ', style: TextStyle(color: Colors.red.shade600)),
+                  label: Text(Ch.xoaCapTu(ngonNguHienTai.value),
+                      style: TextStyle(color: Colors.red.shade600)),
                 ),
               ),
             ],
@@ -861,10 +878,10 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
             child: TextField(
               controller: _oTimKiemTuDien,
               focusNode: _focusTimKiemTuDien,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 isDense: true,
-                hintText: 'Tìm trong từ điển...',
-                border: OutlineInputBorder(),
+                hintText: Ch.timTrongTuDienHintText(ngonNguHienTai.value),
+                border: const OutlineInputBorder(),
               ),
               onSubmitted: (_) => _dieuHuongTimKiemTuDien(1),
             ),
@@ -878,17 +895,17 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
           ),
           IconButton(
             icon: const Icon(Icons.keyboard_arrow_up),
-            tooltip: 'Kết quả trước',
+            tooltip: Ch.ketQuaTruoc(ngonNguHienTai.value),
             onPressed: _ketQuaTimTuDien.isEmpty ? null : () => _dieuHuongTimKiemTuDien(-1),
           ),
           IconButton(
             icon: const Icon(Icons.keyboard_arrow_down),
-            tooltip: 'Kết quả tiếp theo',
+            tooltip: Ch.ketQuaTiepTheo(ngonNguHienTai.value),
             onPressed: _ketQuaTimTuDien.isEmpty ? null : () => _dieuHuongTimKiemTuDien(1),
           ),
           IconButton(
             icon: Icon(Icons.close, color: Colors.green.shade700),
-            tooltip: 'Xoá nội dung tìm',
+            tooltip: Ch.xoaNoiDungTim(ngonNguHienTai.value),
             onPressed: () => _oTimKiemTuDien.clear(),
           ),
           TextButton(
@@ -898,7 +915,7 @@ class _ManHinhTuDienChinhTaState extends State<_ManHinhTuDienChinhTa> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
             ),
             onPressed: _dongTimKiemTuDien,
-            child: const Text('Tắt'),
+            child: Text(Ch.tat(ngonNguHienTai.value)),
           ),
         ],
       ),
