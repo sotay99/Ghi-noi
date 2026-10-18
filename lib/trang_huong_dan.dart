@@ -1,8 +1,14 @@
 // Trang Hướng dẫn: một bài viết dài, trình bày như một trang thiết kế thật
 // sự — tiêu đề lớn, tiêu đề phụ có màu, đoạn văn có chữ đậm/tô nền/đổi màu,
 // thẻ thống kê, hộp mẹo, trích dẫn — chứ không phải một khối chữ đơn điệu.
+//
+// Nội dung dài (đoạn văn, danh sách) nằm ở `chuoi_huong_dan.dart` theo đa
+// ngôn ngữ — trang này chỉ lắp khung, đọc `ngonNguHienTai` tại lúc build.
 
 import 'package:flutter/material.dart';
+
+import 'chuoi_huong_dan.dart';
+import 'ngon_ngu.dart';
 
 const _mauChinh = Color(0xFF1A73E8);
 const _mauChinhDam = Color(0xFF0B3D91);
@@ -12,135 +18,132 @@ class ManHinhHuongDan extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            pinned: true,
-            backgroundColor: _mauChinh,
-            foregroundColor: Colors.white,
-            title: const Text('Hướng dẫn'),
-          ),
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: const [
-                _Hero(),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(20, 28, 20, 40),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _HopMoDau(),
-                      SizedBox(height: 28),
-                      _MucLon(so: 'I', tieuDe: 'Nói và gõ tay cùng lúc'),
-                      SizedBox(height: 14),
-                      _Doan(_doan1),
-                      SizedBox(height: 28),
-                      _MucLon(so: 'II', tieuDe: 'Quản lý nhiều ghi chú, chuyển tệp trong một nhịp'),
-                      SizedBox(height: 14),
-                      _Doan(_doan2),
-                      SizedBox(height: 14),
-                      _TheHanChe(
-                        mau: Color(0xFF185ABC),
-                        mauNen: Color(0xFFE8F0FE),
-                        icon: Icons.folder_copy_outlined,
-                        tieuDe: 'Phần lớn app ghi chú khác chưa chú trọng điều này',
-                        gachDau: _dacDiemDaTep,
-                      ),
-                      SizedBox(height: 28),
-                      _MucLon(so: 'III', tieuDe: 'Gõ nhanh hơn với bộ nhớ tạm, từ điển gõ nhanh, sửa lỗi chính tả'),
-                      SizedBox(height: 14),
-                      _Doan(_doan3b),
-                      SizedBox(height: 14),
-                      _TheHanChe(
-                        mau: Color(0xFF188038),
-                        mauNen: Color(0xFFE6F4EA),
-                        icon: Icons.content_paste_outlined,
-                        tieuDe: 'Ba trợ thủ nhỏ, hiệu quả lớn',
-                        gachDau: _dacDiemGoNhanh,
-                      ),
-                      SizedBox(height: 28),
-                      _MucLon(so: 'IV', tieuDe: 'Trợ lý AI đi kèm'),
-                      SizedBox(height: 14),
-                      _Doan(_doan3),
-                      SizedBox(height: 14),
-                      _TheHanChe(
-                        mau: Color(0xFF9334E6),
-                        mauNen: Color(0xFFF3E8FD),
-                        icon: Icons.auto_awesome_outlined,
-                        tieuDe: 'Không cần rời khỏi app',
-                        gachDau: _dacDiemAi,
-                      ),
-                      SizedBox(height: 28),
-                      _MucLon(so: 'V', tieuDe: 'Đồng bộ nhiều thiết bị'),
-                      SizedBox(height: 14),
-                      _Doan(_doan4),
-                      SizedBox(height: 28),
-                      _MucLon(so: 'VI', tieuDe: 'Ghi nhanh ngay từ màn hình chính (Android)'),
-                      SizedBox(height: 6),
-                      _ChiChuNenTang('Chỉ dành cho Android — iPhone/iPad sẽ nâng cấp sau'),
-                      SizedBox(height: 14),
-                      _Doan(_doan5Widget),
-                      SizedBox(height: 14),
-                      _CacBuocDanhSo(cacBuoc: _cacBuocCaiWidget),
-                      SizedBox(height: 28),
-                      _MucLon(so: 'VII', tieuDe: 'Bí quyết để nhanh hơn nữa'),
-                      SizedBox(height: 14),
-                      _Doan(_doan8),
-                      SizedBox(height: 14),
-                      _OGoiY(
-                        icon: Icons.keyboard_alt_outlined,
-                        mau: _mauChinhDam,
-                        mauNen: Color(0xFFE8F0FE),
-                        tieuDe: 'Chọn đúng bàn phím',
-                        noiDung: _oGoiYBanPhim,
-                      ),
-                      SizedBox(height: 12),
-                      _OGoiY(
-                        icon: Icons.translate_outlined,
-                        mau: Color(0xFF188038),
-                        mauNen: Color(0xFFE6F4EA),
-                        tieuDe: 'Chọn đúng bộ gõ',
-                        noiDung: _oGoiYBoGo,
-                      ),
-                      SizedBox(height: 12),
-                      _OGoiY(
-                        icon: Icons.school_outlined,
-                        mau: Color(0xFF9334E6),
-                        mauNen: Color(0xFFF3E8FD),
-                        tieuDe: 'Học gõ mười ngón, không nhìn phím',
-                        noiDung: _oGoiYMuoiNgon,
-                      ),
-                      SizedBox(height: 12),
-                      _OGoiY(
-                        icon: Icons.mic_external_on_outlined,
-                        mau: Color(0xFFD01884),
-                        mauNen: Color(0xFFFCE4EC),
-                        tieuDe: 'Dùng micro rời — nghe rõ hơn hẳn',
-                        noiDung: _oGoiYMicroRoi,
-                      ),
-                      SizedBox(height: 28),
-                      _MucLon(so: 'VIII', tieuDe: 'Liên hệ'),
-                      SizedBox(height: 14),
-                      _Doan(
-                        'Có thắc mắc, góp ý, báo lỗi, vui lòng liên hệ qua '
-                        'một trong các cách sau:\n\n'
-                        '**Email:** lookatmevanthanhpham@gmail.com\n'
-                        '**Email khác:** 219thanhdeptrai@gmail.com\n'
-                        '**Điện thoại:** +84 91 711 4941',
-                      ),
-                      SizedBox(height: 28),
-                      _TrichDan(),
-                      SizedBox(height: 8),
-                    ],
-                  ),
-                ),
-              ],
+    return ValueListenableBuilder<NgonNgu>(
+      valueListenable: ngonNguHienTai,
+      builder: (context, nn, _) => Scaffold(
+        backgroundColor: Colors.white,
+        body: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              pinned: true,
+              backgroundColor: _mauChinh,
+              foregroundColor: Colors.white,
+              title: Text(ChHuongDan.tieuDeTrang(nn)),
             ),
-          ),
-        ],
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const _Hero(),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 28, 20, 40),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _HopMoDau(nn),
+                        const SizedBox(height: 28),
+                        _MucLon(so: 'I', tieuDe: ChHuongDan.mucI(nn)),
+                        const SizedBox(height: 14),
+                        _Doan(ChHuongDan.doan1(nn)),
+                        const SizedBox(height: 28),
+                        _MucLon(so: 'II', tieuDe: ChHuongDan.mucII(nn)),
+                        const SizedBox(height: 14),
+                        _Doan(ChHuongDan.doan2(nn)),
+                        const SizedBox(height: 14),
+                        _TheHanChe(
+                          mau: const Color(0xFF185ABC),
+                          mauNen: const Color(0xFFE8F0FE),
+                          icon: Icons.folder_copy_outlined,
+                          tieuDe: ChHuongDan.theDaTepTieuDe(nn),
+                          gachDau: ChHuongDan.dacDiemDaTep(nn),
+                        ),
+                        const SizedBox(height: 28),
+                        _MucLon(so: 'III', tieuDe: ChHuongDan.mucIII(nn)),
+                        const SizedBox(height: 14),
+                        _Doan(ChHuongDan.doan3b(nn)),
+                        const SizedBox(height: 14),
+                        _TheHanChe(
+                          mau: const Color(0xFF188038),
+                          mauNen: const Color(0xFFE6F4EA),
+                          icon: Icons.content_paste_outlined,
+                          tieuDe: ChHuongDan.theGoNhanhTieuDe(nn),
+                          gachDau: ChHuongDan.dacDiemGoNhanh(nn),
+                        ),
+                        const SizedBox(height: 28),
+                        _MucLon(so: 'IV', tieuDe: ChHuongDan.mucIV(nn)),
+                        const SizedBox(height: 14),
+                        _Doan(ChHuongDan.doan3(nn)),
+                        const SizedBox(height: 14),
+                        _TheHanChe(
+                          mau: const Color(0xFF9334E6),
+                          mauNen: const Color(0xFFF3E8FD),
+                          icon: Icons.auto_awesome_outlined,
+                          tieuDe: ChHuongDan.theAiTieuDe(nn),
+                          gachDau: ChHuongDan.dacDiemAi(nn),
+                        ),
+                        const SizedBox(height: 28),
+                        _MucLon(so: 'V', tieuDe: ChHuongDan.mucV(nn)),
+                        const SizedBox(height: 14),
+                        _Doan(ChHuongDan.doan4(nn)),
+                        const SizedBox(height: 28),
+                        _MucLon(so: 'VI', tieuDe: ChHuongDan.mucVI(nn)),
+                        const SizedBox(height: 6),
+                        _ChiChuNenTang(ChHuongDan.chiDanhAndroid(nn)),
+                        const SizedBox(height: 14),
+                        _Doan(ChHuongDan.doan5Widget(nn)),
+                        const SizedBox(height: 14),
+                        _CacBuocDanhSo(cacBuoc: ChHuongDan.cacBuocCaiWidget(nn)),
+                        const SizedBox(height: 28),
+                        _MucLon(so: 'VII', tieuDe: ChHuongDan.mucVII(nn)),
+                        const SizedBox(height: 14),
+                        _Doan(ChHuongDan.doan8(nn)),
+                        const SizedBox(height: 14),
+                        _OGoiY(
+                          icon: Icons.keyboard_alt_outlined,
+                          mau: _mauChinhDam,
+                          mauNen: const Color(0xFFE8F0FE),
+                          tieuDe: ChHuongDan.oGoiYBanPhimTieuDe(nn),
+                          noiDung: ChHuongDan.oGoiYBanPhim(nn),
+                        ),
+                        const SizedBox(height: 12),
+                        _OGoiY(
+                          icon: Icons.translate_outlined,
+                          mau: const Color(0xFF188038),
+                          mauNen: const Color(0xFFE6F4EA),
+                          tieuDe: ChHuongDan.oGoiYBoGoTieuDe(nn),
+                          noiDung: ChHuongDan.oGoiYBoGo(nn),
+                        ),
+                        const SizedBox(height: 12),
+                        _OGoiY(
+                          icon: Icons.school_outlined,
+                          mau: const Color(0xFF9334E6),
+                          mauNen: const Color(0xFFF3E8FD),
+                          tieuDe: ChHuongDan.oGoiYMuoiNgonTieuDe(nn),
+                          noiDung: ChHuongDan.oGoiYMuoiNgon(nn),
+                        ),
+                        const SizedBox(height: 12),
+                        _OGoiY(
+                          icon: Icons.mic_external_on_outlined,
+                          mau: const Color(0xFFD01884),
+                          mauNen: const Color(0xFFFCE4EC),
+                          tieuDe: ChHuongDan.oGoiYMicroRoiTieuDe(nn),
+                          noiDung: ChHuongDan.oGoiYMicroRoi(nn),
+                        ),
+                        const SizedBox(height: 28),
+                        _MucLon(so: 'VIII', tieuDe: ChHuongDan.mucVIII(nn)),
+                        const SizedBox(height: 14),
+                        _Doan(ChHuongDan.lienHe(nn)),
+                        const SizedBox(height: 28),
+                        _TrichDan(nn),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -193,14 +196,16 @@ class _Hero extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          Text(
-            'Nói ra ý tưởng, gõ tay sửa liền — không đợi, không xung đột, '
-            'không mất mạch suy nghĩ.',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.92),
-              fontSize: 16,
-              height: 1.5,
-              fontWeight: FontWeight.w500,
+          ValueListenableBuilder<NgonNgu>(
+            valueListenable: ngonNguHienTai,
+            builder: (context, nn, _) => Text(
+              ChHuongDan.heroDongTrichDan(nn),
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.92),
+                fontSize: 16,
+                height: 1.5,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -236,7 +241,8 @@ class _Hero extends StatelessWidget {
 /// Nói thẳng vấn đề ngay dưới tiêu đề — ai lười đọc cả bài vẫn nắm được ý
 /// chính trong vài giây.
 class _HopMoDau extends StatelessWidget {
-  const _HopMoDau();
+  const _HopMoDau(this.nn);
+  final NgonNgu nn;
 
   @override
   Widget build(BuildContext context) {
@@ -248,12 +254,7 @@ class _HopMoDau extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFAECBFA)),
       ),
-      child: const _Doan(
-        'Nói và gõ tay, xưa nay luôn phải **chọn một**: bật giọng nói thì '
-        'tắt bàn phím, ngồi gõ thì im giọng nói. Flowrite phá bỏ luật đó — '
-        'bạn ==nói và gõ cùng lúc, không lẫn không đè lên nhau==, lại còn '
-        'quản lý nhiều ghi chú, có AI hỗ trợ, đồng bộ mọi thiết bị.',
-      ),
+      child: _Doan(ChHuongDan.hopMoDau(nn)),
     );
   }
 }
@@ -325,7 +326,7 @@ class _ChiChuNenTang extends StatelessWidget {
 }
 
 /// Danh sách các bước đánh số tròn — dùng cho hướng dẫn thao tác từng bước
-/// (khác `_TheHanChe`/`_dacDiemDaTep` là liệt kê đặc điểm, không phải thứ tự).
+/// (khác `_TheHanChe`/`dacDiemDaTep` là liệt kê đặc điểm, không phải thứ tự).
 class _CacBuocDanhSo extends StatelessWidget {
   const _CacBuocDanhSo({required this.cacBuoc});
   final List<String> cacBuoc;
@@ -543,7 +544,8 @@ class _TheHanChe extends StatelessWidget {
 // ---------------------------------------------------------------- trích dẫn
 
 class _TrichDan extends StatelessWidget {
-  const _TrichDan();
+  const _TrichDan(this.nn);
+  final NgonNgu nn;
 
   @override
   Widget build(BuildContext context) {
@@ -559,15 +561,13 @@ class _TrichDan extends StatelessWidget {
         children: [
           const Icon(Icons.format_quote, color: Colors.white70, size: 30),
           const SizedBox(height: 8),
-          const Text(
-            'Nói nhanh, gõ chính xác, chuyển tệp tức khắc, có AI hỗ trợ, và '
-            'mở đúng ghi chú ở bất kỳ thiết bị nào — đó là Flowrite.',
-            style: TextStyle(color: Colors.white, fontSize: 16.5, fontWeight: FontWeight.w700, height: 1.5),
+          Text(
+            ChHuongDan.trichDanLon(nn),
+            style: const TextStyle(color: Colors.white, fontSize: 16.5, fontWeight: FontWeight.w700, height: 1.5),
           ),
           const SizedBox(height: 14),
           Text(
-            'Flowrite không thay bạn viết — nó chỉ dọn đường để ý tưởng của '
-            'bạn ra tới trang giấy nhanh nhất có thể.',
+            ChHuongDan.trichDanNho(nn),
             style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13.5, height: 1.5),
           ),
         ],
@@ -575,100 +575,3 @@ class _TrichDan extends StatelessWidget {
     );
   }
 }
-
-// ------------------------------------------------------------------- văn bản
-
-const _doan1 =
-    'Phần lớn app ghi âm chuyển chữ buộc bạn chọn MỘT trong hai: hoặc **nói**, '
-    'hoặc **gõ**. Flowrite để cả hai diễn ra ĐAN XEN tự nhiên — nói một câu '
-    'dài, rồi đưa tay gõ chèn ngay một từ, một con số — không cần tắt micro, '
-    'không lo giọng nói và ký tự gõ tay ==đá nhau làm hỏng câu==.';
-
-const _doan2 =
-    'Ghi chú được tổ chức theo **thư mục lồng nhau** như một cây thư mục '
-    'thật — không phải một danh sách dài vô tổ chức. Và khi đang soạn một '
-    'tệp, bạn chuyển ngay sang tệp kế tiếp trong cùng thư mục bằng nút '
-    '**"Tệp trước/Tệp sau"** ngay tại màn hình soạn thảo.';
-
-const _dacDiemDaTep = [
-  'Chuyển qua ghi chú khác KHÔNG phải quay lại màn hình thư mục rồi bấm mở lại từng cái — chỉ một nút, ngay tại chỗ đang soạn.',
-  'Hết tệp cuối tự vòng về tệp đầu (và ngược lại) — không bao giờ "kẹt ở biên".',
-  'Tìm nhanh trong thư mục, và tuỳ chọn mở sẵn đúng ghi chú mỗi khi khởi động app.',
-];
-
-const _doan3b =
-    'Những đoạn gõ lặp lại — chữ ký, lời chào, cụm từ hay dùng — không cần '
-    'gõ lại từ đầu mỗi lần. Và những lỗi chính tả nhỏ không cần tự soi từng '
-    'chữ để sửa.';
-
-const _dacDiemGoNhanh = [
-  '**Bộ nhớ tạm để dán văn bản**: lưu lại 10 lần cắt/dán/copy gần nhất, ghim lại dòng nào muốn giữ lâu — dán lại y nguyên bất cứ lúc nào, khỏi gõ lại.',
-  '**Từ điển nhập liệu nhanh**: một bảng 26 dòng chứa sẵn các đoạn hay dùng, chạm một lần là dán thẳng vào bài — nhanh hơn hẳn gõ tay cho những câu lặp đi lặp lại.',
-  '**Từ điển sửa lỗi chính tả**: tự động dò và gợi ý sửa lỗi gõ sai quen tay, giữ văn bản sạch mà không phải dừng lại đọc rà soát.',
-];
-
-const _doan3 =
-    'Không cần rời Flowrite để dùng AI — mọi tính năng AI nằm sẵn trong '
-    'thanh công cụ, xử lý ngay trên văn bản đang soạn.';
-
-const _dacDiemAi = [
-  'Kiểm tra chính tả, tóm tắt, viết lại cả bài hoặc một đoạn đang chọn.',
-  'Trò chuyện hỏi đáp ngay trong app để brainstorm hoặc hỏi về nội dung bài viết.',
-  'Đọc ảnh chụp hoặc file âm thanh, tự động chuyển thành văn bản.',
-];
-
-const _doan4 =
-    'Đăng nhập tài khoản Google (**hoàn toàn tuỳ chọn**) để mở đúng ghi chú '
-    'đó ở một thiết bị khác — điện thoại, máy tính, trình duyệt nào cũng '
-    'thấy cùng một dữ liệu.';
-
-const _doan5Widget =
-    'Đặt một **tiện ích (widget) Flowrite** ngay ngoài màn hình chính điện '
-    'thoại/máy tính bảng Android — ghi một ý nhanh mà ==không cần mở app==.';
-
-const _cacBuocCaiWidget = [
-  'Chạm giữ (long-press) một khoảng trống ở màn hình chính thiết bị.',
-  'Chọn mục "Widgets" (Tiện ích) trong menu hiện ra.',
-  'Tìm "Flowrite" trong danh sách, kéo thả ra màn hình chính.',
-  'Chọn MỘT ghi chú để tiện ích ghi vào — chỉ hỏi đúng một lần lúc vừa đặt.',
-  'Xong! Chạm nút "Ghi nhanh" trên tiện ích bất cứ lúc nào để gõ liền, không cần mở app. Nút "Mở app" bên cạnh mở Flowrite bình thường.',
-];
-
-const _doan8 =
-    'Bản thân ứng dụng chỉ là một nửa câu chuyện — nửa còn lại nằm ở chính '
-    'thói quen của bạn. Vài điều chỉnh nhỏ dưới đây có thể nhân đôi, nhân ba '
-    'hiệu quả của việc kết hợp nói và gõ:';
-
-const _oGoiYBanPhim =
-    'Bàn phím ảo trên màn hình cảm ứng chỉ để dùng tạm — gõ chậm hơn, dễ gõ '
-    'nhầm, và không có phản hồi lực bấm để ngón tay "nhớ vị trí phím". Nếu '
-    'soạn thảo nhiều, hãy **gắn thêm một bàn phím rời** cho điện thoại/máy '
-    'tính bảng qua Bluetooth. Có điều kiện hơn thì bàn phím cơ (cơ khí) cho '
-    'cảm giác gõ rõ ràng, độ nảy tốt, giúp gõ nhanh và chính xác hơn hẳn so '
-    'với bàn phím màng thông thường.';
-
-const _oGoiYBoGo =
-    'Hãy chắc chắn bạn đang dùng đúng bộ gõ cho ngôn ngữ mình viết — với '
-    'tiếng Việt là các kiểu gõ **Telex** hoặc **VNI** quen thuộc. Một bộ gõ '
-    'phù hợp, được thiết lập đúng, giúp gõ dấu nhanh và chính xác hơn nhiều '
-    'so với việc gõ chữ có dấu theo kiểu thủ công từng ký tự.';
-
-const _oGoiYMuoiNgon =
-    'Kỹ năng có ảnh hưởng lớn nhất tới tốc độ gõ tay chính là **gõ mười '
-    'ngón mà không cần nhìn xuống bàn phím**. Người mới tập thường chỉ gõ '
-    'bằng vài ngón và phải liên tục liếc bàn phím, vừa chậm vừa dễ sai. Có '
-    'rất nhiều trang web luyện gõ mười ngón miễn phí và trực quan — chỉ cần '
-    'tìm "luyện gõ mười ngón" hoặc "typing practice" là ra hàng loạt lựa '
-    'chọn để luyện tập mỗi ngày vài phút. Kiên trì một thời gian ngắn, tốc '
-    'độ gõ của bạn có thể tăng gấp đôi, gấp ba so với gõ theo bản năng.';
-
-const _oGoiYMicroRoi =
-    'Micro của điện thoại thường nằm ở cạnh dưới máy — càng xa miệng, máy '
-    'càng khó nghe rõ, càng dễ nhận nhầm chữ. Một chiếc **micro rời** (micro '
-    'cài áo, tai nghe có micro) đặt gần miệng hơn hẳn, giúp bộ nhận dạng '
-    'nghe chuẩn hơn thấy rõ.\n\n'
-    'Vài mẹo nhỏ giúp giọng nói tới máy sạch nhất: luôn để micro **sát '
-    'miệng**, ưu tiên loại có ==bộ lọc chống ồn== nếu có điều kiện, và cố '
-    'gắng thu âm ở nơi yên tĩnh. Ở chỗ ồn mà không có micro rời, một mẹo đơn '
-    'giản là lấy tay khum lại che quanh miệng và micro của máy — vừa chắn '
-    'bớt tiếng ồn xung quanh, vừa hướng giọng nói thẳng vào micro.';
