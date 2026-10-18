@@ -2662,66 +2662,56 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      'Cài đặt chế độ tìm kiếm',
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                    Text(
+                      Ch.caiDatCheDoTimKiem(ngonNguHienTai.value),
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                     ),
                     const SizedBox(height: 4),
                     _dongCongTacTimKiem(
-                      'Khớp cả chữ Hoa và chữ thường',
+                      Ch.khopCaHoaThuong(ngonNguHienTai.value),
                       !phanBietHoaThuong,
                       (bat) => datHoaThuong(!bat),
                       khiBamTimHieuThem: () => _hienGiaiThichTimKiem(
-                        'Khớp cả chữ Hoa và chữ thường',
-                        'Tìm "h" sẽ ra cả "h" và "H" — không phân biệt chữ '
-                            'Hoa/thường khi so khớp.',
+                        Ch.khopCaHoaThuong(ngonNguHienTai.value),
+                        Ch.khopCaHoaThuongGiaiThich(ngonNguHienTai.value),
                       ),
                     ),
                     _dongCongTacTimKiem(
-                      'Chữ Hoa và chữ thường luôn khác nhau',
+                      Ch.hoaThuongLuonKhacNhau(ngonNguHienTai.value),
                       phanBietHoaThuong,
                       (bat) => datHoaThuong(bat),
                       khiBamTimHieuThem: () => _hienGiaiThichTimKiem(
-                        'Chữ Hoa và chữ thường luôn khác nhau',
-                        'Tìm "h" chỉ ra đúng "h", không ra "H" — phân biệt '
-                            'chính xác chữ Hoa/thường.',
+                        Ch.hoaThuongLuonKhacNhau(ngonNguHienTai.value),
+                        Ch.hoaThuongLuonKhacNhauGiaiThich(ngonNguHienTai.value),
                       ),
                     ),
                     const SizedBox(height: 6),
                     _dongCongTacTimKiem(
-                      'Khớp cả chữ không dấu và chữ có dấu',
+                      Ch.khopCaDauKhongDau(ngonNguHienTai.value),
                       !phanBietDauThanh,
                       (bat) => datDauThanh(!bat),
                       khiBamTimHieuThem: () => _hienGiaiThichTimKiem(
-                        'Khớp cả chữ không dấu và chữ có dấu',
-                        'Tìm "thang" sẽ ra cả "thắng", "thằng", "tháng"... — '
-                            'không phân biệt dấu thanh khi so khớp.',
+                        Ch.khopCaDauKhongDau(ngonNguHienTai.value),
+                        Ch.khopCaDauKhongDauGiaiThich(ngonNguHienTai.value),
                       ),
                     ),
                     _dongCongTacTimKiem(
-                      'Chữ không dấu và chữ có dấu luôn khác nhau',
+                      Ch.dauKhongDauLuonKhacNhau(ngonNguHienTai.value),
                       phanBietDauThanh,
                       (bat) => datDauThanh(bat),
                       khiBamTimHieuThem: () => _hienGiaiThichTimKiem(
-                        'Chữ không dấu và chữ có dấu luôn khác nhau',
-                        'Tìm đúng chính xác dấu đã gõ — gõ "thang" chỉ ra '
-                            '"thang", không ra các từ có dấu khác.',
+                        Ch.dauKhongDauLuonKhacNhau(ngonNguHienTai.value),
+                        Ch.dauKhongDauLuonKhacNhauGiaiThich(ngonNguHienTai.value),
                       ),
                     ),
                     const Divider(height: 24),
-                    const Text(
-                      'Hướng dẫn thay thế',
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                    Text(
+                      Ch.huongDanThayThe(ngonNguHienTai.value),
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      '• "Thay chỗ này": chỉ thay đúng kết quả đang chọn (số '
-                      'thứ tự đang hiện, ví dụ 3/5).\n\n'
-                      '• "Tất cả": thay hết mọi kết quả cùng lúc, có hỏi xác '
-                      'nhận trước khi làm.\n\n'
-                      '• Để trống ô Thay thế rồi bấm một trong hai nút: kết '
-                      'quả tìm kiếm đó bị XOÁ, không cần gõ gì để thay vào '
-                      'chỗ trống.',
+                    Text(
+                      Ch.noiDungHuongDanThayThe(ngonNguHienTai.value),
                     ),
                   ],
                 ),

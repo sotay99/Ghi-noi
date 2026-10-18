@@ -896,6 +896,43 @@ class Ch {
   static String dangDungMicroTatTruocKhiGhiAmChamCham(NgonNgu nn) => nn == NgonNgu.vi
       ? 'Đang dùng Micro — tắt Micro trước khi ghi âm.'
       : 'Microphone in use — turn it off before recording audio.';
+
+  // --------------------------------------------- Modal "Cài đặt tìm kiếm"
+  static String caiDatCheDoTimKiem(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Cài đặt chế độ tìm kiếm' : 'Search settings';
+  static String khopCaHoaThuong(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Khớp cả chữ Hoa và chữ thường'
+      : 'Match both uppercase and lowercase';
+  static String khopCaHoaThuongGiaiThich(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Tìm "h" sẽ ra cả "h" và "H" — không phân biệt chữ Hoa/thường khi so khớp.'
+      : 'Searching "h" matches both "h" and "H" — case-insensitive.';
+  static String hoaThuongLuonKhacNhau(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Chữ Hoa và chữ thường luôn khác nhau'
+      : 'Uppercase and lowercase are always different';
+  static String hoaThuongLuonKhacNhauGiaiThich(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Tìm "h" chỉ ra đúng "h", không ra "H" — phân biệt chính xác chữ Hoa/thường.'
+      : 'Searching "h" only matches "h", not "H" — exact case match.';
+  static String khopCaDauKhongDau(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Khớp cả chữ không dấu và chữ có dấu'
+      : 'Match both accented and unaccented letters';
+  static String khopCaDauKhongDauGiaiThich(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Tìm "thang" sẽ ra cả "thắng", "thằng", "tháng"... — không phân biệt dấu thanh khi so khớp.'
+      : 'Searching "thang" matches "thắng", "thằng", "tháng"... — ignores tone marks.';
+  static String dauKhongDauLuonKhacNhau(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Chữ không dấu và chữ có dấu luôn khác nhau'
+      : 'Accented and unaccented letters are always different';
+  static String dauKhongDauLuonKhacNhauGiaiThich(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Tìm đúng chính xác dấu đã gõ — gõ "thang" chỉ ra "thang", không ra các từ có dấu khác.'
+      : 'Matches the exact tone marks typed — typing "thang" only matches "thang", not accented variants.';
+  static String huongDanThayThe(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Hướng dẫn thay thế' : 'Replace guide';
+  static String noiDungHuongDanThayThe(NgonNgu nn) => nn == NgonNgu.vi
+      ? '• "Thay chỗ này": chỉ thay đúng kết quả đang chọn (số thứ tự đang hiện, ví dụ 3/5).\n\n'
+          '• "Tất cả": thay hết mọi kết quả cùng lúc, có hỏi xác nhận trước khi làm.\n\n'
+          '• Để trống ô Thay thế rồi bấm một trong hai nút: kết quả tìm kiếm đó bị XOÁ, không cần gõ gì để thay vào chỗ trống.'
+      : '• "Replace here": replaces only the currently selected result (the number shown, e.g. 3/5).\n\n'
+          '• "All": replaces every result at once, with a confirmation first.\n\n'
+          '• Leave the Replace box empty and tap either button: that search result is DELETED, no need to type anything to replace it with.';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt
