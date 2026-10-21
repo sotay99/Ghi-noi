@@ -200,7 +200,7 @@ class _ThanCaiDatKiemTraToanVanState extends State<_ThanCaiDatKiemTraToanVan> {
               ],
             ),
             Text(
-              CaiDat.tenMucDoDaiDeXuat[_mucDo],
+              Ch.tenMucDoDaiDeXuat(_mucDo, ngonNguHienTai.value),
               textAlign: TextAlign.center,
               style: const TextStyle(color: Color(0xFF1A73E8), fontWeight: FontWeight.w600),
             ),
@@ -209,7 +209,7 @@ class _ThanCaiDatKiemTraToanVanState extends State<_ThanCaiDatKiemTraToanVan> {
               min: 0,
               max: 4,
               divisions: 4,
-              label: CaiDat.tenMucDoDaiDeXuat[_mucDo],
+              label: Ch.tenMucDoDaiDeXuat(_mucDo, ngonNguHienTai.value),
               onChanged: (gia) {
                 setState(() => _mucDo = gia.round());
               },

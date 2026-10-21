@@ -478,9 +478,13 @@ class ThanhCongCu extends StatelessWidget {
                           if (!ratHep)
                           _NutCoChuThich(
                             hien: hienChuThich,
-                            chu: 'Hướng dẫn sử dụng',
-                            child: _nut(rong, Icons.help_outline_rounded,
-                                'Hướng dẫn', 'Hướng dẫn', khiBamHuongDan),
+                            chu: Ch.nutHuongDanDayDu(ngonNguHienTai.value),
+                            child: _nut(
+                                rong,
+                                Icons.help_outline_rounded,
+                                Ch.nutHuongDan(ngonNguHienTai.value),
+                                Ch.nutHuongDan(ngonNguHienTai.value),
+                                khiBamHuongDan),
                           ),
                           _NutCoChuThich(
                             hien: hienChuThich,
@@ -521,12 +525,12 @@ class ThanhCongCu extends StatelessWidget {
                           // danh sách này.
                           _NutCoChuThich(
                             hien: hienChuThich,
-                            chu: 'Phím nhanh cho màn hình cảm ứng',
+                            chu: Ch.phimNhanhChoManHinhCamUng(ngonNguHienTai.value),
                             child: _nut(
                               rong,
                               Icons.keyboard,
-                              'Phím nhanh',
-                              'Phím nhanh',
+                              Ch.phimNhanhNhanGon(ngonNguHienTai.value),
+                              Ch.phimNhanhNhanGon(ngonNguHienTai.value),
                               // Thông báo khi BẬT lên giờ do chính
                               // `khiBamBoPhimNhanh` (_bamNutBoPhimNhanhCamUng
                               // trong trang_soan_thao.dart) tự hiện — gọi
@@ -540,7 +544,7 @@ class ThanhCongCu extends StatelessWidget {
                           ),
                           _NutCoChuThich(
                             hien: hienChuThich,
-                            chu: 'Xem thêm lựa chọn',
+                            chu: Ch.xemThemLuaChon(ngonNguHienTai.value),
                             child: _NutThemMenu(
                               rong: rong,
                               khiBamBoPhimNhanh: khiBamBoPhimNhanh,
@@ -561,7 +565,7 @@ class ThanhCongCu extends StatelessWidget {
                           ),
                           _NutCoChuThich(
                             hien: hienChuThich,
-                            chu: 'Tài khoản và Cài đặt',
+                            chu: Ch.taiKhoanVaCaiDat(ngonNguHienTai.value),
                             child: _NutTaiKhoanMenu(
                               rong: rong,
                               khiBamCaiDatMicro: khiBamCaiDatMicro,
@@ -596,7 +600,7 @@ class ThanhCongCu extends StatelessWidget {
                   // bị Copy/Cắt che mất.
                   _NutCoChuThich(
                     hien: hienChuThich,
-                    chu: 'Tạo vùng chọn văn bản',
+                    chu: Ch.taoVungChonVanBan(ngonNguHienTai.value),
                     child: _NutAllTron(
                       dangChonTatCa: dangChonTatCa,
                       khiBam: khiBamChonTatCa,
@@ -809,9 +813,9 @@ class _NutAllTron extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: 'Tạo vùng chọn văn bản',
+      label: Ch.taoVungChonVanBan(ngonNguHienTai.value),
       child: Tooltip(
-        message: 'Tạo vùng chọn văn bản',
+        message: Ch.taoVungChonVanBan(ngonNguHienTai.value),
         child: Material(
           color: dangChonTatCa ? Colors.blue.shade100 : Colors.white,
           shape: const CircleBorder(),
@@ -880,9 +884,9 @@ class _NutMicroTron extends StatelessWidget {
 
     return Semantics(
       button: true,
-      label: bat ? 'Tắt micro' : 'Bật micro',
+      label: bat ? Ch.tatMicro(ngonNguHienTai.value) : Ch.batMicro(ngonNguHienTai.value),
       child: Tooltip(
-        message: '${bat ? 'Tắt' : 'Bật'} micro ($nhanPhimTat)',
+        message: Ch.tatBatMicroVoiPhimTat(bat, nhanPhimTat, ngonNguHienTai.value),
         child: Material(
           color: nen,
           shape: const CircleBorder(),
@@ -1081,9 +1085,9 @@ class SongAm extends StatelessWidget {
     if (!micDangBat) {
       return Semantics(
         button: true,
-        label: 'Hiện chú thích',
+        label: Ch.hienChuThichNut(ngonNguHienTai.value),
         child: Tooltip(
-          message: 'Hiện chú thích',
+          message: Ch.hienChuThichNut(ngonNguHienTai.value),
           child: InkWell(
             customBorder: const CircleBorder(),
             onTap: khiBamChuThich,
@@ -1574,9 +1578,9 @@ class _NutThemMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: 'Thêm',
+      label: Ch.nutThem(ngonNguHienTai.value),
       child: Tooltip(
-        message: 'Thêm',
+        message: Ch.nutThem(ngonNguHienTai.value),
         child: PopupMenuButton<int>(
           onOpened: khiMoMenu,
           padding: EdgeInsets.zero,
@@ -1797,9 +1801,9 @@ class _NutTaiKhoanMenu extends StatelessWidget {
     );
     return Semantics(
       button: true,
-      label: 'Tài khoản và Cài đặt',
+      label: Ch.taiKhoanVaCaiDat(ngonNguHienTai.value),
       child: Tooltip(
-        message: 'Tài khoản và Cài đặt',
+        message: Ch.taiKhoanVaCaiDat(ngonNguHienTai.value),
         child: PopupMenuButton<int>(
           onOpened: khiMoMenu,
           padding: EdgeInsets.zero,
@@ -1892,28 +1896,30 @@ class _NutTaiKhoanMenu extends StatelessWidget {
             final cuon = ScrollController();
             return [
               _mucDongMenu(cuon,
-                  tenMenu: 'Tài khoản và Cài đặt',
+                  tenMenu: Ch.taiKhoanVaCaiDat(ngonNguHienTai.value),
                   mauDamTenMenu: Colors.yellow.shade200),
               _mucCuonDanhSach(ctx, cuon, [
                 // Hai mục mới — CHƯA gắn logic (chờ gắn sau), tạm đặt ở đầu
                 // menu, cùng kiểu dòng với "Cài đặt Micro"/"Cài đặt Hiển thị
                 // và tự động sửa" bên dưới.
                 _mucMenuThem(6, 'Ngôn ngữ - Language', icon: Icons.language),
-                _mucMenuThem(27, 'Khi khởi động App: Mở tệp...', icon: Icons.description_outlined),
+                _mucMenuThem(27, Ch.khiKhoiDongAppMoTep(ngonNguHienTai.value),
+                    icon: Icons.description_outlined),
                 _dividerMenu(),
                 // (YÊU CẦU MỚI) Năm mục "Cài đặt..." — chữ màu TÍM để phân
                 // biệt với các mục khác trong menu, icon SÁT NGHĨA với từng
                 // cài đặt (không dùng icon bánh răng chung chung). Hai mục
                 // từ điển/bộ nhớ tạm dùng ĐÚNG emoji đã quen mắt ở nút nhanh
                 // tương ứng khi có vùng chọn (xem `trang_soan_thao.dart`).
-                _mucMenuThem(1, 'Cài đặt Micro', icon: Icons.mic_none, mauChu: Colors.purple.shade700),
-                _mucMenuThem(2, 'Cài đặt Hiển thị và tự động sửa',
+                _mucMenuThem(1, Ch.caiDatMicroMenu(ngonNguHienTai.value),
+                    icon: Icons.mic_none, mauChu: Colors.purple.shade700),
+                _mucMenuThem(2, Ch.caiDatHienThiVaTuDongSuaMenu(ngonNguHienTai.value),
                     icon: Icons.text_fields, mauChu: Colors.purple.shade700),
-                _mucMenuThem(9, 'Cài đặt từ điển sửa lỗi chính tả',
+                _mucMenuThem(9, Ch.caiDatTuDienSuaLoiChinhTaMenu(ngonNguHienTai.value),
                     emoji: '📒', mauChu: Colors.purple.shade700),
-                _mucMenuThem(26, 'Cài đặt Từ điển nhập liệu nhanh',
+                _mucMenuThem(26, Ch.caiDatTuDienNhapLieuNhanhMenu(ngonNguHienTai.value),
                     emoji: '📖', mauChu: Colors.purple.shade700),
-                _mucMenuThem(10, 'Cài đặt Bộ nhớ tạm để dán văn bản',
+                _mucMenuThem(10, Ch.caiDatBoNhoTamDeDanVanBanMenu(ngonNguHienTai.value),
                     emoji: '📋', mauChu: Colors.purple.shade700),
                 _dividerMenu(),
                 _mucMenuThem(3, Ch.dieuKhoanSuDung(ngonNguHienTai.value), icon: Icons.gavel_outlined),
@@ -2175,9 +2181,13 @@ class _NutAIMenu extends StatelessWidget {
                 // — xem `_moModalChonKieuTomTat` (mở modal chọn kiểu trước
                 // khi gọi Gemini, kết quả có nút "Thay thế toàn bộ văn
                 // bản").
-                _mucMenuThem(6, 'Chuyển hình ảnh thành văn bản', icon: Icons.image_outlined),
-                _mucMenuThem(7, 'Chụp ảnh (camera)', icon: Icons.camera_alt_outlined),
-                _mucMenuThem(8, 'Chuyển file âm thanh thành văn bản', icon: Icons.graphic_eq),
+                _mucMenuThem(6, Ch.chuyenHinhAnhThanhVanBanMenu(ngonNguHienTai.value),
+                    icon: Icons.image_outlined),
+                _mucMenuThem(7, Ch.chupAnhCamera(ngonNguHienTai.value),
+                    icon: Icons.camera_alt_outlined),
+                _mucMenuThem(
+                    8, Ch.chuyenFileAmThanhThanhVanBanMenu(ngonNguHienTai.value),
+                    icon: Icons.graphic_eq),
                 // Vị trí 4 — CHỈ hiện khi có vùng chọn THẬT SỰ (không bị ảnh
                 // hưởng bởi chính công tắc này — nếu không, bấm ép "toàn
                 // bộ văn bản" xong sẽ tự làm mục này biến mất, không bấm
@@ -2191,8 +2201,8 @@ class _NutAIMenu extends StatelessWidget {
                     height: 34,
                     child: Text(
                       epToanVanKhiCoVungChon
-                          ? 'Làm việc với Đoạn văn đang chọn'
-                          : 'Làm việc với Toàn bộ văn bản',
+                          ? Ch.lamViecVoiDoanVanDangChon(ngonNguHienTai.value)
+                          : Ch.lamViecVoiToanBoVanBan(ngonNguHienTai.value),
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: epToanVanKhiCoVungChon
@@ -2276,12 +2286,12 @@ class _NutAIMenu extends StatelessWidget {
                 _DongMenuCoTheBam(
                   gia: 5,
                   height: 34,
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.tune, size: 17, color: Color(0xFF5F6368)),
-                      SizedBox(width: 10),
-                      Text('Cài đặt nút "Kiểm tra toàn văn"'),
+                      const Icon(Icons.tune, size: 17, color: Color(0xFF5F6368)),
+                      const SizedBox(width: 10),
+                      Text(Ch.caiDatNutKiemTraToanVan(ngonNguHienTai.value)),
                     ],
                   ),
                 ),

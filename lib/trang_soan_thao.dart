@@ -2480,17 +2480,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             children: [
               TextSpan(
                 text: laXoa
-                    ? 'Bạn có chắc chắn xoá các ký tự '
-                    : 'Bạn có chắc chắn thay đổi các ký tự ',
+                    ? Ch.banCoChacChanXoaCacKyTu(ngonNguHienTai.value)
+                    : Ch.banCoChacChanThayDoiCacKyTu(ngonNguHienTai.value),
               ),
               _oanTuHopThoai(tuKhoa),
               if (!laXoa) ...[
-                const TextSpan(text: ' thành '),
+                TextSpan(text: Ch.thanh(ngonNguHienTai.value)),
                 _oanTuHopThoai(thayThe),
               ],
-              const TextSpan(text: ' ở '),
+              TextSpan(text: Ch.oKetQuaTimKiemKhong(ngonNguHienTai.value)),
               _oanTuHopThoaiXanh('$soLuong'),
-              const TextSpan(text: ' kết quả tìm kiếm không?'),
+              TextSpan(text: Ch.ketQuaTimKiemKhongHoi(ngonNguHienTai.value)),
             ],
           ),
         ),
@@ -3841,8 +3841,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           IconButton(
             iconSize: 20,
             tooltip: widget.caiDat.ghimThanhDinhDang
-                ? 'Bỏ ghim thanh công cụ định dạng'
-                : 'Ghim thanh công cụ định dạng',
+                ? Ch.boGhimThanhCongCuDinhDang(ngonNguHienTai.value)
+                : Ch.ghimThanhCongCuDinhDang(ngonNguHienTai.value),
             icon: const Icon(Icons.push_pin),
             visualDensity: matDoNut,
             constraints: kichThuocNut,
@@ -5412,7 +5412,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Future<void> _chonMauTenTepHienTai() async {
     final mau = await hienThiChonMauCoBanChoTen(
       context,
-      tieuDe: 'Chọn màu Tên Tệp',
+      tieuDe: Ch.chonMauTenTep(ngonNguHienTai.value),
     );
     if (mau == null || !mounted) return;
     widget.kho.datMauGhiChu(_ghiChuHienTai.id, mau.value);
@@ -7539,11 +7539,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Khi bật, mỗi thẻ ghi âm tích đủ số giây bên dưới sẽ tự '
-                  'động được gửi đi chuyển thành văn bản, không cần bạn tự '
-                  'bấm. Tắt đi thì mọi thẻ đều chờ bạn tự bấm chuyển hoá.',
-                  style: TextStyle(fontSize: 13),
+                Text(
+                  Ch.giaiThichTuDongChuyenHoaTheGhiAm(ngonNguHienTai.value),
+                  style: const TextStyle(fontSize: 13),
                 ),
                 const SizedBox(height: 8),
                 SwitchListTile(
@@ -7615,11 +7613,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Mỗi lần bấm nút ghi âm (hoặc dùng phím tắt) để bắt đầu ghi '
-                  'âm một thẻ mới, chọn xem Bảng điều khiển này có tự mở ra '
-                  'ngay không, hay chỉ hiện dải thanh công cụ ghim ở đầu màn hình.',
-                  style: TextStyle(fontSize: 13),
+                Text(
+                  Ch.giaiThichTuMoBangDieuKhien(ngonNguHienTai.value),
+                  style: const TextStyle(fontSize: 13),
                 ),
                 const SizedBox(height: 12),
                 RadioListTile<bool>(
@@ -8005,7 +8001,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     text: TextSpan(
                       style: kieuTieuDe,
                       children: [
-                        const TextSpan(text: 'Sắp chạm giới hạn '),
+                        TextSpan(text: Ch.sapChamGioiHanTieuDePrefix(ngonNguHienTai.value)),
                         TextSpan(text: '$tongPhut phút', style: kieuDo),
                       ],
                     ),
@@ -8026,21 +8022,17 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       style: kieuChuThuong,
                       children: [
                         TextSpan(
-                          text: 'Thẻ ghi âm #$soThe (thẻ tự động thứ '
-                              '$_soLanToiDaTuDongTaoTheLienTiep liên tiếp) sắp ghi đủ 60 '
-                              'giây, tổng cộng sắp chạm ',
+                          text: Ch.theGhiAmSoDangSapGhiDu60Giay(
+                              soThe, _soLanToiDaTuDongTaoTheLienTiep, ngonNguHienTai.value),
                         ),
                         TextSpan(text: '$tongPhut phút', style: kieuDo),
-                        const TextSpan(text: ' không ai bấm gì. '),
+                        TextSpan(text: Ch.khongAiBamGi(ngonNguHienTai.value)),
                         TextSpan(
-                          text: 'Nếu không chọn, tới đúng giây thứ 60 hệ '
-                              'thống sẽ TỰ NGỪNG ghi âm luôn, KHÔNG tạo '
-                              'thêm thẻ mới nữa',
+                          text: Ch.neuKhongChonTuNgungGhiAm(ngonNguHienTai.value),
                           style: kieuNoiBat,
                         ),
-                        const TextSpan(
-                          text: ' (để tránh tốn token AI và pin máy vô ích). '
-                              'Bạn muốn làm gì bây giờ?',
+                        TextSpan(
+                          text: Ch.deTranhTonTokenVaPinBanMuonLamGi(ngonNguHienTai.value),
                         ),
                       ],
                     ),
@@ -8051,16 +8043,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       style: kieuChuThuong,
                       children: [
                         TextSpan(
-                          text: 'Thẻ ghi âm #$soThe sắp ghi đủ 60 giây. ',
+                          text: Ch.theGhiAmSoSapGhiDu60Giay(soThe, ngonNguHienTai.value),
                         ),
                         TextSpan(
-                          text: 'Bạn có thể không cần làm gì bây giờ cả',
+                          text: Ch.banCoTheKhongCanLamGiBayGio(ngonNguHienTai.value),
                           style: kieuDo,
                         ),
-                        const TextSpan(
-                          text: ' — tới đúng giây thứ 60 nó sẽ tự động chốt '
-                              'và ghi tiếp bằng một thẻ mới. Bạn muốn làm '
-                              'gì bây giờ?',
+                        TextSpan(
+                          text: Ch.toiDungGiay60TuDongChot(ngonNguHienTai.value),
                         ),
                       ],
                     ),
@@ -8314,11 +8304,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         builder: (context) => AlertDialog(
           title: Text(Ch.xoaBanGhiAmDangDoDang(ngonNguHienTai.value)),
           content: Text(
-            'Bản ghi âm đang dở dang này đã ghi được '
-            '${dinhDangMmSs(_thoiLuongTheGhiAmDangGhi.value)}. Xoá đi sẽ mất '
-            'VĨNH VIỄN, không thể phục hồi lại được (khác với thẻ ghi âm đã '
-            'chốt — không lưu tạm bất cứ gì để hoàn tác). Bạn có chắc chắn '
-            'muốn xoá không?',
+            Ch.banGhiAmDangDoDangDaGhiDuoc(
+                dinhDangMmSs(_thoiLuongTheGhiAmDangGhi.value), ngonNguHienTai.value),
           ),
           actions: [
             TextButton(
@@ -8870,11 +8857,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           context: context,
           builder: (context) => AlertDialog(
             title: Text(Ch.khongConBanGhiAm(ngonNguHienTai.value)),
-            content: const Text(
-              'Cái thẻ này đã được chuyển hoá rồi nên không còn bản ghi âm '
-              'nào nữa. Bạn chỉ có thể bấm nút Chuyển hoá thì có thể xem toàn '
-              'bộ văn bản.',
-            ),
+            content: Text(Ch.theDaChuyenHoaRoiKhongConBanGhiAm(ngonNguHienTai.value)),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
@@ -9074,20 +9057,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             builder: (context) => AlertDialog(
               title: Text(Ch.xoaTheGhiAm(ngonNguHienTai.value)),
               content: Text(soLuongThe > 1
-                  ? 'Vùng chọn này chứa $soLuongThe thẻ ghi âm — xoá sẽ HUỶ '
-                      'LUÔN những thẻ đó, không thể phục hồi lại được. Bạn '
-                      'có chắc chắn muốn xoá không?'
+                  ? Ch.vungChonChuaNhieuTheXoaSeHuyLuon(soLuongThe, ngonNguHienTai.value)
                   : coDangGhi
-                      ? 'Thẻ này ĐANG GHI ÂM — xoá sẽ HUỶ LUÔN bản ghi đang '
-                          'thu, không thể phục hồi lại được. Bạn có chắc '
-                          'chắn muốn xoá không?'
+                      ? Ch.theDangGhiAmXoaSeHuyLuonBanGhiDangThu(ngonNguHienTai.value)
                       : dsDangChuyen.isNotEmpty
-                          ? 'Thẻ này ĐANG được gửi đi phiên âm — xoá sẽ bỏ '
-                              'luôn kết quả sắp về, không thể phục hồi lại '
-                              'được. Bạn có chắc chắn muốn xoá không?'
-                          : 'Thẻ ghi âm này sẽ bị xoá VĨNH VIỄN, không thể '
-                              'phục hồi lại được. Bạn có chắc chắn muốn xoá '
-                              'không?'),
+                          ? Ch.theDangGuiPhienAmXoaSeBoLuonKetQua(ngonNguHienTai.value)
+                          : Ch.theGhiAmSeBiXoaVinhVienChung(ngonNguHienTai.value)),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
@@ -9202,13 +9177,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         title: Text(Ch.khongKhaDungTrenIphone(ngonNguHienTai.value)),
-        content: const Text(
-          'Micro (vừa nói vừa ra chữ) tại điện thoại Iphone không thể khả '
-          'dụng trên môi trường Website, chỉ khả dụng trên môi trường app '
-          'mobile. Nếu bạn cho rằng thiết bị của bạn không phải Iphone, hãy '
-          'bấm vào Cài đặt Micro. Bạn có thể tải app mobile cho Iphone để '
-          'sử dụng tính năng này.',
-        ),
+        content: Text(Ch.microIphoneKhongKhaDungTrenWebsite(ngonNguHienTai.value)),
         actions: [
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(),
@@ -11681,16 +11650,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final daHuy = ValueNotifier<bool>(false);
     setState(() => _dangKiemTraToanVan = true);
 
-    final hauTo = vungChon != null ? ' ở đoạn đang chọn' : ' toàn văn';
-    final moTaDangXuLy = switch (loaiKiemTra) {
-      'chinh_ta' => 'AI đang kiểm tra lỗi chính tả$hauTo, tìm từ/cụm từ '
-          'sai để đề xuất sửa.',
-      'dau_cau' => 'AI đang kiểm tra dấu câu$hauTo, tìm chỗ còn thiếu để '
-          'đề xuất chèn thêm.',
-      _ => 'AI đang kiểm tra lại$hauTo để soát lỗi chính tả - ngữ '
-          'pháp, và đề xuất cách sửa đổi. Đây là bước quan trọng trước '
-          'khi hoàn thiện văn bản.',
-    };
+    final hauTo = vungChon != null
+        ? Ch.hauToODoanDangChon(ngonNguHienTai.value)
+        : Ch.hauToToanVan(ngonNguHienTai.value);
+    final moTaDangXuLy =
+        Ch.moTaDangXuLyKiemTra(loaiKiemTra, hauTo, ngonNguHienTai.value);
 
     unawaited(showDialog<void>(
       context: context,
@@ -14397,10 +14361,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Bạn có thể ghi câu lệnh riêng cho cách viết lại, hoặc để '
-                  'trống để AI tự do viết lại theo ý nó.',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+                Text(
+                  Ch.banCoTheGhiCauLenhRiengChoCachVietLai(ngonNguHienTai.value),
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -15013,10 +14976,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       context: context,
       builder: (ctx2) => AlertDialog(
         title: Text(Ch.huyKetQuaTuAi(ngonNguHienTai.value)),
-        content: const Text(
-          'Văn bản AI vừa phiên âm (kể cả phần bạn đã sửa, nếu có) sẽ mất hẳn, '
-          'không thể lấy lại. Bạn có chắc chắn muốn huỷ không?',
-        ),
+        content: Text(Ch.vanBanAiVuaPhienAmSeMatNeuHuy(ngonNguHienTai.value)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx2).pop(false),
@@ -15152,10 +15112,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(Ch.khongApDungDuocChuTren(ngonNguHienTai.value)),
-        content: const Text(
-          'Định dạng chữ trên (superscript) chỉ áp dụng cho con số và chữ cái '
-          '(chữ thường) trong bảng chữ cái Quốc tế.',
-        ),
+        content: Text(Ch.dinhDangChuTrenChiApDungChoSoVaChuThuong(ngonNguHienTai.value)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
@@ -15459,9 +15416,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 Text(chu),
               ]);
           return [
-            PopupMenuItem(value: 'taoMoi', child: dong(Icons.note_add_outlined, 'Tạo Tệp văn bản mới')),
-            PopupMenuItem(value: 'xoa', child: dong(Icons.delete_outline, 'Chuyển vào thùng rác')),
-            PopupMenuItem(value: 'mau', child: dong(Icons.palette_outlined, 'Chọn màu Tên Tệp')),
+            PopupMenuItem(
+                value: 'taoMoi',
+                child: dong(Icons.note_add_outlined, Ch.taoTepVanBanMoi(ngonNguHienTai.value))),
+            PopupMenuItem(
+                value: 'xoa',
+                child: dong(Icons.delete_outline, Ch.chuyenVaoThungRac(ngonNguHienTai.value))),
+            PopupMenuItem(
+                value: 'mau',
+                child: dong(Icons.palette_outlined, Ch.chonMauTenTep(ngonNguHienTai.value))),
             PopupMenuItem(
                 value: 'tai_ve',
                 child: dong(Icons.download_outlined, Ch.taiVe(ngonNguHienTai.value))),
@@ -15479,10 +15442,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 ]),
               ),
             const PopupMenuDivider(),
-            dongThongTin('Số từ: $soTu'),
-            dongThongTin('Ký tự (có dấu cách): $soKyTuCoDauCach'),
-            dongThongTin('Ký tự (không dấu cách): $soKyTuKhongDauCach'),
-            dongThongTin('Số đoạn: $soDoan'),
+            dongThongTin(Ch.soTuDong(soTu, ngonNguHienTai.value)),
+            dongThongTin(Ch.kyTuCoDauCachDong(soKyTuCoDauCach, ngonNguHienTai.value)),
+            dongThongTin(Ch.kyTuKhongDauCachDong(soKyTuKhongDauCach, ngonNguHienTai.value)),
+            dongThongTin(Ch.soDoanDong(soDoan, ngonNguHienTai.value)),
           ];
         },
         child: Container(
@@ -15790,8 +15753,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           IconButton(
             onPressed: _moHopThoaiTuDienNhapLieuNhanh,
             icon: const Text('📖', style: TextStyle(fontSize: 18)),
-            tooltip:
-                'Từ điển nhập liệu nhanh (${widget.caiDat.phimTatTuDienNhapLieuNhanh.nhan})',
+            tooltip: Ch.tuDienNhapLieuNhanhVoiPhimTat(
+                widget.caiDat.phimTatTuDienNhapLieuNhanh.nhan, ngonNguHienTai.value),
             visualDensity: VisualDensity.compact,
             constraints: _kichThuocNutTren,
             padding: EdgeInsets.zero,
@@ -15995,8 +15958,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 color: _epHienBanPhimAoTrongBoPhimNhanh ? Colors.white : null,
               ),
               tooltip: _epHienBanPhimAoTrongBoPhimNhanh
-                  ? 'Tắt bàn phím ảo'
-                  : 'Hiện bàn phím ảo cùng Bộ phím nhanh',
+                  ? Ch.tatBanPhimAo(ngonNguHienTai.value)
+                  : Ch.hienBanPhimAoCungBoPhimNhanh(ngonNguHienTai.value),
               visualDensity: VisualDensity.compact,
               constraints: _kichThuocNutTren,
               style: IconButton.styleFrom(
@@ -16169,11 +16132,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 ),
                 child: Text(
                   dangDoiViTriThe
-                      ? 'Di chuyển con trỏ tới vị trí muốn đặt thẻ ghi âm '
-                          '#${_soTheDangDoiViTri} này, rồi bấm "Chuyển tới đây".'
-                      : 'Di chuyển con trỏ tới vị trí muốn chèn văn bản từ AI, rồi bấm '
-                          '"Chèn vào vị trí này". Có vùng đang chọn thì văn bản mới sẽ '
-                          'thay thế đúng vùng đó.',
+                      ? Ch.diChuyenConTroToiViTriDatThe(
+                          _soTheDangDoiViTri!, ngonNguHienTai.value)
+                      : Ch.diChuyenConTroToiViTriChenVanBanAi(ngonNguHienTai.value),
                   style: const TextStyle(fontSize: 12, color: Color(0xFF1565C0)),
                 ),
               ),
@@ -16335,7 +16296,10 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     if (_theGhiAmDangTamDung)
                       Text(Ch.tamDungCoDauCach(ngonNguHienTai.value), style: kieuSo)
                     else
-                      _ChuLuonSong(chu: 'Đang Ghi âm ', mau: Colors.red.shade700, coChu: coChu),
+                      _ChuLuonSong(
+                          chu: Ch.dangGhiAmPrefixLabel(ngonNguHienTai.value),
+                          mau: Colors.red.shade700,
+                          coChu: coChu),
                     _SoPhutGiayGhiAm(thoiLuong: gia, style: kieuSo),
                   ],
                 ),
@@ -18350,44 +18314,22 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
             ),
           ],
         ),
-        content: const SizedBox(
+        content: SizedBox(
           width: 380,
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '• Dán: bấm vào một dòng, hoặc gõ đúng phím số của dòng đó '
-                  '(bàn phím rời, 1-9 rồi 0) để dán ngay vào vị trí con trỏ.',
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '• Tự ghi: mỗi lần Cắt/Copy, đoạn văn bản tự thêm vào dòng '
-                  'trống đầu tiên; hết dòng trống thì đè lên dòng CŨ NHẤT '
-                  'trong các dòng chưa ghim.',
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '• Màu nền đỏ nhạt = dòng cũ nhất, vàng nhạt = dòng gần cũ '
-                  'nhất trong các dòng CHƯA ghim — đây là 2 dòng sắp bị đè '
-                  'tiếp theo, chỉ hiện khi lịch sử đã đủ 10 dòng.',
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '• Ghim (nút 📌): dòng đã ghim (nền xanh lá) không bao giờ '
-                  'bị đè, và không tính vào việc xác định dòng cũ/gần cũ '
-                  'nhất. Bấm lại để bỏ ghim. Ghim đủ cả 10 dòng thì lịch sử '
-                  'tạm hết chỗ ghi thêm — vẫn bình thường, Dán bằng Ctrl+V/'
-                  'nút Dán không hề bị ảnh hưởng.',
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '• Đoạn nào dài hơn 10.000 ký tự sẽ KHÔNG được ghi vào bảng '
-                  'này (âm thầm, không báo) — tránh bộ nhớ tạm quá nặng. '
-                  'Cắt/Copy vẫn thành công như thường vào bộ nhớ đệm của '
-                  'máy.',
-                ),
+                Text(Ch.ghiChuBoNhoTamDan1(ngonNguHienTai.value)),
+                const SizedBox(height: 8),
+                Text(Ch.ghiChuBoNhoTamDan2(ngonNguHienTai.value)),
+                const SizedBox(height: 8),
+                Text(Ch.ghiChuBoNhoTamDan3(ngonNguHienTai.value)),
+                const SizedBox(height: 8),
+                Text(Ch.ghiChuBoNhoTamDan4(ngonNguHienTai.value)),
+                const SizedBox(height: 8),
+                Text(Ch.ghiChuBoNhoTamDan5(ngonNguHienTai.value)),
               ],
             ),
           ),
@@ -18551,8 +18493,8 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
               ),
             ),
             tooltip: dangGhim
-                ? 'Bỏ ghim (cho phép lịch sử mới đè lên lại)'
-                : 'Ghim dòng này (không bao giờ bị thay thế)',
+                ? Ch.boGhimChoPhepLichSuMoiDeLenLai(ngonNguHienTai.value)
+                : Ch.ghimDongNayKhongBaoGioBiThayThe(ngonNguHienTai.value),
             visualDensity: VisualDensity.compact,
             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             padding: EdgeInsets.zero,
@@ -18876,7 +18818,7 @@ class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNha
             ),
           ],
         ),
-        content: const SizedBox(
+        content: SizedBox(
           width: 380,
           child: SingleChildScrollView(
             child: Column(
@@ -18884,53 +18826,21 @@ class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNha
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Từ điển này được lưu tại bộ nhớ lâu dài của app',
-                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+                  Ch.tuDienNayLuuTaiBoNhoLauDaiCuaApp(ngonNguHienTai.value),
+                  style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
                 ),
-                SizedBox(height: 10),
-                Text(
-                  '• Dán nhanh: bấm vào một dòng (hoặc gõ đúng phím chữ cái '
-                  'của dòng đó trên bàn phím vật lý) để dán ngay vào vị trí '
-                  'con trỏ trong khung soạn thảo. Dòng trống thì không bấm/'
-                  'gõ được gì.',
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '• Ẩn/hiện bảng này: bấm nút 📖 ở thanh công cụ, hoặc dùng '
-                  'phím tắt đã chọn (xem/đổi ở mục "Phím tắt" trong Cài đặt) '
-                  '— mặc định là bấm Alt 2 lần liên tiếp.',
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '• Ba tab: "Gần đây", "Q→M" (theo hàng phím vật lý) và '
-                  '"A→Z" (bảng chữ cái). Đổi tab bằng cách bấm chuột vào tab, '
-                  'hoặc bấm phím 1/2/3, hoặc phím mũi tên trái/phải — app tự '
-                  'nhớ tab đang mở cho lần sau.',
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '• Cuộn xem hết 26 dòng trong một tab: vuốt tay, lăn chuột, '
-                  'kéo thanh cuộn, hoặc phím mũi tên lên/xuống để nhảy thẳng '
-                  'lên đầu/xuống cuối. Phím cách cuộn xen kẽ: đang ở đâu đó '
-                  'thì cuộn xuống cuối, đã ở cuối rồi thì cuộn lên đầu.',
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '• Soạn nội dung cho từng dòng: bấm "Cài đặt" (ngay bên '
-                  'cạnh nút Hướng dẫn này) để gõ tay hoặc dán văn bản (giữ cả '
-                  'định dạng đậm/nghiêng/màu...) vào từng ô, đổi thứ tự giữa '
-                  'các dòng, hoặc đổi phím tắt ẩn/hiện bảng.',
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '• Hai cách đưa thẳng một đoạn có sẵn vào từ điển, không '
-                  'cần gõ lại: (1) bôi đen một đoạn trong khung soạn thảo rồi '
-                  'bấm nút 📖 vừa hiện ra cạnh nút Xoá; (2) mở bảng "Bộ nhớ '
-                  'tạm để dán văn bản", bấm nút 📖 ở dòng lịch sử muốn đưa '
-                  'vào. Cả hai cùng mở một modal cho chọn dòng (trống hay đã '
-                  'có chữ đều được, có cảnh báo trước khi thay nội dung cũ) '
-                  'và giữ nguyên định dạng nếu đoạn gốc có.',
-                ),
+                const SizedBox(height: 10),
+                Text(Ch.ghiChuTuDienNhapLieu1(ngonNguHienTai.value)),
+                const SizedBox(height: 8),
+                Text(Ch.ghiChuTuDienNhapLieu2(ngonNguHienTai.value)),
+                const SizedBox(height: 8),
+                Text(Ch.ghiChuTuDienNhapLieu3(ngonNguHienTai.value)),
+                const SizedBox(height: 8),
+                Text(Ch.ghiChuTuDienNhapLieu4(ngonNguHienTai.value)),
+                const SizedBox(height: 8),
+                Text(Ch.ghiChuTuDienNhapLieu5(ngonNguHienTai.value)),
+                const SizedBox(height: 8),
+                Text(Ch.ghiChuTuDienNhapLieu6(ngonNguHienTai.value)),
               ],
             ),
           ),
@@ -18956,13 +18866,9 @@ class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNha
   }
 
   String get _chuThichTab => switch (_tab) {
-        'ganDay' => 'Các dòng vừa được sử dụng gần đây, trong đó: Các màu '
-            'xanh đậm là gần đây nhất, các màu xanh nhạt là cũ hơn',
-        'hang' => 'Sắp xếp theo các hàng nút chữ cái trên bàn phím vật lý, '
-            'từ trái qua phải, từ trên xuống dưới, Phím nào có gạch chân là '
-            'ở bên phải',
-        _ => 'Các phím tắt chữ cái Sắp xếp theo Bảng chữ cái Alphabet quốc '
-            'tế từ A đến Z',
+        'ganDay' => Ch.chuThichTabGanDayTuDien(ngonNguHienTai.value),
+        'hang' => Ch.chuThichTabHangTuDien(ngonNguHienTai.value),
+        _ => Ch.chuThichTabAZTuDien(ngonNguHienTai.value),
       };
 
   /// (YÊU CẦU MỚI) Màu chữ của dòng chú thích — riêng cho từng tab, để dễ
@@ -19328,13 +19234,9 @@ class _HopThoaiThemNhanhTuDienState extends State<_HopThoaiThemNhanhTuDien>
   }
 
   String get _chuThichTab => switch (_tab) {
-        'ganDay' => 'Các dòng vừa được sử dụng gần đây, trong đó: Các màu '
-            'xanh đậm là gần đây nhất, các màu xanh nhạt là cũ hơn',
-        'hang' => 'Sắp xếp theo các hàng nút chữ cái trên bàn phím vật lý, '
-            'từ trái qua phải, từ trên xuống dưới, Phím nào có gạch chân là '
-            'ở bên phải',
-        _ => 'Các phím tắt chữ cái Sắp xếp theo Bảng chữ cái Alphabet quốc '
-            'tế từ A đến Z',
+        'ganDay' => Ch.chuThichTabGanDayTuDien(ngonNguHienTai.value),
+        'hang' => Ch.chuThichTabHangTuDien(ngonNguHienTai.value),
+        _ => Ch.chuThichTabAZTuDien(ngonNguHienTai.value),
       };
 
   Color get _mauChuThichTab => switch (_tab) {
@@ -19394,8 +19296,8 @@ class _HopThoaiThemNhanhTuDienState extends State<_HopThoaiThemNhanhTuDien>
       builder: (ctx) => AlertDialog(
         title: Text(Ch.thayTheNoiDungDongNay(ngonNguHienTai.value)),
         content: Text(
-          'Dòng Phím ${chuCaiTuDienNhapLieuNhanh(i)} này đã có nội dung — nội dung cũ sẽ bị mất, '
-          'thay bằng đoạn vừa chọn. Bạn có chắc chắn không?',
+          Ch.dongPhimKyTuDaCoNoiDungSeMat(
+              chuCaiTuDienNhapLieuNhanh(i), ngonNguHienTai.value),
         ),
         actions: [
           TextButton(
@@ -19606,10 +19508,11 @@ class _HopThoaiThemNhanhTuDienState extends State<_HopThoaiThemNhanhTuDien>
                   onPressed: dongTrongChoNut == null ? null : () => _ghiVaoDong(dongTrongChoNut),
                   icon: const Icon(Icons.flash_on_outlined, size: 16),
                   label: Text(
-                    dongTrongChoNut == null
-                        ? 'Thêm nhanh vào Dòng trống gần nhất'
-                        : 'Thêm nhanh vào Dòng trống gần nhất '
-                            '(Phím ${chuCaiTuDienNhapLieuNhanh(dongTrongChoNut)})',
+                    Ch.themNhanhVaoDongTrongGanNhat(
+                        dongTrongChoNut == null
+                            ? null
+                            : chuCaiTuDienNhapLieuNhanh(dongTrongChoNut),
+                        ngonNguHienTai.value),
                   ),
                   style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6)),
                 ),

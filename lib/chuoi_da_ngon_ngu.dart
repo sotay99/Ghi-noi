@@ -1557,6 +1557,12 @@ class Ch {
       ? 'Độ dài của từng đoạn văn được đề xuất'
       : 'Length of each suggested paragraph';
 
+  static String tenMucDoDaiDeXuat(int mucDo, NgonNgu nn) {
+    const vi = ['Rất ngắn', 'Ngắn', 'Trung bình', 'Dài', 'Rất dài'];
+    const en = ['Very short', 'Short', 'Medium', 'Long', 'Very long'];
+    return (nn == NgonNgu.vi ? vi : en)[mucDo];
+  }
+
   static String tuyChinhCauLenhChoAiLamViec(NgonNgu nn) => nn == NgonNgu.vi
       ? 'Tùy chỉnh câu lệnh để cho AI làm việc'
       : 'Customize the instruction for the AI';
@@ -1944,6 +1950,13 @@ class Ch {
       ? 'Đóng bộ phím nhanh cho màn hình cảm ứng'
       : 'Close quick touch keyboard';
 
+  static String phimNhanhChoManHinhCamUng(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Phím nhanh cho màn hình cảm ứng'
+      : 'Quick touch keyboard';
+
+  static String phimNhanhNhanGon(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Phím nhanh' : 'Quick keys';
+
   static String quayLaiKetQuaAi(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Quay lại kết quả AI' : 'Back to AI result';
 
@@ -1952,6 +1965,463 @@ class Ch {
 
   static String chenVaoViTriNay(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Chèn vào vị trí này' : 'Insert at this position';
+
+  // ------------------------------------------------- Khối văn bản dài nối nhiều dòng
+  // (phát hiện khi người dùng báo còn sót nhiều chuỗi tiếng Việt sau khi đã
+  // "rà sạch" theo các script quét trước — nguyên nhân: chuỗi literal Dart
+  // nối nhiều dòng liền kề `'...' 'dòng 2'` không khớp regex quét 1 dòng.)
+
+  static String giaiThichTuDongChuyenHoaTheGhiAm(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Khi bật, mỗi thẻ ghi âm tích đủ số giây bên dưới sẽ tự động được '
+          'gửi đi chuyển thành văn bản, không cần bạn tự bấm. Tắt đi thì mọi '
+          'thẻ đều chờ bạn tự bấm chuyển hoá.'
+      : 'When on, each recording card that reaches the number of seconds '
+          'below is automatically sent to be converted to text — no need to '
+          'tap yourself. When off, every card waits for you to tap convert.';
+
+  static String giaiThichTuMoBangDieuKhien(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Mỗi lần bấm nút ghi âm (hoặc dùng phím tắt) để bắt đầu ghi âm một '
+          'thẻ mới, chọn xem Bảng điều khiển này có tự mở ra ngay không, hay '
+          'chỉ hiện dải thanh công cụ ghim ở đầu màn hình.'
+      : 'Each time you tap the record button (or use the shortcut) to start '
+          'recording a new card, choose whether this control panel opens '
+          'right away, or only the pinned toolbar strip shows at the top of '
+          'the screen.';
+
+  static String sapChamGioiHanTieuDePrefix(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Sắp chạm giới hạn ' : 'Approaching the limit ';
+
+  static String theGhiAmSoDangSapGhiDu60Giay(int soThe, int soLan, NgonNgu nn) =>
+      nn == NgonNgu.vi
+          ? 'Thẻ ghi âm #$soThe (thẻ tự động thứ $soLan liên tiếp) sắp ghi đủ '
+              '60 giây, tổng cộng sắp chạm '
+          : 'Recording card #$soThe (the $soLan-th automatic card in a row) '
+              'is about to reach 60 seconds, bringing the total close to ';
+
+  static String khongAiBamGi(NgonNgu nn) =>
+      nn == NgonNgu.vi ? ' không ai bấm gì. ' : ' with no one tapping anything. ';
+
+  static String neuKhongChonTuNgungGhiAm(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Nếu không chọn, tới đúng giây thứ 60 hệ thống sẽ TỰ NGỪNG ghi âm '
+          'luôn, KHÔNG tạo thêm thẻ mới nữa'
+      : "If you don't choose, right at second 60 the system will "
+          'AUTOMATICALLY STOP recording, WITHOUT creating a new card';
+
+  static String deTranhTonTokenVaPinBanMuonLamGi(NgonNgu nn) => nn == NgonNgu.vi
+      ? ' (để tránh tốn token AI và pin máy vô ích). Bạn muốn làm gì bây giờ?'
+      : ' (to avoid wasting AI tokens and battery). What would you like to '
+          'do now?';
+
+  static String theGhiAmSoSapGhiDu60Giay(int soThe, NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Thẻ ghi âm #$soThe sắp ghi đủ 60 giây. '
+      : 'Recording card #$soThe is about to reach 60 seconds. ';
+
+  static String banCoTheKhongCanLamGiBayGio(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bạn có thể không cần làm gì bây giờ cả'
+      : "You don't need to do anything right now";
+
+  static String toiDungGiay60TuDongChot(NgonNgu nn) => nn == NgonNgu.vi
+      ? ' — tới đúng giây thứ 60 nó sẽ tự động chốt và ghi tiếp bằng một thẻ '
+          'mới. Bạn muốn làm gì bây giờ?'
+      : ' — right at second 60 it will automatically finalize and continue '
+          'recording with a new card. What would you like to do now?';
+
+  static String banGhiAmDangDoDangDaGhiDuoc(String thoiLuong, NgonNgu nn) =>
+      nn == NgonNgu.vi
+          ? 'Bản ghi âm đang dở dang này đã ghi được $thoiLuong. Xoá đi sẽ '
+              'mất VĨNH VIỄN, không thể phục hồi lại được (khác với thẻ ghi '
+              'âm đã chốt — không lưu tạm bất cứ gì để hoàn tác). Bạn có '
+              'chắc chắn muốn xoá không?'
+          : 'This in-progress recording has recorded $thoiLuong. Deleting it '
+              'will be lost PERMANENTLY and cannot be recovered (unlike a '
+              'finalized recording card — nothing is kept to undo). Are you '
+              'sure you want to delete it?';
+
+  static String theDaChuyenHoaRoiKhongConBanGhiAm(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Cái thẻ này đã được chuyển hoá rồi nên không còn bản ghi âm nào '
+          'nữa. Bạn chỉ có thể bấm nút Chuyển hoá thì có thể xem toàn bộ văn '
+          'bản.'
+      : 'This card has already been converted, so there is no recording '
+          'left. You can only tap the Convert button to see the full text.';
+
+  static String vungChonChuaNhieuTheXoaSeHuyLuon(int soLuongThe, NgonNgu nn) =>
+      nn == NgonNgu.vi
+          ? 'Vùng chọn này chứa $soLuongThe thẻ ghi âm — xoá sẽ HUỶ LUÔN '
+              'những thẻ đó, không thể phục hồi lại được. Bạn có chắc chắn '
+              'muốn xoá không?'
+          : 'This selection contains $soLuongThe recording cards — deleting '
+              'will CANCEL those cards for good, they cannot be recovered. '
+              'Are you sure you want to delete them?';
+
+  static String theDangGhiAmXoaSeHuyLuonBanGhiDangThu(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Thẻ này ĐANG GHI ÂM — xoá sẽ HUỶ LUÔN bản ghi đang thu, không thể '
+          'phục hồi lại được. Bạn có chắc chắn muốn xoá không?'
+      : 'This card is CURRENTLY RECORDING — deleting will CANCEL the '
+          'in-progress recording for good, it cannot be recovered. Are you '
+          'sure you want to delete it?';
+
+  static String theDangGuiPhienAmXoaSeBoLuonKetQua(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Thẻ này ĐANG được gửi đi phiên âm — xoá sẽ bỏ luôn kết quả sắp về, '
+          'không thể phục hồi lại được. Bạn có chắc chắn muốn xoá không?'
+      : 'This card is CURRENTLY being transcribed — deleting will discard '
+          'the incoming result for good, it cannot be recovered. Are you '
+          'sure you want to delete it?';
+
+  static String theGhiAmSeBiXoaVinhVienChung(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Thẻ ghi âm này sẽ bị xoá VĨNH VIỄN, không thể phục hồi lại được. '
+          'Bạn có chắc chắn muốn xoá không?'
+      : 'This recording card will be deleted PERMANENTLY, it cannot be '
+          'recovered. Are you sure you want to delete it?';
+
+  static String microIphoneKhongKhaDungTrenWebsite(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Micro (vừa nói vừa ra chữ) tại điện thoại Iphone không thể khả '
+          'dụng trên môi trường Website, chỉ khả dụng trên môi trường app '
+          'mobile. Nếu bạn cho rằng thiết bị của bạn không phải Iphone, hãy '
+          'bấm vào Cài đặt Micro. Bạn có thể tải app mobile cho Iphone để '
+          'sử dụng tính năng này.'
+      : 'The microphone (speak while typing) on an iPhone browser cannot '
+          'work on the Website — it only works in the mobile app. If you '
+          "believe your device isn't an iPhone, tap Microphone Settings. "
+          'You can download the mobile app for iPhone to use this feature.';
+
+  static String hauToODoanDangChon(NgonNgu nn) =>
+      nn == NgonNgu.vi ? ' ở đoạn đang chọn' : ' in the selected paragraph';
+
+  static String hauToToanVan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? ' toàn văn' : ' in the whole text';
+
+  static String moTaDangXuLyKiemTra(String loaiKiemTra, String hauTo, NgonNgu nn) {
+    if (nn == NgonNgu.vi) {
+      return switch (loaiKiemTra) {
+        'chinh_ta' =>
+          'AI đang kiểm tra lỗi chính tả$hauTo, tìm từ/cụm từ sai để đề xuất sửa.',
+        'dau_cau' =>
+          'AI đang kiểm tra dấu câu$hauTo, tìm chỗ còn thiếu để đề xuất chèn thêm.',
+        _ =>
+          'AI đang kiểm tra lại$hauTo để soát lỗi chính tả - ngữ pháp, và đề '
+              'xuất cách sửa đổi. Đây là bước quan trọng trước khi hoàn '
+              'thiện văn bản.',
+      };
+    }
+    return switch (loaiKiemTra) {
+      'chinh_ta' =>
+        'AI is checking spelling$hauTo, looking for misspelled words/phrases to suggest fixes.',
+      'dau_cau' =>
+        'AI is checking punctuation$hauTo, looking for missing marks to suggest adding.',
+      _ =>
+        'AI is reviewing$hauTo for spelling and grammar issues, and '
+            'suggesting edits. This is an important step before finishing '
+            'the document.',
+    };
+  }
+
+  static String diChuyenConTroToiViTriDatThe(int soThe, NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Di chuyển con trỏ tới vị trí muốn đặt thẻ ghi âm #$soThe này, rồi '
+          'bấm "Chuyển tới đây".'
+      : 'Move the cursor to where you want to place recording card #$soThe, '
+          'then tap "Move here".';
+
+  static String diChuyenConTroToiViTriChenVanBanAi(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Di chuyển con trỏ tới vị trí muốn chèn văn bản từ AI, rồi bấm '
+          '"Chèn vào vị trí này". Có vùng đang chọn thì văn bản mới sẽ thay '
+          'thế đúng vùng đó.'
+      : 'Move the cursor to where you want to insert the text from AI, then '
+          'tap "Insert at this position". If text is selected, the new text '
+          'will replace exactly that selection.';
+
+  static String ghiChuBoNhoTamDan1(NgonNgu nn) => nn == NgonNgu.vi
+      ? '• Dán: bấm vào một dòng, hoặc gõ đúng phím số của dòng đó (bàn '
+          'phím rời, 1-9 rồi 0) để dán ngay vào vị trí con trỏ.'
+      : '• Paste: tap a row, or type the row\'s exact number key (external '
+          'keyboard, 1-9 then 0) to paste right at the cursor.';
+
+  static String ghiChuBoNhoTamDan2(NgonNgu nn) => nn == NgonNgu.vi
+      ? '• Tự ghi: mỗi lần Cắt/Copy, đoạn văn bản tự thêm vào dòng trống '
+          'đầu tiên; hết dòng trống thì đè lên dòng CŨ NHẤT trong các dòng '
+          'chưa ghim.'
+      : '• Auto-record: every time you Cut/Copy, the text is added to the '
+          'first empty row; once no empty row is left, it overwrites the '
+          'OLDEST row among the unpinned ones.';
+
+  static String ghiChuBoNhoTamDan3(NgonNgu nn) => nn == NgonNgu.vi
+      ? '• Màu nền đỏ nhạt = dòng cũ nhất, vàng nhạt = dòng gần cũ nhất '
+          'trong các dòng CHƯA ghim — đây là 2 dòng sắp bị đè tiếp theo, '
+          'chỉ hiện khi lịch sử đã đủ 10 dòng.'
+      : '• Light red background = the oldest row, light yellow = the '
+          'second-oldest among the UNPINNED rows — these are the next 2 rows '
+          'about to be overwritten, shown only once the history has 10 rows.';
+
+  static String ghiChuBoNhoTamDan4(NgonNgu nn) => nn == NgonNgu.vi
+      ? '• Ghim (nút 📌): dòng đã ghim (nền xanh lá) không bao giờ bị đè, '
+          'và không tính vào việc xác định dòng cũ/gần cũ nhất. Bấm lại để '
+          'bỏ ghim. Ghim đủ cả 10 dòng thì lịch sử tạm hết chỗ ghi thêm — '
+          'vẫn bình thường, Dán bằng Ctrl+V/nút Dán không hề bị ảnh hưởng.'
+      : '• Pin (📌 button): a pinned row (green background) is never '
+          "overwritten, and doesn't count toward determining the "
+          'oldest/second-oldest row. Tap again to unpin. Pinning all 10 rows '
+          "means the history temporarily has no room left to record — "
+          "that's normal, Paste via Ctrl+V/the Paste button is unaffected.";
+
+  static String ghiChuBoNhoTamDan5(NgonNgu nn) => nn == NgonNgu.vi
+      ? '• Đoạn nào dài hơn 10.000 ký tự sẽ KHÔNG được ghi vào bảng này '
+          '(âm thầm, không báo) — tránh bộ nhớ tạm quá nặng. Cắt/Copy vẫn '
+          'thành công như thường vào bộ nhớ đệm của máy.'
+      : "• Text longer than 10,000 characters will NOT be recorded in this "
+          "table (silently, no notice) — to avoid an overly heavy history. "
+          "Cut/Copy still succeeds as usual into the device's clipboard.";
+
+  static String tuDienNayLuuTaiBoNhoLauDaiCuaApp(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Từ điển này được lưu tại bộ nhớ lâu dài của app'
+      : "This dictionary is saved in the app's long-term storage";
+
+  static String ghiChuTuDienNhapLieu1(NgonNgu nn) => nn == NgonNgu.vi
+      ? '• Dán nhanh: bấm vào một dòng (hoặc gõ đúng phím chữ cái của dòng '
+          'đó trên bàn phím vật lý) để dán ngay vào vị trí con trỏ trong '
+          'khung soạn thảo. Dòng trống thì không bấm/gõ được gì.'
+      : '• Quick paste: tap a row (or type its exact letter key on a '
+          'physical keyboard) to paste right at the cursor in the editor. '
+          'An empty row does nothing when tapped/typed.';
+
+  static String ghiChuTuDienNhapLieu2(NgonNgu nn) => nn == NgonNgu.vi
+      ? '• Ẩn/hiện bảng này: bấm nút 📖 ở thanh công cụ, hoặc dùng phím tắt '
+          'đã chọn (xem/đổi ở mục "Phím tắt" trong Cài đặt) — mặc định là '
+          'bấm Alt 2 lần liên tiếp.'
+      : '• Show/hide this panel: tap the 📖 button on the toolbar, or use '
+          'the chosen shortcut (view/change it under "Shortcuts" in '
+          'Settings) — default is pressing Alt twice in a row.';
+
+  static String ghiChuTuDienNhapLieu3(NgonNgu nn) => nn == NgonNgu.vi
+      ? '• Ba tab: "Gần đây", "Q→M" (theo hàng phím vật lý) và "A→Z" (bảng '
+          'chữ cái). Đổi tab bằng cách bấm chuột vào tab, hoặc bấm phím '
+          '1/2/3, hoặc phím mũi tên trái/phải — app tự nhớ tab đang mở cho '
+          'lần sau.'
+      : '• Three tabs: "Recent", "Q→M" (by physical keyboard row) and "A→Z" '
+          '(alphabetical). Switch tabs by clicking a tab, pressing 1/2/3, or '
+          'the left/right arrow keys — the app remembers the open tab for '
+          'next time.';
+
+  static String ghiChuTuDienNhapLieu4(NgonNgu nn) => nn == NgonNgu.vi
+      ? '• Cuộn xem hết 26 dòng trong một tab: vuốt tay, lăn chuột, kéo '
+          'thanh cuộn, hoặc phím mũi tên lên/xuống để nhảy thẳng lên '
+          'đầu/xuống cuối. Phím cách cuộn xen kẽ: đang ở đâu đó thì cuộn '
+          'xuống cuối, đã ở cuối rồi thì cuộn lên đầu.'
+      : '• Scroll through all 26 rows in a tab: swipe, scroll the wheel, '
+          'drag the scrollbar, or use the up/down arrow keys to jump '
+          'straight to the top/bottom. The spacebar toggles: from anywhere '
+          'it scrolls to the bottom, from the bottom it scrolls to the top.';
+
+  static String ghiChuTuDienNhapLieu5(NgonNgu nn) => nn == NgonNgu.vi
+      ? '• Soạn nội dung cho từng dòng: bấm "Cài đặt" (ngay bên cạnh nút '
+          'Hướng dẫn này) để gõ tay hoặc dán văn bản (giữ cả định dạng '
+          'đậm/nghiêng/màu...) vào từng ô, đổi thứ tự giữa các dòng, hoặc '
+          'đổi phím tắt ẩn/hiện bảng.'
+      : '• Edit the content of each row: tap "Settings" (right next to this '
+          'Guide button) to type or paste text (keeping '
+          'bold/italic/color... formatting) into each box, reorder the '
+          'rows, or change the show/hide shortcut.';
+
+  static String ghiChuTuDienNhapLieu6(NgonNgu nn) => nn == NgonNgu.vi
+      ? '• Hai cách đưa thẳng một đoạn có sẵn vào từ điển, không cần gõ '
+          'lại: (1) bôi đen một đoạn trong khung soạn thảo rồi bấm nút 📖 '
+          'vừa hiện ra cạnh nút Xoá; (2) mở bảng "Bộ nhớ tạm để dán văn '
+          'bản", bấm nút 📖 ở dòng lịch sử muốn đưa vào. Cả hai cùng mở một '
+          'modal cho chọn dòng (trống hay đã có chữ đều được, có cảnh báo '
+          'trước khi thay nội dung cũ) và giữ nguyên định dạng nếu đoạn gốc '
+          'có.'
+      : '• Two ways to send an existing passage straight into the '
+          "dictionary without retyping: (1) select a passage in the editor "
+          'then tap the 📖 button that appears next to the Delete button; '
+          '(2) open the "Clipboard history" panel, tap the 📖 button on the '
+          'row you want to send. Both open a modal to pick a row (empty or '
+          'already filled, with a warning before replacing old content) and '
+          'keep the original formatting if the source had any.';
+
+  static String chuThichTabGanDayTuDien(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Các dòng vừa được sử dụng gần đây, trong đó: Các màu xanh đậm là '
+          'gần đây nhất, các màu xanh nhạt là cũ hơn'
+      : 'Rows recently used, where: darker blue shades are the most recent, '
+          'lighter blue shades are older';
+
+  static String chuThichTabHangTuDien(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Sắp xếp theo các hàng nút chữ cái trên bàn phím vật lý, từ trái '
+          'qua phải, từ trên xuống dưới, Phím nào có gạch chân là ở bên phải'
+      : 'Sorted by the letter-key rows on a physical keyboard, left to '
+          'right, top to bottom — an underlined key is on the right side';
+
+  static String chuThichTabAZTuDien(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Các phím tắt chữ cái Sắp xếp theo Bảng chữ cái Alphabet quốc tế '
+          'từ A đến Z'
+      : 'Letter shortcuts sorted by the international alphabet, from A to Z';
+
+  static String dongPhimKyTuDaCoNoiDungSeMat(String chuCai, NgonNgu nn) =>
+      nn == NgonNgu.vi
+          ? 'Dòng Phím $chuCai này đã có nội dung — nội dung cũ sẽ bị mất, '
+              'thay bằng đoạn vừa chọn. Bạn có chắc chắn không?'
+          : 'Row $chuCai already has content — the old content will be '
+              'lost, replaced by what you just selected. Are you sure?';
+
+  static String banCoTheGhiCauLenhRiengChoCachVietLai(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bạn có thể ghi câu lệnh riêng cho cách viết lại, hoặc để trống để '
+          'AI tự do viết lại theo ý nó.'
+      : 'You can write your own instruction for how to rewrite, or leave it '
+          'blank to let AI rewrite freely.';
+
+  static String vanBanAiVuaPhienAmSeMatNeuHuy(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Văn bản AI vừa phiên âm (kể cả phần bạn đã sửa, nếu có) sẽ mất '
+          'hẳn, không thể lấy lại. Bạn có chắc chắn muốn huỷ không?'
+      : "The text AI just transcribed (including any edits you've made) "
+          'will be lost for good and cannot be recovered. Are you sure you '
+          'want to cancel?';
+
+  static String dinhDangChuTrenChiApDungChoSoVaChuThuong(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Định dạng chữ trên (superscript) chỉ áp dụng cho con số và chữ '
+          'cái (chữ thường) trong bảng chữ cái Quốc tế.'
+      : 'Superscript formatting only applies to numbers and lowercase '
+          'letters in the international alphabet.';
+
+  static String giaiThichThungRacGiuToiDa30Ngay(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Mỗi mục chỉ được giữ tối đa 30 ngày trong thùng rác, quá hạn sẽ tự '
+          'xoá vĩnh viễn. Không thể xem nội dung bên trong — chỉ có thể '
+          'khôi phục hoặc xoá vĩnh viễn.'
+      : "Each item is kept for at most 30 days in the trash — once it "
+          "expires it's permanently deleted. You cannot view the content "
+          'inside — you can only restore it or delete it permanently.';
+
+  // ------------------------------------- Nhãn/tooltip còn sót ở thanh công cụ
+  // (phát hiện khi dò qua chu:/label:/message:/tooltip: nhiều dòng — regex
+  // quét 1 dòng trước đây không bắt được các ternary/field nhiều dòng này)
+
+  static String xemThemLuaChon(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Xem thêm lựa chọn' : 'See more options';
+
+  static String taiKhoanVaCaiDat(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tài khoản và Cài đặt' : 'Account and Settings';
+
+  static String taoVungChonVanBan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tạo vùng chọn văn bản' : 'Create a text selection';
+
+  static String tatMicro(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tắt micro' : 'Turn off microphone';
+
+  static String batMicro(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Bật micro' : 'Turn on microphone';
+
+  static String tatBatMicroVoiPhimTat(bool bat, String phimTat, NgonNgu nn) =>
+      nn == NgonNgu.vi
+          ? '${bat ? 'Tắt' : 'Bật'} micro ($phimTat)'
+          : '${bat ? 'Turn off' : 'Turn on'} microphone ($phimTat)';
+
+  static String hienChuThichNut(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Hiện chú thích' : 'Show label';
+
+
+  static String xoaTuKhoa(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Xoá từ khoá' : 'Clear search';
+
+  static String tuDienNhapLieuNhanhVoiPhimTat(String phimTat, NgonNgu nn) =>
+      nn == NgonNgu.vi
+          ? 'Từ điển nhập liệu nhanh ($phimTat)'
+          : 'Quick dictionary ($phimTat)';
+
+  static String boGhimThanhCongCuDinhDang(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Bỏ ghim thanh công cụ định dạng' : 'Unpin formatting toolbar';
+
+  static String ghimThanhCongCuDinhDang(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Ghim thanh công cụ định dạng' : 'Pin formatting toolbar';
+
+  static String tatBanPhimAo(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tắt bàn phím ảo' : 'Turn off on-screen keyboard';
+
+  static String hienBanPhimAoCungBoPhimNhanh(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Hiện bàn phím ảo cùng Bộ phím nhanh'
+      : 'Show on-screen keyboard with Quick keys';
+
+  static String boGhimChoPhepLichSuMoiDeLenLai(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bỏ ghim (cho phép lịch sử mới đè lên lại)'
+      : 'Unpin (allow new history to overwrite again)';
+
+  static String ghimDongNayKhongBaoGioBiThayThe(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Ghim dòng này (không bao giờ bị thay thế)'
+      : 'Pin this row (never overwritten)';
+
+  static String dangGhiAmPrefixLabel(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đang Ghi âm ' : 'Recording ';
+
+  static String chuyenHinhAnhThanhVanBanMenu(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chuyển hình ảnh thành văn bản' : 'Convert image to text';
+
+  static String chupAnhCamera(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chụp ảnh (camera)' : 'Take a photo (camera)';
+
+  static String chuyenFileAmThanhThanhVanBanMenu(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Chuyển file âm thanh thành văn bản'
+      : 'Convert audio file to text';
+
+  static String lamViecVoiDoanVanDangChon(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Làm việc với Đoạn văn đang chọn' : 'Work with the Selected Paragraph';
+
+  static String lamViecVoiToanBoVanBan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Làm việc với Toàn bộ văn bản' : 'Work with the Whole Text';
+
+  static String caiDatNutKiemTraToanVan(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Cài đặt nút "Kiểm tra toàn văn"'
+      : 'Settings for the "Full-text check" button';
+
+  static String caiDatMicroMenu(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Cài đặt Micro' : 'Microphone settings';
+
+  static String caiDatHienThiVaTuDongSuaMenu(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Cài đặt Hiển thị và tự động sửa' : 'Display and auto-correct settings';
+
+  static String caiDatTuDienSuaLoiChinhTaMenu(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Cài đặt từ điển sửa lỗi chính tả' : 'Spell-check dictionary settings';
+
+  static String caiDatTuDienNhapLieuNhanhMenu(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Cài đặt Từ điển nhập liệu nhanh' : 'Quick dictionary settings';
+
+  static String caiDatBoNhoTamDeDanVanBanMenu(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Cài đặt Bộ nhớ tạm để dán văn bản'
+      : 'Clipboard history settings';
+
+  static String banCoChacChanXoaCacKyTu(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Bạn có chắc chắn xoá các ký tự ' : 'Are you sure you want to delete the characters ';
+
+  static String banCoChacChanThayDoiCacKyTu(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bạn có chắc chắn thay đổi các ký tự '
+      : 'Are you sure you want to change the characters ';
+
+  static String thanh(NgonNgu nn) => nn == NgonNgu.vi ? ' thành ' : ' to ';
+
+  static String oKetQuaTimKiemKhong(NgonNgu nn) =>
+      nn == NgonNgu.vi ? ' ở ' : ' in ';
+
+  static String ketQuaTimKiemKhongHoi(NgonNgu nn) =>
+      nn == NgonNgu.vi ? ' kết quả tìm kiếm không?' : ' search results?';
+
+  static String soTuDong(int soTu, NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Số từ: $soTu' : 'Words: $soTu';
+
+  static String kyTuCoDauCachDong(int so, NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Ký tự (có dấu cách): $so'
+      : 'Characters (with spaces): $so';
+
+  static String kyTuKhongDauCachDong(int so, NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Ký tự (không dấu cách): $so'
+      : 'Characters (no spaces): $so';
+
+  static String soDoanDong(int so, NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Số đoạn: $so' : 'Paragraphs: $so';
+
+  static String themNhanhVaoDongTrongGanNhat(String? phim, NgonNgu nn) {
+    if (nn == NgonNgu.vi) {
+      return phim == null
+          ? 'Thêm nhanh vào Dòng trống gần nhất'
+          : 'Thêm nhanh vào Dòng trống gần nhất (Phím $phim)';
+    }
+    return phim == null
+        ? 'Quick-add to the nearest empty row'
+        : 'Quick-add to the nearest empty row (Key $phim)';
+  }
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt

@@ -260,13 +260,11 @@ class _ModalThungRacState extends State<ModalThungRac> {
               itemCount: ds.length + 1,
               itemBuilder: (context, i) {
                 if (i == 0) {
-                  return const Padding(
-                    padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                     child: Text(
-                      'Mỗi mục chỉ được giữ tối đa 30 ngày trong thùng rác, '
-                      'quá hạn sẽ tự xoá vĩnh viễn. Không thể xem nội dung '
-                      'bên trong — chỉ có thể khôi phục hoặc xoá vĩnh viễn.',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+                      Ch.giaiThichThungRacGiuToiDa30Ngay(ngonNguHienTai.value),
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
                     ),
                   );
                 }
@@ -400,18 +398,18 @@ class _ManHinhTimKiemThungRacState extends State<_ManHinhTimKiemThungRac> {
                         controller: _oTimKiem,
                         autofocus: true,
                         onChanged: (_) => setState(() {}),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           isDense: true,
-                          hintText: 'Nhập tên tệp hoặc thư mục...',
-                          border: OutlineInputBorder(),
-                          contentPadding:
-                              EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          hintText: Ch.nhapTenTepHoacThuMuc(ngonNguHienTai.value),
+                          border: const OutlineInputBorder(),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
                         ),
                       ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close),
-                      tooltip: 'Xoá từ khoá',
+                      tooltip: Ch.xoaTuKhoa(ngonNguHienTai.value),
                       onPressed: () => setState(() => _oTimKiem.clear()),
                     ),
                     TextButton(
