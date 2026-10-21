@@ -1807,6 +1807,114 @@ class Ch {
   static String nhapTenTepHoacThuMuc(NgonNgu nn) => nn == NgonNgu.vi
       ? 'Nhập tên tệp hoặc thư mục...'
       : 'Enter file or folder name...';
+
+  // ------------------------------------------------------- man_hinh_thu_muc.dart (tiếp)
+  static String tenBoNhoNoiBoTrinhDuyet(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bộ nhớ nội bộ trong Trình duyệt web của thiết bị'
+      : 'Local storage in this device\'s web browser';
+
+  static String tenBoNhoNoiBoThietBi(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bộ nhớ nội bộ trong thiết bị'
+      : 'Local storage on this device';
+
+  static String chonNoiLuuTru(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chọn nơi lưu trữ' : 'Choose a storage location';
+
+  static String ghiChuDangMoNamTrongThuMucVuaChuyenVaoThungRac(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Ghi chú đang mở nằm trong thư mục vừa chuyển vào thùng rác.'
+      : 'The note you have open is inside a folder that was just moved to trash.';
+
+  static String ghiChuTen(NgonNgu nn) => nn == NgonNgu.vi ? 'Ghi chú' : 'Note';
+
+  static String ghiChuDangMoVuaChuyenVaoThungRac(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Ghi chú đang mở vừa chuyển vào thùng rác.'
+      : 'The note you have open was just moved to trash.';
+
+  static String khongTaoDuocTepNenThuLaiSau(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Không tạo được tệp nén. Thử lại sau.'
+      : 'Could not create the zip file. Try again later.';
+
+  static String khongDocDuocTep(String ten, Object loi, NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Không đọc được "$ten": $loi'
+      : 'Could not read "$ten": $loi';
+
+  static String tepKhongPhaiZipHopLe(String ten, NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Tệp "$ten" không phải .zip hợp lệ, đã bỏ qua.'
+      : '"$ten" is not a valid .zip file, skipped.';
+
+  static String khongTheDanODayHayVaoBoNhoTruoc(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Không thể dán ở đây — hãy vào một bộ nhớ trước.'
+      : 'Cannot paste here — open a storage location first.';
+
+  static String khongTheChuyenVaoChinhNo(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Không thể chuyển vào chính nó.' : 'Cannot move into itself.';
+
+  static String khongTheChuyenThuMucVaoChinhConChau(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Không thể chuyển thư mục vào chính con cháu của nó.'
+      : 'Cannot move a folder into its own descendant.';
+
+  static String motMuc(NgonNgu nn) => nn == NgonNgu.vi ? '1 mục' : '1 item';
+
+  static String soMuc(int tong, NgonNgu nn) =>
+      nn == NgonNgu.vi ? '$tong mục' : '$tong items';
+
+  static String ghiChuDangMoNamTrongMucVuaChuyenVaoThungRac(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Ghi chú đang mở nằm trong mục vừa chuyển vào thùng rác.'
+      : 'The note you have open is inside an item that was just moved to trash.';
+
+  static String damMay(NgonNgu nn) => nn == NgonNgu.vi ? 'Đám mây' : 'Cloud';
+
+  static String noiBo(NgonNgu nn) => nn == NgonNgu.vi ? 'Nội bộ' : 'Local';
+
+  static String giaiThichBoNhoDamMay(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bộ nhớ này lưu trên máy chủ đám mây, có thể truy cập bộ nhớ này '
+          'ở bất cứ thiết bị nào nếu có internet và đăng nhập bằng tài '
+          'khoản này, App tự động lưu file lên bộ nhớ đám mây khi soạn thảo'
+      : 'This storage is kept on the cloud server — you can reach it from '
+          'any device with internet access while signed in to this account. '
+          'The app automatically saves files to cloud storage while you edit';
+
+  static String giaiThichBoNhoNoiBoWeb(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bộ nhớ nội bộ này lưu tại trình duyệt web này của thiết bị, '
+          'riêng tư tuyệt đối, nếu xoá Tệp và dữ liệu trang web thì bộ '
+          'nhớ nội bộ này sẽ bị xoá theo. App tự động lưu file mỗi khi '
+          'có sự thay đổi mà không cần bấm nút lưu file.'
+      : 'This local storage lives in this device\'s web browser only — '
+          'completely private, but clearing the site\'s data and files will '
+          'erase it too. The app saves files automatically on every change, '
+          'no save button needed.';
+
+  static String giaiThichBoNhoNoiBoThietBi(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Bộ nhớ nội bộ này lưu tại thiết bị, riêng tư và an toàn. App '
+          'tự động lưu file mỗi khi có sự thay đổi mà không cần bấm '
+          'nút lưu file.'
+      : 'This local storage lives on this device — private and safe. The '
+          'app saves files automatically on every change, no save button '
+          'needed.';
+
+  static String timKiemTrongThuMuc(String ten, NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Tìm kiếm trong "$ten"'
+      : 'Search inside "$ten"';
+
+  static String nhapKyTuDeTimKiem(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Nhập ký tự để tìm kiếm' : 'Type to search';
+
+  static String khongTimThayKetQua(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Không tìm thấy kết quả' : 'No results found';
+
+  static String dangXemBanNgoaiTuyen(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đang xem bản ngoại tuyến — sẽ đồng bộ khi có mạng.'
+      : 'Viewing the offline version — will sync once you\'re back online.';
+
+  static String dangGiuChoDan(String ten, NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đang giữ "$ten" — dán vào đây?'
+      : 'Holding "$ten" — paste it here?';
+
+  static String dangChoNhapTepNen(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đang chờ nhập tệp nén — đưa vào đây?'
+      : 'Waiting to import a zip file — drop it here?';
+
+  static String daXoa(NgonNgu nn) => nn == NgonNgu.vi ? 'Đã xoá' : 'Deleted';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt

@@ -289,8 +289,8 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   /// (YÊU CẦU MỚI) Tên thư mục "Bộ nhớ nội bộ" — khác nhau giữa bản web
   /// (đọc từ Trình duyệt web) và bản APK/iOS (đọc thẳng từ máy).
   String get _tenBoNhoNoiBo => kIsWeb
-      ? 'Bộ nhớ nội bộ trong Trình duyệt web của thiết bị'
-      : 'Bộ nhớ nội bộ trong thiết bị';
+      ? Ch.tenBoNhoNoiBoTrinhDuyet(ngonNguHienTai.value)
+      : Ch.tenBoNhoNoiBoThietBi(ngonNguHienTai.value);
 
   /// (SỬA LỖI) `thuMucGoc` ('goc') là HẰNG SỐ DÙNG CHUNG cho MỌI cây (nội
   /// bộ lẫn đám mây) — chỉ kiểm `_thuMucHienTaiId == thuMucGoc` không đủ để
@@ -324,7 +324,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       : const Icon(Icons.description_outlined);
 
   String get _tenThuMucHienTai {
-    if (_thuMucHienTaiId == _ngoiNhaChung) return 'Chọn nơi lưu trữ';
+    if (_thuMucHienTaiId == _ngoiNhaChung) return Ch.chonNoiLuuTru(ngonNguHienTai.value);
     // (YÊU CẦU MỚI) Đứng NGAY tại gốc (không phải một thư mục con nào bên
     // trong) — đổi tên hiển thị, xem màu ở `_dongTenThuMuc`.
     if (_thuMucHienTaiId == thuMucGoc) {
@@ -366,7 +366,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     }
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
-      _bao('Cần đăng nhập Google trước (menu "Tài khoản và Cài đặt" ở trang soạn thảo).');
+      _bao(Ch.canDangNhapGoogleTruoc(ngonNguHienTai.value));
       return;
     }
     setState(() => _dangTaiDamMay = true);
@@ -387,11 +387,11 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       // lỗi mơ hồ.
       if (!mounted) return;
       setState(() => _dangTaiDamMay = false);
-      _bao('Vui lòng kết nối internet.');
+      _bao(Ch.vuiLongKetNoiInternet(ngonNguHienTai.value));
     } catch (e) {
       if (!mounted) return;
       setState(() => _dangTaiDamMay = false);
-      _bao('Không mở được Bộ nhớ trên đám mây: $e');
+      _bao(Ch.khongMoDuocBoNhoDamMay(ngonNguHienTai.value, e));
     }
   }
 
@@ -516,7 +516,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
 
   Future<void> _themThuMuc() async {
     final goiY = _kho.tenThuMucGoiY(_thuMucHienTaiId);
-    final ten = await _hoiTenMoiTao(tieuDe: 'Thư mục mới', tenGoiY: goiY);
+    final ten = await _hoiTenMoiTao(tieuDe: Ch.thuMucMoiTieuDe(ngonNguHienTai.value), tenGoiY: goiY);
     if (ten == null) return;
     setState(() {
       final t = _kho.taoThuMucMoi(_thuMucHienTaiId);
@@ -527,7 +527,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
 
   Future<void> _themGhiChu() async {
     final goiY = _kho.tenGhiChuGoiY(_thuMucHienTaiId);
-    final ten = await _hoiTenMoiTao(tieuDe: 'Ghi chú mới', tenGoiY: goiY);
+    final ten = await _hoiTenMoiTao(tieuDe: Ch.ghiChuMoiTieuDe(ngonNguHienTai.value), tenGoiY: goiY);
     if (ten == null) return;
     setState(() {
       final g = _kho.taoGhiChuMoi(_thuMucHienTaiId);
@@ -679,7 +679,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     if (!mounted) return;
     _baoDaChuyenVaoThungRac();
     if (coGhiChuDangMoBenTrong) {
-      _bao('Ghi chú đang mở nằm trong thư mục vừa chuyển vào thùng rác.');
+      _bao(Ch.ghiChuDangMoNamTrongThuMucVuaChuyenVaoThungRac(ngonNguHienTai.value));
     }
   }
 
@@ -698,10 +698,10 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   Future<void> _taiVeGhiChu(GhiChuFile g) async {
     hienThongBaoGiua(context, Ch.dangTaiFileTxtVeThietBi(ngonNguHienTai.value));
     try {
-      final tenTep = '${g.ten.trim().isEmpty ? 'Ghi chú' : g.ten.trim()}.txt';
+      final tenTep = '${g.ten.trim().isEmpty ? Ch.ghiChuTen(ngonNguHienTai.value) : g.ten.trim()}.txt';
       await luuVaChiaSeGhiChu(tenTep, g.noiDung, g.ten);
     } catch (_) {
-      if (mounted) _bao('Không xuất được tệp. Thử lại sau.');
+      if (mounted) _bao(Ch.khongXuatDuocTepThuLaiSau(ngonNguHienTai.value));
     }
   }
 
@@ -712,7 +712,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     if (!mounted) return;
     _baoDaChuyenVaoThungRac();
     if (laDangMo) {
-      _bao('Ghi chú đang mở vừa chuyển vào thùng rác.');
+      _bao(Ch.ghiChuDangMoVuaChuyenVaoThungRac(ngonNguHienTai.value));
     }
   }
 
@@ -755,7 +755,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       final bytes = nenThuMucThanhZip(_kho, id, ten);
       await luuVaChiaSeTep('$ten.zip', bytes, loaiMime: 'application/zip');
     } catch (_) {
-      if (mounted) _bao('Không tạo được tệp nén. Thử lại sau.');
+      if (mounted) _bao(Ch.khongTaoDuocTepNenThuLaiSau(ngonNguHienTai.value));
     }
   }
 
@@ -773,7 +773,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
         allowedExtensions: ['zip', 'txt'],
       );
     } catch (e) {
-      _bao('Không mở được hộp thoại chọn tệp: $e');
+      _bao(Ch.khongMoDuocHopThoaiChonTep(ngonNguHienTai.value, '$e'));
       return;
     }
     if (teps.isEmpty) return;
@@ -785,7 +785,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       try {
         bytes = await tep.readAsBytes();
       } catch (e) {
-        _bao('Không đọc được nội dung tệp vừa chọn: $e');
+        _bao(Ch.khongDocDuocNoiDungTepVuaChon(ngonNguHienTai.value, '$e'));
         return;
       }
       if (bytes.length > gioiHanTxtByte) {
@@ -819,7 +819,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       try {
         bytes = await tep.readAsBytes();
       } catch (e) {
-        _bao('Không đọc được "${tep.name}": $e');
+        _bao(Ch.khongDocDuocTep(tep.name, e, ngonNguHienTai.value));
         continue;
       }
       if (tep.name.toLowerCase().endsWith('.txt')) {
@@ -838,7 +838,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
           if (ketQua.coTepQuaNang) coTepQuaNang = true;
           nguon.add(NguonNhap.zip(tep.name, ketQua.cay));
         } catch (_) {
-          _bao('Tệp "${tep.name}" không phải .zip hợp lệ, đã bỏ qua.');
+          _bao(Ch.tepKhongPhaiZipHopLe(tep.name, ngonNguHienTai.value));
         }
       }
     }
@@ -957,7 +957,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     // (YÊU CẦU MỚI) "Ngôi nhà chung" không phải một thư mục thật — không có
     // chỗ nào để dán vào cả.
     if (_thuMucHienTaiId == _ngoiNhaChung) {
-      _bao('Không thể dán ở đây — hãy vào một bộ nhớ trước.');
+      _bao(Ch.khongTheDanODayHayVaoBoNhoTruoc(ngonNguHienTai.value));
       return;
     }
     final khoNguon = _choDanKho ?? _kho;
@@ -991,11 +991,11 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       for (final id in _choDanThuMucIds) {
         if (_choDanLaCat) {
           if (id == _thuMucHienTaiId) {
-            _bao('Không thể chuyển vào chính nó.');
+            _bao(Ch.khongTheChuyenVaoChinhNo(ngonNguHienTai.value));
             continue;
           }
           if (!_kho.diChuyenThuMuc(id, _thuMucHienTaiId)) {
-            _bao('Không thể chuyển thư mục vào chính con cháu của nó.');
+            _bao(Ch.khongTheChuyenThuMucVaoChinhConChau(ngonNguHienTai.value));
             continue;
           }
           idsMoi.add(id);
@@ -1070,12 +1070,12 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
 
   String _tenMucDangChonDuyNhat() {
     if (_dsThuMucDaChon.isNotEmpty) {
-      return _kho.timThuMuc(_dsThuMucDaChon.first)?.ten ?? '1 mục';
+      return _kho.timThuMuc(_dsThuMucDaChon.first)?.ten ?? Ch.motMuc(ngonNguHienTai.value);
     }
     if (_dsGhiChuDaChon.isNotEmpty) {
-      return _kho.timGhiChu(_dsGhiChuDaChon.first)?.ten ?? '1 mục';
+      return _kho.timGhiChu(_dsGhiChuDaChon.first)?.ten ?? Ch.motMuc(ngonNguHienTai.value);
     }
-    return '1 mục';
+    return Ch.motMuc(ngonNguHienTai.value);
   }
 
   /// "Sao chép"/"Cắt (di chuyển)" ở thanh hành động "Chọn nhiều" — gửi cả
@@ -1083,7 +1083,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   /// `_dat`/`_dan`), rồi thoát luôn chế độ "Chọn nhiều".
   void _datNhieu({required bool laCat}) {
     final tong = _dsThuMucDaChon.length + _dsGhiChuDaChon.length;
-    final ten = tong == 1 ? _tenMucDangChonDuyNhat() : '$tong mục';
+    final ten = tong == 1 ? _tenMucDangChonDuyNhat() : Ch.soMuc(tong, ngonNguHienTai.value);
     setState(() {
       _choDanLaCat = laCat;
       _choDanThuMucIds = _dsThuMucDaChon.toList();
@@ -1142,7 +1142,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
     if (!mounted) return;
     _baoDaChuyenVaoThungRac();
     if (coGhiChuDangMo) {
-      _bao('Ghi chú đang mở nằm trong mục vừa chuyển vào thùng rác.');
+      _bao(Ch.ghiChuDangMoNamTrongMucVuaChuyenVaoThungRac(ngonNguHienTai.value));
     }
   }
 
@@ -1275,7 +1275,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
       // biệt hẳn với tên các thư mục con (xanh dương) phía sau.
       final laGocNoiBo = chuoi[i] == thuMucGoc;
       final ten = laGocNoiBo
-          ? (_laKhoDamMay ? 'Đám mây' : 'Nội bộ')
+          ? (_laKhoDamMay ? Ch.damMay(ngonNguHienTai.value) : Ch.noiBo(ngonNguHienTai.value))
           : (_kho.timThuMuc(chuoi[i])?.ten ?? '?');
       final laCuoiCung = i == chuoi.length - 1;
       manh.add(const Padding(
@@ -1404,17 +1404,10 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
   /// `Padding` co giãn tự nhiên, không cần ép chiều cao cố định).
   Widget _thanhChuThichBoNhoNoiBo() {
     final chu = _laKhoDamMay
-        ? 'Bộ nhớ này lưu trên máy chủ đám mây, có thể truy cập bộ nhớ này '
-            'ở bất cứ thiết bị nào nếu có internet và đăng nhập bằng tài '
-            'khoản này, App tự động lưu file lên bộ nhớ đám mây khi soạn thảo'
+        ? Ch.giaiThichBoNhoDamMay(ngonNguHienTai.value)
         : kIsWeb
-            ? 'Bộ nhớ nội bộ này lưu tại trình duyệt web này của thiết bị, '
-                'riêng tư tuyệt đối, nếu xoá Tệp và dữ liệu trang web thì bộ '
-                'nhớ nội bộ này sẽ bị xoá theo. App tự động lưu file mỗi khi '
-                'có sự thay đổi mà không cần bấm nút lưu file.'
-            : 'Bộ nhớ nội bộ này lưu tại thiết bị, riêng tư và an toàn. App '
-                'tự động lưu file mỗi khi có sự thay đổi mà không cần bấm '
-                'nút lưu file.';
+            ? Ch.giaiThichBoNhoNoiBoWeb(ngonNguHienTai.value)
+            : Ch.giaiThichBoNhoNoiBoThietBi(ngonNguHienTai.value);
     return Material(
       color: const Color(0xFFF1F3F4),
       child: SafeArea(
@@ -1786,7 +1779,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                   child: Text(
-                    'Tìm kiếm trong "$_timKiemTrongThuMucTen"',
+                    Ch.timKiemTrongThuMuc(_timKiemTrongThuMucTen, ngonNguHienTai.value),
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1826,17 +1819,17 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
               ),
               Expanded(
                 child: !coGoTim
-                    ? const Center(
+                    ? Center(
                         child: Text(
-                          'Nhập ký tự để tìm kiếm',
-                          style: TextStyle(color: Color(0xFF9AA0A6)),
+                          Ch.nhapKyTuDeTimKiem(ngonNguHienTai.value),
+                          style: const TextStyle(color: Color(0xFF9AA0A6)),
                         ),
                       )
                     : rong
-                        ? const Center(
+                        ? Center(
                             child: Text(
-                              'Không tìm thấy kết quả',
-                              style: TextStyle(color: Color(0xFF9AA0A6)),
+                              Ch.khongTimThayKetQua(ngonNguHienTai.value),
+                              style: const TextStyle(color: Color(0xFF9AA0A6)),
                             ),
                           )
                         : ListView(
@@ -1913,14 +1906,14 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                 width: double.infinity,
                 color: const Color(0xFFFCE8E6),
                 padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.cloud_off, size: 18, color: Color(0xFFB3261E)),
-                    SizedBox(width: 8),
+                    const Icon(Icons.cloud_off, size: 18, color: Color(0xFFB3261E)),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Đang xem bản ngoại tuyến — sẽ đồng bộ khi có mạng.',
-                        style: TextStyle(fontSize: 13, color: Color(0xFFB3261E)),
+                        Ch.dangXemBanNgoaiTuyen(ngonNguHienTai.value),
+                        style: const TextStyle(fontSize: 13, color: Color(0xFFB3261E)),
                       ),
                     ),
                   ],
@@ -1936,10 +1929,10 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                 child: laNgoiNhaChung
                     ? _danhSachNgoiNhaChung()
                     : trong
-                  ? const Center(
+                  ? Center(
                       child: Text(
-                        'Thư mục trống',
-                        style: TextStyle(color: Color(0xFF9AA0A6)),
+                        Ch.thuMucTrong(ngonNguHienTai.value),
+                        style: const TextStyle(color: Color(0xFF9AA0A6)),
                       ),
                     )
                   : ListView(
@@ -2173,7 +2166,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Đang giữ "$_choDanTen" — dán vào đây?',
+                            Ch.dangGiuChoDan(_choDanTen, ngonNguHienTai.value),
                             style: const TextStyle(fontSize: 13),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -2210,10 +2203,10 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                           color: Color(0xFF1A73E8),
                         ),
                         const SizedBox(width: 8),
-                        const Expanded(
+                        Expanded(
                           child: Text(
-                            'Đang chờ nhập tệp nén — đưa vào đây?',
-                            style: TextStyle(fontSize: 13),
+                            Ch.dangChoNhapTepNen(ngonNguHienTai.value),
+                            style: const TextStyle(fontSize: 13),
                           ),
                         ),
                         TextButton(
@@ -2299,7 +2292,7 @@ class _NutXoaTimKiemThuMucState extends State<_NutXoaTimKiemThuMuc> {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Text(
-          'Đã xoá',
+          Ch.daXoa(ngonNguHienTai.value),
           style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w600),
         ),
       );
