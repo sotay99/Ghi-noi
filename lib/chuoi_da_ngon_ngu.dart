@@ -1991,7 +1991,7 @@ class Ch {
   static String sapChamGioiHanTieuDePrefix(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Sắp chạm giới hạn ' : 'Approaching the limit ';
 
-  static String theGhiAmSoDangSapGhiDu60Giay(int soThe, int soLan, NgonNgu nn) =>
+  static String theGhiAmSoDangSapGhiDu60Giay(int? soThe, int soLan, NgonNgu nn) =>
       nn == NgonNgu.vi
           ? 'Thẻ ghi âm #$soThe (thẻ tự động thứ $soLan liên tiếp) sắp ghi đủ '
               '60 giây, tổng cộng sắp chạm '
@@ -2012,7 +2012,7 @@ class Ch {
       : ' (to avoid wasting AI tokens and battery). What would you like to '
           'do now?';
 
-  static String theGhiAmSoSapGhiDu60Giay(int soThe, NgonNgu nn) => nn == NgonNgu.vi
+  static String theGhiAmSoSapGhiDu60Giay(int? soThe, NgonNgu nn) => nn == NgonNgu.vi
       ? 'Thẻ ghi âm #$soThe sắp ghi đủ 60 giây. '
       : 'Recording card #$soThe is about to reach 60 seconds. ';
 
@@ -2090,7 +2090,7 @@ class Ch {
   static String hauToToanVan(NgonNgu nn) =>
       nn == NgonNgu.vi ? ' toàn văn' : ' in the whole text';
 
-  static String moTaDangXuLyKiemTra(String loaiKiemTra, String hauTo, NgonNgu nn) {
+  static String moTaDangXuLyKiemTra(String? loaiKiemTra, String hauTo, NgonNgu nn) {
     if (nn == NgonNgu.vi) {
       return switch (loaiKiemTra) {
         'chinh_ta' =>
