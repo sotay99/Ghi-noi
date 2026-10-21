@@ -1915,6 +1915,43 @@ class Ch {
       : 'Waiting to import a zip file — drop it here?';
 
   static String daXoa(NgonNgu nn) => nn == NgonNgu.vi ? 'Đã xoá' : 'Deleted';
+
+  static String moThuMuc(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Mở thư mục' : 'Open folder';
+
+  static String tatTuDong(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tắt tự động' : 'Turn off auto';
+
+  static String batTuDong(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Bật tự động' : 'Turn on auto';
+
+  static String giayTamNhan(NgonNgu nn, int giayTam) =>
+      nn == NgonNgu.vi ? '$giayTam giây' : '$giayTam sec';
+
+  static String tiepTuc(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tiếp tục' : 'Continue';
+
+  static String tamDung(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tạm dừng' : 'Pause';
+
+  static String hienThanhDinhDang(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Hiện thanh định dạng' : 'Show formatting bar';
+
+  static String anThanhDinhDang(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Ẩn thanh định dạng' : 'Hide formatting bar';
+
+  static String dongBoPhimNhanhChoManHinhCamUng(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đóng bộ phím nhanh cho màn hình cảm ứng'
+      : 'Close quick touch keyboard';
+
+  static String quayLaiKetQuaAi(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Quay lại kết quả AI' : 'Back to AI result';
+
+  static String chuyenToiDay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chuyển tới đây' : 'Move here';
+
+  static String chenVaoViTriNay(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chèn vào vị trí này' : 'Insert at this position';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt

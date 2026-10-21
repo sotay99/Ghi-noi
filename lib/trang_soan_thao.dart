@@ -586,7 +586,7 @@ class _NutDanNoiKhiThuGonState extends State<_NutDanNoiKhiThuGon>
       builder: (context, _) {
         final doRoNut = _doRoNutTaiThoiDiem(_dk.value);
         return Tooltip(
-          message: 'Dán',
+          message: Ch.dan(ngonNguHienTai.value),
           child: InkWell(
             borderRadius: BorderRadius.circular(20),
             onTap: () {},
@@ -6013,7 +6013,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                             await widget.caiDat.datTuDongDongBangKyTuDacBiet(!tuDong);
                             dungLai(() {});
                           },
-                          child: Text(tuDong ? 'Tắt tự động' : 'Bật tự động'),
+                          child: Text(tuDong
+                              ? Ch.tatTuDong(ngonNguHienTai.value)
+                              : Ch.batTuDong(ngonNguHienTai.value)),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -7569,7 +7571,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     max: CaiDat.gioiHanTrenNguongTuDongGuiTheGhiAm.toDouble(),
                     divisions: CaiDat.gioiHanTrenNguongTuDongGuiTheGhiAm -
                         CaiDat.gioiHanDuoiNguongTuDongGuiTheGhiAm,
-                    label: '$giayTam giây',
+                    label: Ch.giayTamNhan(ngonNguHienTai.value, giayTam),
                     onChanged: (v) async {
                       capNhatModal(() => giayTam = v.round());
                       await widget.caiDat.datNguongTuDongGuiTheGhiAmGiay(v.round());
@@ -8071,7 +8073,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             actions: [
               TextButton(
                 onPressed: bamTamDungTiepTuc,
-                child: Text(_theGhiAmDangTamDung ? 'Tiếp tục' : 'Tạm dừng'),
+                child: Text(_theGhiAmDangTamDung
+                    ? Ch.tiepTuc(ngonNguHienTai.value)
+                    : Ch.tamDung(ngonNguHienTai.value)),
               ),
               TextButton(
                 onPressed: () {
@@ -15238,10 +15242,11 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// phía dưới (`ThanhCongCu`) đã bỏ, tránh trùng hai nút một chức năng.
   Widget _nutThuMuc({required bool coChu}) {
     if (!coChu) {
-      return _nutVuongDieuHuongTep(Icons.folder, 'Mở thư mục', _moManHinhThuMuc);
+      return _nutVuongDieuHuongTep(
+          Icons.folder, Ch.moThuMuc(ngonNguHienTai.value), _moManHinhThuMuc);
     }
     return Tooltip(
-      message: 'Mở thư mục',
+      message: Ch.moThuMuc(ngonNguHienTai.value),
       child: InkWell(
         onTap: _moManHinhThuMuc,
         child: Container(
@@ -15396,7 +15401,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// viết logic mới — chỉ nối thêm một lối vào khác cho chúng.
   Widget _nutMoRongTep() {
     return Tooltip(
-      message: 'Mở rộng',
+      message: Ch.moRong(ngonNguHienTai.value),
       child: PopupMenuButton<String>(
         tooltip: '',
         onSelected: (v) {
@@ -15831,7 +15836,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           // icon (24) là cách nhất quán nhất còn lại (emoji render bình
           // thường qua `Text`, không cần gói phụ thuộc thêm).
           icon: const Text('🔤', style: TextStyle(fontSize: 18)),
-          tooltip: _anThanhDinhDang ? 'Hiện thanh định dạng' : 'Ẩn thanh định dạng',
+          tooltip: _anThanhDinhDang
+              ? Ch.hienThanhDinhDang(ngonNguHienTai.value)
+              : Ch.anThanhDinhDang(ngonNguHienTai.value),
           visualDensity: VisualDensity.compact,
           constraints: _kichThuocNutTren,
           padding: EdgeInsets.zero,
@@ -16102,7 +16109,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Tooltip(
-                message: 'Đóng bộ phím nhanh cho màn hình cảm ứng',
+                message: Ch.dongBoPhimNhanhChoManHinhCamUng(ngonNguHienTai.value),
                 child: InkWell(
                   onTap: () {},
                   onTapDown: (_) => _bamNutBoPhimNhanhCamUng(),
@@ -16114,7 +16121,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     color: Colors.red.shade600,
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     alignment: Alignment.center,
-                    child: Text(manHinhHep ? 'X' : 'Đóng',
+                    child: Text(manHinhHep ? 'X' : Ch.dong(ngonNguHienTai.value),
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                   ),
                 ),
@@ -16207,14 +16214,18 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     child: OutlinedButton(
                       onPressed:
                           dangDoiViTriThe ? _huyDoiViTriThe : _quayLaiKetQuaFileAmThanh,
-                      child: Text(dangDoiViTriThe ? 'Huỷ — Quay lại' : 'Quay lại kết quả AI'),
+                      child: Text(dangDoiViTriThe
+                          ? Ch.huyQuayLai(ngonNguHienTai.value)
+                          : Ch.quayLaiKetQuaAi(ngonNguHienTai.value)),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: FilledButton(
                       onPressed: dangDoiViTriThe ? _xacNhanDoiViTriThe : _chenTaiViTriDaChon,
-                      child: Text(dangDoiViTriThe ? 'Chuyển tới đây' : 'Chèn vào vị trí này'),
+                      child: Text(dangDoiViTriThe
+                          ? Ch.chuyenToiDay(ngonNguHienTai.value)
+                          : Ch.chenVaoViTriNay(ngonNguHienTai.value)),
                     ),
                   ),
                 ],
