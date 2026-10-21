@@ -3314,9 +3314,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final ratHep = MediaQuery.sizeOf(context).width < 420;
     final cacDong = <InlineSpan>[
       TextSpan(
-        text: 'Gõ chữ và bấm Micro để nói...\n'
-            'Thực hiện song song hai việc trên cùng lúc.\n'
-            '${ratHep ? 'Vui lòng đọc hướng dẫn và mẹo sử dụng App (nút ' : 'Vui lòng đọc hướng dẫn và mẹo sử dụng App (Nút '}',
+        text: '${Ch.goiYTrongDongGoChu(ngonNguHienTai.value)}\n'
+            '${Ch.goiYTrongDongSongSong(ngonNguHienTai.value)}\n'
+            '${Ch.goiYTrongDongHuongDan(ratHep, ngonNguHienTai.value)}',
       ),
       WidgetSpan(
         alignment: PlaceholderAlignment.middle,
@@ -3333,12 +3333,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // `_thietBiHienTai`) + số phiên bản web + gợi ý dùng Chrome.
     if (kIsWeb) {
       cacDong.addAll([
-        const TextSpan(
-          text: '\nNếu Micro trục trặc, hãy vào Cài đặt Micro\n',
+        TextSpan(
+          text: Ch.goiYTrongDongMicroTrucTrac(ngonNguHienTai.value),
         ),
-        const TextSpan(
-          text: 'Đang sử dụng bộ Micro của Thiết bị ',
-          style: TextStyle(decoration: TextDecoration.underline),
+        TextSpan(
+          text: Ch.goiYTrongDongDangDungBoMicro(ngonNguHienTai.value),
+          style: const TextStyle(decoration: TextDecoration.underline),
         ),
         TextSpan(
           text: _thietBiHienTai.ten,
@@ -3349,15 +3349,15 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           ),
         ),
         TextSpan(
-          text: '\n@Flowrite web (phiên bản $phienBanWebDayDu)\n'
-              'Truy cập Web bằng trình duyệt Chrome để sử dụng tốt nhất!',
+          text: Ch.goiYTrongDongPhienBanWeb(phienBanWebDayDu, ngonNguHienTai.value) +
+              Ch.goiYTrongDongDungChrome(ngonNguHienTai.value),
         ),
       ]);
     }
     // (YÊU CẦU MỚI) Dòng cuối cùng của chữ gợi ý — áp dụng cho cả web và
     // Android/iOS gốc.
     cacDong.add(
-      const TextSpan(text: '\nApp luôn tự động lưu nội dung soạn thảo'),
+      TextSpan(text: Ch.goiYTrongDongTuDongLuu(ngonNguHienTai.value)),
     );
     return RichText(
       text: TextSpan(

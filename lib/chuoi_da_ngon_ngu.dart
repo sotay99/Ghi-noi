@@ -2422,6 +2422,47 @@ class Ch {
         ? 'Quick-add to the nearest empty row'
         : 'Quick-add to the nearest empty row (Key $phim)';
   }
+
+  // ------------------------------------------- Chữ gợi ý khi bài còn trống
+  static String goiYTrongDongGoChu(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Gõ chữ và bấm Micro để nói...' : 'Type and tap Mic to speak...';
+
+  static String goiYTrongDongSongSong(NgonNgu nn) =>
+      nn == NgonNgu.vi
+          ? 'Thực hiện song song hai việc trên cùng lúc.'
+          : 'Do both at the same time.';
+
+  static String goiYTrongDongHuongDan(bool ratHep, NgonNgu nn) {
+    if (nn == NgonNgu.vi) {
+      return ratHep
+          ? 'Vui lòng đọc hướng dẫn và mẹo sử dụng App (nút '
+          : 'Vui lòng đọc hướng dẫn và mẹo sử dụng App (Nút ';
+    }
+    return ratHep
+        ? 'Please read the guide and tips for using the App (the '
+        : 'Please read the guide and tips for using the App (the ';
+  }
+
+  static String goiYTrongDongMicroTrucTrac(NgonNgu nn) => nn == NgonNgu.vi
+      ? '\nNếu Micro trục trặc, hãy vào Cài đặt Micro\n'
+      : '\nIf the Mic has issues, go to Mic Settings\n';
+
+  static String goiYTrongDongDangDungBoMicro(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đang sử dụng bộ Micro của Thiết bị '
+      : "Currently using the device's Mic set ";
+
+  static String goiYTrongDongPhienBanWeb(String phienBan, NgonNgu nn) =>
+      nn == NgonNgu.vi
+          ? '\n@Flowrite web (phiên bản $phienBan)\n'
+          : '\n@Flowrite web (version $phienBan)\n';
+
+  static String goiYTrongDongDungChrome(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Truy cập Web bằng trình duyệt Chrome để sử dụng tốt nhất!'
+      : 'For the best experience, access the Web via Chrome!';
+
+  static String goiYTrongDongTuDongLuu(NgonNgu nn) => nn == NgonNgu.vi
+      ? '\nApp luôn tự động lưu nội dung soạn thảo'
+      : '\nThe App always auto-saves your writing';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt
