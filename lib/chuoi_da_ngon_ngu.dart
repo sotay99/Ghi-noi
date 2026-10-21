@@ -1792,6 +1792,21 @@ class Ch {
   static String khongConThuMucConNaoNua(NgonNgu nn) => nn == NgonNgu.vi
       ? 'Trong này không còn thư mục con nào nữa'
       : 'There are no more subfolders in here';
+
+  static String cuonLenDauDanhSach(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Cuộn lên đầu danh sách' : 'Scroll to top of list';
+
+  static String cuonXuongCuoiDanhSach(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Cuộn xuống cuối danh sách' : 'Scroll to bottom of list';
+
+  static String themGhiChu(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Thêm ghi chú' : 'Add note';
+
+  static String them(NgonNgu nn) => nn == NgonNgu.vi ? 'Thêm' : 'Add';
+
+  static String nhapTenTepHoacThuMuc(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Nhập tên tệp hoặc thư mục...'
+      : 'Enter file or folder name...';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt

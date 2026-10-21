@@ -273,7 +273,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
           child: IconButton(
             onPressed: _cuonDanhSachThuMucLenDau,
             icon: const Icon(Icons.arrow_upward, size: 20),
-            tooltip: 'Cuộn lên đầu danh sách',
+            tooltip: Ch.cuonLenDauDanhSach(ngonNguHienTai.value),
           ),
         ),
         Opacity(
@@ -281,7 +281,7 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
           child: IconButton(
             onPressed: _cuonDanhSachThuMucXuongCuoi,
             icon: const Icon(Icons.arrow_downward, size: 20),
-            tooltip: 'Cuộn xuống cuối danh sách',
+            tooltip: Ch.cuonXuongCuoiDanhSach(ngonNguHienTai.value),
           ),
         ),
       ];
@@ -1477,11 +1477,11 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
               IconButton(
                 onPressed: _themGhiChu,
                 icon: const Icon(Icons.note_add_outlined),
-                tooltip: 'Thêm ghi chú',
+                tooltip: Ch.themGhiChu(ngonNguHienTai.value),
               ),
               PopupMenuButton<int>(
                 icon: const Icon(Icons.more_vert),
-                tooltip: 'Thêm',
+                tooltip: Ch.them(ngonNguHienTai.value),
                 onSelected: (v) {
                   switch (v) {
                     case 1:
@@ -1803,12 +1803,12 @@ class _ManHinhThuMucState extends State<ManHinhThuMuc> {
                           controller: _oTimKiemThuMuc,
                           autofocus: true,
                           onChanged: (_) => setState(() {}),
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             isDense: true,
-                            hintText: 'Nhập tên tệp hoặc thư mục...',
-                            border: OutlineInputBorder(),
-                            contentPadding:
-                                EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            hintText: Ch.nhapTenTepHoacThuMuc(ngonNguHienTai.value),
+                            border: const OutlineInputBorder(),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
                           ),
                         ),
                       ),
@@ -2306,7 +2306,7 @@ class _NutXoaTimKiemThuMucState extends State<_NutXoaTimKiemThuMuc> {
     }
     return IconButton(
       icon: Icon(Icons.close, color: Colors.green.shade700),
-      tooltip: 'Xoá',
+      tooltip: Ch.xoa(ngonNguHienTai.value),
       onPressed: _bam,
     );
   }
