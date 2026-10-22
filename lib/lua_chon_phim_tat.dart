@@ -11,6 +11,8 @@
 // đề nào trong hai vấn đề trên — không phải tổ hợp/phím nào bị hệ thống
 // hay trình duyệt can thiệp sẵn.)
 
+import 'ngon_ngu.dart';
+
 /// Ba chức năng dùng CHUNG bốn kiểu phím tắt ở `LuaChonPhimTat`, không bao
 /// giờ được phép trùng nhau — xem
 /// `CaiDat.datPhimTatTinhNangVaTuHoanDoiNeuTrung`.
@@ -74,21 +76,27 @@ class LuaChonPhimTat {
     }
   }
 
-  /// Nhãn hiển thị ngắn gọn, ví dụ 'Tab', 'Ctrl + G', 'Bấm Ctrl 2 lần'.
-  String get nhan {
+  /// Nhãn hiển thị ngắn gọn, ví dụ 'Tab', 'Ctrl + G', 'Bấm Ctrl 2 lần'/
+  /// 'Press Ctrl twice' tuỳ ngôn ngữ hiện tại.
+  String get nhan => nhanTheo(ngonNguHienTai.value);
+
+  /// Giống [nhan] nhưng cho phép truyền rõ ngôn ngữ (dùng ở nơi cần ép một
+  /// ngôn ngữ cụ thể thay vì luôn đọc `ngonNguHienTai.value`).
+  String nhanTheo(NgonNgu nn) {
+    final laVi = nn == NgonNgu.vi;
     switch (loai) {
       case 'tab':
         return 'Tab';
       case 'ctrl':
         return 'Ctrl + ${phim ?? '?'}';
       case 'shiftDup':
-        return 'Bấm Shift 2 lần';
+        return laVi ? 'Bấm Shift 2 lần' : 'Press Shift twice';
       case 'altShift':
         return 'Alt + Shift';
       case 'altDup':
-        return 'Bấm Alt 2 lần';
+        return laVi ? 'Bấm Alt 2 lần' : 'Press Alt twice';
       default:
-        return 'Bấm Ctrl 2 lần';
+        return laVi ? 'Bấm Ctrl 2 lần' : 'Press Ctrl twice';
     }
   }
 

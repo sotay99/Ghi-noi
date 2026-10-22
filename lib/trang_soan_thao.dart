@@ -600,7 +600,7 @@ class _NutDanNoiKhiThuGonState extends State<_NutDanNoiKhiThuGon>
               ),
               alignment: Alignment.center,
               child: Text(
-                'Dán',
+                Ch.dan(ngonNguHienTai.value),
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
@@ -3740,14 +3740,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         spacing: 2,
         runSpacing: 2,
         children: [
-          nut(Icons.format_bold, _damDangCho, 'dam', 'Đậm (Ctrl+B)'),
-          nut(Icons.format_italic, _nghiengDangCho, 'nghieng', 'Nghiêng (Ctrl+I)'),
-          nut(Icons.format_underlined, _gachChanDangCho, 'gachChan', 'Gạch chân (Ctrl+U)'),
-          nut(Icons.strikethrough_s, _gachNganDangCho, 'gachNgang', 'Gạch ngang thân (Ctrl+Shift+X)'),
-          nutChu('x²', _treMuDangCho, 'treMu', 'Chữ trên (Ctrl+Shift+=)'),
-          nutChu('x₂', _treChanDangCho, 'treChan', 'Chữ dưới (Ctrl+=)'),
+          nut(Icons.format_bold, _damDangCho, 'dam', Ch.damTooltip(ngonNguHienTai.value)),
+          nut(Icons.format_italic, _nghiengDangCho, 'nghieng', Ch.nghiengTooltip(ngonNguHienTai.value)),
+          nut(Icons.format_underlined, _gachChanDangCho, 'gachChan', Ch.gachChanTooltip(ngonNguHienTai.value)),
+          nut(Icons.strikethrough_s, _gachNganDangCho, 'gachNgang', Ch.gachNgangTooltip(ngonNguHienTai.value)),
+          nutChu('x²', _treMuDangCho, 'treMu', Ch.treMuTooltip(ngonNguHienTai.value)),
+          nutChu('x₂', _treChanDangCho, 'treChan', Ch.treChanTooltip(ngonNguHienTai.value)),
           _NutMauDinhDang(
-            nhan: 'Màu chữ (Ctrl+Shift+C)',
+            nhan: Ch.mauChuTooltip(ngonNguHienTai.value),
             bat: _mauChuDangCho != null,
             mauHienThi: widget.caiDat.mauChuGanNhat,
             khiBam: () => _apDungDinhDang('mauChu'),
@@ -3759,7 +3759,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             choPhepTrongSuot: false,
           ),
           _NutMauDinhDang(
-            nhan: 'Màu nền chữ (Ctrl+Shift+H)',
+            nhan: Ch.mauNenChuTooltip(ngonNguHienTai.value),
             bat: _mauNenDangCho != null,
             mauHienThi: widget.caiDat.mauNenGanNhat,
             khiBam: () => _apDungDinhDang('mauNen'),
@@ -13919,7 +13919,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
 
-    _moModalKetQuaFileAmThanh(vanBanKetQua, tieuDe: 'Văn bản từ hình ảnh');
+    _moModalKetQuaFileAmThanh(vanBanKetQua, tieuDe: 'hinhAnh');
   }
 
   /// Mục "Tóm tắt toàn văn" trong menu "Làm việc với AI" — mở modal "Chọn
@@ -14868,7 +14868,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return;
     }
 
-    _moModalKetQuaFileAmThanh(vanBanKetQua, tieuDe: 'Văn bản từ ảnh chụp');
+    _moModalKetQuaFileAmThanh(vanBanKetQua, tieuDe: 'anhChup');
   }
 
   /// Giữ nội dung modal kết quả AI qua nhiều lần mở/đóng (bấm "Chọn vị trí
@@ -14879,7 +14879,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   /// tính năng giống hệt nhau, chỉ khác tiêu đề modal
   /// (`_tieuDeModalKetQuaFile`) và hàm gọi AI phía trước.
   TextEditingController? _oKetQuaFileAmThanh;
-  String _tieuDeModalKetQuaFile = 'Văn bản từ tệp âm thanh';
+  String _tieuDeModalKetQuaFile = 'amThanh';
 
   void _dongHanKetQuaFileAmThanh() {
     _oKetQuaFileAmThanh?.dispose();
@@ -14898,7 +14898,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(_tieuDeModalKetQuaFile),
+        title: Text(Ch.tieuDeModalKetQuaFile(_tieuDeModalKetQuaFile, ngonNguHienTai.value)),
         content: SizedBox(
           width: 420,
           child: Column(
@@ -15653,7 +15653,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Widget _nutDanCongCu() => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
         child: _NutCongCuChu(
-          nhan: 'Dán',
+          nhan: Ch.dan(ngonNguHienTai.value),
           bLiet: _phimPasteDangLiet,
           onTap: _phimAoPasteCoLiet,
         ),
@@ -18457,7 +18457,7 @@ class _HopThoaiLichSuBoNhoTamState extends State<_HopThoaiLichSuBoNhoTam> {
                     SizedBox(width: manHinhHep ? 4 : 10),
                     Expanded(
                       child: Text(
-                        doanHienThi ?? '(trống)',
+                        doanHienThi ?? Ch.trongNgoacDon(ngonNguHienTai.value),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         softWrap: false,
@@ -18931,7 +18931,7 @@ class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNha
             children: [
               Expanded(
                 child: Text(
-                  rong ? '(trống)' : doanHienThi,
+                  rong ? Ch.trongNgoacDon(ngonNguHienTai.value) : doanHienThi,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   softWrap: false,
@@ -18950,7 +18950,7 @@ class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNha
               // xám như trước) — áp dụng cả khi rút gọn còn một chữ cái ở
               // màn hẹp.
               Text(
-                manHinhHep ? chuCai : 'Phím $chuCai',
+                manHinhHep ? chuCai : Ch.phimChuCai(ngonNguHienTai.value, chuCai),
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -19034,9 +19034,9 @@ class _HopThoaiTuDienNhapLieuNhanhState extends State<_HopThoaiTuDienNhapLieuNha
             // vuông — Gần đây / Q→M (theo hàng phím) / A→Z.
             Row(
               children: [
-                _nutTab('ganDay', 'Gần đây - Phím 1', 'Gần đây (1)', manHinhHepBeNgang),
-                _nutTab('hang', 'Sắp xếp Q → M - Phím 2', 'Q → M (2)', manHinhHepBeNgang),
-                _nutTab('bangChuCai', 'Sắp xếp A → Z - Phím 3', 'A → Z (3)', manHinhHepBeNgang),
+                _nutTab('ganDay', Ch.tabGanDayRong(ngonNguHienTai.value), Ch.tabGanDayHep(ngonNguHienTai.value), manHinhHepBeNgang),
+                _nutTab('hang', Ch.tabHangPhimRong(ngonNguHienTai.value), 'Q → M (2)', manHinhHepBeNgang),
+                _nutTab('bangChuCai', Ch.tabBangChuCaiRong(ngonNguHienTai.value), 'A → Z (3)', manHinhHepBeNgang),
               ],
             ),
             const SizedBox(height: 8),
@@ -19384,7 +19384,7 @@ class _HopThoaiThemNhanhTuDienState extends State<_HopThoaiThemNhanhTuDien>
               const SizedBox(width: 2),
               Expanded(
                 child: Text(
-                  rong ? '(trống)' : doanHienThi,
+                  rong ? Ch.trongNgoacDon(ngonNguHienTai.value) : doanHienThi,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   softWrap: false,
@@ -19396,7 +19396,7 @@ class _HopThoaiThemNhanhTuDienState extends State<_HopThoaiThemNhanhTuDien>
               ),
               SizedBox(width: manHinhHep ? 4 : 10),
               Text(
-                manHinhHep ? chuCai : 'Phím $chuCai',
+                manHinhHep ? chuCai : Ch.phimChuCai(ngonNguHienTai.value, chuCai),
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -19521,9 +19521,9 @@ class _HopThoaiThemNhanhTuDienState extends State<_HopThoaiThemNhanhTuDien>
             const SizedBox(height: 10),
             Row(
               children: [
-                _nutTab('ganDay', 'Gần đây - Phím 1', 'Gần đây (1)', manHinhHepBeNgang),
-                _nutTab('hang', 'Sắp xếp Q → M - Phím 2', 'Q → M (2)', manHinhHepBeNgang),
-                _nutTab('bangChuCai', 'Sắp xếp A → Z - Phím 3', 'A → Z (3)', manHinhHepBeNgang),
+                _nutTab('ganDay', Ch.tabGanDayRong(ngonNguHienTai.value), Ch.tabGanDayHep(ngonNguHienTai.value), manHinhHepBeNgang),
+                _nutTab('hang', Ch.tabHangPhimRong(ngonNguHienTai.value), 'Q → M (2)', manHinhHepBeNgang),
+                _nutTab('bangChuCai', Ch.tabBangChuCaiRong(ngonNguHienTai.value), 'A → Z (3)', manHinhHepBeNgang),
               ],
             ),
             const SizedBox(height: 8),

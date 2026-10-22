@@ -504,6 +504,22 @@ class Ch {
 
   static String dan(NgonNgu nn) => nn == NgonNgu.vi ? 'Dán' : 'Paste';
 
+  /// Tiêu đề modal kết quả AI từ tệp — [loai] là 'amThanh'/'hinhAnh'/'anhChup'.
+  static String tieuDeModalKetQuaFile(String loai, NgonNgu nn) {
+    if (nn == NgonNgu.vi) {
+      return switch (loai) {
+        'hinhAnh' => 'Văn bản từ hình ảnh',
+        'anhChup' => 'Văn bản từ ảnh chụp',
+        _ => 'Văn bản từ tệp âm thanh',
+      };
+    }
+    return switch (loai) {
+      'hinhAnh' => 'Text from image',
+      'anhChup' => 'Text from photo',
+      _ => 'Text from audio file',
+    };
+  }
+
   static String huyChonNhieu(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Hủy chọn nhiều' : 'Cancel multi-select';
 
@@ -532,6 +548,16 @@ class Ch {
 
   static String sapXepZTrenA(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Sắp xếp Z → A' : 'Sort Z → A';
+
+  static String tabGanDayRong(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Gần đây - Phím 1' : 'Recent - Key 1';
+  static String tabGanDayHep(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Gần đây (1)' : 'Recent (1)';
+  static String tabHangPhimRong(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Sắp xếp Q → M - Phím 2' : 'Sort Q → M - Key 2';
+  static String tabBangChuCaiRong(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Sắp xếp A → Z - Phím 3' : 'Sort A → Z - Key 3';
+
 
   static String duaVaoChoNay(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Đưa vào chỗ này' : 'Move here';
@@ -743,6 +769,22 @@ class Ch {
       nn == NgonNgu.vi ? 'Xoá nội dung thay thế' : 'Clear replacement text';
   static String xoaDinhDangVanBan(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Xoá định dạng văn bản (Ctrl+Q)' : 'Clear text formatting (Ctrl+Q)';
+  static String damTooltip(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đậm (Ctrl+B)' : 'Bold (Ctrl+B)';
+  static String nghiengTooltip(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Nghiêng (Ctrl+I)' : 'Italic (Ctrl+I)';
+  static String gachChanTooltip(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Gạch chân (Ctrl+U)' : 'Underline (Ctrl+U)';
+  static String gachNgangTooltip(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Gạch ngang thân (Ctrl+Shift+X)' : 'Strikethrough (Ctrl+Shift+X)';
+  static String treMuTooltip(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chữ trên (Ctrl+Shift+=)' : 'Superscript (Ctrl+Shift+=)';
+  static String treChanTooltip(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chữ dưới (Ctrl+=)' : 'Subscript (Ctrl+=)';
+  static String mauChuTooltip(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Màu chữ (Ctrl+Shift+C)' : 'Text color (Ctrl+Shift+C)';
+  static String mauNenChuTooltip(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Màu nền chữ (Ctrl+Shift+H)' : 'Highlight color (Ctrl+Shift+H)';
   static String hoanDoiHoaThuong(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Hoán đổi chữ Hoa chữ thường' : 'Swap uppercase/lowercase';
   static String chonKieuHoaThuong(NgonNgu nn) =>
