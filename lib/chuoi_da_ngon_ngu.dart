@@ -757,6 +757,20 @@ class Ch {
       nn == NgonNgu.vi ? 'Đang chuẩn bị…' : 'Preparing…';
   static String banGhiAmSoCoDauCach(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Bản Ghi âm số ' : 'Recording No. ';
+  /// Nhãn thẻ ghi âm trong VĂN BẢN TÀI LIỆU (`the_ghi_am.dart`,
+  /// `〔Ghi âm N 🎙️ mm:ss〕`) — khác `banGhiAmSoCoDauCach` (chỉ dùng cho tiêu
+  /// đề bảng điều khiển, không ghép vào token lưu trong tài liệu).
+  static String tuGhiAmTrongThe(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Ghi âm' : 'Recording';
+  /// Nhãn "đang gửi cho AI" trong token tài liệu (`〔Đang chuyển N 🎙️
+  /// mm:ss〕`) và trong thẻ chat (`〔🎙️ Đang chuyển #N〕`).
+  static String tuDangChuyenTrongThe(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đang chuyển' : 'Transcribing';
+  /// Nhãn "đang ghi dở" trong thẻ chat (`〔🎙️ Đang ghi âm #N〕`) — khác
+  /// `tuGhiAmTrongThe` (đó là danh từ "Ghi âm N", đây là động từ tiếp diễn
+  /// "Đang ghi âm").
+  static String dangGhiAmTrongTheChat(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đang ghi âm' : 'Recording';
 
   // ------------------------------------------- Tooltip/hintText trang_soan_thao.dart
   static String ketQuaTruoc(NgonNgu nn) =>

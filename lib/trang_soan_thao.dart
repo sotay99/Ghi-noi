@@ -1533,14 +1533,14 @@ class _BoDieuKhienChinhTa extends TextEditingController {
     {
       var timTu = 0;
       while (true) {
-        final i = vb.indexOf(tenTokenDangGhiAm, timTu);
+        final i = vb.indexOf(tenTokenDangGhiAm(ngonNguHienTai.value), timTu);
         if (i < 0) break;
         vung.add(_VungVe(
           batDau: i,
-          ketThuc: i + tenTokenDangGhiAm.length,
+          ketThuc: i + tenTokenDangGhiAm(ngonNguHienTai.value).length,
           style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold),
         ));
-        timTu = i + tenTokenDangGhiAm.length;
+        timTu = i + tenTokenDangGhiAm(ngonNguHienTai.value).length;
       }
     }
 
@@ -7710,8 +7710,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
   }
 
-  String _nhanTheGhiAmHoanChinh(int soThe) =>
-      nhanTheHoanChinh(soThe, _thoiLuongTheoTheGhiAm[soThe] ?? Duration.zero);
+  String _nhanTheGhiAmHoanChinh(int soThe) => nhanTheHoanChinh(
+      soThe, _thoiLuongTheoTheGhiAm[soThe] ?? Duration.zero, ngonNguHienTai.value);
 
   Future<void> _bamNutGhiAmThe() async {
     if (_trinhGhiAmMo) {
@@ -7824,7 +7824,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final vb = _boDieuKhien.text;
     var viTri = _boDieuKhien.selection.baseOffset;
     if (viTri < 0 || viTri > vb.length) viTri = vb.length;
-    var chen = tenTokenDangGhiAm;
+    var chen = tenTokenDangGhiAm(ngonNguHienTai.value);
     var lechDauChen = 0;
     if (viTri > 0 && !_laKhoangTrang(vb[viTri - 1])) {
       chen = ' $chen';
@@ -7877,12 +7877,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _thoiLuongTheoTheGhiAm.remove(soThe);
       if (viTriToken != null) {
         final vb = _boDieuKhien.text;
-        final ketThucToken = viTriToken + tenTokenDangGhiAm.length;
+        final ketThucToken = viTriToken + tenTokenDangGhiAm(ngonNguHienTai.value).length;
         if (ketThucToken <= vb.length &&
-            vb.substring(viTriToken, ketThucToken) == tenTokenDangGhiAm) {
+            vb.substring(viTriToken, ketThucToken) == tenTokenDangGhiAm(ngonNguHienTai.value)) {
           final moi = vb.replaceRange(viTriToken, ketThucToken, '');
-          _dieuChinhVungToanVanSauKhiSua(viTriToken, tenTokenDangGhiAm.length, 0);
-          _dieuChinhLoiChinhTaSauKhiSua(viTriToken, tenTokenDangGhiAm.length, 0,
+          _dieuChinhVungToanVanSauKhiSua(viTriToken, tenTokenDangGhiAm(ngonNguHienTai.value).length, 0);
+          _dieuChinhLoiChinhTaSauKhiSua(viTriToken, tenTokenDangGhiAm(ngonNguHienTai.value).length, 0,
               vanBanCu: vb, vanBanMoi: moi);
           _ghiVaoO(moi, viTriToken);
           _henLuu();
@@ -7905,9 +7905,9 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       return soThe;
     }
     final vb = _boDieuKhien.text;
-    final ketThucToken = viTriToken + tenTokenDangGhiAm.length;
+    final ketThucToken = viTriToken + tenTokenDangGhiAm(ngonNguHienTai.value).length;
     if (ketThucToken > vb.length ||
-        vb.substring(viTriToken, ketThucToken) != tenTokenDangGhiAm) {
+        vb.substring(viTriToken, ketThucToken) != tenTokenDangGhiAm(ngonNguHienTai.value)) {
       // Lưới an toàn — về lý thuyết không xảy ra vì ChanSuaGiuaThe chặn mọi
       // sửa một-phần, và trường hợp xoá TRỌN token đã được `_dieuChinhLoiChinhTaSauKhiSua`
       // phát hiện và null hoá `_viTriTokenDangGhiThe` ở trên rồi.
@@ -7915,8 +7915,8 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     }
     final nhan = _nhanTheGhiAmHoanChinh(soThe);
     final moi = vb.replaceRange(viTriToken, ketThucToken, nhan);
-    _dieuChinhVungToanVanSauKhiSua(viTriToken, tenTokenDangGhiAm.length, nhan.length);
-    _dieuChinhLoiChinhTaSauKhiSua(viTriToken, tenTokenDangGhiAm.length, nhan.length,
+    _dieuChinhVungToanVanSauKhiSua(viTriToken, tenTokenDangGhiAm(ngonNguHienTai.value).length, nhan.length);
+    _dieuChinhLoiChinhTaSauKhiSua(viTriToken, tenTokenDangGhiAm(ngonNguHienTai.value).length, nhan.length,
         vanBanCu: vb, vanBanMoi: moi);
     final viTriConTro = viTriToken + nhan.length;
     _neo = viTriConTro;
@@ -8370,12 +8370,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   void _raSoatVaXoaTheDangGhiAmConSot() {
     if (!mounted || _trinhGhiAmMo) return;
     final vb = _boDieuKhien.text;
-    final vt = vb.indexOf(tenTokenDangGhiAm);
+    final vt = vb.indexOf(tenTokenDangGhiAm(ngonNguHienTai.value));
     if (vt < 0) return;
-    final kt = vt + tenTokenDangGhiAm.length;
+    final kt = vt + tenTokenDangGhiAm(ngonNguHienTai.value).length;
     final moi = vb.replaceRange(vt, kt, '');
-    _dieuChinhVungToanVanSauKhiSua(vt, tenTokenDangGhiAm.length, 0);
-    _dieuChinhLoiChinhTaSauKhiSua(vt, tenTokenDangGhiAm.length, 0, vanBanCu: vb, vanBanMoi: moi);
+    _dieuChinhVungToanVanSauKhiSua(vt, tenTokenDangGhiAm(ngonNguHienTai.value).length, 0);
+    _dieuChinhLoiChinhTaSauKhiSua(vt, tenTokenDangGhiAm(ngonNguHienTai.value).length, 0, vanBanCu: vb, vanBanMoi: moi);
     _ghiVaoO(moi, vt.clamp(0, moi.length));
     _henLuu();
   }
@@ -8421,12 +8421,12 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _thoiLuongTheoTheGhiAm.remove(soThe);
     if (!mounted || viTriToken == null) return;
     final vb = _boDieuKhien.text;
-    final ketThucToken = viTriToken + tenTokenDangGhiAm.length;
+    final ketThucToken = viTriToken + tenTokenDangGhiAm(ngonNguHienTai.value).length;
     if (ketThucToken <= vb.length &&
-        vb.substring(viTriToken, ketThucToken) == tenTokenDangGhiAm) {
+        vb.substring(viTriToken, ketThucToken) == tenTokenDangGhiAm(ngonNguHienTai.value)) {
       final moi = vb.replaceRange(viTriToken, ketThucToken, '');
-      _dieuChinhVungToanVanSauKhiSua(viTriToken, tenTokenDangGhiAm.length, 0);
-      _dieuChinhLoiChinhTaSauKhiSua(viTriToken, tenTokenDangGhiAm.length, 0,
+      _dieuChinhVungToanVanSauKhiSua(viTriToken, tenTokenDangGhiAm(ngonNguHienTai.value).length, 0);
+      _dieuChinhLoiChinhTaSauKhiSua(viTriToken, tenTokenDangGhiAm(ngonNguHienTai.value).length, 0,
           vanBanCu: vb, vanBanMoi: moi);
       _ghiVaoO(moi, viTriToken);
       _henLuu();
@@ -8560,7 +8560,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     _theGhiAmDangGui.add(soThe);
     final nhanDangChuyen = nhanTheDangChuyen(
-        soThe, _thoiLuongTheoTheGhiAm[soThe] ?? Duration.zero);
+        soThe, _thoiLuongTheoTheGhiAm[soThe] ?? Duration.zero, ngonNguHienTai.value);
     _doiNhanTheGhiAm(viTriGoc, nhanGoc.length, nhanDangChuyen);
     if (_boDieuKhien.theGhiAmLoiTamThoi.remove(soThe)) _boDieuKhien.veLai();
 
@@ -8787,14 +8787,14 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       // Thẻ đang ghi dở mang token GIỮ CHỖ chung (không đánh số), không
       // khớp được với `reTheGhiAmHoanChinh` (chỉ bắt thẻ đã ghi XONG) —
       // tìm thẳng token giữ chỗ đó.
-      final vt = vb.indexOf(tenTokenDangGhiAm);
+      final vt = vb.indexOf(tenTokenDangGhiAm(ngonNguHienTai.value));
       if (vt == -1) {
         await _ketThucCheDoDoiViTriThe();
         return;
       }
       batDau = vt;
-      ketThuc = vt + tenTokenDangGhiAm.length;
-      tokenText = tenTokenDangGhiAm;
+      ketThuc = vt + tenTokenDangGhiAm(ngonNguHienTai.value).length;
+      tokenText = tenTokenDangGhiAm(ngonNguHienTai.value);
     } else {
       Match? khop;
       for (final m in reTheGhiAmHoanChinh.allMatches(vb)) {
@@ -9015,7 +9015,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
     if (dongY != true || !mounted) return;
     final nhan = nhanTheDangChuyen(
-        soThe, _thoiLuongTheoTheGhiAm[soThe] ?? Duration.zero);
+        soThe, _thoiLuongTheoTheGhiAm[soThe] ?? Duration.zero, ngonNguHienTai.value);
     final vb = _boDieuKhien.text;
     final viTri = vb.indexOf(nhan);
     if (viTri < 0) return;
@@ -9043,7 +9043,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final doan = vb.substring(batDau, ketThuc);
     final dsHoanChinh = reTheGhiAmHoanChinh.allMatches(doan).toList();
     final dsDangChuyen = reTheDangChuyen.allMatches(doan).toList();
-    final coDangGhi = doan.contains(tenTokenDangGhiAm);
+    final coDangGhi = doan.contains(tenTokenDangGhiAm(ngonNguHienTai.value));
     final soLuongThe = dsHoanChinh.length + dsDangChuyen.length + (coDangGhi ? 1 : 0);
     if (soLuongThe == 0) return; // đã đổi khác đi trong lúc chờ, bỏ qua.
 
@@ -10814,7 +10814,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // sẽ tự phát hiện và âm thầm bỏ dữ liệu ghi âm dở đó khi thẻ được chốt.
     final tvt = _viTriTokenDangGhiThe;
     if (tvt != null) {
-      final ktToken = tvt + tenTokenDangGhiAm.length;
+      final ktToken = tvt + tenTokenDangGhiAm(ngonNguHienTai.value).length;
       if (vitri <= tvt && ketThucXoa >= ktToken) {
         _viTriTokenDangGhiThe = null;
       } else if (tvt >= ketThucXoa) {
@@ -13358,7 +13358,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     for (final m in reTheDangChuyen.allMatches(vb)) {
       ds.add(m[0]!);
     }
-    if (vb.contains(tenTokenDangGhiAm)) ds.add(tenTokenDangGhiAm);
+    if (vb.contains(tenTokenDangGhiAm(ngonNguHienTai.value))) ds.add(tenTokenDangGhiAm(ngonNguHienTai.value));
     return ds;
   }
 

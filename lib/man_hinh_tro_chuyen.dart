@@ -93,6 +93,21 @@ class ManHinhTroChuyen extends StatefulWidget {
   State<ManHinhTroChuyen> createState() => _ManHinhTroChuyenState();
 }
 
+/// Nhãn "đang ghi dở"/"đang chuyển" ghép vào token thẻ ghi âm của Ô NHẬP
+/// CHAT (`〔🎙️ ... #N〕`, xem `_ManHinhTroChuyenState._chenTheChoChuyenChat`)
+/// — token MỚI luôn ghép bằng ngôn ngữ app hiện tại, nhưng lúc TÌM lại một
+/// token đã chèn trước đó (`_tatCa*`) phải khớp CẢ HAI ngôn ngữ, đề phòng
+/// người dùng đổi ngôn ngữ app ngay giữa lúc một thẻ đang ghi/đang chuyển
+/// (hiếm nhưng vẫn phải đúng). Thêm ngôn ngữ mới chỉ cần [NgonNgu] có thêm
+/// case — `Ch.dangGhiAmTrongTheChat`/`Ch.tuDangChuyenTrongThe` tự lo phần
+/// dịch.
+String _nhanDangGhiAmChat(NgonNgu nn) => Ch.dangGhiAmTrongTheChat(nn);
+String _nhanDangChuyenChat(NgonNgu nn) => Ch.tuDangChuyenTrongThe(nn);
+List<String> get _tatCaNhanGhiAmChat => NgonNgu.values.map(_nhanDangGhiAmChat).toList();
+List<String> get _tatCaNhanDangChuyenChat =>
+    NgonNgu.values.map(_nhanDangChuyenChat).toList();
+List<String> get _tatCaNhanTheChat => [..._tatCaNhanGhiAmChat, ..._tatCaNhanDangChuyenChat];
+
 class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   /// Ngôn ngữ hiện tại — gán lại mỗi lần `_build` chạy (qua
   /// `ValueListenableBuilder<NgonNgu>` ở `build()`), các hàm con trong State
@@ -1030,7 +1045,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     if (!mounted) return;
     final id = ++_dinhDanhTheChoChuyenChatKeTiep;
     _idTheChoChuyenChat[soThe] = id;
-    final token = '〔🎙️ Đang ghi âm #$id〕';
+    final token = '〔🎙️ ${_nhanDangGhiAmChat(ngonNguHienTai.value)} #$id〕';
     final vb = _oNhap.text;
     final selection = _oNhap.selection;
     final viTri = selection.isValid ? selection.start : vb.length;
@@ -1048,16 +1063,28 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     if (!mounted) return;
     final id = _idTheChoChuyenChat[soThe];
     if (id == null) return;
-    final cu = '〔🎙️ Đang ghi âm #$id〕';
-    final moiLabel = '〔🎙️ Đang chuyển #$id〕';
+    final moiLabel = '〔🎙️ ${_nhanDangChuyenChat(ngonNguHienTai.value)} #$id〕';
     final vb = _oNhap.text;
-    final i = vb.indexOf(cu);
-    if (i == -1) return;
+    // Token "đang ghi dở" có thể đã được chèn ở một ngôn ngữ KHÁC ngôn ngữ
+    // hiện tại (người dùng đổi ngôn ngữ app ngay giữa lúc ghi) — thử khớp
+    // mọi biến thể đã biết, không chỉ ngôn ngữ hiện tại.
+    String? cu;
+    var i = -1;
+    for (final g in _tatCaNhanGhiAmChat) {
+      final token = '〔🎙️ $g #$id〕';
+      final vt = vb.indexOf(token);
+      if (vt != -1) {
+        cu = token;
+        i = vt;
+        break;
+      }
+    }
+    if (i == -1 || cu == null) return;
     final selCu = _oNhap.selection;
-    setState(() => _oNhap.text = vb.replaceRange(i, i + cu.length, moiLabel));
-    // Token mới dài hơn 1 ký tự ("ghi âm" dài hơn "chuyển") — dời con trỏ
-    // theo đúng độ lệch nếu nó đang đứng NGAY SAU token (vị trí thường
-    // gặp nhất: vừa chèn xong).
+    setState(() => _oNhap.text = vb.replaceRange(i, i + cu!.length, moiLabel));
+    // Token mới có thể dài/ngắn khác token cũ (từ ngữ khác nhau, kể cả khác
+    // ngôn ngữ) — dời con trỏ theo đúng độ lệch nếu nó đang đứng NGAY SAU
+    // token (vị trí thường gặp nhất: vừa chèn xong).
     if (selCu.isValid && selCu.baseOffset >= i + cu.length) {
       final lech = moiLabel.length - cu.length;
       _oNhap.selection = TextSelection.collapsed(offset: selCu.baseOffset + lech);
@@ -1073,7 +1100,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
     final vb = _oNhap.text;
     int? batDau, ketThuc;
     if (id != null) {
-      for (final g in ['Đang ghi âm', 'Đang chuyển']) {
+      for (final g in _tatCaNhanTheChat) {
         final token = '〔🎙️ $g #$id〕';
         final i = vb.indexOf(token);
         if (i != -1) {
@@ -1099,7 +1126,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
       final id = _idTheChoChuyenChat.remove(soThe);
       if (id != null) {
         final vb = _oNhap.text;
-        for (final g in ['Đang ghi âm', 'Đang chuyển']) {
+        for (final g in _tatCaNhanTheChat) {
           final token = '〔🎙️ $g #$id〕';
           final i = vb.indexOf(token);
           if (i != -1) {
@@ -1123,7 +1150,7 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
   void _raSoatVaXoaTheGhiAmConSotChat() {
     if (!mounted) return;
     final vb = _oNhap.text;
-    final m = RegExp('〔🎙️ Đang ghi âm #\\d+〕').firstMatch(vb);
+    final m = RegExp('〔🎙️ (?:${_tatCaNhanGhiAmChat.join('|')}) #\\d+〕').firstMatch(vb);
     if (m == null) return;
     setState(() => _oNhap.text = vb.replaceRange(m.start, m.end, ''));
     _oNhap.selection = TextSelection.collapsed(offset: m.start);
@@ -2799,7 +2826,8 @@ class _GioiHanKyTuChat extends TextInputFormatter {
 }
 
 class _BoDieuKhienChat extends TextEditingController {
-  static final RegExp _reThe = RegExp('〔🎙️ (?:Đang ghi âm|Đang chuyển) #(\\d+)〕');
+  static final RegExp _reThe =
+      RegExp('〔🎙️ (?:${_tatCaNhanTheChat.join('|')}) #(\\d+)〕');
 
   @override
   set selection(TextSelection newSelection) {

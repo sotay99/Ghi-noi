@@ -13,24 +13,56 @@
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
+import 'chuoi_da_ngon_ngu.dart';
+import 'ngon_ngu.dart';
+
+/// Từ "Ghi âm"/"Đang chuyển" ghép vào token LƯU TRONG TÀI LIỆU (khác chữ
+/// hiển thị ở UI chrome thường, vì đây trở thành một phần nội dung đã lưu
+/// của người dùng — đổi ngôn ngữ app KHÔNG được làm "mất" các thẻ đã tạo từ
+/// trước bằng ngôn ngữ khác). Token MỚI luôn ghép bằng ngôn ngữ app hiện
+/// tại; các regex bên dưới khớp CẢ HAI từ (mọi ngôn ngữ đã từng hỗ trợ) để
+/// thẻ cũ vẫn nhận ra được sau khi đổi ngôn ngữ. Thêm ngôn ngữ mới thì
+/// thêm đúng 1 case ở mỗi hàm `_tu*` này VÀ nối thêm vào alternation của
+/// regex tương ứng.
+String _tuGhiAm(NgonNgu nn) => Ch.tuGhiAmTrongThe(nn);
+String _tuDangChuyen(NgonNgu nn) => Ch.tuDangChuyenTrongThe(nn);
+
+/// Chữ thường của [_tuGhiAm] — placeholder dùng dạng tiếp diễn thường
+/// ("đang ghi âm"/"recording"), không viết hoa đầu câu như trong token đã
+/// chốt ("Ghi âm N").
+String _tuGhiAmThuong(NgonNgu nn) =>
+    nn == NgonNgu.en ? 'recording' : 'đang ghi âm';
+
 /// Token của một thẻ ĐANG ghi dở (chưa có thời lượng) — placeholder hiển
 /// thị màu đỏ cho tới khi chốt xong thành `〔Ghi âm N 🎙️ mm:ss〕` (màu
-/// xanh lá).
-const tenTokenDangGhiAm = '〔🎙️ … đang ghi âm …〕';
+/// xanh lá). [nn] mặc định `NgonNgu.vi` để không phá chữ ký cũ ở nơi chưa
+/// kịp cập nhật — luôn truyền `ngonNguHienTai.value` ở nơi gọi mới.
+String tenTokenDangGhiAm([NgonNgu nn = NgonNgu.vi]) =>
+    '〔🎙️ … ${_tuGhiAmThuong(nn)} …〕';
 
-/// Thẻ đã ghi xong: `〔Ghi âm 3 🎙️ 01:25〕` — màu xanh lá (bình thường) hoặc
-/// cam đậm (đang lỗi tạm thời, chờ gửi lại — chữ giống nhau, chỉ khác màu,
-/// xem `_theGhiAmLoiTamThoi` trong `trang_soan_thao.dart`).
-final RegExp reTheGhiAmHoanChinh = RegExp('〔Ghi âm (\\d+) 🎙️ \\d+:\\d+〕');
+/// Mọi biến thể placeholder "đang ghi dở" (mọi ngôn ngữ) — dùng để QUÉT
+/// (không phải để hiển thị) trong `timCacVungTheGhiAm`.
+List<String> get _tatCaTenTokenDangGhiAm =>
+    NgonNgu.values.map(tenTokenDangGhiAm).toList();
 
-/// Thẻ ĐANG được gửi cho Gemini: `〔Đang chuyển 3 🎙️ 01:25〕` — giữ nguyên số
-/// N (khác thời điểm chưa gửi/gửi lỗi chỉ khác PHẦN CHỮ đầu, mm:ss không
-/// đổi) để vẫn tìm lại đúng bằng cách so khớp nguyên văn nhãn, không lẫn
-/// giữa nhiều thẻ đang gửi cùng lúc (auto gửi ngầm có thể gửi nhiều thẻ một
-/// lượt). Nhóm 2 (`\d+:\d+`) là phần mm:ss — tách riêng để tô màu khác
-/// phần "Đang chuyển N" (xem `_BoDieuKhienChinhTa.buildTextSpan`).
-final RegExp reTheDangChuyen =
-    RegExp('〔Đang chuyển (\\d+) 🎙️ (\\d+:\\d+)〕');
+/// Thẻ đã ghi xong: `〔Ghi âm 3 🎙️ 01:25〕` (hoặc `〔Recording 3 🎙️ 01:25〕`)
+/// — màu xanh lá (bình thường) hoặc cam đậm (đang lỗi tạm thời, chờ gửi
+/// lại — chữ giống nhau, chỉ khác màu, xem `_theGhiAmLoiTamThoi` trong
+/// `trang_soan_thao.dart`). Khớp CẢ HAI từ ngôn ngữ (xem chú thích
+/// `_tuGhiAm` ở trên) để thẻ tạo từ ngôn ngữ trước vẫn nhận ra sau khi đổi.
+final RegExp reTheGhiAmHoanChinh =
+    RegExp('〔(?:${NgonNgu.values.map(_tuGhiAm).join('|')}) (\\d+) 🎙️ \\d+:\\d+〕');
+
+/// Thẻ ĐANG được gửi cho Gemini: `〔Đang chuyển 3 🎙️ 01:25〕` (hoặc
+/// `〔Transcribing 3 🎙️ 01:25〕`) — giữ nguyên số N (khác thời điểm chưa
+/// gửi/gửi lỗi chỉ khác PHẦN CHỮ đầu, mm:ss không đổi) để vẫn tìm lại đúng
+/// bằng cách so khớp nguyên văn nhãn, không lẫn giữa nhiều thẻ đang gửi
+/// cùng lúc (auto gửi ngầm có thể gửi nhiều thẻ một lượt). Nhóm 2
+/// (`\d+:\d+`) là phần mm:ss — tách riêng để tô màu khác phần "Đang chuyển
+/// N" (xem `_BoDieuKhienChinhTa.buildTextSpan`). Khớp cả hai ngôn ngữ, lý
+/// do như `reTheGhiAmHoanChinh`.
+final RegExp reTheDangChuyen = RegExp(
+    '〔(?:${NgonNgu.values.map(_tuDangChuyen).join('|')}) (\\d+) 🎙️ (\\d+:\\d+)〕');
 
 /// "mm:ss" — dùng cho cả đồng hồ đang ghi và nhãn thẻ đã chốt.
 String dinhDangMmSs(Duration d) {
@@ -38,13 +70,16 @@ String dinhDangMmSs(Duration d) {
   return '${hai(d.inMinutes)}:${hai(d.inSeconds % 60)}';
 }
 
-/// Nhãn hiển thị đầy đủ của thẻ số [soThe] với thời lượng [thoiLuong].
-String nhanTheHoanChinh(int soThe, Duration thoiLuong) =>
-    '〔Ghi âm $soThe 🎙️ ${dinhDangMmSs(thoiLuong)}〕';
+/// Nhãn hiển thị đầy đủ của thẻ số [soThe] với thời lượng [thoiLuong], ghép
+/// bằng ngôn ngữ app hiện tại [nn] (luôn truyền `ngonNguHienTai.value` —
+/// mặc định `NgonNgu.vi` chỉ để không phá chữ ký cũ).
+String nhanTheHoanChinh(int soThe, Duration thoiLuong, [NgonNgu nn = NgonNgu.vi]) =>
+    '〔${_tuGhiAm(nn)} $soThe 🎙️ ${dinhDangMmSs(thoiLuong)}〕';
 
-/// Nhãn "đang gửi cho Gemini" của thẻ số [soThe].
-String nhanTheDangChuyen(int soThe, Duration thoiLuong) =>
-    '〔Đang chuyển $soThe 🎙️ ${dinhDangMmSs(thoiLuong)}〕';
+/// Nhãn "đang gửi cho Gemini" của thẻ số [soThe], ghép bằng ngôn ngữ app
+/// hiện tại [nn].
+String nhanTheDangChuyen(int soThe, Duration thoiLuong, [NgonNgu nn = NgonNgu.vi]) =>
+    '〔${_tuDangChuyen(nn)} $soThe 🎙️ ${dinhDangMmSs(thoiLuong)}〕';
 
 /// Tìm TOÀN BỘ vùng thẻ ghi âm (đã xong, đang gửi, VÀ đang ghi dở) trong
 /// [text] — dùng làm "vùng khoá" cho: formatter chặn sửa giữa thẻ, đẩy con
@@ -58,12 +93,16 @@ List<(int, int)> timCacVungTheGhiAm(String text) {
   for (final m in reTheDangChuyen.allMatches(text)) {
     vung.add((m.start, m.end));
   }
-  var timTu = 0;
-  while (true) {
-    final i = text.indexOf(tenTokenDangGhiAm, timTu);
-    if (i < 0) break;
-    vung.add((i, i + tenTokenDangGhiAm.length));
-    timTu = i + tenTokenDangGhiAm.length;
+  // Quét MỌI biến thể ngôn ngữ của placeholder "đang ghi dở" — thẻ có thể
+  // đã được tạo khi app ở ngôn ngữ khác ngôn ngữ hiện tại.
+  for (final token in _tatCaTenTokenDangGhiAm) {
+    var timTu = 0;
+    while (true) {
+      final i = text.indexOf(token, timTu);
+      if (i < 0) break;
+      vung.add((i, i + token.length));
+      timTu = i + token.length;
+    }
   }
   return vung;
 }
