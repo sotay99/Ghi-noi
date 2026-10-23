@@ -1,0 +1,156 @@
+// Luật bảo mật Firestore — Flowrite (project `flowrite219`).
+//
+// MẶC ĐỊNH CẤM TUYỆT ĐỐI mọi đọc/ghi (xem khối `match /{document=**}` ở
+// cuối) — chỉ những collection liệt kê rõ bên dưới mới được mở, đúng mức
+// cần thiết. Dán TOÀN BỘ nội dung tệp này vào Firebase Console → Firestore
+// Database → Rules → Publish (ĐÂY LÀ FIRESTORE, không phải Realtime
+// Database — app này không dùng Realtime Database ở đâu cả, chỉ Firestore;
+// mục "Realtime Database" trong Console KHÔNG áp dụng tệp này).
+//
+// `cloud-function/index.js` (collection `gioiHanAi`) gọi Firestore REST API
+// bằng TOKEN TRUY CẬP GOOGLE của chính service account chạy function (xem
+// `layTokenTruyCapGoogle()`), KHÔNG phải token Firebase Auth của người dùng
+// — loại truy cập này được Google Cloud IAM xét quyền RIÊNG, bỏ qua hoàn
+// toàn luật ở tệp này (giống hệt cách Admin SDK hoạt động). Vì vậy luật của
+// `gioiHanAi` ở dưới CẤM HẲN client — không cần "mở cửa sau" nào cho
+// cloud-function, nó không đi qua luật này. Yêu cầu: service account chạy
+// cloud-function (mặc định thường là App Engine default service account
+// `PROJECT_ID@appspot.gserviceaccount.com`, hoặc service account riêng nếu
+// deploy có chọn) phải có vai trò IAM "Cloud Datastore User"
+// (`roles/datastore.user`) trên project `flowrite219` — kiểm tra ở Google
+// Cloud Console → IAM, thêm nếu thiếu (đúng kiểu đã làm với "Service Usage
+// Consumer" lúc vá lỗi deploy Hosting trước đây).
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- Helper: có phải 1 trong 2 email admin không -------------------
+    // PHẢI khớp đúng danh sách ở `lib/quyen_admin.dart` (`_emailsAdmin`) —
+    // đổi một bên mà quên đổi bên kia thì một phía "tưởng là admin" nhưng
+    // không làm được gì, hoặc ngược lại (xem chú thích gốc ở file đó).
+    function laAdmin() {
+      return request.auth != null &&
+        request.auth.token.email != null &&
+        request.auth.token.email.lower() in [
+          'lookatmevanthanhpham@gmail.com',
+          '219thanhdeptrai@gmail.com'
+        ];
+    }
+
+    function laChinhChu(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // ---- users/{uid} — hồ sơ đăng nhập (dang_nhap_google.dart) ----------
+    // Ghi mỗi lần đăng nhập Google thành công: email/tenHienThi/urlAnhDaiDien/
+    // lanDauDangNhap/lanCuoiDangNhap. Đọc TOÀN BỘ collection: chỉ admin
+    // (màn "Các User đã đăng nhập", modal_danh_sach_user.dart). Chính chủ
+    // cũng được đọc đúng hồ sơ CỦA MÌNH (hợp lý, không có lý do cấm).
+    match /users/{uid} {
+      allow read: if laAdmin() || laChinhChu(uid);
+      allow create: if laChinhChu(uid) &&
+        request.resource.data.keys().hasOnly(['email', 'tenHienThi', 'urlAnhDaiDien', 'lanDauDangNhap', 'lanCuoiDangNhap']);
+      allow update: if laChinhChu(uid) &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['email', 'tenHienThi', 'urlAnhDaiDien', 'lanDauDangNhap', 'lanCuoiDangNhap']);
+      allow delete: if false;
+
+      // ---- users/{uid}/thuMucDamMay/{id} — cây thư mục Bộ nhớ đám mây ---
+      // (kho_du_lieu.dart, KhoDuLieuDamMay) — CHỈ chính chủ đọc/ghi/xoá.
+      match /thuMucDamMay/{id} {
+        allow read, write: if laChinhChu(uid);
+      }
+
+      // ---- users/{uid}/ghiChuDamMay/{id} — nội dung ghi chú Bộ nhớ đám mây
+      match /ghiChuDamMay/{id} {
+        allow read, write: if laChinhChu(uid);
+      }
+
+      // ---- users/{uid}/caiDatDamMay/{id} — cài đặt đồng bộ theo tài khoản
+      // (ngôn ngữ app, ngôn ngữ ghi âm, ghim thanh định dạng...) — CHỈ
+      // chính chủ đọc/ghi. Không giới hạn field cụ thể (cài đặt mới sẽ còn
+      // thêm liên tục, giới hạn field ở đây sẽ phải sửa luật mỗi lần thêm
+      // cài đặt mới — chấp nhận rủi ro thấp vì chỉ chính chủ ghi được vào
+      // ĐÚNG cây dữ liệu của họ, không ảnh hưởng ai khác).
+      match /caiDatDamMay/{id} {
+        allow read, write: if laChinhChu(uid);
+      }
+
+      // ---- users/{uid}/tuDienDamMay/{id} — từ điển nhập nhanh/chính tả
+      // đồng bộ theo tài khoản (tu_dien_dam_may.dart) — CHỈ chính chủ.
+      match /tuDienDamMay/{id} {
+        allow read, write: if laChinhChu(uid);
+      }
+    }
+
+    // ---- chiaSeTep/{ma} — bản sao công khai cho trang xem "Chia sẻ tệp
+    // bằng đường link" (flowrite.pro/<mã>, một trang TĨNH đọc công khai,
+    // không qua Firebase Auth) — ĐỌC CÔNG KHAI bắt buộc, đây là mục đích
+    // của collection này (kho_du_lieu.dart đã cố ý KHÔNG để trang đó đọc
+    // thẳng document gốc `ghiChuDamMay` để không lộ field khác).
+    //
+    // GHI: chỉ người dùng đã đăng nhập, VÀ đúng chủ sở hữu tài liệu gốc
+    // (`idTepGoc`) đang nằm trong CHÍNH cây `ghiChuDamMay` của họ — chặn
+    // trường hợp một người đăng nhập khác tự ghi đè `chiaSeTep/<mã>` của
+    // người khác nếu đoán được mã. `get()` thêm 1 lượt đọc nhưng đáng giá.
+    match /chiaSeTep/{ma} {
+      allow read: if true;
+      allow create, update: if request.auth != null &&
+        request.resource.data.chuSoHuu == request.auth.token.email &&
+        request.resource.data.keys().hasOnly(['ten', 'noiDung', 'chuSoHuu', 'idTepGoc', 'khaDung']) &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)/ghiChuDamMay/$(request.resource.data.idTepGoc));
+      // Thu hồi link (ngungChiaSeTep, kho_du_lieu.dart) — chỉ đúng chủ cũ
+      // (so khớp field `chuSoHuu` đã ghi trước đó) được xoá.
+      allow delete: if request.auth != null && resource.data.chuSoHuu == request.auth.token.email;
+    }
+
+    // ---- canhBaoApi/{id} — cảnh báo gần/đã chạm hạn mức Groq (ghi bởi
+    // MỌI client, kể cả chưa đăng nhập — gui_ghi_am_gemini.dart; đọc CHỈ
+    // admin, modal_canh_bao_api.dart). Immutable log: không cho sửa, chỉ
+    // admin xoá dọn dẹp.
+    match /canhBaoApi/{id} {
+      allow read: if laAdmin();
+      allow create: if request.resource.data.keys().hasOnly(['thongDiep', 'nguon', 'thoiGian']) &&
+        request.resource.data.thongDiep is string &&
+        request.resource.data.thongDiep.size() < 2000 &&
+        request.resource.data.nguon is string;
+      allow update: if false;
+      allow delete: if laAdmin();
+    }
+
+    // ---- gopY/{id} — góp ý/báo lỗi (ai cũng TẠO được, kể cả chưa đăng
+    // nhập — modal_gop_y.dart; đọc + đổi `trangThai` CHỈ admin —
+    // modal_quan_ly_gop_y.dart).
+    match /gopY/{id} {
+      allow read: if laAdmin();
+      allow create: if request.resource.data.keys().hasOnly(['noiDung', 'email', 'thoiGian', 'trangThai']) &&
+        request.resource.data.noiDung is string &&
+        request.resource.data.noiDung.size() >= 20 &&
+        request.resource.data.noiDung.size() <= 10000 &&
+        request.resource.data.trangThai == 'chuaXuLy';
+      // Admin chỉ được đổi field `trangThai` (sang 1 trong 3 giá trị hợp
+      // lệ) — không được sửa nội dung góp ý của người dùng.
+      allow update: if laAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['trangThai']) &&
+        request.resource.data.trangThai in ['chuaXuLy', 'daXuLy', 'thungRac'];
+      allow delete: if laAdmin();
+    }
+
+    // ---- gioiHanAi/{id} — hạn mức AI theo người/thiết bị mỗi ngày
+    // (cloud-function/index.js, docHanMucAi/ghiHanMucAi) — CẤM TUYỆT ĐỐI
+    // client đọc/ghi qua đây. Client tự sửa `kyTu`/`anhByte`/`amThanhGiay`
+    // về 0 là phá ngay cơ chế chặn lạm dụng. cloud-function không đi qua
+    // luật này (xem giải thích đầu tệp — dùng token IAM của service
+    // account, không phải Firebase Auth).
+    match /gioiHanAi/{id} {
+      allow read, write: if false;
+    }
+
+    // ---- Mặc định: CẤM TUYỆT ĐỐI mọi collection khác chưa liệt kê ở trên.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

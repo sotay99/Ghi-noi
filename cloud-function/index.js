@@ -157,9 +157,41 @@ function layDinhDanhNguoiGoi(than) {
   return { id: null, dangNhap: false };
 }
 
+// (YÊU CẦU MỚI — vá lỗ hổng "rules Firestore mở toang") Trước đây gọi
+// Firestore REST API "trần" (không kèm Authorization nào cả) — chỉ hoạt
+// động được vì luật Firestore project đang MỞ TOÀN BỘ cho mọi người. Siết
+// luật lại (xem `firestore.rules`, collection `gioiHanAi` cấm hẳn client)
+// thì cách gọi trần này sẽ bị chính Firestore từ chối — kể cả server của
+// mình. Sửa: xin TOKEN TRUY CẬP GOOGLE của service account đang chạy chính
+// function này, qua metadata server nội bộ của Google Cloud (CHỈ gọi được
+// TỪ BÊN TRONG môi trường chạy thật của Cloud Functions/Cloud Run/App
+// Engine — không cần cài thêm gói `firebase-admin`/`google-auth-library`
+// nào, không cần khoá riêng nào cả). Loại truy cập IAM này được Firestore
+// xét theo vai trò IAM của service account (cần vai trò "Cloud Datastore
+// User" — xem chú thích đầu `firestore.rules`), KHÔNG đi qua luật Firestore
+// (y hệt cách Admin SDK hoạt động) — nên vẫn đọc/ghi được `gioiHanAi` dù
+// luật đã cấm hẳn client thường.
+let _tokenTruyCapCache = { token: '', hetHan: 0 };
+
+async function layTokenTruyCapGoogle() {
+  if (Date.now() < _tokenTruyCapCache.hetHan - 60_000) return _tokenTruyCapCache.token;
+  const res = await fetch(
+    'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token',
+    { headers: { 'Metadata-Flavor': 'Google' } },
+  );
+  if (!res.ok) throw new Error(`Không lấy được token truy cập Google (metadata server trả ${res.status}).`);
+  const data = await res.json();
+  _tokenTruyCapCache = {
+    token: data.access_token,
+    hetHan: Date.now() + Number(data.expires_in || 3000) * 1000,
+  };
+  return _tokenTruyCapCache.token;
+}
+
 async function docHanMucAi(id) {
   const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID_FIRESTORE}/databases/(default)/documents/gioiHanAi/${encodeURIComponent(id)}`;
-  const res = await fetch(url);
+  const token = await layTokenTruyCapGoogle();
+  const res = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Firestore GET lỗi ${res.status}`);
   const data = await res.json();
@@ -174,9 +206,10 @@ async function docHanMucAi(id) {
 
 async function ghiHanMucAi(id, ban) {
   const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID_FIRESTORE}/databases/(default)/documents/gioiHanAi/${encodeURIComponent(id)}`;
+  const token = await layTokenTruyCapGoogle();
   await fetch(url, {
     method: 'PATCH',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
     body: JSON.stringify({
       fields: {
         ngay: { stringValue: ban.ngay },
@@ -192,8 +225,9 @@ async function ghiHanMucAi(id, ban) {
 /// LÚC GỌI (giống cách `thanhdeptrai.vn` tính hạn link tải "chỉ lúc bắt
 /// đầu"), không hoàn lại nếu bản thân lượt gọi AI sau đó lỗi — đơn giản hơn
 /// nhiều so với đọc-gọi AI-rồi-mới-ghi, và đủ dùng cho mục đích chặn lạm
-/// dụng. Đọc/ghi Firestore qua REST công khai (rules project đang mở toàn
-/// bộ — xem CLAUDE.md) nên KHÔNG cần khoá service account riêng.
+/// dụng. Đọc/ghi Firestore qua REST, xác thực bằng token IAM của chính
+/// service account chạy function này (xem `layTokenTruyCapGoogle` — luật
+/// Firestore nay đã siết chặt, cấm hẳn client thường, xem `firestore.rules`).
 /// Lỗi Firestore (mạng, hạn mức Firestore...) KHÔNG được chặn người dùng —
 /// coi như cho qua, vì đó là lỗi hạ tầng của mình, không phải lỗi của họ.
 async function thuHanMucAi(id, dangNhap, loai, soLuong) {
