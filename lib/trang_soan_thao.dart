@@ -4353,6 +4353,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         context,
         Ch.daDangNhapVaoTaiKhoan(ngonNguHienTai.value, ten),
         thoiGian: const Duration(seconds: 5),
+        ganTren: true,
       );
     });
     // TextField (Material) không có tham số `onSelectionChanged` — đó là
@@ -15263,7 +15264,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         const SizedBox(width: 6),
         _NutPhimAo(
           nhan: '📖',
-          moTa: 'Thêm vào Từ điển nhập liệu nhanh',
+          moTa: Ch.themVungChonVaoTuDienNhapLieuNhanh(ngonNguHienTai.value),
           mauNen: const Color(0xFF1A73E8),
           mauVien: const Color(0xFF0B57D0),
           rong: 40,
@@ -15272,7 +15273,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         const SizedBox(width: 6),
         _NutPhimAo(
           nhan: '📒',
-          moTa: 'Thêm vào Từ điển sửa lỗi chính tả',
+          moTa: Ch.themVungChonVaoTuDienChinhTa(ngonNguHienTai.value),
           mauNen: const Color(0xFF1A73E8),
           mauVien: const Color(0xFF0B57D0),
           rong: 40,

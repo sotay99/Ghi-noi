@@ -898,6 +898,12 @@ class Ch {
   static String cat(NgonNgu nn) => nn == NgonNgu.vi ? 'Cắt' : 'Cut';
   static String xoaDoanDangChon(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Xoá đoạn đang chọn' : 'Delete selected text';
+  static String themVungChonVaoTuDienNhapLieuNhanh(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Thêm vào Từ điển nhập liệu nhanh'
+      : 'Add to Quick-input dictionary';
+  static String themVungChonVaoTuDienChinhTa(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Thêm vào Từ điển sửa lỗi chính tả'
+      : 'Add to Spelling-correction dictionary';
 
   // ------------------------- Menu Tài khoản-Cài đặt: nhãn "Ngôn ngữ"
   // Quy tắc: vi -> 'Ngôn ngữ - Language' (giữ y như cũ); en -> CHỈ
