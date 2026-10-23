@@ -79,6 +79,19 @@ class Ch {
       ? 'Chia sẻ ứng dụng này đến với mọi người'
       : 'Share this app with everyone';
 
+  /// (YÊU CẦU MỚI) Văn bản mời đi kèm khi chia sẻ ứng dụng — dùng cho cả
+  /// Web Share API (bản web) lẫn `share_plus` (bản gốc), và cho văn bản
+  /// copy vào bộ nhớ tạm lúc trình duyệt không hỗ trợ `navigator.share`.
+  static String loiMoiChiaSeUngDung(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Flowrite — nói và gõ tay cùng lúc, có AI hỗ trợ, đồng bộ mọi thiết bị. Xem thử:'
+      : 'Flowrite — speak and type at the same time, AI-assisted, synced across devices. Check it out:';
+
+  /// (YÊU CẦU MỚI) Thông báo nhanh khi trình duyệt KHÔNG hỗ trợ
+  /// `navigator.share` — app tự copy link lời mời vào bộ nhớ tạm thay thế.
+  static String daCopyLoiMoiChiaSe(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đã copy lời mời + link vào bộ nhớ tạm — dán vào Messenger/Zalo... để gửi.'
+      : 'Invite + link copied to clipboard — paste it into Messenger/Zalo... to send.';
+
   static String caiDatUngDungVaoThietBi(NgonNgu nn) => nn == NgonNgu.vi
       ? 'Cài đặt ứng dụng vào thiết bị'
       : 'Install app on this device';

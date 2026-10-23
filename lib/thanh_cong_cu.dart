@@ -75,6 +75,7 @@ class ThanhCongCu extends StatelessWidget {
     required this.khiBamBaoMat,
     required this.khiBamLuyenGoPhim,
     required this.khiBamCaiDatUngDung,
+    required this.khiBamChiaSe,
     required this.khiBamGopY,
     required this.khiBamDonate,
     required this.khiBamQuanLyGopY,
@@ -109,6 +110,10 @@ class ThanhCongCu extends StatelessWidget {
 
   /// (YÊU CẦU MỚI) Mục "Cài đặt Ứng dụng vào Thiết bị" — truyền thẳng xuống `_NutThemMenu`.
   final VoidCallback khiBamCaiDatUngDung;
+
+  /// (YÊU CẦU MỚI) Mục "Chia sẻ ứng dụng này đến với mọi người" — truyền
+  /// thẳng xuống `_NutThemMenu`.
+  final VoidCallback khiBamChiaSe;
 
   /// (YÊU CẦU MỚI) Mục "Góp ý thêm, báo lỗi về ứng dụng" — truyền thẳng xuống `_NutThemMenu`.
   final VoidCallback khiBamGopY;
@@ -559,6 +564,7 @@ class ThanhCongCu extends StatelessWidget {
                               khiMoMenu: khiMoMenuCanReset,
                               khiBamLuyenGoPhim: khiBamLuyenGoPhim,
                               khiBamCaiDatUngDung: khiBamCaiDatUngDung,
+                              khiBamChiaSe: khiBamChiaSe,
                               khiBamGopY: khiBamGopY,
                               khiBamDonate: khiBamDonate,
                             ),
@@ -1524,6 +1530,7 @@ class _NutThemMenu extends StatelessWidget {
     required this.khiMoMenu,
     required this.khiBamLuyenGoPhim,
     required this.khiBamCaiDatUngDung,
+    required this.khiBamChiaSe,
     required this.khiBamGopY,
     required this.khiBamDonate,
   });
@@ -1567,6 +1574,13 @@ class _NutThemMenu extends StatelessWidget {
   /// (YÊU CẦU MỚI) Mục "Cài đặt Ứng dụng vào Thiết bị" — nổi bật nền xanh
   /// dương đậm, ngay phía trên "Chia sẻ ứng dụng...".
   final VoidCallback khiBamCaiDatUngDung;
+
+  /// (YÊU CẦU MỚI) Mục "Chia sẻ ứng dụng này đến với mọi người" — gọi
+  /// `chiaSeUngDung()` (Web Share API/`share_plus`), rơi về copy link nếu
+  /// trình duyệt không hỗ trợ. Trước đây mục này có mặt trong danh sách
+  /// nhưng KHÔNG CÓ gì gắn với `onSelected` (bấm vào không có phản ứng) —
+  /// nay nối đúng xử lý.
+  final VoidCallback khiBamChiaSe;
 
   /// (YÊU CẦU MỚI) Mục "Góp ý thêm, báo lỗi về ứng dụng" — mở `moModalGopY`.
   final VoidCallback khiBamGopY;
@@ -1633,6 +1647,9 @@ class _NutThemMenu extends StatelessWidget {
                 break;
               case 29:
                 khiBamCaiDatUngDung();
+                break;
+              case 6:
+                khiBamChiaSe();
                 break;
               case 7:
                 khiBamGopY();

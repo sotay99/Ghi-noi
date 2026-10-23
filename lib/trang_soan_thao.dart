@@ -80,7 +80,33 @@ import 'phien_ban_web_day_du.dart';
 import 'the_ghi_am.dart';
 import 'thanh_cong_cu.dart';
 import 'thong_bao_giua.dart';
+import 'chia_se_ung_dung.dart';
 import 'trang_huong_dan.dart';
+
+/// (YÊU CẦU MỚI) Mục "Chia sẻ ứng dụng này đến với mọi người" (menu "Thêm
+/// lựa chọn") — trước đây có mặt trong danh sách nhưng KHÔNG gắn xử lý gì
+/// (bấm vào im lặng, không phản ứng). Gọi `chiaSeUngDung()` (Web Share
+/// API trên web, `share_plus` trên bản gốc — xem `chia_se_ung_dung.dart`)
+/// với link trang giới thiệu SEO ĐÚNG ngôn ngữ app hiện tại
+/// (`/gioi-thieu/vi` hoặc `/gioi-thieu/en`). Trả `false` CHỈ xảy ra trên
+/// web khi trình duyệt không hỗ trợ `navigator.share` — khi đó copy lời
+/// mời + link vào bộ nhớ tạm thay thế, báo bằng `hienThongBaoGiua`.
+Future<void> _chiaSeUngDung(BuildContext context) async {
+  final nn = ngonNguHienTai.value;
+  final url = 'https://flowrite.pro/gioi-thieu/${nn == NgonNgu.vi ? 'vi' : 'en'}';
+  final loiMoi = Ch.loiMoiChiaSeUngDung(nn);
+
+  final daChiaSe = await chiaSeUngDung(
+    tieuDe: 'Flowrite',
+    vanBan: loiMoi,
+    url: url,
+  );
+  if (daChiaSe) return;
+
+  await Clipboard.setData(ClipboardData(text: '$loiMoi $url'));
+  if (!context.mounted) return;
+  hienThongBaoGiua(context, Ch.daCopyLoiMoiChiaSe(nn), ganTren: true);
+}
 
 /// Một từ khớp "Từ điển sửa lỗi chính tả của bạn" tìm được trong bài —
 /// [thayThe] CHÍNH LÀ `CapTuDien.thayThe` tại lúc quét (rỗng nghĩa là "đề
@@ -17221,6 +17247,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                 ),
                 khiBamLuyenGoPhim: () => moModalLuyenGoPhim(context),
                 khiBamCaiDatUngDung: () => moModalCaiDatUngDung(context),
+                khiBamChiaSe: () => _chiaSeUngDung(context),
                 khiBamGopY: () => moModalGopY(
                   context,
                   emailDaDangNhap: _nguoiDungDangNhap?.email,
