@@ -4333,6 +4333,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _thoatKhoiDamMayNeuCanThiet(nguoiDung);
       if (nguoiDung == null) return;
       unawaited(_dongBoCaiDatTuTaiKhoanKhiDangNhap(nguoiDung.uid));
+      unawaited(dongBoNgonNguKhiDangNhap(nguoiDung.uid));
       // (YÊU CẦU MỚI — 2 bộ nhớ từ điển) Tải hai bộ từ điển ĐÁM MÂY của tài
       // khoản MỌI LẦN phát hiện có đăng nhập (kể cả phiên cũ tự khôi phục —
       // khác với auto bật/tắt ngay dưới đây) — cần có sẵn SẴN SÀNG để quét
@@ -8568,6 +8569,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         duLieu.bytes,
         duLieu.mime,
         locHallucination: true,
+        maNgonNgu: maNgonNguGhiAmChoAi(ngonNguGhiAmHienTai.value, ngonNguHienTai.value),
       );
       if (!mounted) return;
       final viTri = _boDieuKhien.text.indexOf(nhanDangChuyen);

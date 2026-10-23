@@ -29,6 +29,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await taiNgonNgu();
+  await taiNgonNguGhiAm();
   // (SỬA LỖI NGHIÊM TRỌNG) KHÔNG `await` — xem chú thích ở `khoiTaoAppCheck`.
   // Chạy nền, không chặn màn hình đầu tiên vẽ ra.
   unawaited(khoiTaoAppCheck());

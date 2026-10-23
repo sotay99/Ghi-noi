@@ -44,10 +44,16 @@ Future<void> _ghiCanhBaoHanMucApi(String thongDiep) async {
 
 /// Trả về chữ phiên âm được, hoặc ném lỗi ra ngoài (nơi gọi tự quyết định
 /// báo lỗi hay âm thầm thử lại sau).
+/// [maNgonNgu]: mã ISO-639-1 (`'vi'`/`'en'`) gửi cho Groq biết trước ngôn
+/// ngữ của đoạn ghi âm, tính từ cài đặt "Ngôn ngữ ghi âm" (xem
+/// `maNgonNguGhiAmChoAi` ở `ngon_ngu.dart`) — `null` nghĩa là "Tự động
+/// nhận diện trong âm thanh", KHÔNG gửi field này lên server (server tự
+/// mặc định, xem `goiGroqAmThanh` ở `cloud-function/index.js`).
 Future<String> guiGhiAmChoGemini(
   Uint8List bytes,
   String mimeType, {
   bool locHallucination = false,
+  String? maNgonNgu,
 }) async {
   final base64 = base64Encode(bytes);
   final phanHoi = await http
@@ -59,6 +65,7 @@ Future<String> guiGhiAmChoGemini(
           'audioBase64': base64,
           'mimeType': mimeType.isNotEmpty ? mimeType : 'audio/mp4',
           if (locHallucination) 'locHallucination': true,
+          if (maNgonNgu != null) 'ngonNgu': maNgonNgu,
         })),
       )
       .timeout(const Duration(minutes: 3));

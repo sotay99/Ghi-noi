@@ -2473,7 +2473,12 @@ class _KhungGhiAmChatState extends State<_KhungGhiAmChat> {
       return;
     }
     try {
-      final chu = await guiGhiAmChoGemini(kq.bytes, kq.mime, locHallucination: true);
+      final chu = await guiGhiAmChoGemini(
+        kq.bytes,
+        kq.mime,
+        locHallucination: true,
+        maNgonNgu: maNgonNguGhiAmChoAi(ngonNguGhiAmHienTai.value, ngonNguHienTai.value),
+      );
       if (chu.trim().isNotEmpty) {
         widget.khiCoVanBan(soThe, chu.trim());
       } else {

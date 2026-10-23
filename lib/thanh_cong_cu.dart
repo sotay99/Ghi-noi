@@ -8,7 +8,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
-import 'modal_chon_ngon_ngu.dart';
+import 'modal_cai_dat_ngon_ngu.dart';
 import 'ngon_ngu.dart';
 import 'chuoi_da_ngon_ngu.dart';
 import 'quyen_admin.dart';
@@ -1702,8 +1702,9 @@ class _NutThemMenu extends StatelessWidget {
 /// Menu thả xuống của nút "Tài khoản của bạn" — cùng cơ chế với
 /// `_NutThemMenu`/`_NutAIMenu`. "Điều khoản sử dụng"/"Bảo mật và quyền
 /// riêng tư" mở `TrangDieuKhoan`/`TrangBaoMat` (toàn màn hình, nội dung
-/// chọn/copy được). "Ngôn ngữ - Language" mở `moModalChonNgonNgu` (xem
-/// `modal_chon_ngon_ngu.dart`), không bắt buộc chọn (đã chọn trước rồi).
+/// chọn/copy được). "Ngôn ngữ - Language" mở `moModalCaiDatNgonNgu` (MỚI,
+/// xem `modal_cai_dat_ngon_ngu.dart`) — modal 2 dòng (ngôn ngữ app + ngôn
+/// ngữ ghi âm), không bắt buộc chọn.
 class _NutTaiKhoanMenu extends StatelessWidget {
   const _NutTaiKhoanMenu({
     required this.rong,
@@ -1872,7 +1873,7 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                 khiBamKhoiDongTep();
                 break;
               case 6:
-                moModalChonNgonNgu(context);
+                moModalCaiDatNgonNgu(context);
                 break;
               case 3:
                 khiBamDieuKhoan();

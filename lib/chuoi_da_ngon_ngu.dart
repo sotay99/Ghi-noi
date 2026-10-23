@@ -905,6 +905,22 @@ class Ch {
       ? 'Thêm vào Từ điển sửa lỗi chính tả'
       : 'Add to Spelling-correction dictionary';
 
+  // ------------------------- Modal "Cài đặt Ngôn ngữ" (2 dòng)
+  static String tieuDeModalCaiDatNgonNgu(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Cài đặt Ngôn ngữ' : 'Language settings';
+  static String ngonNguCuaUngDung(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Ngôn ngữ của ứng dụng' : 'App language';
+  static String ngonNguGhiAmNhan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Ngôn ngữ ghi âm' : 'Recording language';
+  static String moTaNgonNguGhiAm(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Áp dụng cho tính năng ghi âm (nói xong mới ra chữ)'
+      : 'Applies to the record-then-transcribe feature';
+  static String tuyChonTheoNgonNguApp(NgonNgu nn, String tenNgonNguApp) => nn == NgonNgu.vi
+      ? 'Theo ngôn ngữ chung của app ($tenNgonNguApp)'
+      : 'Follow the app\'s language ($tenNgonNguApp)';
+  static String tuyChonTuDongNhanDien(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Tự động nhận diện trong âm thanh' : 'Auto-detect from audio';
+
   // ------------------------- Menu Tài khoản-Cài đặt: nhãn "Ngôn ngữ"
   // Quy tắc: vi -> 'Ngôn ngữ - Language' (giữ y như cũ); en -> CHỈ
   // 'Language' (không lặp 'Language - Language'); ngôn ngữ MỚI thêm sau
