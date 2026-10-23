@@ -1326,20 +1326,29 @@ class _ManHinhTroChuyenState extends State<ManHinhTroChuyen> {
       return;
     }
 
+    // (MỚI — mục B) Chỉ dẫn ngôn ngữ trả lời, chèn vào MỖI lượt gửi (không
+    // chỉ lượt đầu) — để nếu người dùng đổi ngôn ngữ app giữa cuộc trò
+    // chuyện, lượt kế tiếp lập tức theo đúng ngôn ngữ mới. Xem
+    // `huongDanNgonNguChoAiTheo` (ngon_ngu.dart) — server (`goiGeminiChatStream`)
+    // chỉ chuyển tiếp thẳng lichSu, không tự ép ngôn ngữ nào.
+    final chiDanNgonNgu = huongDanNgonNguChoAiTheo(_nn);
+
     String? noiDungDinhKem;
     String choAi;
     switch (dinhKem) {
       case LoaiDinhKemTroChuyen.toanVan:
-        choAi = 'Đây là toàn văn bản đang soạn (mới nhất):\n"""\n'
+        choAi = '$chiDanNgonNgu\n\n'
+            'Đây là toàn văn bản đang soạn (mới nhất):\n"""\n'
             '${widget.layVanBanHienTai()}\n"""\n\n'
             'Câu hỏi của tôi: $cauHoi';
       case LoaiDinhKemTroChuyen.doanChon:
         noiDungDinhKem = _noiDungDoanChonDinhKem ?? '';
-        choAi = 'Đây là một đoạn trong văn bản đang soạn (đoạn đã chọn):\n"""\n'
+        choAi = '$chiDanNgonNgu\n\n'
+            'Đây là một đoạn trong văn bản đang soạn (đoạn đã chọn):\n"""\n'
             '$noiDungDinhKem\n"""\n\n'
             'Câu hỏi của tôi: $cauHoi';
       case LoaiDinhKemTroChuyen.khong:
-        choAi = cauHoi;
+        choAi = '$chiDanNgonNgu\n\n$cauHoi';
     }
 
     late final int chiSoAi;

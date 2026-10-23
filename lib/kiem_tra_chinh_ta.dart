@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 
 import 'ai_cau_hinh.dart';
 import 'canh_bao_han_muc_ai.dart';
+import 'ngon_ngu.dart';
 
 /// Một lỗi chính tả AI tìm được: vùng [batDau, ketThuc) trong văn bản, cùng
 /// từ đề xuất thay thế. [tu] là từ SAI, giữ lại để lúc người dùng chọn thay
@@ -76,6 +77,9 @@ class DichVuKiemTraChinhTa {
           body: jsonEncode(await ganDinhDanhAi({
             'action': 'chinh_ta',
             'text': ghep,
+            // (MỚI — mục B, CHƯA có hiệu lực) xem chú thích cùng field này ở
+            // gui_tom_tat_gemini.dart — server (huongDanChinhTa) chưa đọc.
+            'ngonNguApp': maIso6391(ngonNguHienTai.value),
             'boQuaTruocViTri': nguCanh.length,
             'layLoiChinhTa': layLoiChinhTa,
             'chenDauCau': chenDauCau,

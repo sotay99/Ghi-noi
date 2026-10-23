@@ -44,6 +44,36 @@ String maIso6391(NgonNgu nn) {
   }
 }
 
+/// (MỚI — mục B, "đồng bộ ngôn ngữ prompt khi làm việc với AI") Chỉ dẫn
+/// NGÔN NGỮ TRẢ LỜI để chèn vào prompt/lịch sử gửi AI — dùng cho các tính
+/// năng mà client TỰ XÂY prompt (hiện chỉ có "Trò chuyện"/`tro_chuyen`,
+/// xem `lib/man_hinh_tro_chuyen.dart`): server chỉ chuyển tiếp thẳng
+/// `lichSu` cho Gemini (`goiGeminiChatStream`), không tự thêm chỉ dẫn nào,
+/// nên client chèn được trực tiếp. Luôn đọc [nn] tại nơi gọi (không cache)
+/// để theo sát ngôn ngữ app hiện tại. Thêm ngôn ngữ mới vào [NgonNgu] thì
+/// thêm đúng một case ở đây.
+///
+/// LƯU Ý QUAN TRỌNG (chưa áp dụng được cho các tính năng AI khác): Tóm
+/// tắt/Mở rộng/Viết lại/Kiểm tra toàn văn/Kiểm tra chính tả/Đề xuất ý
+/// tưởng đều có prompt XÂY SẴN Ở PHÍA SERVER (`cloud-function/index.js`,
+/// các hàm `huongDanTomTat`/`huongDanMoRong`/`huongDanVietLai`/
+/// `huongDanToanVan`/`huongDanChiChinhTaToanVan`/`huongDanChiDauCauToanVan`/
+/// `huongDanChinhTa`/`huongDanTheoHanhDong` case `de_xuat_y_tuong`) — mỗi
+/// hàm đó đều VIẾT CỨNG "tiếng Việt" ngay trong câu chỉ dẫn gửi Gemini.
+/// Client không có cách chèn ngôn ngữ vào prompt của các tính năng này —
+/// muốn đồng bộ đúng mục B cho chúng PHẢI sửa `cloud-function/index.js`
+/// (đọc field `ngonNguApp` các request đã gửi kèm sẵn ở dưới, rồi tự ghép
+/// câu chỉ dẫn ngôn ngữ tương ứng vào từng hàm `huongDan*`) — việc đó CHƯA
+/// làm ở đây, để dành cho lượt sửa `cloud-function/index.js` sau.
+String huongDanNgonNguChoAiTheo(NgonNgu nn) {
+  switch (nn) {
+    case NgonNgu.vi:
+      return 'Hãy luôn trả lời bằng tiếng Việt.';
+    case NgonNgu.en:
+      return 'Always answer in English.';
+  }
+}
+
 /// (MỚI — "Ngôn ngữ ghi âm") Ngôn ngữ dùng cho tính năng ghi âm (nói xong
 /// mới ra chữ, gọi Groq) — TÁCH RIÊNG khỏi [NgonNgu] (ngôn ngữ app) vì có
 /// thêm 2 lựa chọn mà [NgonNgu] không có: "theo ngôn ngữ app hiện tại" và

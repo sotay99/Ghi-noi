@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 
 import 'ai_cau_hinh.dart';
 import 'canh_bao_han_muc_ai.dart';
+import 'ngon_ngu.dart';
 
 /// [phanTram] (120-400) và/hoặc [huongDanNguoiDung] — ít nhất một trong hai
 /// phải có, nơi gọi (modal chọn kiểu mở rộng) đã chặn gửi lên khi cả hai
@@ -29,6 +30,9 @@ Future<String> guiMoRongChoGemini(
         body: jsonEncode(await ganDinhDanhAi({
           'action': 'mo_rong',
           'text': vanBan,
+          // (MỚI — mục B, CHƯA có hiệu lực) xem chú thích cùng field này ở
+          // gui_tom_tat_gemini.dart — server (huongDanMoRong) chưa đọc.
+          'ngonNguApp': maIso6391(ngonNguHienTai.value),
           if (phanTram != null) 'phanTram': phanTram,
           if (huongDanNguoiDung != null && huongDanNguoiDung.trim().isNotEmpty)
             'huongDanNguoiDung': huongDanNguoiDung.trim(),

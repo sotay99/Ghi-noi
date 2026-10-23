@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 
 import 'ai_cau_hinh.dart';
 import 'canh_bao_han_muc_ai.dart';
+import 'ngon_ngu.dart';
 
 /// Trả về văn bản đã viết lại, hoặc ném lỗi ra ngoài (nơi gọi tự quyết định
 /// báo lỗi hay âm thầm thử lại sau).
@@ -24,6 +25,9 @@ Future<String> guiVietLaiChoGemini(
         body: jsonEncode(await ganDinhDanhAi({
           'action': 'got_dua',
           'text': vanBan,
+          // (MỚI — mục B, CHƯA có hiệu lực) xem chú thích cùng field này ở
+          // gui_tom_tat_gemini.dart — server (huongDanVietLai) chưa đọc.
+          'ngonNguApp': maIso6391(ngonNguHienTai.value),
           if (huongDanNguoiDung != null && huongDanNguoiDung.trim().isNotEmpty)
             'huongDanNguoiDung': huongDanNguoiDung.trim(),
         })),

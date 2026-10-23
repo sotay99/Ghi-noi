@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 
 import 'ai_cau_hinh.dart';
 import 'canh_bao_han_muc_ai.dart';
+import 'ngon_ngu.dart';
 
 /// Một từ/cụm từ sai chính tả tìm được trong lần kiểm tra toàn văn — vị trí
 /// tính trên TOÀN BỘ văn bản đã gửi, khác với [LoiChinhTa] của bản kiểm tra
@@ -99,6 +100,10 @@ class DichVuKiemTraToanVan {
           body: jsonEncode(await ganDinhDanhAi({
             'action': 'toan_van',
             'text': vanBan,
+            // (MỚI — mục B, CHƯA có hiệu lực) xem chú thích cùng field này ở
+            // gui_tom_tat_gemini.dart — server (huongDanToanVan/
+            // huongDanChiChinhTaToanVan/huongDanChiDauCauToanVan) chưa đọc.
+            'ngonNguApp': maIso6391(ngonNguHienTai.value),
             'vungDaXuLy': vungDaXuLy.map((v) => v.toJson()).toList(),
             'chenDauCau': chenDauCau,
             if (khoangKyTu != null) 'doDaiMin': khoangKyTu.$1,
