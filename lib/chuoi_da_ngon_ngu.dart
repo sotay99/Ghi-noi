@@ -63,7 +63,7 @@ class Ch {
       nn == NgonNgu.vi ? 'Kiểm tra toàn văn' : 'Check whole text';
 
   static String troChuyen(NgonNgu nn) =>
-      nn == NgonNgu.vi ? 'Trò chuyện với AI' : 'Chat with AI';
+      nn == NgonNgu.vi ? 'Trò chuyện với AI' : 'Chat';
 
   // ----------------------------------------------------- Menu "Thêm lựa chọn"
   static String tuDienNhapLieuNhanh(NgonNgu nn) =>
@@ -845,6 +845,73 @@ class Ch {
   static String xoaBanNayDongTrinhGhiAm(NgonNgu nn) => nn == NgonNgu.vi
       ? 'Xoá bản này-Đóng trình ghi âm'
       : 'Delete this recording-Close';
+
+  // ------------------------- Dialog "Cài đặt tự động Mở bảng điều khiển"
+  static String moiLanGhiAmTuDongPrefix(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Mỗi lần ghi âm: Tự động '
+      : 'Each time you record: Automatically ';
+  static String chuHoaHien(NgonNgu nn) => nn == NgonNgu.vi ? 'HIỆN' : 'SHOW';
+  static String chuHoaAn(NgonNgu nn) => nn == NgonNgu.vi ? 'ẨN' : 'HIDE';
+  static String bangDieuKhienNaySuffix(NgonNgu nn) =>
+      nn == NgonNgu.vi ? ' bảng điều khiển này.' : ' this control panel.';
+
+  // ------------------------- Thanh ghim nổi khi đang ghi âm (dạng "A-B")
+  static String hienBangDieuKhien(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Hiện bảng điều khiển' : 'Show control panel';
+  static String hoanThanhChuyenThanhVanBanGach(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Hoàn thành-Chuyển thành văn bản'
+      : 'Finish-Transcribe to text';
+  static String hoanThanhTaoBanGhiAmMoiGach(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Hoàn thành-Tạo bản ghi âm mới'
+      : 'Finish-Create new recording';
+  static String hoanThanhPhatDeNgheLaiGach(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Hoàn thành-Phát để nghe lại'
+      : 'Finish-Play to listen back';
+  static String hoanThanhDongTrinhGhiAmGach(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Hoàn thành-Đóng trình ghi âm'
+      : 'Finish-Close the recorder';
+
+  // ------------------------- Bảng "Recording No. N" (dạng "A và B")
+  static String hoanThanhVaChuyenHoaThanhVanBan(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Hoàn thành và Chuyển hoá thành văn bản'
+      : 'Finish and transcribe to text';
+  static String hoanThanhVaTaoBanGhiAmMoi(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Hoàn thành và Tạo bản ghi âm mới'
+      : 'Finish and create new recording';
+  static String hoanThanhVaPhatDeNgheLai(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Hoàn thành và Phát để nghe lại'
+      : 'Finish and play to listen back';
+  static String hoanThanhVaDongTrinhGhiAm(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Hoàn thành và Đóng trình ghi âm'
+      : 'Finish and close the recorder';
+  static String anBangDieuKhienTiepTucGhiAm(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Ẩn bảng điều khiển-tiếp tục Ghi âm'
+      : 'Hide panel-keep recording';
+  static String caiDatCheDoTuDongChuyenHoaVanBan(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Cài đặt chế độ Tự động chuyển hoá văn bản'
+      : 'Auto-transcribe mode settings';
+  static String caiDatTuDongMoBangDieuKhienNay(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Cài đặt tự động Mở bảng điều khiển này'
+      : 'Auto-open this panel settings';
+
+  // ------------------------- Thanh công cụ có vùng chọn (Copy/Cắt/Xoá)
+  static String cat(NgonNgu nn) => nn == NgonNgu.vi ? 'Cắt' : 'Cut';
+  static String xoaDoanDangChon(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Xoá đoạn đang chọn' : 'Delete selected text';
+
+  // ------------------------- Menu Tài khoản-Cài đặt: nhãn "Ngôn ngữ"
+  // Quy tắc: vi -> 'Ngôn ngữ - Language' (giữ y như cũ); en -> CHỈ
+  // 'Language' (không lặp 'Language - Language'); ngôn ngữ MỚI thêm sau
+  // này (nếu có) -> '<"Ngôn ngữ" dịch sang ngôn ngữ đó> - Language', phần
+  // ' - Language' LUÔN giữ nguyên tiếng Anh, không dịch tiếp.
+  static String nhanMenuNgonNgu(NgonNgu nn) {
+    switch (nn) {
+      case NgonNgu.vi:
+        return 'Ngôn ngữ - Language';
+      case NgonNgu.en:
+        return 'Language';
+    }
+  }
 
   // ---------------------------------------------- Snackbar/thông báo nhanh
   static String khongKiemTraDuoc(NgonNgu nn, String loi) =>

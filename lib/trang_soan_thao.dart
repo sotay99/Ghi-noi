@@ -7637,15 +7637,19 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                         decoration: TextDecoration.none,
                       ),
                       children: [
-                        const TextSpan(text: 'Mỗi lần ghi âm: Tự động '),
                         TextSpan(
-                          text: 'HIỆN',
+                            text: Ch.moiLanGhiAmTuDongPrefix(
+                                ngonNguHienTai.value)),
+                        TextSpan(
+                          text: Ch.chuHoaHien(ngonNguHienTai.value),
                           style: TextStyle(
                             backgroundColor: Colors.green.shade200,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const TextSpan(text: ' bảng điều khiển này.'),
+                        TextSpan(
+                            text: Ch.bangDieuKhienNaySuffix(
+                                ngonNguHienTai.value)),
                       ],
                     ),
                   ),
@@ -7664,15 +7668,19 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                         decoration: TextDecoration.none,
                       ),
                       children: [
-                        const TextSpan(text: 'Mỗi lần ghi âm: Tự động '),
                         TextSpan(
-                          text: 'ẨN',
+                            text: Ch.moiLanGhiAmTuDongPrefix(
+                                ngonNguHienTai.value)),
+                        TextSpan(
+                          text: Ch.chuHoaAn(ngonNguHienTai.value),
                           style: TextStyle(
                             backgroundColor: Colors.orange.shade200,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const TextSpan(text: ' bảng điều khiển này.'),
+                        TextSpan(
+                            text: Ch.bangDieuKhienNaySuffix(
+                                ngonNguHienTai.value)),
                       ],
                     ),
                   ),
@@ -15292,7 +15300,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
         ),
         const SizedBox(width: 6),
         _NutCongCuChu(
-          nhan: 'Cắt',
+          nhan: Ch.cat(ngonNguHienTai.value),
           mauChu: mauChu,
           onTap: () => _bamCopyCutPasteOHangThayNav(_phimAoCut),
         ),
@@ -15300,7 +15308,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           const SizedBox(width: 6),
           _NutPhimAo(
             nhan: '⌫',
-            moTa: 'Xoá đoạn đang chọn',
+            moTa: Ch.xoaDoanDangChon(ngonNguHienTai.value),
             mauNen: Colors.red.shade50,
             mauVien: Colors.red.shade300,
             rong: 40,
@@ -16316,7 +16324,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
   Widget _oTamDungTiepTuc(bool manHinhHep) {
     return _theGhiAmDangTamDung
         ? _oTrinhGhiAmMoi(
-            nhan: 'Tiếp Tục',
+            nhan: Ch.tiepTuc(ngonNguHienTai.value),
             icon: Icons.play_circle_outline,
             mauNen: Colors.green.shade100,
             mauChu: Colors.green.shade800,
@@ -16324,7 +16332,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
             manHinhHep: manHinhHep,
           )
         : _oTrinhGhiAmMoi(
-            nhan: 'Tạm dừng',
+            nhan: Ch.tamDung(ngonNguHienTai.value),
             icon: Icons.pause_circle_outline,
             mauNen: Colors.red.shade100,
             mauChu: Colors.red.shade800,
@@ -16343,7 +16351,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
 
     final oDangGhi = _oTrangThaiGhiAmLon(manHinhHep);
     final oHienBang = _oTrinhGhiAmMoi(
-      nhan: 'Hiện bảng điều khiển',
+      nhan: Ch.hienBangDieuKhien(ngonNguHienTai.value),
       icon: Icons.tune_rounded,
       mauNen: Colors.amber.shade100,
       mauChu: Colors.brown.shade800,
@@ -16352,7 +16360,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     );
     final oTamTiep = _oTamDungTiepTuc(manHinhHep);
     final oChuyenVanBan = _oTrinhGhiAmMoi(
-      nhan: 'Hoàn thành-Chuyển thành văn bản',
+      nhan: Ch.hoanThanhChuyenThanhVanBanGach(ngonNguHienTai.value),
       icon: Icons.text_snippet_outlined,
       mauNen: Colors.green.shade100,
       mauChu: Colors.green.shade900,
@@ -16360,7 +16368,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       manHinhHep: manHinhHep,
     );
     final oTaoMoi = _oTrinhGhiAmMoi(
-      nhan: 'Hoàn thành-Tạo bản ghi âm mới',
+      nhan: Ch.hoanThanhTaoBanGhiAmMoiGach(ngonNguHienTai.value),
       icon: Icons.add_circle_outline,
       mauNen: Colors.cyan.shade100,
       mauChu: Colors.cyan.shade900,
@@ -16368,7 +16376,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       manHinhHep: manHinhHep,
     );
     final oPhatLai = _oTrinhGhiAmMoi(
-      nhan: 'Hoàn thành-Phát để nghe lại',
+      nhan: Ch.hoanThanhPhatDeNgheLaiGach(ngonNguHienTai.value),
       icon: Icons.play_arrow_rounded,
       mauNen: Colors.lightGreen.shade100,
       mauChu: Colors.green.shade900,
@@ -16376,7 +16384,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       manHinhHep: manHinhHep,
     );
     final oDong = _oTrinhGhiAmMoi(
-      nhan: 'Hoàn thành-Đóng trình ghi âm',
+      nhan: Ch.hoanThanhDongTrinhGhiAmGach(ngonNguHienTai.value),
       icon: Icons.check_circle_outline,
       mauNen: Colors.blue.shade100,
       mauChu: Colors.blue.shade900,
@@ -16501,7 +16509,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                     children: [
                       _NutPhimAo(
                         nhan: '⌫',
-                        moTa: 'Xoá đoạn đang chọn',
+                        moTa: Ch.xoaDoanDangChon(ngonNguHienTai.value),
                         mauNen: Colors.red.shade50,
                         mauVien: Colors.red.shade300,
                         rong: 40,
@@ -17811,7 +17819,7 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
             nhanPhim: widget.phimTatGhiAm.nhan,
             icon: Icons.play_circle_outline,
             mau: Colors.green.shade800,
-            nhan: 'Tiếp Tục',
+            nhan: Ch.tiepTuc(ngonNguHienTai.value),
             onBam: _bamTamDungTiepTuc,
             manHinhHep: manHinhHep,
           )
@@ -17819,7 +17827,7 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
             nhanPhim: widget.phimTatGhiAm.nhan,
             icon: Icons.pause_circle_outline,
             mau: Colors.red.shade800,
-            nhan: 'Tạm dừng',
+            nhan: Ch.tamDung(ngonNguHienTai.value),
             onBam: _bamTamDungTiepTuc,
             manHinhHep: manHinhHep,
           );
@@ -17849,7 +17857,8 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
                         nhanPhim: 'phím 1',
                         icon: Icons.text_snippet_outlined,
                         mau: Colors.green.shade900,
-                        nhan: 'Hoàn thành và Chuyển hoá thành văn bản',
+                        nhan: Ch.hoanThanhVaChuyenHoaThanhVanBan(
+                            ngonNguHienTai.value),
                         onBam: _cacHanhDongPhimSo[0],
                         manHinhHep: manHinhHep,
                       ),
@@ -17857,7 +17866,8 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
                         nhanPhim: 'phím 2',
                         icon: Icons.add_circle_outline,
                         mau: Colors.cyan.shade900,
-                        nhan: 'Hoàn thành và Tạo bản ghi âm mới',
+                        nhan: Ch.hoanThanhVaTaoBanGhiAmMoi(
+                            ngonNguHienTai.value),
                         onBam: _cacHanhDongPhimSo[1],
                         manHinhHep: manHinhHep,
                       ),
@@ -17865,7 +17875,8 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
                         nhanPhim: 'phím 3',
                         icon: Icons.play_arrow_rounded,
                         mau: Colors.green.shade900,
-                        nhan: 'Hoàn thành và Phát để nghe lại',
+                        nhan: Ch.hoanThanhVaPhatDeNgheLai(
+                            ngonNguHienTai.value),
                         onBam: _cacHanhDongPhimSo[2],
                         manHinhHep: manHinhHep,
                       ),
@@ -17873,7 +17884,8 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
                         nhanPhim: 'phím 4',
                         icon: Icons.check_circle_outline,
                         mau: Colors.blue.shade900,
-                        nhan: 'Hoàn thành và Đóng trình ghi âm',
+                        nhan: Ch.hoanThanhVaDongTrinhGhiAm(
+                            ngonNguHienTai.value),
                         onBam: _cacHanhDongPhimSo[3],
                         manHinhHep: manHinhHep,
                       ),
@@ -17897,7 +17909,8 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
                         nhanPhim: 'phím 6',
                         icon: Icons.visibility_off_outlined,
                         mau: const Color(0xFF5F6368),
-                        nhan: 'Ẩn bảng điều khiển-tiếp tục Ghi âm',
+                        nhan: Ch.anBangDieuKhienTiepTucGhiAm(
+                            ngonNguHienTai.value),
                         onBam: _cacHanhDongPhimSo[5],
                         manHinhHep: manHinhHep,
                       ),
@@ -17905,7 +17918,8 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
                         nhanPhim: 'phím 7',
                         icon: Icons.cloud_sync,
                         mau: Colors.deepPurple,
-                        nhan: 'Cài đặt chế độ Tự động chuyển hoá văn bản',
+                        nhan: Ch.caiDatCheDoTuDongChuyenHoaVanBan(
+                            ngonNguHienTai.value),
                         onBam: _cacHanhDongPhimSo[6],
                         manHinhHep: manHinhHep,
                       ),
@@ -17913,7 +17927,8 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
                         nhanPhim: 'phím 8',
                         icon: Icons.tune_rounded,
                         mau: Colors.brown.shade800,
-                        nhan: 'Cài đặt tự động Mở bảng điều khiển này',
+                        nhan: Ch.caiDatTuDongMoBangDieuKhienNay(
+                            ngonNguHienTai.value),
                         onBam: _cacHanhDongPhimSo[7],
                         manHinhHep: manHinhHep,
                       ),
@@ -17921,7 +17936,7 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
                         nhanPhim: 'phím 9',
                         icon: Icons.drag_indicator,
                         mau: Colors.indigo.shade800,
-                        nhan: 'Thay đổi vị trí của thẻ này',
+                        nhan: Ch.thayDoiViTriTheNay(ngonNguHienTai.value),
                         onBam: _cacHanhDongPhimSo[8],
                         manHinhHep: manHinhHep,
                       ),
@@ -17952,13 +17967,13 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
               const SizedBox(width: 8),
               _dangTamDung
                   ? _NutGhimBangDieuKhien(
-                      nhan: 'Tiếp Tục',
+                      nhan: Ch.tiepTuc(ngonNguHienTai.value),
                       icon: Icons.play_circle_outline,
                       mau: Colors.green.shade800,
                       onBam: _bamTamDungTiepTuc,
                     )
                   : _NutGhimBangDieuKhien(
-                      nhan: 'Tạm dừng',
+                      nhan: Ch.tamDung(ngonNguHienTai.value),
                       icon: Icons.pause_circle_outline,
                       mau: Colors.red.shade800,
                       onBam: _bamTamDungTiepTuc,

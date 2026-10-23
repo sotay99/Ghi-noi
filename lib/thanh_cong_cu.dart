@@ -1902,7 +1902,8 @@ class _NutTaiKhoanMenu extends StatelessWidget {
                 // Hai mục mới — CHƯA gắn logic (chờ gắn sau), tạm đặt ở đầu
                 // menu, cùng kiểu dòng với "Cài đặt Micro"/"Cài đặt Hiển thị
                 // và tự động sửa" bên dưới.
-                _mucMenuThem(6, 'Ngôn ngữ - Language', icon: Icons.language),
+                _mucMenuThem(6, Ch.nhanMenuNgonNgu(ngonNguHienTai.value),
+                    icon: Icons.language),
                 _mucMenuThem(27, Ch.khiKhoiDongAppMoTep(ngonNguHienTai.value),
                     icon: Icons.description_outlined),
                 _dividerMenu(),
