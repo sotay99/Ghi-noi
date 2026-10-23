@@ -41,6 +41,7 @@ import 'khoi_dong_lai_app.dart';
 import 'kiem_tra_cap_nhat.dart';
 import 'canh_bao_han_muc_ai.dart';
 import 'modal_bao_mat.dart';
+import 'modal_apk_chua_ra_mat.dart';
 import 'modal_cai_dat_ung_dung.dart';
 import 'modal_canh_bao_api.dart';
 import 'modal_danh_sach_user.dart';
@@ -16663,8 +16664,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       ),
                     ),
                     TextButton(
-                      onPressed: () =>
-                          moLienKetNgoai('https://github.com/sotay99/ghi-noi/releases/latest'),
+                      onPressed: () => hienModalApkChuaRaMat(context),
                       child: Text(Ch.taiApk(ngonNguHienTai.value)),
                     ),
                     IconButton(
@@ -16700,8 +16700,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
                       ),
                     ),
                     TextButton(
-                      onPressed: () =>
-                          moLienKetNgoai('https://github.com/sotay99/ghi-noi/releases/latest'),
+                      onPressed: () => hienModalApkChuaRaMat(context),
                       child: Text(Ch.taiBanMoi(ngonNguHienTai.value)),
                     ),
                     IconButton(
