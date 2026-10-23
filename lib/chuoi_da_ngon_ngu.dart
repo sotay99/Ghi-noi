@@ -751,6 +751,10 @@ class Ch {
       nn == NgonNgu.vi ? 'Xoá tất cả' : 'Delete all';
   static String tamDungCoDauCach(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Tạm dừng ' : 'Paused ';
+  static String chuyenHoaThanhVanBan(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chuyển hoá thành văn bản' : 'Transcribe to text';
+  static String dangChuanBiGhiAm(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đang chuẩn bị…' : 'Preparing…';
   static String banGhiAmSoCoDauCach(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Bản Ghi âm số ' : 'Recording No. ';
 

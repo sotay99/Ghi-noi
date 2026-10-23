@@ -16282,7 +16282,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
           }
           if (_soTheGhiAmDangGhi == null) {
             return Text(
-              'Đang chuẩn bị…',
+              Ch.dangChuanBiGhiAm(ngonNguHienTai.value),
               style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold, fontSize: coChu),
             );
           }
@@ -17773,7 +17773,9 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                '${_dangTamDung ? 'Tạm dừng' : 'Đang Ghi âm'} ',
+                                _dangTamDung
+                                    ? Ch.tamDungCoDauCach(ngonNguHienTai.value)
+                                    : Ch.dangGhiAmPrefixLabel(ngonNguHienTai.value),
                                 style: TextStyle(
                                   color: Colors.red.shade700,
                                   fontWeight: FontWeight.bold,
@@ -17962,7 +17964,7 @@ class _BangDieuKhienGhiAmState extends State<_BangDieuKhienGhiAm> {
             mainAxisSize: MainAxisSize.min,
             children: [
               _NutGhimBangDieuKhien(
-                nhan: 'Chuyển hoá thành văn bản',
+                nhan: Ch.chuyenHoaThanhVanBan(ngonNguHienTai.value),
                 icon: Icons.text_snippet_outlined,
                 mau: Colors.green.shade900,
                 onBam: _cacHanhDongPhimSo[0],
