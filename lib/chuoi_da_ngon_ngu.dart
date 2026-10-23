@@ -92,6 +92,41 @@ class Ch {
       ? 'Đã copy lời mời + link vào bộ nhớ tạm — dán vào Messenger/Zalo... để gửi.'
       : 'Invite + link copied to clipboard — paste it into Messenger/Zalo... to send.';
 
+  /// (YÊU CẦU MỚI) Modal "Chia sẻ ứng dụng" — 4 hành động: chia sẻ qua ứng
+  /// dụng khác (Web Share API/`share_plus`), copy nội dung mời đầy đủ, copy
+  /// riêng link, mở link ở tab mới.
+  static String chiaSeQuaUngDungKhac(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Chia sẻ qua ứng dụng khác...' : 'Share via other app...';
+
+  static String saoChepNoiDungChiaSe(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Sao chép nội dung chia sẻ' : 'Copy share text';
+
+  static String saoChepLink(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Sao chép link' : 'Copy link';
+
+  static String moLinkTabMoi(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Mở link' : 'Open link';
+
+  static String daCopyNoiDungChiaSe(NgonNgu nn) => nn == NgonNgu.vi
+      ? 'Đã copy nội dung chia sẻ vào bộ nhớ tạm.'
+      : 'Share text copied to clipboard.';
+
+  static String daCopyLink(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Đã copy link vào bộ nhớ tạm.' : 'Link copied to clipboard.';
+
+  /// (YÊU CẦU MỚI) Tên MẶC ĐỊNH khi tạo ghi chú/thư mục mới — "Ghi chú N"/
+  /// "Thư mục N" (vi) hay "Note N"/"Folder N" (en), [soThuTu] là N (logic
+  /// tính số thứ tự tự động không đổi, chỉ đổi phần CHỮ bao quanh N). DÙNG
+  /// CHUNG cho MỌI nơi tạo mới (cây thư mục chính, modal "Khi khởi động
+  /// app: mở tệp", nút tạo tệp mới ở màn soạn thảo, cả bộ nhớ thiết bị lẫn
+  /// đám mây — tất cả đi qua `KhoDuLieu._tenGhiChuTuDong`/
+  /// `_tenThuMucTuDong`). Thêm ngôn ngữ mới chỉ cần thêm 1 nhánh ở đây.
+  static String tenGhiChuMacDinh(NgonNgu nn, int soThuTu) =>
+      nn == NgonNgu.vi ? 'Ghi chú $soThuTu' : 'Note $soThuTu';
+
+  static String tenThuMucMacDinh(NgonNgu nn, int soThuTu) =>
+      nn == NgonNgu.vi ? 'Thư mục $soThuTu' : 'Folder $soThuTu';
+
   static String caiDatUngDungVaoThietBi(NgonNgu nn) => nn == NgonNgu.vi
       ? 'Cài đặt ứng dụng vào thiết bị'
       : 'Install app on this device';
@@ -426,8 +461,8 @@ class Ch {
       nn == NgonNgu.vi ? 'Đã dán văn bản vào từ bộ nhớ đệm' : 'Pasted text from clipboard';
 
   static String daLuuVaoBoNhoMay(NgonNgu nn, String tenTep) => nn == NgonNgu.vi
-      ? 'Đã lưu "$tenTep" vào bộ nhớ máy.'
-      : 'Saved "$tenTep" to device storage.';
+      ? 'Đã lưu "$tenTep" vào bộ nhớ, app sẽ tự động lưu mà không cần bấm nút Lưu.'
+      : 'Saved "$tenTep" — the app auto-saves, no need to press Save.';
 
   static String daMoKhoaBanPhim(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Đã mở khoá bàn phím' : 'Keyboard unlocked';

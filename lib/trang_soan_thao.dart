@@ -81,6 +81,7 @@ import 'the_ghi_am.dart';
 import 'thanh_cong_cu.dart';
 import 'thong_bao_giua.dart';
 import 'chia_se_ung_dung.dart';
+import 'modal_chia_se_ung_dung.dart';
 import 'trang_huong_dan.dart';
 
 /// (YÊU CẦU MỚI) Mục "Chia sẻ ứng dụng này đến với mọi người" (menu "Thêm

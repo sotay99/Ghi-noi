@@ -9,7 +9,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'chuoi_da_ngon_ngu.dart';
 import 'mo_hinh.dart';
+import 'ngon_ngu.dart';
 
 /// Độ dài tối đa của tên thư mục/ghi chú.
 const doDaiTenToiDa = 100;
@@ -256,18 +258,18 @@ class KhoDuLieu {
 
   String _tenGhiChuTuDong(String chaId) {
     var n = 1;
-    while (_daCoTen('Ghi chú $n', chaId)) {
+    while (_daCoTen(Ch.tenGhiChuMacDinh(ngonNguHienTai.value, n), chaId)) {
       n++;
     }
-    return 'Ghi chú $n';
+    return Ch.tenGhiChuMacDinh(ngonNguHienTai.value, n);
   }
 
   String _tenThuMucTuDong(String chaId) {
     var n = 1;
-    while (_daCoTen('Thư mục $n', chaId)) {
+    while (_daCoTen(Ch.tenThuMucMacDinh(ngonNguHienTai.value, n), chaId)) {
       n++;
     }
-    return 'Thư mục $n';
+    return Ch.tenThuMucMacDinh(ngonNguHienTai.value, n);
   }
 
   // -------------------------------------------------------------- thêm mới
