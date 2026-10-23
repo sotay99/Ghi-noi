@@ -85,27 +85,19 @@ import 'trang_huong_dan.dart';
 
 /// (YÊU CẦU MỚI) Mục "Chia sẻ ứng dụng này đến với mọi người" (menu "Thêm
 /// lựa chọn") — trước đây có mặt trong danh sách nhưng KHÔNG gắn xử lý gì
-/// (bấm vào im lặng, không phản ứng). Gọi `chiaSeUngDung()` (Web Share
-/// API trên web, `share_plus` trên bản gốc — xem `chia_se_ung_dung.dart`)
-/// với link trang giới thiệu SEO ĐÚNG ngôn ngữ app hiện tại
-/// (`/gioi-thieu/vi` hoặc `/gioi-thieu/en`). Trả `false` CHỈ xảy ra trên
-/// web khi trình duyệt không hỗ trợ `navigator.share` — khi đó copy lời
-/// mời + link vào bộ nhớ tạm thay thế, báo bằng `hienThongBaoGiua`.
+/// (bấm vào im lặng, không phản ứng). Giờ mở `hienModalChiaSeUngDung`
+/// (xem `modal_chia_se_ung_dung.dart`) — modal xem trước nội dung mời +
+/// link trang giới thiệu SEO ĐÚNG ngôn ngữ app hiện tại
+/// (`/gioi-thieu/vi` hoặc `/gioi-thieu/en`), với 3 nút: chia sẻ qua ứng
+/// dụng khác (Web Share API/`share_plus`, `chiaSeUngDung()` trong
+/// `chia_se_ung_dung.dart`), sao chép nội dung chia sẻ đầy đủ, sao chép
+/// riêng link, mở link ở tab mới.
 Future<void> _chiaSeUngDung(BuildContext context) async {
   final nn = ngonNguHienTai.value;
   final url = 'https://flowrite.pro/gioi-thieu/${nn == NgonNgu.vi ? 'vi' : 'en'}';
   final loiMoi = Ch.loiMoiChiaSeUngDung(nn);
 
-  final daChiaSe = await chiaSeUngDung(
-    tieuDe: 'Flowrite',
-    vanBan: loiMoi,
-    url: url,
-  );
-  if (daChiaSe) return;
-
-  await Clipboard.setData(ClipboardData(text: '$loiMoi $url'));
-  if (!context.mounted) return;
-  hienThongBaoGiua(context, Ch.daCopyLoiMoiChiaSe(nn), ganTren: true);
+  hienModalChiaSeUngDung(context, tieuDe: 'Flowrite', vanBan: loiMoi, url: url);
 }
 
 /// Một từ khớp "Từ điển sửa lỗi chính tả của bạn" tìm được trong bài —
@@ -2487,6 +2479,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
       _dieuChinhVungToanVanSauKhiSua(v.batDau, v.ketThuc - v.batDau, 0);
       _ghiVaoO(moi, v.batDau);
     }
+    _henLuu();
     _luuVanBan();
     _capNhatKetQuaTimKiem();
   }
@@ -13569,6 +13562,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     // Trả mọi mốc về vạch xuất phát, nếu không thì câu nói kế tiếp lại nhắm
     // vào một vị trí không còn tồn tại.
     _ghiVaoO('', 0);
+    _henLuu();
     _neo = 0;
     _chuTam = '';
     _tuDaChotTrongPhien = [];
@@ -14678,6 +14672,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     _luuDiemMoc();
 
     _ghiVaoO(vanBanMoi, vanBanMoi.length);
+    _henLuu();
     _neo = vanBanMoi.length;
     _chuTam = '';
     _tuDaChotTrongPhien = [];
@@ -14802,6 +14797,7 @@ class _TrangSoanThaoState extends State<TrangSoanThao>
     final moi = vbHienTai.replaceRange(vung.start, vung.end, vanBanMoi);
     final viTriConTroMoi = vung.start + vanBanMoi.length;
     _ghiVaoO(moi, viTriConTroMoi);
+    _henLuu();
     _neo = viTriConTroMoi;
     await _luuVanBan();
     if (mounted) _nhapNhayToanVan(vung.start, viTriConTroMoi);
