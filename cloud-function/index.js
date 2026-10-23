@@ -245,6 +245,22 @@ const QUY_TAC_CHINH_TA_CHUNG =
   'Văn bản là hỗn hợp chữ từ HAI nguồn: gõ tay và giọng nói (voice-to-text). Chữ GÕ TAY ít khi sai ngữ cảnh nhưng có thể gõ nhầm phím thành từ sai chính tả. Chữ GIỌNG NÓI hầu như không bao giờ sai chính tả (bộ nhận dạng luôn trả về từ có nghĩa) nhưng RẤT DỄ sai NGỮ CẢNH vì nghe nhầm âm gần giống — ví dụ "con trỏ văn bản" bị nhận nhầm thành "con chó văn bản". Hãy cảnh giác hơn với những cụm nghe giống nhau về âm nhưng lệch hẳn về nghĩa so với mạch văn xung quanh, đó là loại lỗi giọng nói hay mắc nhất. ' +
   'Đề xuất thay thế được phép MANG THEO dấu câu bên trong nếu hợp lý, ví dụ "Nhà" có thể đề xuất thành "nhà," nếu sau đó là một mệnh đề khác, hoặc "người iu tới rùi" có thể đề xuất thành "Người yêu, tới rồi!".';
 
+/// Câu chỉ dẫn ngôn ngữ TRẢ LỜI ghép vào mọi prompt "làm việc với AI" (Tóm
+/// tắt/Mở rộng/Viết lại/Kiểm tra toàn văn/Kiểm tra chính tả...) — đọc từ
+/// field `ngonNguApp` client gửi kèm (mã ISO 'vi'/'en', xem `maIso6391` phía
+/// Flutter, `lib/ngon_ngu.dart`). Request CŨ chưa cập nhật client không gửi
+/// field này — coi như 'vi' để giữ nguyên hành vi trước đây (app vốn chỉ có
+/// tiếng Việt). Thêm ngôn ngữ mới chỉ cần thêm 1 case ở đây.
+function huongDanNgonNguAi(ngonNguApp) {
+  switch (ngonNguApp) {
+    case 'en':
+      return 'Trả lời bằng tiếng Anh (English). ';
+    case 'vi':
+    default:
+      return 'Trả lời bằng tiếng Việt. ';
+  }
+}
+
 /// Mỗi tính năng AI trong app ứng với một "hành động" ở đây. Muốn thêm tính
 /// năng mới thì thêm một case, không cần sửa gì khác.
 function huongDanTheoHanhDong(action) {
@@ -286,6 +302,7 @@ function moTaVungDaXuLy(vungDaXuLy) {
 function huongDanChiChinhTaToanVan(than) {
   const vungDaXuLy = Array.isArray(than.vungDaXuLy) ? than.vungDaXuLy : [];
   let huongDan =
+    huongDanNgonNguAi(than.ngonNguApp) +
     'Bạn là bộ kiểm tra CHÍNH TẢ tiếng Việt (không kiểm tra ngữ pháp, không kiểm tra văn phong, KHÔNG đề xuất đoạn nào cần thay thế hay xoá, KHÔNG tìm dấu câu thiếu) cho TOÀN BỘ văn bản sau đây. ' +
     QUY_TAC_CHINH_TA_CHUNG + ' ' +
     moTaVungDaXuLy(vungDaXuLy);
@@ -301,6 +318,7 @@ function huongDanChiChinhTaToanVan(than) {
 function huongDanChiDauCauToanVan(than) {
   const vungDaXuLy = Array.isArray(than.vungDaXuLy) ? than.vungDaXuLy : [];
   let huongDan =
+    huongDanNgonNguAi(than.ngonNguApp) +
     'Bạn soát TOÀN BỘ văn bản tiếng Việt sau đây, CHỈ tìm những chỗ CÒN THIẾU dấu câu (chấm, phẩy, hỏi, than, chấm phẩy, hai chấm, ba chấm, ngoặc đơn, ngoặc kép, gạch ngang, hoặc dấu khác bạn thấy cần) và đề xuất CHÈN THÊM vào — KHÔNG sửa chính tả, KHÔNG đề xuất đoạn nào cần thay thế hay xoá. ' +
     moTaVungDaXuLy(vungDaXuLy);
   huongDan +=
@@ -320,6 +338,7 @@ function huongDanToanVan(than) {
   const cauLenhTuyChinh = typeof than.cauLenhTuyChinh === 'string' ? than.cauLenhTuyChinh.trim() : '';
 
   let huongDan =
+    huongDanNgonNguAi(than.ngonNguApp) +
     'Bạn là biên tập viên tiếng Việt, soát lại TOÀN BỘ văn bản sau đây một cách kỹ lưỡng. ' +
     QUY_TAC_CHINH_TA_CHUNG + ' ' +
     moTaVungDaXuLy(vungDaXuLy);
@@ -367,7 +386,7 @@ function huongDanTomTat(than) {
   const huongDanNguoiDung =
     typeof than.huongDanNguoiDung === 'string' ? than.huongDanNguoiDung.trim() : '';
 
-  let huongDan = 'Tóm tắt đoạn văn bản tiếng Việt sau đây, giữ đúng ý chính. ';
+  let huongDan = huongDanNgonNguAi(than.ngonNguApp) + 'Tóm tắt đoạn văn bản sau đây, giữ đúng ý chính. ';
 
   if (phanTram != null) {
     huongDan +=
@@ -395,7 +414,8 @@ function huongDanMoRong(than) {
     typeof than.huongDanNguoiDung === 'string' ? than.huongDanNguoiDung.trim() : '';
 
   let huongDan =
-    'Mở rộng đoạn văn bản tiếng Việt sau đây, thêm chi tiết hợp lý, giữ nguyên văn phong gốc. ';
+    huongDanNgonNguAi(than.ngonNguApp) +
+    'Mở rộng đoạn văn bản sau đây, thêm chi tiết hợp lý, giữ nguyên văn phong gốc. ';
 
   if (phanTram != null) {
     huongDan +=
@@ -416,7 +436,8 @@ function huongDanVietLai(than) {
     typeof than.huongDanNguoiDung === 'string' ? than.huongDanNguoiDung.trim() : '';
 
   let huongDan =
-    'Viết lại đoạn văn bản tiếng Việt sau đây cho hay hơn, câu chữ mượt mà và tự nhiên hơn — KHÔNG đổi ý nghĩa gốc. ';
+    huongDanNgonNguAi(than.ngonNguApp) +
+    'Viết lại đoạn văn bản sau đây cho hay hơn, câu chữ mượt mà và tự nhiên hơn — KHÔNG đổi ý nghĩa gốc. ';
 
   if (huongDanNguoiDung) {
     huongDan +=
@@ -434,8 +455,8 @@ function huongDanVietLai(than) {
 /// giúp AI hiểu đúng nghĩa của từ đang xét hơn hẳn so với chỉ đưa một câu cộc
 /// lốc — một câu quá ngắn dễ khiến AI bỏ sót lỗi hoặc đề xuất sai vì không
 /// biết ngữ cảnh xung quanh.
-function huongDanChinhTa(boQuaTruocViTri, layLoiChinhTa, chenDauCau) {
-  let huongDan = '';
+function huongDanChinhTa(boQuaTruocViTri, layLoiChinhTa, chenDauCau, ngonNguApp) {
+  let huongDan = huongDanNgonNguAi(ngonNguApp);
 
   if (layLoiChinhTa) {
     huongDan +=
@@ -808,7 +829,7 @@ exports.flowriteAi = async (req, res) => {
   }
 
   const than = req.body || {};
-  const { action, text, boQuaTruocViTri, layLoiChinhTa, chenDauCau } = than;
+  const { action, text, boQuaTruocViTri, layLoiChinhTa, chenDauCau, ngonNguApp } = than;
   const { id: idNguoiGoi, dangNhap } = layDinhDanhNguoiGoi(than);
 
   // Nhánh riêng cho ghi âm: gửi lên là DỮ LIỆU ÂM THANH, không phải `text`,
@@ -972,6 +993,7 @@ exports.flowriteAi = async (req, res) => {
       Number.isInteger(boQuaTruocViTri) && boQuaTruocViTri > 0 ? boQuaTruocViTri : 0,
       layLoiChinhTa !== false, // mặc định true — giữ tương thích ngược
       chenDauCau === true,
+      ngonNguApp,
     );
   } else if (action === 'toan_van') {
     if (than.loaiKiemTra === 'chinh_ta') {
