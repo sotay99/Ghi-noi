@@ -63,6 +63,8 @@ on:
       - 'lib/mo_lien_ket_ngoai_web.dart'
       - 'lib/mo_lien_ket_ngoai_io.dart'
       - 'web_static/chia-se-tep.html'
+      - 'web_static/gioi-thieu-vi.html'
+      - 'web_static/gioi-thieu-en.html'
       - '.github/workflows/deploy-web-full.yml'
   workflow_dispatch:
 
@@ -134,6 +136,16 @@ jobs:
       - name: Chép trang tĩnh "Chia sẻ tệp bằng đường link"
         run: cp web_static/chia-se-tep.html build/web/chia-se-tep.html
 
+      # (YÊU CẦU MỚI — trang giới thiệu SEO) HTML tĩnh THẬT (không phải
+      # Flutter) để Google index tốt — đặt dưới /gioi-thieu/vi và
+      # /gioi-thieu/en (path segment, không phải ?lang=), rewrite ở bước
+      # "Tạo cấu hình Firebase Hosting" bên dưới trỏ TRƯỚC rule "**".
+      - name: Chép trang tĩnh "Giới thiệu" (SEO, đa ngôn ngữ)
+        run: |
+          mkdir -p build/web/gioi-thieu/vi build/web/gioi-thieu/en
+          cp web_static/gioi-thieu-vi.html build/web/gioi-thieu/vi/index.html
+          cp web_static/gioi-thieu-en.html build/web/gioi-thieu/en/index.html
+
       # Đưa thẳng lên channel "live" — địa chỉ chính flowrite219.web.app,
       # vĩnh viễn, không hết hạn (khác channel xem trước "day-du"/tên nhánh,
       # gia hạn 7-30 ngày mỗi lần đẩy nhưng vẫn có ngày hết nếu ngừng đẩy).
@@ -147,6 +159,8 @@ jobs:
               "public": "build/web",
               "ignore": ["firebase.json", "**/.*"],
               "rewrites": [
+                { "source": "/gioi-thieu/vi", "destination": "/gioi-thieu/vi/index.html" },
+                { "source": "/gioi-thieu/en", "destination": "/gioi-thieu/en/index.html" },
                 { "source": "/:ma", "destination": "/chia-se-tep.html" },
                 { "source": "**", "destination": "/index.html" }
               ],
