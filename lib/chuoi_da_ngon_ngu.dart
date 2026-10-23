@@ -23,6 +23,13 @@ class Ch {
   static String nutHuongDanDayDu(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Hướng dẫn sử dụng' : 'User guide';
 
+  /// Nút duy nhất của hàng phụ hiện ra ở màn hình RẤT hẹp (xem
+  /// `_hangPhuHuongDanKhiRatHep`, `thanh_cong_cu.dart`) — tên đầy đủ hơn
+  /// `nutHuongDan`/`nutHuongDanDayDu` vì đây là nút DUY NHẤT còn lại thay
+  /// thế cả hàng chính lúc đó, cần rõ nghĩa hơn.
+  static String nutHuongDanVaMeoSuDung(NgonNgu nn) =>
+      nn == NgonNgu.vi ? 'Hướng dẫn và mẹo sử dụng' : 'Guide and usage tips';
+
   static String nutLamViecVoiAi(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Làm việc với AI' : 'Work with AI';
 
@@ -62,8 +69,12 @@ class Ch {
   static String kiemTraToanVan(NgonNgu nn) =>
       nn == NgonNgu.vi ? 'Kiểm tra toàn văn' : 'Check whole text';
 
+  /// Tên mục "Trò chuyện" trong menu Tài khoản-Cài đặt — CỐ Ý ngắn gọn ở
+  /// MỌI ngôn ngữ (không kèm "với AI"/"with AI"): đây là ý nghĩa gốc của
+  /// tính năng, không phải vấn đề dịch thuật — thêm ngôn ngữ mới cũng theo
+  /// đúng tinh thần ngắn gọn này.
   static String troChuyen(NgonNgu nn) =>
-      nn == NgonNgu.vi ? 'Trò chuyện với AI' : 'Chat';
+      nn == NgonNgu.vi ? 'Trò chuyện' : 'Chat';
 
   // ----------------------------------------------------- Menu "Thêm lựa chọn"
   static String tuDienNhapLieuNhanh(NgonNgu nn) =>

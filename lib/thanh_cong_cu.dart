@@ -721,7 +721,7 @@ class ThanhCongCu extends StatelessWidget {
       ),
       child: _NutRong(
         bieuTuong: Icons.help_outline_rounded,
-        nhan: 'Hướng dẫn và mẹo sử dụng',
+        nhan: Ch.nutHuongDanVaMeoSuDung(ngonNguHienTai.value),
         khiBam: khiBamHuongDan,
       ),
     );
