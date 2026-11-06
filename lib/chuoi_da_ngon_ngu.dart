@@ -2672,9 +2672,6 @@ class Ch {
       ? '\nApp luôn tự động lưu nội dung soạn thảo'
       : '\nThe App always auto-saves your writing';
 
-  static String apkRaMatNgay10Thang11(NgonNgu nn) => nn == NgonNgu.vi
-      ? 'Bản APK trên Android sẽ ra mắt vào ngày 10/11/2026.'
-      : 'The Android APK will be released on November 10, 2026.';
 }
 
 // CÒN TỒN ĐỌNG (chưa bọc đa ngôn ngữ, để nguyên tiếng Việt — việc cho lượt

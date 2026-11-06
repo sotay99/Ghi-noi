@@ -8,7 +8,7 @@
 import 'package:flutter/material.dart';
 
 import 'chuoi_da_ngon_ngu.dart';
-import 'modal_apk_chua_ra_mat.dart';
+import 'mo_lien_ket_ngoai.dart';
 import 'ngon_ngu.dart';
 
 void moModalCaiDatUngDung(BuildContext context) {
@@ -99,7 +99,8 @@ class _TrangCaiDatUngDung extends StatelessWidget {
                   context,
                   Ch.thongBaoAndroidChuaLenChPlay(ngonNguHienTai.value),
                 ),
-                khiBamTaiApk: () => hienModalApkChuaRaMat(context),
+                khiBamTaiApk: () =>
+                    moLienKetNgoai('https://github.com/sotay99/ghi-noi/releases/latest'),
               ),
             ],
           ),
