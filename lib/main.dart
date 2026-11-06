@@ -113,7 +113,18 @@ class _UngDungFlowriteState extends State<UngDungFlowrite> {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1A73E8)),
+        // Bảng màu lấy ĐÚNG 3 màu thật trong assets/logo.png (đo bằng
+        // ImageMagick): #1A73E8 (nền logo, giữ làm seed — không đổi),
+        // #0B3D91 (cây bút, navy đậm — gán cho `secondary` thay vì để
+        // Material tự suy ra một sắc độ không liên quan logo), #AEC9F7
+        // (góc gấp giấy, xanh nhạt — gán cho `secondaryContainer`) để các
+        // điểm nhấn phụ của app bám sát đúng bộ nhận diện logo thay vì màu
+        // suy diễn chung chung.
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1A73E8))
+            .copyWith(
+          secondary: const Color(0xFF0B3D91),
+          secondaryContainer: const Color(0xFFAEC9F7),
+        ),
         scaffoldBackgroundColor: Colors.white,
       ),
       // (YÊU CẦU MỚI) Bọc TOÀN APP trong một `SelectionArea` DUY NHẤT — tên

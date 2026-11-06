@@ -95,7 +95,14 @@ class _UngDungFlowriteWebDayDuState extends State<UngDungFlowriteWebDayDu> {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1A73E8)),
+        // Xem giải thích đầy đủ ở `main.dart` — bảng màu lấy đúng 3 màu
+        // thật trong assets/logo.png (#1A73E8 seed, #0B3D91 secondary,
+        // #AEC9F7 secondaryContainer) thay vì để Material tự suy ra.
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1A73E8))
+            .copyWith(
+          secondary: const Color(0xFF0B3D91),
+          secondaryContainer: const Color(0xFFAEC9F7),
+        ),
         scaffoldBackgroundColor: Colors.white,
       ),
       // (YÊU CẦU MỚI) Xem giải thích đầy đủ ở `main.dart` — bọc toàn app
